@@ -1,0 +1,6 @@
+# build folder
+*/build/*
+
+# emacs
+*~
+\#*\#

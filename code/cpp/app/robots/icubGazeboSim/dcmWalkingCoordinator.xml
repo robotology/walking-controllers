@@ -1,0 +1,65 @@
+<!-- Copyright (C) 2018 Fondazione Istituto Italiano di Tecnologia (IIT) -->
+<!-- All Rights Reserved. -->
+<!-- Authors: Giulio Romualdi <giulio.romualdi@iit.it> -->
+
+<application>
+
+  <name>DCM walking coordinator (icubGazeboSim)</name>
+  <description>2D-DCM walking application.</description>
+  <version>1.0</version>
+  <authors>
+    <author email="giulio.romualdi@iit.it">Giulio Romualdi</author>
+  </authors>
+
+  <module>
+    <name>gzserver</name>
+    <parameters>-slibgazebo_yarp_clock.so icub.world</parameters>
+    <node>localhost</node>
+  </module>
+
+  <module>
+    <name>gzclient</name>
+    <parameters></parameters>
+    <node>localhost</node>
+  </module>
+
+  <module>
+    <name>WalkingModule</name>
+    <node>localhost</node>
+    <environment>YARP_CLOCK=/clock</environment>
+  </module>
+
+  <module>
+    <name>WalkingLoggerModule</name>
+    <node>localhost</node>
+    <environment>YARP_CLOCK=/clock</environment>
+  </module>
+
+  <module>
+    <name>yarprobotinterface</name>
+    <node>localhost</node>
+    <parameters>--config launch-wholebodydynamics.xml</parameters>
+    <environment>YARP_CLOCK=/clock</environment>
+  </module>
+
+  <connection>
+    <from>/wholeBodyDynamics/left_foot/cartesianEndEffectorWrench:o</from>
+    <to>/walking-coordinator/leftFootWrench:i</to>
+  </connection>
+
+  <connection>
+    <from>/wholeBodyDynamics/right_foot/cartesianEndEffectorWrench:o</from>
+    <to>/walking-coordinator/rightFootWrench:i</to>
+  </connection>
+
+  <connection>
+    <from>/walking-coordinator/logger/data:o</from>
+    <to>/logger/data:i</to>
+  </connection>
+
+  <connection>
+    <from>/walking-coordinator/logger/rpc:o</from>
+    <to>/logger/rpc:i</to>
+  </connection>
+
+</application>
