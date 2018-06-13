@@ -96,9 +96,10 @@ class WalkingPIDHandler {
     PIDPhase m_previousPhase;
     int m_currentPIDIndex;
     int m_desiredPIDIndex;
-    double m_firmwareDelay;
-    double m_smoothingTime;
+    double m_firmwareDelay, m_smoothingTime, m_maximumContactDelay;
     yarp::os::Bottle m_remoteControlBoards; //to be removed when the gain scheduling has a proper interface to set the smoothing times.
+    std::deque<bool> m_leftIsFixedModified, m_rightIsFixedModified;
+    double m_dT;
 
     std::mutex m_mutex;
     std::condition_variable m_conditionVariable;
@@ -136,18 +137,24 @@ class WalkingPIDHandler {
 
     bool setGeneralSmoothingTime(double smoothingTime);
 
+    bool modifyFixedLists(std::deque<bool> &leftIsFixed, std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed);
+
 public:
     WalkingPIDHandler();
 
     ~WalkingPIDHandler();
 
-    bool initialize(const yarp::os::Bottle& PIDSettings, yarp::dev::PolyDriver& robotDriver, yarp::os::Bottle& remoteControlBords);
+    bool initialize(const yarp::os::Bottle& PIDSettings, yarp::dev::PolyDriver& robotDriver, yarp::os::Bottle& remoteControlBords, double dT);
+
+    bool setMaximumContactDelay(double maxContactDelay);
 
     bool restorePIDs();
 
     bool usingGainScheduling();
 
     bool updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, double time);
+
+    bool updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed, double time);
 
     bool reset();
 

@@ -324,6 +324,173 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     return true;
 }
 
+bool WalkingModule::configureReactiveGainScheduling(const yarp::os::Searchable &config)
+{
+    if (config.isNull()){
+        m_useReactiveGainScheduling = false;
+        return true;
+    }
+
+    m_leftIsActuallyFixed = true;
+    m_rightIsActuallyFixed = true;
+    m_leftPreviousDesiredWasFixed = true;
+    m_rightPreviousDesiredWasFixed = true;
+
+    m_minNormalForce = config.check("normalForceThreshold", yarp::os::Value(1.0)).asDouble();
+
+    if (m_minNormalForce <= 0) {
+        yError() << "The normalForceThreshold parameter has to be strictly positive";
+        return false;
+    }
+
+    m_localCOPThreshold = config.check("localCOPThreshold", yarp::os::Value(1.0)).asDouble();
+
+    if (m_localCOPThreshold <= 0) {
+        yError() << "The localCOPThreshold parameter has to be strictly positive";
+        return false;
+    }
+
+    m_stableContactMinDuration = config.check("stableContactMinDuration", yarp::os::Value(0.0)).asDouble();
+    double maximumContactDelay = config.check("maximumContactDelay", yarp::os::Value(0.1)).asDouble();
+
+    m_timeBeforeEarlyContact = config.check("timeBeforeEarlyContact", yarp::os::Value(0.1)).asDouble();
+
+    if (m_timeBeforeEarlyContact < 0) {
+        yError() << " The timeBeforeEarlyContact parameter is supposed to be non-negative.";
+        return false;
+    }
+
+    m_leftSwingDuration = 0.0;
+    m_rightSwingDuration = 0.0;
+    m_leftTimeMismatch = 0.0;
+    m_rightTimeMismatch = 0.0;
+
+    if (!m_PIDHandler->setMaximumContactDelay(maximumContactDelay)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool WalkingModule::checkLeftContactActivationConditions()
+{
+    if (m_leftWrench.getLinearVec3()(2) > m_minNormalForce) { //condition on the normal force satisfied
+        double localZMPNorm, xZMP, yZMP;
+        xZMP = -m_leftWrench.getAngularVec3()(1) / m_leftWrench.getLinearVec3()(2);
+        yZMP = m_leftWrench.getAngularVec3()(0) / m_leftWrench.getLinearVec3()(2);
+        localZMPNorm = std::sqrt(std::pow(xZMP, 2) + std::pow(yZMP, 2));
+        return (localZMPNorm < m_localCOPThreshold); //condition on the cop satisfied
+    }
+    return false;
+}
+
+bool WalkingModule::checkRightContactActivationConditions()
+{
+    if (m_rightWrench.getLinearVec3()(2) > m_minNormalForce) { //condition on the normal force satisfied
+        double localZMPNorm, xZMP, yZMP;
+        xZMP = -m_rightWrench.getAngularVec3()(1) / m_rightWrench.getLinearVec3()(2);
+        yZMP = m_rightWrench.getAngularVec3()(0) / m_rightWrench.getLinearVec3()(2);
+        localZMPNorm = std::sqrt(std::pow(xZMP, 2) + std::pow(yZMP, 2));
+        return (localZMPNorm < m_localCOPThreshold); //condition on the cop satisfied
+    }
+    return false;
+}
+
+bool WalkingModule::checkContactsState(bool plannedLeftState, bool plannedRightState)
+{
+    //left part
+    if (plannedLeftState){
+        m_leftSwingDuration = -0.01; //If negative this counter stops increasing
+    }
+
+    if (plannedRightState) {
+        m_rightSwingDuration = -0.01; //If negative this counter stops increasing
+    }
+
+    if (plannedLeftState && !m_leftIsActuallyFixed) { //possible late activation
+        if (checkLeftContactActivationConditions()) {
+            m_stableContactTimeLeft += m_dT;
+
+            if (m_stableContactTimeLeft >= m_stableContactMinDuration) { //condition on time satisfied
+                m_leftIsActuallyFixed = true;
+                yInfo() << "Late left contact (" << m_leftTimeMismatch << "s).";
+                m_leftTimeMismatch = 0.0;
+            }
+        } else {
+            m_stableContactTimeLeft = 0;
+            m_leftTimeMismatch += m_dT;
+        }
+    } else if (!plannedLeftState && !m_leftIsActuallyFixed && (m_leftSwingDuration > m_timeBeforeEarlyContact)) { //possible early activation
+        if (checkLeftContactActivationConditions()) { //condition on the cop satisfied
+            m_stableContactTimeLeft += m_dT;
+
+            if (m_stableContactTimeLeft >= m_stableContactMinDuration) { //condition on time satisfied
+                m_leftIsActuallyFixed = true;
+                yInfo() << "Early left contact (" << m_leftTimeMismatch << "s).";
+                m_leftTimeMismatch = 0.0;
+            }
+
+        } else {
+            m_stableContactTimeLeft = 0;
+            m_leftTimeMismatch += m_dT;
+        }
+    } else if (m_leftPreviousDesiredWasFixed && !plannedLeftState){ //Deactivation is still automatic
+        m_leftIsActuallyFixed = plannedLeftState;
+        m_stableContactTimeLeft = 0; //reset;
+        m_leftSwingDuration = 0.0; //swing starts
+    }
+
+    //right part
+
+    if (plannedRightState && !m_rightIsActuallyFixed) { //possible late activation
+        if (checkRightContactActivationConditions()) { //condition on the normal force satisfied
+            m_stableContactTimeRight += m_dT;
+
+            if (m_stableContactTimeRight >= m_stableContactMinDuration) { //condition on time satisfied
+                m_rightIsActuallyFixed = true;
+                yInfo() << "Late right contact (" << m_rightTimeMismatch << "s).";
+                m_rightTimeMismatch = 0.0;
+            }
+
+        } else {
+            m_stableContactTimeRight = 0;
+            m_rightTimeMismatch += m_dT;
+        }
+    } else if (!plannedRightState && !m_rightIsActuallyFixed && (m_rightSwingDuration > m_timeBeforeEarlyContact)) { //possible early activation
+        if (checkRightContactActivationConditions()) { //condition on the normal force satisfied
+            m_stableContactTimeRight += m_dT;
+
+            if (m_stableContactTimeRight >= m_stableContactMinDuration) { //condition on time satisfied
+                m_rightIsActuallyFixed = true;
+                yInfo() << "Early right contact (" << m_rightTimeMismatch << "s).";
+                m_rightTimeMismatch = 0.0;
+            }
+
+        } else {
+            m_stableContactTimeRight = 0;
+            m_rightTimeMismatch += m_dT;
+        }
+
+    } else if (m_rightPreviousDesiredWasFixed && !plannedRightState){ //Deactivation is still automatic
+        m_rightIsActuallyFixed = plannedRightState;
+        m_stableContactTimeRight = 0; //reset;
+        m_rightSwingDuration = 0.0; //swing starts
+    }
+
+    if (m_leftSwingDuration >= 0.0) {
+        m_leftSwingDuration += m_dT;
+    }
+
+    if (m_rightSwingDuration >= 0.0) {
+        m_rightSwingDuration += m_dT;
+    }
+
+    m_leftPreviousDesiredWasFixed = plannedLeftState;
+    m_rightPreviousDesiredWasFixed = plannedRightState;
+
+    return true;
+}
+
 bool WalkingModule::configureForceTorqueSensors(const yarp::os::Searchable& config)
 {
     std::string portInput, portOutput;
@@ -529,7 +696,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // set PIDs gains
     m_PIDHandler = std::make_unique<WalkingPIDHandler>();
     yarp::os::Bottle& pidOptions = rf.findGroup("PID");
-    if (!m_PIDHandler->initialize(pidOptions, m_robotDevice, m_remoteControlBoards))
+
+    yarp::os::Bottle& reactiveGSOptions = pidOptions.findGroup("REACTIVE_GAIN_SCHEDULING");
+    if (!configureReactiveGainScheduling(reactiveGSOptions)) {
+        yError() << "[configure] Failed to configure the Reactive Gain Scheduling option.";
+        return false;
+    }
+
+    if (!m_PIDHandler->initialize(pidOptions, m_robotDevice, m_remoteControlBoards, m_dT))
     {
         yError() << "[configure] Failed to configure the PIDs.";
         return false;
@@ -724,10 +898,22 @@ bool WalkingModule::updateModule()
 
         if (m_PIDHandler->usingGainScheduling())
         {
-            if (!m_PIDHandler->updatePhases(m_leftInContact, m_rightInContact, m_time))
-            {
-                yError() << "[updateModule] Unable to get the update PID.";
-                return false;
+            if (m_useReactiveGainScheduling) {
+                if (!checkContactsState(m_leftInContact.front(), m_rightInContact.front())) {
+                    yError() << "[updateModule] Error while checking the current contact state.";
+                    return false;
+                }
+                if (!m_PIDHandler->updatePhases(m_leftInContact, m_rightInContact, m_leftIsActuallyFixed, m_rightIsActuallyFixed, m_time))
+                {
+                    yError() << "[updateModule] Unable to get the update PID.";
+                    return false;
+                }
+            } else {
+                if (!m_PIDHandler->updatePhases(m_leftInContact, m_rightInContact, m_time))
+                {
+                    yError() << "[updateModule] Unable to get the update PID.";
+                    return false;
+                }
             }
         }
 

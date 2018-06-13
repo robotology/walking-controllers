@@ -169,6 +169,17 @@ class WalkingModule:
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
     size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
+    bool m_useReactiveGainScheduling; /**< Gain scheduling will depends on the actual contacts state. */
+    double m_minNormalForce; /**< Minimum normal force to consider a contact active. */
+    double m_localCOPThreshold; /**< Maximum distance of the local COP from the origin of the foot frame to consider a contact active. */
+    double m_stableContactMinDuration; /**< Time during which all the conditions should remain true before considering a contact active. */
+    double  m_stableContactTimeLeft, m_stableContactTimeRight; /**< Define for how long the corresponding contact has remained stable. */
+    bool m_leftIsActuallyFixed, m_rightIsActuallyFixed; /**< Actual states of contacts. */
+    bool m_leftPreviousDesiredWasFixed, m_rightPreviousDesiredWasFixed; /**< Save the contact state coming the planner used at the previous instant. */
+    double m_timeBeforeEarlyContact; /**< Save the time to wait before triggering an early contact. */
+    double m_leftSwingDuration, m_rightSwingDuration; /**< Save how much time has passed during the swing to avoid too early contacts. */
+    double m_leftTimeMismatch, m_rightTimeMismatch; /**< Save how much time the contacts are late/early. */
+
     std::mutex m_mutex; /**< Mutex. */
 
     iDynTree::Vector2 m_desiredPosition;
@@ -190,6 +201,33 @@ class WalkingModule:
      * @return true in case of success and false otherwise.
      */
     bool configureRobot(const yarp::os::Searchable& config);
+
+    /**
+     * Configure the reactive gain scheduling
+     * @param config is the reference to a resource finder object.
+     * @return true in case of success and false otherwise.
+     */
+    bool configureReactiveGainScheduling(const yarp::os::Searchable& config);
+
+    /**
+     * Check if the conditions to consider the left contact active are satisfied or not.
+     * @return True if the conditions are all satisfied.
+     */
+    bool checkLeftContactActivationConditions();
+
+    /**
+     * Check if the conditions to consider the right contact active are satisfied or not.
+     * @return True if the conditions are all satisfied.
+     */
+    bool checkRightContactActivationConditions();
+
+    /**
+     * Check the state of the contacts given some conditions on the measured normal forces
+     * @param plannedLeftState defines the contact state for the left foot coming from the planner
+     * @param plannedRightState defines the contact state for the right foot coming from the planner
+     * @return true in case of success and false otherwise.
+     */
+    bool checkContactsState(bool plannedLeftState, bool plannedRightState);
 
     /**
      * Get the name of the controlled joints from the resource finder

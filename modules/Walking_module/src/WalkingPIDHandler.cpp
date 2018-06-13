@@ -24,14 +24,16 @@
 #include <cmath>
 
 WalkingPIDHandler::WalkingPIDHandler()
-    :m_useGainScheduling(false)
-    ,m_pidInterface(nullptr)
-    ,m_phaseInitTime(0.0)
-    ,m_previousPhase(PIDPhase::Default)
-    ,m_currentPIDIndex(-1) //DEFAULT
-    ,m_desiredPIDIndex(-1)
-    ,m_firmwareDelay(0.0)
-    ,m_smoothingTime(1.0)
+    : m_useGainScheduling(false)
+    , m_pidInterface(nullptr)
+    , m_phaseInitTime(0.0)
+    , m_previousPhase(PIDPhase::Default)
+    , m_currentPIDIndex(-1) //DEFAULT
+    , m_desiredPIDIndex(-1)
+    , m_firmwareDelay(0.0)
+    , m_smoothingTime(1.0)
+    , m_maximumContactDelay(0.1)
+    , m_dT(0.01)
 {
 }
 
@@ -187,6 +189,10 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
                 double activationOffset = group->check("activationOffset", yarp::os::Value(0.0)).asDouble();
 //                double smoothingTime = group->check("smoothingTime", yarp::os::Value(1.0)).asDouble(); //For the time being we use a common smoothingTime
 
+                if ((phase == PIDPhase::Switch) && (activationOffset < (m_maximumContactDelay - m_firmwareDelay))) {
+                    yWarning() << "If the activationOffset of "<< name << " is lower than (maximumContactDelay - firmwareDelay). The group may be triggered too in advance in case of late activation of the contact.";
+                }
+
                 PIDmap groupMap;
                 if (!parsePIDGroup(group, groupMap))
                     return false;
@@ -194,10 +200,16 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
                 m_PIDs.insert(m_PIDs.end(), PIDSchedulingObject(name, phase, activationOffset, groupMap));
 
                 if (!(m_PIDs.back().setSmoothingTime(m_smoothingTime))){ //For the time being we use a common smoothingTime
-                    yError() << "Failed is setting smoothingTime for group " << name <<".";
+                    yError() << "Failed while setting smoothingTime for group " << name <<".";
                     m_PIDs.pop_back();
                     return false;
                 }
+                if (!(m_PIDs.back().setPeriod(m_dT))) {
+                    yError() << "Failed while setting the period for group " << name << ".";
+                    m_PIDs.pop_back();
+                    return false;
+                }
+
             }
         }
     }
@@ -414,6 +426,54 @@ bool WalkingPIDHandler::setGeneralSmoothingTime(double smoothingTime)
     return true;
 }
 
+bool WalkingPIDHandler::modifyFixedLists(std::deque<bool> &leftIsFixed, std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    unsigned int delayInstants = static_cast<unsigned int>(std::round(m_maximumContactDelay/m_dT));
+
+    if ((leftIsFixed.front() == leftIsActuallyFixed) && (rightIsFixed.front() == rightIsActuallyFixed))
+        return true;
+
+    if (leftIsFixed.front() && rightIsFixed.front()) { //possible late activation
+        if (leftIsActuallyFixed && !rightIsActuallyFixed) {
+            size_t i = 0;
+            while ((i <= delayInstants) && ((i+1) < leftIsFixed.size()) && (leftIsFixed[i+1])) { //avoid that both feet are not in contact
+                rightIsFixed[i] = false;
+                ++i;
+            }
+        } else if (rightIsActuallyFixed && !leftIsActuallyFixed) {
+            size_t i = 0;
+            while ((i <= delayInstants) && ((i+1) < rightIsFixed.size()) && (rightIsFixed[i+1])) { //avoid that both feet are not in contact
+                leftIsFixed[i] = false;
+                ++i;
+            }
+        } else {
+            yError() << "Is the robot jumping alredy?";
+            return false;
+        }
+    } else if (leftIsActuallyFixed && rightIsActuallyFixed && (m_previousPhase != PIDPhase::Switch)) { //possible early activation (avoiding late deactivation by checking the previous phase)
+        if (leftIsFixed.front() && !rightIsFixed.front()) {
+            size_t i = 0;
+            while (((i+1) < rightIsFixed.size()) && !(rightIsFixed[i+1])) { //keep rightIsFixed equal to true for at least one instant
+                rightIsFixed[i] = true;
+                ++i;
+            }
+        } else if (rightIsFixed.front() && !leftIsFixed.front()) {
+            size_t i = 0;
+            while (((i+1) < leftIsFixed.size()) && !(leftIsFixed[i+1])) { //keep leftIsFixed equal to true for at least one instant
+                leftIsFixed[i] = true;
+                ++i;
+            }
+        } else {
+            yError() << "Is the robot jumping alredy?";
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool WalkingPIDHandler::getAxisMap()
 {
     m_axisMap.clear();
@@ -566,7 +626,7 @@ bool WalkingPIDHandler::isPIDElement(const yarp::os::Value &groupElement)
     return yes;
 }
 
-bool WalkingPIDHandler::initialize(const yarp::os::Bottle &PIDSettings, yarp::dev::PolyDriver &robotDriver, yarp::os::Bottle& remoteControlBords)
+bool WalkingPIDHandler::initialize(const yarp::os::Bottle &PIDSettings, yarp::dev::PolyDriver &robotDriver, yarp::os::Bottle& remoteControlBords, double dT)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -574,6 +634,13 @@ bool WalkingPIDHandler::initialize(const yarp::os::Bottle &PIDSettings, yarp::de
 
     m_originalPID.clear();
     m_defaultPID.clear();
+
+    if (dT <= 0){
+        yError() << "The parameter dT is supposed to be positive.";
+        return false;
+    }
+
+    m_dT = dT;
 
     if (!PIDSettings.isNull()) {
         yInfo("Loading custom PIDs");
@@ -630,7 +697,8 @@ bool WalkingPIDHandler::initialize(const yarp::os::Bottle &PIDSettings, yarp::de
             /*if (!getSmoothingTimes(m_originalSmoothingTimesInMs)) { //to be restored once the gain scheduling has a proper interface to get the smoothing times
               yError() << "Error while retrieving the original smoothing times. Deactivating gain scheduling.";
               m_useGainScheduling = false;
-              } else */if (!setGeneralSmoothingTime(m_smoothingTime)) {
+              } else */
+            if (!setGeneralSmoothingTime(m_smoothingTime)) {
                 yError() << "Error while setting the default smoothing time. Deactivating gain scheduling.";
                 m_useGainScheduling = false;
             } else {
@@ -639,6 +707,17 @@ bool WalkingPIDHandler::initialize(const yarp::os::Bottle &PIDSettings, yarp::de
         }
 
     }
+    return true;
+}
+
+bool WalkingPIDHandler::setMaximumContactDelay(double maxContactDelay)
+{
+    if (maxContactDelay < 0) {
+        yError() << " The maxContactDelay parameter is supposed to be non negative.";
+        return false;
+    }
+
+    m_maximumContactDelay = maxContactDelay;
     return true;
 }
 
@@ -709,6 +788,30 @@ bool WalkingPIDHandler::updatePhases(const std::deque<bool> &leftIsFixed, const 
     m_conditionVariable.notify_one();
 
     return true;
+}
+
+bool WalkingPIDHandler::updatePhases(const std::deque<bool> &leftIsFixed, const std::deque<bool> &rightIsFixed, bool leftIsActuallyFixed, bool rightIsActuallyFixed, double time)
+{
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        if ((leftIsFixed.size() == 0) || (rightIsFixed.size() == 0)) {
+            yError() << "Empty list of contacts.";
+            return false;
+        }
+        if (leftIsFixed.size() != rightIsFixed.size()){
+            yError() << "Incongruous dimension of the leftIsFixed and rightIsFixed vectors.";
+            return false;
+        }
+        m_leftIsFixedModified = leftIsFixed;
+        m_rightIsFixedModified = rightIsFixed;
+    }
+
+    if (!modifyFixedLists(m_leftIsFixedModified, m_rightIsFixedModified, leftIsActuallyFixed, rightIsActuallyFixed)){
+        yError() << "Error while modying the list of contacts.";
+        return false;
+    }
+
+    return updatePhases(m_leftIsFixedModified, m_rightIsFixedModified, time);
 }
 
 bool WalkingPIDHandler::reset()
