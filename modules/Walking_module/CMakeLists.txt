@@ -1,3 +1,7 @@
+# Copyright (C) 2018 Fondazione Istituto Italiano di Tecnologia (IIT)
+# All Rights Reserved.
+# Authors: Giulio Romualdi <giulio.romualdi@iit.it>
+
 # set target name
 set(EXE_TARGET_NAME WalkingModule)
 
@@ -10,29 +14,14 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
   DEPENDS ENABLE_RPATH
   USE_LINK_PATH)
 
+# Find required package
+find_package(ICUB REQUIRED)
 find_package(UnicyclePlanner REQUIRED)
 find_package(OsqpEigen REQUIRED)
+find_package(qpOASES REQUIRED)
+find_package(Threads REQUIRED)
 
 include(FindPackageHandleStandardArgs)
-
-find_path(qpOASES_INCLUDEDIR
-  NAMES qpOASES.hpp
-  HINTS "${qpOASES_SOURCE_DIR}"
-  ENV qpOASES_SOURCE_DIR
-  PATH_SUFFIXES include)
-find_library(qpOASES_LIB
-  NAMES qpOASES
-  HINTS "${qpOASES_BINARY_DIR}"
-  ENV qpOASES_BINARY_DIR
-  PATH_SUFFIXES lib
-  libs)
-
-set(qpOASES_INCLUDE_DIRS ${qpOASES_INCLUDEDIR})
-set(qpOASES_LIBRARIES ${qpOASES_LIB})
-
-find_package_handle_standard_args(qpOASES DEFAULT_MSG qpOASES_LIBRARIES
-  qpOASES_INCLUDE_DIRS)
-set(qpOASES_FOUND ${QPOASES_FOUND})
 
 # set cpp files
 set(${EXE_TARGET_NAME}_SRC
@@ -93,11 +82,12 @@ add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}
 target_link_libraries(${EXE_TARGET_NAME}
   ${YARP_LIBRARIES}
   ${iDynTree_LIBRARIES}
+  ctrlLib
   UnicyclePlanner
   OsqpEigen::OsqpEigen
   osqp::osqp
   icubWalking-service
-  pthread
+  Threads::Threads
   ${qpOASES_LIBRARIES})
 
 install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
