@@ -17,6 +17,7 @@
 
 // iCub-ctrl
 #include <iCub/ctrl/pids.h>
+#include <iCub/ctrl/minJerkCtrl.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -29,8 +30,14 @@
  */
 class WalkingZMPController
 {
-    double m_kZMP; /**< Controller gain. */
-    double m_kCoM; /**< Controller gain. */
+    double m_kZMP; /**< CoM controller gain. */
+    double m_kCoM; /**< ZMP controller gain. */
+
+    double m_kCoMWalking; /**< Desired CoM controller gain during the walking phase. */
+    double m_kZMPWalking; /**< Desired ZMP controller gain during the walking phase. */
+
+    double m_kCoMStance; /**< Desired CoM controller gain during the stance phase. */
+    double m_kZMPStance; /**< Desired ZMP controller gain during the stance phase. */
 
     bool m_controlEvaluated; /**< True if the control output was correctly evaluated. */
 
@@ -49,6 +56,12 @@ class WalkingZMPController
      */
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
+    bool m_useGainScheduling; /**< True of the gain scheduling is used.*/
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kZMPSmoother; /**< Minimum jerk trajectory for the
+                                                                   ZMP gain. */
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kCoMSmoother; /**< Minimum jerk trajectory for the
+                                                                   CoM gain. */
+
 public:
 
     /**
@@ -65,6 +78,12 @@ public:
      */
     void setFeedback(const iDynTree::Vector2& zmpFeedback,
                      const iDynTree::Position& comFeedback);
+
+    /**
+     * set the phase (Walking or stance)
+     * @param isStancePhase true if the current phase is the stance phase.
+     */
+    void setPhase(const bool& isStancePhase);
 
     /**
      * Set the desired reference signals.

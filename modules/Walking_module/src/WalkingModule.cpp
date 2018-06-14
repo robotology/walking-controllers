@@ -86,12 +86,20 @@ bool WalkingModule::propagateReferenceSignals()
     // as soon as possible.
     if(!m_mergePoints.empty())
     {
+        m_stancePhase = false;
         for(auto& mergePoint : m_mergePoints)
             mergePoint--;
 
         if(m_mergePoints[0] == 0)
             m_mergePoints.pop_front();
     }
+    else
+    {
+        // if there are not any merge points the trajectory is finished so the
+        // robot enters in the stance phase
+        m_stancePhase = true;
+    }
+
     return true;
 }
 
@@ -562,6 +570,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
 
+    yInfo() << "[configure] Ready to play!";
+
     return true;
 }
 
@@ -826,7 +836,8 @@ bool WalkingModule::updateModule()
         else
         {
             m_walkingDCMReactiveController->setFeedback(measuredDCM);
-            m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(), m_DCMVelocityDesired.front());
+            m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(),
+                                                               m_DCMVelocityDesired.front());
 
             if(!m_walkingDCMReactiveController->evaluateControl())
             {
@@ -842,8 +853,10 @@ bool WalkingModule::updateModule()
         }
 
         // inner COM-ZMP controller
+        m_walkingZMPController->setPhase(m_stancePhase || m_robotState == WalkingFSM::OnTheFly);
         m_walkingZMPController->setFeedback(measuredZMP, measuredCoM);
-        m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY, desiredCoMVelocityXY);
+        m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
+                                                   desiredCoMVelocityXY);
 
         if(!m_walkingZMPController->evaluateControl())
         {
@@ -1654,6 +1667,9 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // reset the models
     m_walkingZMPController->reset(m_DCMPositionDesired.front());
     m_stableDCMModel->reset(m_DCMPositionDesired.front());
+
+    // trick: it is useful for the ZMP-CoM gain scheduling
+    m_mergePoints.pop_front();
 
     m_robotState = WalkingFSM::Prepared;
     return true;
