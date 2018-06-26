@@ -65,9 +65,9 @@ make
 ```
 Notice: `sudo` is not necessary if you specify the `CMAKE_INSTALL_PREFIX`. In this case it is necessary to add in the `.bashrc` or `.bash_profile` the following lines:
 ```sh
-export walking-controllers_DIR=/path/where/you/installed/
-export PATH=$PATH:$walking-controllers_DIR/bin
-export YARP_DATA_DIRS=${YARP_DATA_DIRS}:walking-controllers_DIR/share/yarp
+export WalkingControllers_INSTALL_DIR=/path/where/you/installed/
+export PATH=$PATH:$WalkingControllers_INSTALL_DIR/bin
+export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
 ```
 
 # :computer: How to run the simulation
