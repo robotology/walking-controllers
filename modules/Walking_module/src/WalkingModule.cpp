@@ -562,6 +562,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
 
+    yInfo() << "[configure] Ready to play!";
+
     return true;
 }
 
@@ -826,7 +828,8 @@ bool WalkingModule::updateModule()
         else
         {
             m_walkingDCMReactiveController->setFeedback(measuredDCM);
-            m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(), m_DCMVelocityDesired.front());
+            m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(),
+                                                               m_DCMVelocityDesired.front());
 
             if(!m_walkingDCMReactiveController->evaluateControl())
             {
@@ -842,8 +845,16 @@ bool WalkingModule::updateModule()
         }
 
         // inner COM-ZMP controller
+        // if the the norm of desired DCM velocity is lower than a threshold then the robot
+        // is stopped
+        double threshold = 0.001;
+        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
+        m_walkingZMPController->setPhase(stancePhase || m_robotState == WalkingFSM::OnTheFly);
+
+        // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, measuredCoM);
-        m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY, desiredCoMVelocityXY);
+        m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
+                                                   desiredCoMVelocityXY);
 
         if(!m_walkingZMPController->evaluateControl())
         {
@@ -2119,8 +2130,6 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
     buff(1) = measuredCoM(1);
     m_walkingZMPController->reset(buff);
     m_stableDCMModel->reset(buff);
-    // todo
-    // yInfo() << measuredCoM(0) << " "<<measuredCoM(1) << " "<<measuredCoM(2);
 
     // reset the gains
     if (m_PIDHandler->usingGainScheduling())
