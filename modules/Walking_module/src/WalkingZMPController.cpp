@@ -26,15 +26,17 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
         return false;
     }
 
+    m_useGainScheduling = config.check("useGainScheduling", yarp::os::Value(false)).asBool();
+
     // set the gain of the CoM controller
-    if(!YarpHelper::getDoubleFromSearchable(config, "kCoM", m_kCoM))
+    if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_walking", m_kCoMWalking))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
     // set the ZMP controller gain
-    if(!YarpHelper::getDoubleFromSearchable(config, "kZMP", m_kZMP))
+    if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_walking", m_kZMPWalking))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
@@ -60,7 +62,66 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
     // instantiate Integrator object
     m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(samplingTime, buffer);
 
+    // if gain scheduling is used the stance gains has to be loaded
+    if(m_useGainScheduling)
+    {
+        double smoothingTime;
+        if(!YarpHelper::getDoubleFromSearchable(config, "smoothingTime", smoothingTime))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_stance", m_kCoMStance))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_stance", m_kZMPStance))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        m_kZMPSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
+                                                                      smoothingTime);
+        m_kCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
+                                                                      smoothingTime);
+
+        // initialize the minimum jerk trajectories
+        m_kZMPSmoother->init(yarp::sig::Vector(1, m_kZMPStance));
+        m_kCoMSmoother->init(yarp::sig::Vector(1, m_kCoMStance));
+
+        m_kCoM = m_kCoMStance;
+        m_kZMP = m_kZMPStance;
+    }
+    else
+    {
+        m_kCoM = m_kCoMWalking;
+        m_kZMP = m_kZMPWalking;
+    }
+
     return true;
+}
+
+void WalkingZMPController::setPhase(const bool& isStancePhase)
+{
+    if(m_useGainScheduling)
+    {
+        if(isStancePhase)
+        {
+            m_kCoMSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMStance));
+            m_kZMPSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPStance));
+        }
+        else
+        {
+            m_kCoMSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMWalking));
+            m_kZMPSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPWalking));
+        }
+        m_kCoM = m_kCoMSmoother->getPos()[0];
+        m_kZMP = m_kZMPSmoother->getPos()[0];
+    }
 }
 
 void WalkingZMPController::setFeedback(const iDynTree::Vector2& zmpFeedback,
