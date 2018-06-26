@@ -86,20 +86,12 @@ bool WalkingModule::propagateReferenceSignals()
     // as soon as possible.
     if(!m_mergePoints.empty())
     {
-        m_stancePhase = false;
         for(auto& mergePoint : m_mergePoints)
             mergePoint--;
 
         if(m_mergePoints[0] == 0)
             m_mergePoints.pop_front();
     }
-    else
-    {
-        // if there are not any merge points the trajectory is finished so the
-        // robot enters in the stance phase
-        m_stancePhase = true;
-    }
-
     return true;
 }
 
@@ -853,7 +845,13 @@ bool WalkingModule::updateModule()
         }
 
         // inner COM-ZMP controller
-        m_walkingZMPController->setPhase(m_stancePhase || m_robotState == WalkingFSM::OnTheFly);
+        // if the the norm of desired DCM velocity is lower than a threshold then the robot
+        // is stopped
+        double threshold = 0.001;
+        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
+        m_walkingZMPController->setPhase(stancePhase || m_robotState == WalkingFSM::OnTheFly);
+
+        // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, measuredCoM);
         m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
                                                    desiredCoMVelocityXY);
@@ -1668,9 +1666,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     m_walkingZMPController->reset(m_DCMPositionDesired.front());
     m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
-    // trick: it is useful for the ZMP-CoM gain scheduling
-    m_mergePoints.pop_front();
-
     m_robotState = WalkingFSM::Prepared;
     return true;
 }
@@ -2135,8 +2130,6 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
     buff(1) = measuredCoM(1);
     m_walkingZMPController->reset(buff);
     m_stableDCMModel->reset(buff);
-    // todo
-    // yInfo() << measuredCoM(0) << " "<<measuredCoM(1) << " "<<measuredCoM(2);
 
     // reset the gains
     if (m_PIDHandler->usingGainScheduling())
