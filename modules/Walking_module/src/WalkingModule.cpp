@@ -369,6 +369,8 @@ bool WalkingModule::configureReactiveGainScheduling(const yarp::os::Searchable &
         return false;
     }
 
+    m_useReactiveGainScheduling = true;
+
     return true;
 }
 

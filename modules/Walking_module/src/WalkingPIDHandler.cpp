@@ -189,8 +189,8 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
                 double activationOffset = group->check("activationOffset", yarp::os::Value(0.0)).asDouble();
 //                double smoothingTime = group->check("smoothingTime", yarp::os::Value(1.0)).asDouble(); //For the time being we use a common smoothingTime
 
-                if ((phase == PIDPhase::Switch) && (activationOffset < (m_maximumContactDelay - m_firmwareDelay))) {
-                    yWarning() << "If the activationOffset of "<< name << " is lower than (maximumContactDelay - firmwareDelay). The group may be triggered too in advance in case of late activation of the contact.";
+                if ((phase == PIDPhase::Switch) && (activationOffset < (m_firmwareDelay))) {
+                    yWarning() << "If the activationOffset of "<< name << " is lower than firmwareDelay. The group may be triggered too in advance in case of late activation of the contact.";
                 }
 
                 PIDmap groupMap;
