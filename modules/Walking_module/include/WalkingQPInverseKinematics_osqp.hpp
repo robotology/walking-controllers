@@ -249,6 +249,13 @@ public:
      */
     bool getRightFootError(iDynTree::VectorDynSize& output);
 
+    /**
+     * Get the neck orientation error.
+     * @param output error
+     * @return true/false in case of success/failure.
+     */
+    bool getNeckOrientationError(iDynTree::Vector3& output);
+
     const Eigen::MatrixXd& getHessianMatrix() const;
 
     const Eigen::MatrixXd& getConstraintMatrix() const;
