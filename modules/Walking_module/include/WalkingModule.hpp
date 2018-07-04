@@ -67,6 +67,7 @@ class WalkingModule:
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
+    bool m_useVelocity; /**< True if real velocity control is used. */
 
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
