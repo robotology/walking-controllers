@@ -445,7 +445,7 @@ bool WalkingQPIK_qpOASES::setBounds()
       - leftFootCorrection;
     Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
       - leftFootCorrection;
-    
+
     // if((m_rightFootTwist(0) == m_rightFootTwist(1)) && (m_rightFootTwist(0) == 0))
     // {
     //     Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist);
@@ -629,5 +629,21 @@ bool WalkingQPIK_qpOASES::getRightFootError(iDynTree::VectorDynSize& output)
         - iDynTree::toEigen(m_rightFootJacobian) * Eigen::Map<Eigen::MatrixXd>(result.data(),
                                                                                m_numberOfVariables,
                                                                                1);
+    return true;
+}
+
+
+bool WalkingQPIK_qpOASES::getNeckOrientationError(iDynTree::Vector3& output)
+{
+    // if(!m_isSolutionEvaluated)
+    // {
+    //     yError() << "[getRightFootError] The solution is not evaluated. "
+    //              << "Please call 'solve()' method.";
+    //     return false;
+    // }
+
+    auto error = m_neckOrientation * m_desiredNeckOrientation.inverse();
+    output = error.asRPY();
+
     return true;
 }

@@ -250,6 +250,13 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getRightFootError(iDynTree::VectorDynSize& output);
+
+    /**
+     * Get the neck orientation error.
+     * @param output error
+     * @return true/false in case of success/failure.
+     */
+    bool getNeckOrientationError(iDynTree::Vector3& output);
 };
 
 #endif

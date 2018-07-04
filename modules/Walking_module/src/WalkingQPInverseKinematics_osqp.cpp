@@ -708,3 +708,18 @@ const Eigen::VectorXd& WalkingQPIK_osqp::getGradient() const
 {
     return m_gradient;
 }
+
+bool WalkingQPIK_osqp::getNeckOrientationError(iDynTree::Vector3& output)
+{
+    // if(!m_isSolutionEvaluated)
+    // {
+    //     yError() << "[getRightFootError] The solution is not evaluated. "
+    //              << "Please call 'solve()' method.";
+    //     return false;
+    // }
+
+    auto error = m_neckOrientation * m_desiredNeckOrientation.inverse();
+    output = error.asRPY();
+
+    return true;
+}

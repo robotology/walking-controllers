@@ -913,7 +913,8 @@ bool WalkingModule::updateModule()
 
             // TO BE TESTED
             // IK vs Velocity controller
-            // if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired_osqp))
+            // auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
+            // if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
             // {
             //     yError() << "[updateModule] Unable to set the internal robot state.";
             //     return false;
@@ -1047,36 +1048,34 @@ bool WalkingModule::updateModule()
         // print timings
         m_profiler->profiling();
 
-        iDynTree::VectorDynSize errorL(6), errorR(6);
-        if(m_robotState != WalkingFSM::OnTheFly && m_useQPIK)
-        {
-            if(m_useOSQP)
-            {
-                m_QPIKSolver_osqp->getRightFootError(errorR);
-                m_QPIKSolver_osqp->getLeftFootError(errorL);
-            }
-            else
-            {
-                m_QPIKSolver_qpOASES->getRightFootError(errorR);
-                m_QPIKSolver_qpOASES->getLeftFootError(errorL);
-            }
-        }
-
         // send data to the WalkingLogger
         if(m_dumpData)
         {
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-            m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP, measuredCoM,
+
+            // get the torso orientation error
+            iDynTree::Vector3 torsoError;
+            if(m_useQPIK)
+            {
+                if(m_useOSQP)
+                    m_QPIKSolver_osqp->getNeckOrientationError(torsoError);
+                else
+                    m_QPIKSolver_qpOASES->getNeckOrientationError(torsoError);
+            }
+            m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
+                                      m_DCMVelocityDesired.front(),
+                                      measuredZMP, desiredZMP,
+                                      measuredCoM,
                                       desiredCoMPositionXY, desiredCoMVelocityXY,
+                                      desiredCoMPosition,
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-                                      m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
-                                      m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
-
-            // m_walkingLogger->sendData(m_dqDesired_osqp, m_dqDesired_qpOASES);
+                                      m_leftTrajectory.front().getPosition(),
+                                      m_leftTrajectory.front().getRotation().asRPY(),
+                                      m_rightTrajectory.front().getPosition(),
+                                      m_rightTrajectory.front().getRotation().asRPY(),
+                                      torsoError);
         }
 
         propagateTime();
@@ -1951,6 +1950,7 @@ bool WalkingModule::startWalking()
                     "com_x", "com_y", "com_z",
                     "com_des_x", "com_des_y",
                     "com_des_dx", "com_des_dy",
+                    "com_ik_x", "com_ik_y", "com_ik_z",
                     "lf_x", "lf_y", "lf_z",
                     "lf_roll", "lf_pitch", "lf_yaw",
                     "rf_x", "rf_y", "rf_z",
@@ -1959,28 +1959,9 @@ bool WalkingModule::startWalking()
                     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_err_x", "lf_err_y", "lf_err_z",
-                    "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
-                    "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
-        // "torso_pitch", "torso_roll", "torso_yaw",
-        // "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow",
-        // "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
-        // "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
-        // "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll"
-
-    // m_walkingLogger->startRecord({"record",
-    //             "torso_pitch_osqp", "torso_roll_osqp", "torso_yaw_osqp",
-    //             "l_shoulder_pitch_osqp", "l_shoulder_roll_osqp", "l_shoulder_yaw_osqp", "l_elbow_osqp",
-    //             "r_shoulder_pitch_osqp", "r_shoulder_roll_osqp", "r_shoulder_yaw_osqp", "r_elbow_osqp",
-    //             "l_hip_pitch_osqp", "l_hip_roll_osqp", "l_hip_yaw_osqp", "l_knee_osqp", "l_ankle_pitch_osqp", "l_ankle_roll_osqp",
-    //             "r_hip_pitch_osqp", "r_hip_roll_osqp", "r_hip_yaw_osqp", "r_knee_osqp", "r_ankle_pitch_osqp", "r_ankle_roll_osqp",
-    //             "torso_pitch_qpOASES", "torso_roll_qpOASES", "torso_yaw_qpOASES",
-    //             "l_shoulder_pitch_qpOASES", "l_shoulder_roll_qpOASES", "l_shoulder_yaw_qpOASES", "l_elbow_qpOASES",
-    //             "r_shoulder_pitch_qpOASES", "r_shoulder_roll_qpOASES", "r_shoulder_yaw_qpOASES", "r_elbow_qpOASES",
-    //             "l_hip_pitch_qpOASES", "l_hip_roll_qpOASES", "l_hip_yaw_qpOASES", "l_knee_qpOASES", "l_ankle_pitch_qpOASES", "l_ankle_roll_qpOASES",
-    //             "r_hip_pitch_qpOASES", "r_hip_roll_qpOASES", "r_hip_yaw_qpOASES", "r_knee_qpOASES", "r_ankle_pitch_qpOASES", "r_ankle_roll_qpOASES"});
+                    "torso_error_roll", "torso_error_pitch", "torso_error_yaw"});
     }
+
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         m_robotState = WalkingFSM::Stance;
