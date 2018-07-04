@@ -393,6 +393,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
+    m_useVelocity = rf.check("use_velocity", yarp::os::Value(false)).asBool();
 
     if(!setControlledJoints(rf))
     {
@@ -615,6 +616,7 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
                               const iDynTree::Rotation& desiredNeckOrientation,
                               iDynTree::VectorDynSize &output)
 {
+
     if(!solver->setRobotState(m_positionFeedbackInRadians,
                               m_FKSolver->getLeftFootToWorldTransform(),
                               m_FKSolver->getRightFootToWorldTransform(),
@@ -909,11 +911,13 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_actuatedDOFs);
             yarp::sig::Vector bufferPosition(m_actuatedDOFs);
 
-            if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired_osqp))
-            {
-                yError() << "[updateFKSolver] Unable to evaluate the CoM.";
-                return false;
-            }
+            // TO BE TESTED
+            // IK vs Velocity controller
+            // if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired_osqp))
+            // {
+            //     yError() << "[updateModule] Unable to set the internal robot state.";
+            //     return false;
+            // }
 
             if(m_useOSQP)
             {
@@ -933,13 +937,20 @@ bool WalkingModule::updateModule()
                               desiredCoMVelocity, measuredCoM,
                               yawRotation, m_dqDesired_qpOASES))
                 {
-                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                    yError() << "[updateModule] Unable to solve the QP problem with qpOASES.";
                     return false;
                 }
 
                 iDynTree::toYarp(m_dqDesired_qpOASES, bufferVelocity);
             }
 
+            // IK vs Velocity controller
+            // if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
+            //                                       m_velocityFeedbackInRadians))
+            // {
+            //     yError() << "[updateModule] Unable to set the internal robot state.";
+            //     return false;
+            // }
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
@@ -1003,12 +1014,23 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        if(m_useQPIK)
+        if(m_useQPIK && m_useVelocity)
         {
-            if(!setDirectPositionReferences(m_qDesired))
+            if(m_useOSQP)
             {
-                yError() << "[updateModule] Error while setting the reference position to iCub.";
-                return false;
+                if(!setVelocityReferences(m_dqDesired_osqp))
+                {
+                    yError() << "[updateModule] Error while setting the reference velocity to iCub.";
+                    return false;
+                }
+            }
+            else
+            {
+                if(!setVelocityReferences(m_dqDesired_qpOASES))
+                {
+                    yError() << "[updateModule] Error while setting the reference velocity to iCub.";
+                    return false;
+                }
             }
         }
         else
@@ -1500,18 +1522,30 @@ bool WalkingModule::setVelocityReferences(const iDynTree::VectorDynSize& desired
         return false;
     }
 
-    if((iDynTree::toEigen(m_toDegBuffer).minCoeff() < -0.25) ||
-       (iDynTree::toEigen(m_toDegBuffer).minCoeff() > 0.25))
+    // check if the desired velocity is higher than a threshold
+    if((iDynTree::toEigen(desiredVelocityRad).minCoeff() < -1.0) ||
+       (iDynTree::toEigen(desiredVelocityRad).maxCoeff() > 1.0))
     {
-        yError() << "[setVelocityReferences] The absolute value of the desired velocity is higher than 0.25 rad/s.";
+        yError() << "[setVelocityReferences] The absolute value of the desired velocity is higher "
+                 << "than 1.0 rad/s.";
         return false;
     }
 
+    // convert rad/s into deg/s
     iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(desiredVelocityRad) * iDynTree::rad2deg(1);
+
+    // since the velocity interface use a minimum jerk trajectory a very high acceleration is set in
+    // order to overcome this drawback
+    yarp::sig::Vector dummy(m_toDegBuffer.size(), std::numeric_limits<double>::max());
+    if(!m_velocityInterface->setRefAccelerations(dummy.data()))
+    {
+        yError() << "[setVelocityReferences] Error while setting the desired acceleration.";
+        return false;
+    }
 
     if(!m_velocityInterface->velocityMove(m_toDegBuffer.data()))
     {
-        yError() << "[setVelocityReferences] Error while setting the desired position.";
+        yError() << "[setVelocityReferences] Error while setting the desired velocity.";
         return false;
     }
 
@@ -1632,21 +1666,10 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    if(m_useQPIK)
+    if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
     {
-        if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-        {
-            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-            return false;
-        }
-    }
-    else
-    {
-        if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-        {
-            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-            return false;
-        }
+        yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
+        return false;
     }
 
     // send the reference again in order to reduce error
@@ -1655,6 +1678,16 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[prepareRobot] Error while setting the initial position using "
                  << "POSITION DIRECT mode.";
         return false;
+    }
+
+    if(m_useQPIK)
+    {
+        if(m_useVelocity)
+            if(!switchToControlMode(VOCAB_CM_VELOCITY))
+            {
+                yError() << "[prepareRobot] Failed in setting VELOCITY mode.";
+                return false;
+            }
     }
 
     yarp::sig::Vector buffer(m_qDesired.size());
