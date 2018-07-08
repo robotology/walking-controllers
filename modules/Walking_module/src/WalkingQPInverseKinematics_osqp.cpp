@@ -723,3 +723,18 @@ bool WalkingQPIK_osqp::getNeckOrientationError(iDynTree::Vector3& output)
 
     return true;
 }
+
+bool WalkingQPIK_osqp::getDesiredNeckOrientation(iDynTree::Vector3& output)
+{
+    // if(!m_isSolutionEvaluated)
+    // {
+    //     yError() << "[getRightFootError] The solution is not evaluated. "
+    //              << "Please call 'solve()' method.";
+    //     return false;
+    // }
+
+    auto error = m_desiredNeckOrientation;
+    output = error.asRPY();
+
+    return true;
+}

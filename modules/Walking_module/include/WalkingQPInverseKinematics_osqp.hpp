@@ -256,6 +256,13 @@ public:
      */
     bool getNeckOrientationError(iDynTree::Vector3& output);
 
+    /**
+     * Get desired neck orientation.
+     * @param output
+     * @return true/false in case of success/failure.
+     */
+    bool getDesiredNeckOrientation(iDynTree::Vector3& output);
+
     const Eigen::MatrixXd& getHessianMatrix() const;
 
     const Eigen::MatrixXd& getConstraintMatrix() const;
