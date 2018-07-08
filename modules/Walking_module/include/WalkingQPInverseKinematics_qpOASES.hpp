@@ -257,6 +257,14 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getNeckOrientationError(iDynTree::Vector3& output);
+
+    /**
+     * Get desired neck orientation.
+     * @param output
+     * @return true/false in case of success/failure.
+     */
+    bool getDesiredNeckOrientation(iDynTree::Vector3& output);
+
 };
 
 #endif

@@ -143,6 +143,13 @@ public:
     bool setDesiredJointsWeight(double weight);
 
     double desiredJointWeight();
+
+    /**
+     * Get desired neck orientation.
+     * @param output
+     * @return true/false in case of success/failure.
+     */
+    bool getDesiredNeckOrientation(iDynTree::Vector3& output);
 };
 
 #endif // end of ICUB_WALKINGIK_H

@@ -472,3 +472,17 @@ double WalkingIK::desiredJointWeight()
 {
     return m_jointRegularizationWeight;
 }
+
+bool WalkingIK::getDesiredNeckOrientation(iDynTree::Vector3& output)
+{
+    // if(!m_isSolutionEvaluated)
+    // {
+    //     yError() << "[getRightFootError] The solution is not evaluated. "
+    //              << "Please call 'solve()' method.";
+    //     return false;
+    // }
+
+    auto error =  m_inertial_R_world.inverse() * m_additionalRotation;
+    output = error.asRPY();
+    return true;
+}

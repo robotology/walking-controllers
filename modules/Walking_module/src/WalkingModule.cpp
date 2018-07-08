@@ -945,6 +945,7 @@ bool WalkingModule::updateModule()
                 iDynTree::toYarp(m_dqDesired_qpOASES, bufferVelocity);
             }
 
+            // TO BE TESTED
             // IK vs Velocity controller
             // if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
             //                                       m_velocityFeedbackInRadians))
@@ -1055,14 +1056,17 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
             // get the torso orientation error
-            iDynTree::Vector3 torsoError;
+            iDynTree::Vector3 torsoDesired;
             if(m_useQPIK)
             {
                 if(m_useOSQP)
-                    m_QPIKSolver_osqp->getNeckOrientationError(torsoError);
+                    m_QPIKSolver_osqp->getDesiredNeckOrientation(torsoDesired);
                 else
-                    m_QPIKSolver_qpOASES->getNeckOrientationError(torsoError);
+                    m_QPIKSolver_qpOASES->getDesiredNeckOrientation(torsoDesired);
             }
+            else
+                m_IKSolver->getDesiredNeckOrientation(torsoDesired);
+
             m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
                                       m_DCMVelocityDesired.front(),
                                       measuredZMP, desiredZMP,
@@ -1075,7 +1079,8 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(),
                                       m_rightTrajectory.front().getRotation().asRPY(),
-                                      torsoError);
+                                      torsoDesired,
+                                      m_FKSolver->getNeckOrientation().asRPY());
         }
 
         propagateTime();
@@ -1959,7 +1964,8 @@ bool WalkingModule::startWalking()
                     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "torso_error_roll", "torso_error_pitch", "torso_error_yaw"});
+                    "torso_des_roll", "torso_des_pitch", "torso_des_yaw",
+                    "torso_roll", "torso_pitch", "torso_yaw"});
     }
 
     {
