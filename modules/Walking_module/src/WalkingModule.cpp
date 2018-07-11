@@ -911,14 +911,14 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_actuatedDOFs);
             yarp::sig::Vector bufferPosition(m_actuatedDOFs);
 
-            // TO BE TESTED
+             // TO BE TESTED
             // IK vs Velocity controller
-            // auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
-            // if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
-            // {
-            //     yError() << "[updateModule] Unable to set the internal robot state.";
-            //     return false;
-            // }
+            auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
+            if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
+            {
+                yError() << "[updateModule] Unable to set the internal robot state.";
+                return false;
+            }
 
             if(m_useOSQP)
             {
@@ -947,12 +947,12 @@ bool WalkingModule::updateModule()
 
             // TO BE TESTED
             // IK vs Velocity controller
-            // if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
-            //                                       m_velocityFeedbackInRadians))
-            // {
-            //     yError() << "[updateModule] Unable to set the internal robot state.";
-            //     return false;
-            // }
+            if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
+                                                  m_velocityFeedbackInRadians))
+            {
+                yError() << "[updateModule] Unable to set the internal robot state.";
+                return false;
+            }
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
@@ -1037,6 +1037,7 @@ bool WalkingModule::updateModule()
         }
         else
         {
+	  yInfo() << "set Position";
             if(!setDirectPositionReferences(m_qDesired))
             {
                 yError() << "[updateModule] Error while setting the reference position to iCub.";
@@ -1047,7 +1048,7 @@ bool WalkingModule::updateModule()
         m_profiler->setEndTime("Total");
 
         // print timings
-        m_profiler->profiling();
+        //m_profiler->profiling();
 
         // send data to the WalkingLogger
         if(m_dumpData)
@@ -1526,14 +1527,14 @@ bool WalkingModule::setVelocityReferences(const iDynTree::VectorDynSize& desired
         return false;
     }
 
-    // check if the desired velocity is higher than a threshold
-    if((iDynTree::toEigen(desiredVelocityRad).minCoeff() < -1.0) ||
-       (iDynTree::toEigen(desiredVelocityRad).maxCoeff() > 1.0))
-    {
-        yError() << "[setVelocityReferences] The absolute value of the desired velocity is higher "
-                 << "than 1.0 rad/s.";
-        return false;
-    }
+    // // check if the desired velocity is higher than a threshold
+    // if((iDynTree::toEigen(desiredVelocityRad).minCoeff() < -1.0) ||
+    //    (iDynTree::toEigen(desiredVelocityRad).maxCoeff() > 1.0))
+    // {
+    //     yError() << "[setVelocityReferences] The absolute value of the desired velocity is higher "
+    //              << "than 1.0 rad/s.";
+    //     return false;
+    // }
 
     // convert rad/s into deg/s
     iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(desiredVelocityRad) * iDynTree::rad2deg(1);
