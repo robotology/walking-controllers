@@ -957,12 +957,12 @@ bool WalkingModule::updateModule()
 
              // TO BE TESTED
             // IK vs Velocity controller
-            auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
-            if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
-            {
-                yError() << "[updateModule] Unable to set the internal robot state.";
-                return false;
-            }
+            // auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
+            // if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
+            // {
+            //     yError() << "[updateModule] Unable to set the internal robot state.";
+            //     return false;
+            // }
 
             if(m_useOSQP)
             {
@@ -991,12 +991,12 @@ bool WalkingModule::updateModule()
 
             // TO BE TESTED
             // IK vs Velocity controller
-            if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
-                                                  m_velocityFeedbackInRadians))
-            {
-                yError() << "[updateModule] Unable to set the internal robot state.";
-                return false;
-            }
+            // if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
+            //                                       m_velocityFeedbackInRadians))
+            // {
+            //     yError() << "[updateModule] Unable to set the internal robot state.";
+            //     return false;
+            // }
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
@@ -1249,6 +1249,7 @@ bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
             {
                 if(m_firstStep)
                 {
+       		  yInfo() << "hi";
                     m_leftWrenchFilter->init(m_leftWrenchInput);
                     m_rightWrenchFilter->init(m_rightWrenchInput);
                 }
@@ -1613,6 +1614,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[prepareRobot] You cannot prepare the robot again.";
         return false;
     }
+
+    m_firstStep = true;
 
 
     iDynTree::Position measuredCoM;
@@ -2021,7 +2024,6 @@ bool WalkingModule::startWalking()
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         m_robotState = WalkingFSM::Stance;
-        m_firstStep = true;
     }
 
     return true;
@@ -2101,6 +2103,7 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
         return false;
     }
 
+    
     std::lock_guard<std::mutex> guard(m_mutex);
 
     iDynTree::Position measuredCoM;

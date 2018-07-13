@@ -9,11 +9,28 @@
 #ifndef WALKING_DCM_REACTIVE_CONTROLLER_HPP
 #define WALKING_DCM_REACTIVE_CONTROLLER_HPP
 
+
+// std
+#include <memory>
+
+
 // YARP
 #include <yarp/os/Searchable.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
+
+
+// iDynTree
+#include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/Core/EigenSparseHelpers.h>
+#include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/Model/Model.h>
+#include <iDynTree/yarp/YARPConfigurationsLoader.h>
+
+// iCub-ctrl
+#include <iCub/ctrl/pids.h>
+
 
 /**
  * WalkingDCMReactiveController class implements the reactive
@@ -23,6 +40,7 @@
 class WalkingDCMReactiveController
 {
     double m_kDCM; /**< Controller gain. */
+    double m_kIDCM; /**< Controller gain. */
     double m_omega; /**< LIPM time constant. */
 
     bool m_isInitialized{false}; /**< True if the control was initialized. */
@@ -34,6 +52,8 @@ class WalkingDCMReactiveController
 
     iDynTree::Vector2 m_controllerOutput; /**< Controller output. */
 
+    std::unique_ptr<iCub::ctrl::Integrator> m_dcmErrorIntegral; /**< left foot error integrator */
+  
 public:
 
     /**
@@ -69,6 +89,16 @@ public:
      * @return true/false in case of success/failure
      */
     bool getControllerOutput(iDynTree::Vector2& controllerOutput);
+
+      /**
+     * Evaluate the integral.
+     * @param integral object;
+     * @param error;
+     * @return the integral position.
+     */
+    iDynTree::VectorDynSize evaluateIntegralError(std::unique_ptr<iCub::ctrl::Integrator>& integral,
+						  const iDynTree::VectorDynSize& error);
+
 };
 
 #endif
