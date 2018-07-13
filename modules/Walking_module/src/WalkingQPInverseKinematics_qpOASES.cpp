@@ -13,6 +13,7 @@
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/EigenSparseHelpers.h>
+#include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/Model/Model.h>
 #include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
@@ -94,6 +95,12 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
         return false;
     }
 
+    if(!YarpHelper::getDoubleFromSearchable(config, "k_intPosFoot", m_kIPosFoot))
+    {
+        yError() << "Initialization failed while reading k_intPosFoot.";
+        return false;
+    }
+
     if(!YarpHelper::getDoubleFromSearchable(config, "k_attFoot", m_kAttFoot))
     {
         yError() << "Initialization failed while reading k_attFoot.";
@@ -111,6 +118,13 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
         yError() << "Initialization failed while reading k_posCom.";
         return false;
     }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "k_intPosCom", m_kICom))
+    {
+        yError() << "Initialization failed while reading k_intPosCom.";
+        return false;
+    }
+
 
     return true;
 }
@@ -216,7 +230,18 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    //
+    // set integral
+    double samplingTime;
+    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", samplingTime))
+    {
+        yError() << "[initialize] Unable to get the double from searchable.";
+        return false;
+    }
+
+    yarp::sig::Vector buffer(3, 0.0);
+    m_leftFootErrorIntegral = std::make_unique<iCub::ctrl::Integrator>(samplingTime, buffer);
+    m_rightFootErrorIntegral = std::make_unique<iCub::ctrl::Integrator>(samplingTime, buffer);
+    m_comErrorIntegral = std::make_unique<iCub::ctrl::Integrator>(samplingTime, buffer);
 
     m_optimizer = std::make_shared<qpOASES::SQProblem>(m_numberOfVariables,
                                                        m_numberOfConstraints);
@@ -408,20 +433,43 @@ bool WalkingQPIK_qpOASES::setLinearConstraintMatrix()
     return true;
 }
 
+iDynTree::Position WalkingQPIK_qpOASES::evaluateIntegralError(std::unique_ptr<iCub::ctrl::Integrator>& integral,
+                                                                   const iDynTree::Position& error)
+{
+    yarp::sig::Vector buffer(error.size());
+    yarp::sig::Vector integralErrorYarp(error.size());
+    iDynTree::toYarp(error, buffer);
+    integralErrorYarp = integral->integrate(buffer);
+
+    // transform into iDynTree Vector
+    iDynTree::Position integralError;
+    iDynTree::toiDynTree(integralErrorYarp, integralError);
+
+    return integralError;
+}
+
 bool WalkingQPIK_qpOASES::setBounds()
 {
+    //  left foot
     Eigen::VectorXd leftFootCorrection(6);
-    leftFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen((m_leftFootToWorldTransform.getPosition() -
-                                                                        m_desiredLeftFootToWorldTransform.getPosition()));
+    iDynTree::Position leftFootError = m_leftFootToWorldTransform.getPosition()
+        - m_desiredLeftFootToWorldTransform.getPosition();
+    leftFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen(leftFootError)
+        + m_kIPosFoot * iDynTree::toEigen(evaluateIntegralError(m_leftFootErrorIntegral, leftFootError));
+
 
     iDynTree::Matrix3x3 errorLeftAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_leftFootToWorldTransform.getRotation() *
                                                                                     m_desiredLeftFootToWorldTransform.getRotation().inverse());
 
     leftFootCorrection.block(3,0,3,1) = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorLeftAttitude)));
 
+    // right foot
     Eigen::VectorXd rightFootCorrection(6);
-    rightFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen((m_rightFootToWorldTransform.getPosition() -
-                                                                         m_desiredRightFootToWorldTransform.getPosition()));
+    iDynTree::Position rightFootError = m_rightFootToWorldTransform.getPosition()
+        - m_desiredRightFootToWorldTransform.getPosition();
+
+    rightFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen(rightFootError)
+        + m_kIPosFoot * iDynTree::toEigen(evaluateIntegralError(m_rightFootErrorIntegral, rightFootError));
 
     iDynTree::Matrix3x3 errorRightAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_rightFootToWorldTransform.getRotation() *
                                                                                      m_desiredRightFootToWorldTransform.getRotation().inverse());
@@ -467,10 +515,16 @@ bool WalkingQPIK_qpOASES::setBounds()
 
     if(m_useCoMAsConstraint)
     {
-        Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity)
-            - m_kCom * (iDynTree::toEigen(m_comPosition) -  iDynTree::toEigen(m_desiredComPosition));
-        Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity)
-            - m_kCom * (iDynTree::toEigen(m_comPosition) -  iDynTree::toEigen(m_desiredComPosition));
+        Eigen::VectorXd comCorrection(3);
+        iDynTree::Position comPositionError = m_desiredComPosition - m_comPosition;
+
+        comCorrection = m_kCom * iDynTree::toEigen(comPositionError) +
+            m_kICom * iDynTree::toEigen(evaluateIntegralError(m_comErrorIntegral, comPositionError));
+
+        Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity) + comCorrection;
+
+        Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity) + comCorrection;
+
     }
 
     return true;

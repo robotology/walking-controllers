@@ -15,9 +15,12 @@
 // YARP
 #include <yarp/os/Searchable.h>
 
-//iDynTree
+// iDynTree
 #include <iDynTree/KinDynComputations.h>
 #include <qpOASES.hpp>
+
+// iCub-ctrl
+#include <iCub/ctrl/pids.h>
 
 #include "Utils.hpp"
 
@@ -66,9 +69,11 @@ class WalkingQPIK_qpOASES
 
     iDynSparseMatrix m_jointRegulatizationGains;  /**< Gain related to the joint regularization. */
     double m_kPosFoot; /**< Gain related to the desired foot position. */
+    double m_kIPosFoot; /**< Gain related to the desired foot position (integral). */
     double m_kAttFoot; /**< Gain related to the desired foot attitude. */
     double m_kNeck; /**< Gain related to the desired foot attitude. */
     double m_kCom; /**< Gain related to the desired foot attitude. */
+    double m_kICom; /**< Gain related to the desired foot attitude (integral). */
 
     iDynSparseMatrix m_comWeightMatrix; /**< CoM weight matrix. */
     iDynSparseMatrix m_neckWeightMatrix; /**< Neck weight matrix. */
@@ -82,6 +87,11 @@ class WalkingQPIK_qpOASES
     bool m_isSolutionEvaluated{false}; /**< True if the solution is evaluated. */
 
     bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
+
+    std::unique_ptr<iCub::ctrl::Integrator> m_leftFootErrorIntegral; /**< left foot error integrator */
+    std::unique_ptr<iCub::ctrl::Integrator> m_rightFootErrorIntegral; /**< right foot error integrator  */
+    std::unique_ptr<iCub::ctrl::Integrator> m_comErrorIntegral; /**< CoM error integrator  */
+
 
     /**
      * Initialize all the constant matrix from the configuration file.
@@ -125,6 +135,16 @@ class WalkingQPIK_qpOASES
      */
     bool setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
                            const iDynTree::VectorDynSize& maxJointsLimit);
+
+    /**
+     * Evaluate the integral.
+     * @param integral object;
+     * @param error;
+     * @return the integral position.
+     */
+    iDynTree::Position evaluateIntegralError(std::unique_ptr<iCub::ctrl::Integrator>& integral,
+                                             const iDynTree::Position& error);
+
 public:
 
     /**
