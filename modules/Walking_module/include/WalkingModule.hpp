@@ -145,11 +145,12 @@ class WalkingModule:
     iDynTree::VectorDynSize m_minJointsLimit; /**< Vector containing the max negative limits [rad/s]. */
     iDynTree::VectorDynSize m_maxJointsLimit; /**< Vector containing the max positive limits [rad/s]. */
 
-    // yarp::sig::Vector m_positionFeedbackInDegreesFiltered;
+    yarp::sig::Vector m_positionFeedbackInDegreesFiltered;
     yarp::sig::Vector m_velocityFeedbackInDegreesFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_velocityFilter; /**< Joint velocity low pass filter .*/
     bool m_useVelocityFilter; /**< True if the joint velocity filter is used. */
+    bool m_usePositionFilter; /**< True if the joint position filter is used. */
 
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
@@ -176,6 +177,8 @@ class WalkingModule:
 
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
+
+    double m_normalForceThreshold;
 
     /**
      * Configure the Force torque sensors. The FT ports are only opened please use yarpamanger

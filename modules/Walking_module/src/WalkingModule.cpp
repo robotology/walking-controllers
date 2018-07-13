@@ -244,9 +244,8 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     m_minJointsLimit.resize(m_actuatedDOFs);
     m_maxJointsLimit.resize(m_actuatedDOFs);
 
-    // m_positionFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
-    // m_positionFeedbackInDegreesFiltered.zero();
-
+    m_positionFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
+    m_positionFeedbackInDegreesFiltered.zero();
     m_velocityFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
     m_velocityFeedbackInDegreesFiltered.zero();
 
@@ -276,6 +275,22 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     // set the inertial to world rotation
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
 
+    m_usePositionFilter = rf.check("use_joint_position_filter", yarp::os::Value("False")).asBool();
+    if(m_usePositionFilter)
+    {
+        double cutFrequency;
+        if(!YarpHelper::getDoubleFromSearchable(rf, "joint_position_cut_frequency", cutFrequency))
+        {
+            yError() << "[configure] Unable get double from searchable.";
+            return false;
+        }
+
+
+        m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, m_dT);
+        m_positionFilter->init(m_positionFeedbackInDegrees);
+    }
+
+
     m_useVelocityFilter = rf.check("use_joint_velocity_filter", yarp::os::Value("False")).asBool();
     if(m_useVelocityFilter)
     {
@@ -286,9 +301,20 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
             return false;
         }
 
+
         // set filters
         // m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(10, m_dT);
         m_velocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, m_dT);
+
+        // double tau = 2 * M_PI / cutFrequency;
+        // yarp::sig::Vector num(2);
+        // yarp::sig::Vector den(2);
+        // num(0) = m_dT;
+        // num(1) = m_dT;
+        // den(0) = 2 * tau + m_dT;
+        // den(1) = -2 * tau + m_dT;
+        // m_velocityFilter = std::make_unique<WalkingLPFilter>();
+        // m_velocityFilter->initialize(m_dT, cutFrequency);
 
         // m_positionFilter->init(m_positionFeedbackInDegrees);
         m_velocityFilter->init(m_velocityFeedbackInDegrees);
@@ -375,6 +401,13 @@ bool WalkingModule::configureForceTorqueSensors(const yarp::os::Searchable& conf
         return false;
     }
 
+    // get the normal force threshold
+    if(!YarpHelper::getDoubleFromSearchable(config, "normalForceThreshold", m_normalForceThreshold))
+    {
+        yError() << "Initialization failed while reading normalForceThreshold.";
+        return false;
+    }
+
     return true;
 }
 
@@ -388,6 +421,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
     setName(string.c_str());
+
+    yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
+    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
 
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
@@ -413,8 +449,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
-    yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
-    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
 
     yarp::os::Bottle& forceTorqueSensorsOptions = rf.findGroup("FT_SENSORS");
     if(!configureForceTorqueSensors(forceTorqueSensorsOptions))
@@ -489,7 +523,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useQPIK)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
-
+        inverseKinematicsQPSolverOptions.append(generalOptions);
         m_QPIKSolver_osqp = std::make_unique<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_actuatedDOFs,
@@ -562,6 +596,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_newTrajectoryRequired = false;
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
+
+    yInfo() << "Option \t Value";
+    yInfo() << "pos filt \t " << m_usePositionFilter;
+    yInfo() << "vel filt \t " << m_useVelocityFilter;
+    yInfo() << "wre filt \t " << m_useWrenchFilter;
+    yInfo() << "useMPC \t " << m_useMPC;
+    yInfo() << "useQPIK \t " << m_useQPIK;
+    yInfo() << "useOSQP \t " << m_useOSQP;
+    yInfo() << "dump \t " << m_dumpData;
+    yInfo() << "velocity \t " << m_useVelocity;
 
     yInfo() << "[configure] Ready to play!";
 
@@ -1037,7 +1081,6 @@ bool WalkingModule::updateModule()
         }
         else
         {
-	  yInfo() << "set Position";
             if(!setDirectPositionReferences(m_qDesired))
             {
                 yError() << "[updateModule] Error while setting the reference position to iCub.";
@@ -1048,7 +1091,7 @@ bool WalkingModule::updateModule()
         m_profiler->setEndTime("Total");
 
         // print timings
-        //m_profiler->profiling();
+        m_profiler->profiling();
 
         // send data to the WalkingLogger
         if(m_dumpData)
@@ -1178,24 +1221,30 @@ bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
 
         if(okVelocity && okPosition && okLeftWrench && okRightWrench)
         {
-            if(m_useVelocityFilter)
+            if(m_usePositionFilter)
             {
-                // filter the joint position and the velocity
-                m_velocityFeedbackInDegreesFiltered = m_velocityFilter->filt(m_velocityFeedbackInDegrees);
+                m_positionFeedbackInDegreesFiltered = m_positionFilter->filt(m_positionFeedbackInDegrees);
                 for(unsigned j = 0; j < m_actuatedDOFs; ++j)
-                {
-                    m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegrees(j));
-                    m_velocityFeedbackInRadians(j) = iDynTree::deg2rad(m_velocityFeedbackInDegreesFiltered(j));
-                }
+                    m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegreesFiltered(j));
             }
             else
             {
                 for(unsigned j = 0; j < m_actuatedDOFs; ++j)
-                {
                     m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegrees(j));
-                    m_velocityFeedbackInRadians(j) = iDynTree::deg2rad(m_velocityFeedbackInDegrees(j));
-                }
             }
+
+            if(m_useVelocityFilter)
+            {
+                m_velocityFeedbackInDegreesFiltered = m_velocityFilter->filt(m_velocityFeedbackInDegrees);
+                for(unsigned j = 0; j < m_actuatedDOFs; ++j)
+                    m_velocityFeedbackInRadians(j) = iDynTree::deg2rad(m_velocityFeedbackInDegreesFiltered(j));
+            }
+            else
+            {
+                for(unsigned j = 0; j < m_actuatedDOFs; ++j)
+                    m_velocityFeedbackInRadians(j) = iDynTree::deg2rad(m_velocityFeedbackInDegrees(j));
+            }
+
             if(m_useWrenchFilter)
             {
                 if(m_firstStep)
@@ -1264,7 +1313,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     iDynTree::Position zmpLeft, zmpRight, zmpWorld;
     double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
 
-    if(m_rightWrench.getLinearVec3()(2) < 0.001)
+    if(m_rightWrench.getLinearVec3()(2) < m_normalForceThreshold)
         zmpRightDefined = 0.0;
     else
     {
@@ -1274,7 +1323,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
         zmpRightDefined = 1.0;
     }
 
-    if(m_leftWrench.getLinearVec3()(2) < 0.001)
+    if(m_leftWrench.getLinearVec3()(2) < m_normalForceThreshold)
         zmpLeftDefined = 0.0;
     else
     {
