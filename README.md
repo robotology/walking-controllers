@@ -122,3 +122,14 @@ You can change the DCM controller and the inverse kinematics solver by edit [the
 
 # :running: How to test on iCub
 You can follows the same instructions of the simulation section without using `YARP_CLOCK=/clock`. Make sure your `YARP_ROBOT_NAME` is coherent with the name of the robot (e.g. iCubGenova04)
+## :warning: Warning
+Currently the supported robots are only:
+- ``iCubGenova04``
+- ``iCubGenova02``
+- ``icubGazeboSim``
+- ``icubGazeboV2_5``
+
+Yet, it is possible to use these controllers provided that the robot has V2.5 legs. In this case, the user should define the robot specific configuration files (those of ``iCubGenova04`` are a good starting point). 
+
+:warning: The STRAIN F/T sensors normally mounted on iCub may suffer from saturations due to the strong impacts the robot has with the ground, which may lead to a failure of the controller. It is suggested to use these controllers with STRAIN2 sensors only (as in ``iCubGenova04``) to avoid such saturations.
+
