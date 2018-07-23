@@ -430,6 +430,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_useVelocity = rf.check("use_velocity", yarp::os::Value(false)).asBool();
+    m_useVelocityControllerAsIK = rf.check("use_velocity_controller_as_IK", yarp::os::Value(false)).asBool();
 
     if(!setControlledJoints(rf))
     {
@@ -606,6 +607,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yInfo() << "useOSQP \t " << m_useOSQP;
     yInfo() << "dump \t " << m_dumpData;
     yInfo() << "velocity \t " << m_useVelocity;
+    yInfo() << "velocity controller as IK \t " << m_useVelocityControllerAsIK;
 
     yInfo() << "[configure] Ready to play!";
 
@@ -955,14 +957,16 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_actuatedDOFs);
             yarp::sig::Vector bufferPosition(m_actuatedDOFs);
 
-             // TO BE TESTED
-            // IK vs Velocity controller
-            // auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
-            // if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
-            // {
-            //     yError() << "[updateModule] Unable to set the internal robot state.";
-            //     return false;
-            // }
+            // Velocity controller as IK
+            if(m_useVelocityControllerAsIK)
+            {
+                auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
+                if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
+                {
+                    yError() << "[updateModule] Unable to set the internal robot state.";
+                    return false;
+                }
+            }
 
             if(m_useOSQP)
             {
@@ -989,15 +993,16 @@ bool WalkingModule::updateModule()
                 iDynTree::toYarp(m_dqDesired_qpOASES, bufferVelocity);
             }
 
-            // TO BE TESTED
-            // IK vs Velocity controller
-            // if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
-            //                                       m_velocityFeedbackInRadians))
-            // {
-            //     yError() << "[updateModule] Unable to set the internal robot state.";
-            //     return false;
-            // }
-
+            // Velocity controller as IK
+            if(m_useVelocityControllerAsIK)
+            {
+                if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
+                                                      m_velocityFeedbackInRadians))
+                {
+                    yError() << "[updateModule] Unable to set the internal robot state.";
+                    return false;
+                }
+            }
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
         }
@@ -1060,7 +1065,9 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        if(m_useQPIK && m_useVelocity)
+        // if the velocity controller is used as inverse kinematics it is not possible to use
+        // set velocity
+        if(m_useQPIK && m_useVelocity && !m_useVelocityControllerAsIK)
         {
             if(m_useOSQP)
             {
@@ -1739,7 +1746,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     if(m_useQPIK)
     {
-        if(m_useVelocity)
+        // if the velocity controller is used as IK you cannot use set velocity
+        if(m_useVelocity && !m_useVelocityControllerAsIK)
             if(!switchToControlMode(VOCAB_CM_VELOCITY))
             {
                 yError() << "[prepareRobot] Failed in setting VELOCITY mode.";
@@ -2103,7 +2111,7 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
         return false;
     }
 
-    
+
     std::lock_guard<std::mutex> guard(m_mutex);
 
     iDynTree::Position measuredCoM;
