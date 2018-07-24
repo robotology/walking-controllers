@@ -119,6 +119,27 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    m_frameLeftHandIndex = m_kinDyn.model().getFrameIndex("l_hand");
+    if(m_frameLeftHandIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: l_hand";
+        return false;
+    }
+
+    m_frameRightHandIndex = m_kinDyn.model().getFrameIndex("r_hand");
+    if(m_frameRightHandIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: r_hand";
+        return false;
+    }
+
+    m_frameRootIndex = m_kinDyn.model().getFrameIndex("root_link");
+    if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: root_link";
+        return false;
+    }
+
     m_frameNeckIndex = m_kinDyn.model().getFrameIndex("neck_2");
     if(m_frameNeckIndex == iDynTree::FRAME_INVALID_INDEX)
     {
@@ -418,6 +439,16 @@ iDynTree::Transform WalkingFK::getRightFootToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameRightIndex);
 }
 
+iDynTree::Transform WalkingFK::getLeftHandToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameLeftHandIndex);
+}
+
+iDynTree::Transform WalkingFK::getRightHandToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameRightHandIndex);
+}
+
 iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
 {
     return m_kinDyn.getWorldTransform(m_frameRootIndex);
@@ -441,6 +472,16 @@ bool WalkingFK::getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 bool WalkingFK::getRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightIndex, jacobian);
+}
+
+bool WalkingFK::getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftHandIndex, jacobian);
+}
+
+bool WalkingFK::getRightHandJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightHandIndex, jacobian);
 }
 
 bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)

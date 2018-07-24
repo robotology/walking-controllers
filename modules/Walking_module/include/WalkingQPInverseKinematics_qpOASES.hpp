@@ -45,13 +45,21 @@ class WalkingQPIK_qpOASES
     iDynTree::MatrixDynSize m_neckJacobian; /**< Neck jacobian (mixed representation). */
     iDynTree::MatrixDynSize m_leftFootJacobian; /**< Left foot Jacobian (mixed representation). */
     iDynTree::MatrixDynSize m_rightFootJacobian; /**< Right foot Jacobian (mixed representation). */
+    iDynTree::MatrixDynSize m_leftHandJacobian; /**< Left hand Jacobian (mixed representation). */
+    iDynTree::MatrixDynSize m_rightHandJacobian; /**< Right hand Jacobian (mixed representation). */
+
 
     iDynTree::Twist m_leftFootTwist; /**< Desired Twist of the left foot. */
     iDynTree::Twist m_rightFootTwist; /**< Desired Twist of the right foot. */
-    iDynTree::Vector3 m_comVelocity; /**< Desired Linear velocity of the CoM. */
-    iDynTree::Position m_desiredComPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_desiredLeftFootToWorldTransform; /**< Desired left foot to world transformation.*/
     iDynTree::Transform m_desiredRightFootToWorldTransform; /**< Desired right foot to world transformation.*/
+
+    iDynTree::Vector3 m_comVelocity; /**< Desired Linear velocity of the CoM. */
+    iDynTree::Position m_desiredComPosition; /**< Desired Linear velocity of the CoM. */
+
+    iDynTree::Transform m_desiredLeftHandToWorldTransform; /**< Desired left hand to world transformation.*/
+    iDynTree::Transform m_desiredRightHandToWorldTransform; /**< Desired right hand to world transformation.*/
+
     iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
     iDynTree::Rotation m_additionalRotation; /**< Additional rotation matrix (it is useful to rotate the
                                                 desiredNeckOrientation rotation matrix). */
@@ -61,6 +69,8 @@ class WalkingQPIK_qpOASES
     iDynTree::Position m_comPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_leftFootToWorldTransform; /**< Actual left foot to world transformation.*/
     iDynTree::Transform m_rightFootToWorldTransform; /**< Actual right foot to world transformation.*/
+    iDynTree::Transform m_leftHandToWorldTransform; /**< Actual left hand to world transformation.*/
+    iDynTree::Transform m_rightHandToWorldTransform; /**< Actual right hand to world transformation.*/
     iDynTree::Rotation m_neckOrientation; /**< Rotation matrix of the actual neck orientation. */
     iDynTree::VectorDynSize m_jointPosition; /**< Actual joint position .*/
 
@@ -70,13 +80,20 @@ class WalkingQPIK_qpOASES
     iDynSparseMatrix m_jointRegulatizationGains;  /**< Gain related to the joint regularization. */
     double m_kPosFoot; /**< Gain related to the desired foot position. */
     double m_kIPosFoot; /**< Gain related to the desired foot position (integral). */
+
     double m_kAttFoot; /**< Gain related to the desired foot attitude. */
     double m_kNeck; /**< Gain related to the desired foot attitude. */
+
     double m_kCom; /**< Gain related to the desired foot attitude. */
     double m_kICom; /**< Gain related to the desired foot attitude (integral). */
 
+    double m_kPosHand; /**< Gain related to the desired hand position. */
+
+    double m_kAttHand; /**< Gain related to the desired hand attitude. */
+
     iDynSparseMatrix m_comWeightMatrix; /**< CoM weight matrix. */
     iDynSparseMatrix m_neckWeightMatrix; /**< Neck weight matrix. */
+    iDynSparseMatrix m_handWeightMatrix; /**< Hands weight matrix. */
     iDynSparseMatrix m_jointRegulatizationHessian; /**< Contains a constant matrix that can be useful
                                                       in the hessian evaluation ($- H'\lambdaH$). */
     iDynSparseMatrix m_jointRegulatizationGradient; /**< Contains a constant matrix that can be useful
@@ -87,6 +104,8 @@ class WalkingQPIK_qpOASES
     bool m_isSolutionEvaluated{false}; /**< True if the solution is evaluated. */
 
     bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
+    bool m_useLeftHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
+    bool m_useRightHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
 
     std::unique_ptr<iCub::ctrl::Integrator> m_leftFootErrorIntegral; /**< left foot error integrator */
     std::unique_ptr<iCub::ctrl::Integrator> m_rightFootErrorIntegral; /**< right foot error integrator  */
@@ -176,6 +195,14 @@ public:
                        const iDynTree::Position& comPosition);
 
     /**
+     * Set the hand state.
+     * @param leftHandToWorldTransformation transformation between the inertial frame and the left hand;
+     * @param rightHandToWorldTransformation transformation between the inertial frame and the right hand;
+     */
+    void setHandsState(const iDynTree::Transform& leftHandToWorldTransform,
+                       const iDynTree::Transform& rightHandToWorldTransform);
+
+    /**
      * Set the Jacobian of the neck
      * @param comJacobian jacobian of the CoM (mixed representation)
      * @return true/false in case of success/failure.
@@ -204,6 +231,20 @@ public:
     bool setRightFootJacobian(const iDynTree::MatrixDynSize& rightFootJacobian);
 
     /**
+     * Set the Jacobian of the left hand.
+     * @param leftHandJacobian Jacobian of the left hand (mixed representation)
+     * @return true/false in case of success/failure.
+     */
+    bool setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJacobian);
+
+    /**
+     * Set the Jacobian of the right hand.
+     * @param rightHandJacobian Jacobian of the right hand (mixed representation)
+     * @return true/false in case of success/failure.
+     */
+    bool setRightHandJacobian(const iDynTree::MatrixDynSize& rightHandJacobian);
+
+    /**
      * Set the desired joint position.
      * Please use this term as regularization term.
      * @param regularizationTerm vector of the desired joint position.
@@ -220,12 +261,33 @@ public:
                              const iDynTree::Twist& rightFootTwist);
 
     /**
-     * Set the desired twist of both feet
-     * @param leftFootTwist contain the desired twist of the left foot (MIXED representation);
-     * @param rightFootTwist contain the desired twist of the right foot (MIXED representation).
+     * Set the desired homogeneous transformation of both feet
+     * @param desiredLeftFootToWorldTransform desired transformation between the inertial frame and the left foot;
+     * @param desiredRightFootToWorldTransform desired transformation between the inertial frame and the right foot.
      */
     void setDesiredFeetTransformation(const iDynTree::Transform& desiredLeftFootToWorldTransform,
                                       const iDynTree::Transform& desiredRightFootToWorldTransform);
+
+    /**
+     * Set the desired left hand transformation
+     * @param desiredLeftHandToWorldTransform desired transformation between the inertial frame and the left hand;
+     */
+    void setDesiredLeftHandTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform);
+
+    /**
+     * Set the desired left hand transformation
+     * @param desiredRightHandToWorldTransform desired transformation between the inertial frame and the right hand.
+     */
+    void setDesiredRightHandTransformation(const iDynTree::Transform& desiredRightHandToWorldTransform);
+
+    /**
+     * Set the desired hands transformation
+     * @param desiredLeftHandToWorldTransform desired transformation between the inertial frame and the left hand;
+     * @param desiredRightHandToWorldTransform desired transformation between the inertial frame and the right hand.
+     */
+    void setDesiredHandsTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform,
+                                       const iDynTree::Transform& desiredRightHandToWorldTransform);
+
     /**
      * Set the desired orientation of the neck
      * @param desiredNeckOrientation rotation matrix between the neck and the world frame.

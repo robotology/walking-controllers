@@ -69,6 +69,8 @@ class WalkingModule:
     bool m_dumpData; /**< True if data are saved. */
     bool m_useVelocity; /**< True if real velocity control is used. */
     bool m_useVelocityControllerAsIK; /**< True the velocity controller is used as IK. */
+    bool m_useLeftHand; /**< Use the left hand inside the  inverse kinematics. */
+    bool m_useRightHand; /**< Use the right hand inside the  inverse kinematics. */
 
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
@@ -181,6 +183,20 @@ class WalkingModule:
 
     double m_normalForceThreshold;
 
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_desiredLeftHandSmoother; /**< Minimum jerk
+                                                                              trajectory for the left
+                                                                              hand. */
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_desiredRightHandSmoother; /**< Minimum jerk
+                                                                               trajectory for the
+                                                                               right hand. */
+    yarp::sig::Vector m_desiredLeftHandPoseYarp;
+    iDynTree::Transform m_desiredLeftHandToRootLinkTransform;
+    yarp::sig::Vector m_desiredRightHandPoseYarp;
+    iDynTree::Transform m_desiredRightHandToRootLinkTransform;
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredLeftHandPosePort; /**< Desired left hand port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredRightHandPosePort; /**< Desired right hand port. */
+
     /**
      * Configure the Force torque sensors. The FT ports are only opened please use yarpamanger
      * to connect them.
@@ -188,6 +204,13 @@ class WalkingModule:
      * @return true in case of success and false otherwise.
      */
     bool configureForceTorqueSensors(const yarp::os::Searchable& config);
+
+    /**
+     * Configure the hand retargeting feature.
+     * @param config is the reference to a resource finder object.
+     * @return true in case of success and false otherwise.
+     */
+    bool configureHandRetargeting(const yarp::os::Searchable& config);
 
     /**
      * Configure the Robot.
@@ -348,6 +371,11 @@ class WalkingModule:
      */
     bool updateTrajectories(const size_t& mergePoint);
 
+
+    /**
+     * Update the desired hands trajectories
+     */
+    void updateDesiredHandsPose();
 public:
 
     /**

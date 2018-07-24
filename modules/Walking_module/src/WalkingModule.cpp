@@ -350,6 +350,88 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     return true;
 }
 
+bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
+{
+    std::string portInput, portOutput;
+
+    if(config.isNull())
+    {
+        yInfo() << "[configureHandRetargeting] No hand retargeting.";
+        m_useLeftHand = false;
+        m_useRightHand = false;
+        return true;
+    }
+
+    double smoothingTime;
+    if(!YarpHelper::getDoubleFromSearchable(config, "hand_smoothing_time", smoothingTime))
+    {
+        yError() << "[configureHandRetargeting] Initialization failed while reading smoothing time.";
+        return false;
+    }
+
+    m_useLeftHand = config.check("use_left_hand", yarp::os::Value("False")).asBool();
+    if(m_useLeftHand)
+    {
+        // open and connect left foot wrench
+        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseInputPort_name",
+                                                portInput))
+        {
+            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
+            return false;
+        }
+        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseOutputPort_name",
+                                                portOutput))
+        {
+            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
+            return false;
+        }
+        // open port
+        m_desiredLeftHandPosePort.open("/" + getName() + portInput);
+        // connect port
+        if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
+        {
+            yError() << "Unable to connect to port " << "/" + getName() + portInput;
+            return false;
+        }
+
+        // initialize the smoother
+        m_desiredLeftHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT,
+                                                                                 smoothingTime);
+    }
+
+    m_useRightHand = config.check("use_right_hand", yarp::os::Value("False")).asBool();
+    if(m_useRightHand)
+    {
+        // open and connect right foot wrench
+        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseInputPort_name",
+                                                portInput))
+        {
+            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
+            return false;
+        }
+        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseOutputPort_name",
+                                                portOutput))
+        {
+            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
+            return false;
+        }
+        // open port
+        m_desiredRightHandPosePort.open("/" + getName() + portInput);
+        // connect port
+        if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
+        {
+            yError() << "Unable to connect to port " << "/" + getName() + portInput;
+            return false;
+        }
+
+        // initialize the smoother
+        m_desiredRightHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT,
+                                                                                 smoothingTime);
+    }
+
+    return true;
+}
+
 bool WalkingModule::configureForceTorqueSensors(const yarp::os::Searchable& config)
 {
     std::string portInput, portOutput;
@@ -458,6 +540,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    yarp::os::Bottle& handRetargetingOptions = rf.findGroup("HAND_RETARGETING");
+    if(!configureHandRetargeting(handRetargetingOptions))
+    {
+        yError() << "[configure] Unable to configure the hand retargeting.";
+        return false;
+    }
+
     // open RPC port for external command
     std::string rpcPortName = "/" + getName() + "/rpc";
     this->yarp().attachAsServer(this->m_rpcPort);
@@ -525,6 +614,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
         inverseKinematicsQPSolverOptions.append(generalOptions);
+        inverseKinematicsQPSolverOptions.append(handRetargetingOptions);
         m_QPIKSolver_osqp = std::make_unique<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_actuatedDOFs,
@@ -656,12 +746,58 @@ bool WalkingModule::close()
     return true;
 }
 
+void WalkingModule::updateDesiredHandsPose()
+{
+    if(m_useLeftHand)
+    {
+        yarp::sig::Vector *desiredLeftHandPose = NULL;
+        desiredLeftHandPose = m_desiredLeftHandPosePort.read(false);
+        if(desiredLeftHandPose != NULL)
+            m_desiredLeftHandPoseYarp = *desiredLeftHandPose;
+
+        m_desiredLeftHandSmoother->computeNextValues(m_desiredLeftHandPoseYarp);
+        yarp::sig::Vector desiredLeftHandPoseSmoothedYarp = m_desiredLeftHandSmoother->getPos();
+        iDynTree::Position leftPosition;
+        iDynTree::toiDynTree(desiredLeftHandPoseSmoothedYarp.subVector(0,2), leftPosition);
+        m_desiredLeftHandToRootLinkTransform.setPosition(leftPosition);
+        m_desiredLeftHandToRootLinkTransform.setRotation(iDynTree::Rotation::RPY(desiredLeftHandPoseSmoothedYarp(3),
+                                                                                 desiredLeftHandPoseSmoothedYarp(4),
+                                                                                 desiredLeftHandPoseSmoothedYarp(5)));
+    }
+
+    if(m_useRightHand)
+    {
+        yarp::sig::Vector *desiredRightHandPose = NULL;
+        desiredRightHandPose = m_desiredRightHandPosePort.read(false);
+        if(desiredRightHandPose != NULL)
+            m_desiredRightHandPoseYarp = *desiredRightHandPose;
+
+        m_desiredRightHandSmoother->computeNextValues(m_desiredRightHandPoseYarp);
+        yarp::sig::Vector desiredRightHandPoseSmoothedYarp = m_desiredRightHandSmoother->getPos();
+        iDynTree::Position rightPosition;
+        iDynTree::toiDynTree(desiredRightHandPoseSmoothedYarp.subVector(0,2), rightPosition);
+        m_desiredRightHandToRootLinkTransform.setPosition(rightPosition);
+        m_desiredRightHandToRootLinkTransform.setRotation(iDynTree::Rotation::RPY(desiredRightHandPoseSmoothedYarp(3),
+                                                                                 desiredRightHandPoseSmoothedYarp(4),
+                                                                                 desiredRightHandPoseSmoothedYarp(5)));
+    }
+}
+
 bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoMPosition,
                               const iDynTree::Vector3& desiredCoMVelocity,
                               const iDynTree::Position& actualCoMPosition,
                               const iDynTree::Rotation& desiredNeckOrientation,
                               iDynTree::VectorDynSize &output)
 {
+
+    // set jacobians
+    iDynTree::MatrixDynSize jacobian, comJacobian;
+    jacobian.resize(6, m_actuatedDOFs + 6);
+    comJacobian.resize(3, m_actuatedDOFs + 6);
+
+
+    solver->setHandsState(m_FKSolver->getLeftHandToWorldTransform(),
+                          m_FKSolver->getRightHandToWorldTransform());
 
     if(!solver->setRobotState(m_positionFeedbackInRadians,
                               m_FKSolver->getLeftFootToWorldTransform(),
@@ -685,10 +821,24 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
 
     solver->setDesiredCoMPosition(desiredCoMPosition);
 
-    // set jacobians
-    iDynTree::MatrixDynSize jacobian, comJacobian;
-    jacobian.resize(6, m_actuatedDOFs + 6);
-    comJacobian.resize(3, m_actuatedDOFs + 6);
+    if(m_useLeftHand)
+    {
+        solver->setDesiredLeftHandTransformation(m_FKSolver->getRootLinkToWorldTransform() *
+                                                 m_desiredLeftHandToRootLinkTransform);
+
+        m_FKSolver->getLeftHandJacobian(jacobian);
+        solver->setLeftHandJacobian(jacobian);
+
+    }
+
+    if(m_useRightHand)
+    {
+        solver->setDesiredRightHandTransformation(m_FKSolver->getRootLinkToWorldTransform() *
+                                                  m_desiredRightHandToRootLinkTransform);
+
+        m_FKSolver->getRightHandJacobian(jacobian);
+        solver->setRightHandJacobian(jacobian);
+    }
 
     m_FKSolver->getLeftFootJacobian(jacobian);
     solver->setLeftFootJacobian(jacobian);
@@ -787,6 +937,9 @@ bool WalkingModule::updateModule()
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
         }
+
+        // get desired hands pose
+        updateDesiredHandsPose();
 
         if(!updateFKSolver())
         {
@@ -970,15 +1123,18 @@ bool WalkingModule::updateModule()
 
             if(m_useOSQP)
             {
-                if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-                              desiredCoMVelocity, measuredCoM,
-                              yawRotation, m_dqDesired_osqp))
-                {
-                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-                    return false;
-                }
+                // if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
+                //               desiredCoMVelocity, measuredCoM,
+                //               yawRotation, m_dqDesired_osqp))
+                // {
+                //     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                //     return false;
+                // }
 
-                iDynTree::toYarp(m_dqDesired_osqp, bufferVelocity);
+                // iDynTree::toYarp(m_dqDesired_osqp, bufferVelocity);
+
+                yError() << "[updateModule] no more implemented";
+                return false;
             }
             else
             {
@@ -1098,7 +1254,7 @@ bool WalkingModule::updateModule()
         m_profiler->setEndTime("Total");
 
         // print timings
-        m_profiler->profiling();
+        // m_profiler->profiling();
 
         // send data to the WalkingLogger
         if(m_dumpData)
@@ -1118,20 +1274,25 @@ bool WalkingModule::updateModule()
             else
                 m_IKSolver->getDesiredNeckOrientation(torsoDesired);
 
-            m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
-                                      m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP,
-                                      measuredCoM,
-                                      desiredCoMPositionXY, desiredCoMVelocityXY,
-                                      desiredCoMPosition,
-                                      leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-                                      rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-                                      m_leftTrajectory.front().getPosition(),
-                                      m_leftTrajectory.front().getRotation().asRPY(),
-                                      m_rightTrajectory.front().getPosition(),
-                                      m_rightTrajectory.front().getRotation().asRPY(),
-                                      torsoDesired,
-                                      m_FKSolver->getNeckOrientation().asRPY());
+            // m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
+            //                           m_DCMVelocityDesired.front(),
+            //                           measuredZMP, desiredZMP,
+            //                           measuredCoM,
+            //                           desiredCoMPositionXY, desiredCoMVelocityXY,
+            //                           desiredCoMPosition,
+            //                           leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
+            //                           rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
+            //                           m_leftTrajectory.front().getPosition(),
+            //                           m_leftTrajectory.front().getRotation().asRPY(),
+            //                           m_rightTrajectory.front().getPosition(),
+            //                           m_rightTrajectory.front().getRotation().asRPY(),
+            //                           torsoDesired,
+            //                           m_FKSolver->getNeckOrientation().asRPY());
+            m_walkingLogger->sendData(m_desiredRightHandPoseYarp.subVector(0,2),
+                                      m_desiredRightHandToRootLinkTransform.getPosition(),
+                                      m_FKSolver->getRightHandToWorldTransform().getPosition());
+
+
         }
 
         propagateTime();
@@ -1256,7 +1417,6 @@ bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
             {
                 if(m_firstStep)
                 {
-       		  yInfo() << "hi";
                     m_leftWrenchFilter->init(m_leftWrenchInput);
                     m_rightWrenchFilter->init(m_rightWrenchInput);
                 }
@@ -1544,13 +1704,13 @@ bool WalkingModule::setDirectPositionReferences(const iDynTree::VectorDynSize& d
         return false;
     }
 
-    if(worstErrorRad.second > 0.5)
-    {
-        yError() << "[setDirectPositionReferences] The worst error between the current and the "
-                 << "desired position of the " << worstErrorRad.first
-                 << "-th joint is greater than 0.5 rad.";
-        return false;
-    }
+    // if(worstErrorRad.second > 0.5)
+    // {
+    //     yError() << "[setDirectPositionReferences] The worst error between the current and the "
+    //              << "desired position of the " << worstErrorRad.first
+    //              << "-th joint is greater than 0.5 rad.";
+    //     return false;
+    // }
 
     iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(desiredPositionsRad) * iDynTree::rad2deg(1);
 
@@ -1755,14 +1915,70 @@ bool WalkingModule::prepareRobot(bool onTheFly)
             }
     }
 
-    yarp::sig::Vector buffer(m_qDesired.size());
-    iDynTree::toYarp(m_qDesired, buffer);
+    // get feedback to initialize integrator and hands minimum jerk trajectories
+    if(!getFeedbacks(10))
+    {
+        yError() << "[prepareRobot] Unable to get the feedback.";
+        return false;
+    }
+
+    yarp::sig::Vector buffer(m_positionFeedbackInRadians.size());
+    iDynTree::toYarp(m_positionFeedbackInRadians, buffer);
     // instantiate Integrator object
     m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
 
     // reset the models
     m_walkingZMPController->reset(m_DCMPositionDesired.front());
     m_stableDCMModel->reset(m_DCMPositionDesired.front());
+
+    if(m_useLeftHand || m_useRightHand)
+    {
+        iDynTree::Position position;
+        iDynTree::Rotation rotation;
+        iDynTree::Transform handToRootLink;
+        yarp::sig::Vector handBuffer(6);
+        if(!updateFKSolver())
+        {
+            yError() << "[prepareRobot] Unable to update FK.";
+            return false;
+        }
+
+        if(m_useLeftHand)
+        {
+            handToRootLink = m_FKSolver->getRootLinkToWorldTransform().inverse() *
+                m_FKSolver->getLeftHandToWorldTransform();
+
+            position = handToRootLink.getPosition();
+            rotation = handToRootLink.getRotation();
+
+            for(int i = 0; i<3; i++)
+                handBuffer(i) = position(i);
+
+            rotation.getRPY(handBuffer(3), handBuffer(4), handBuffer(5));
+
+            m_desiredLeftHandPoseYarp = handBuffer;
+            m_desiredLeftHandSmoother->init(handBuffer);
+
+        }
+
+        if(m_useRightHand)
+        {
+            handToRootLink = m_FKSolver->getRootLinkToWorldTransform().inverse() *
+                m_FKSolver->getRightHandToWorldTransform();
+
+            position = handToRootLink.getPosition();
+            rotation = handToRootLink.getRotation();
+
+            for(int i = 0; i < 3; i++)
+                handBuffer(i) = position(i);
+
+            rotation.getRPY(handBuffer(3), handBuffer(4), handBuffer(5));
+
+            m_desiredRightHandPoseYarp = handBuffer;
+            m_desiredRightHandSmoother->init(handBuffer);
+        }
+    }
+
 
     m_robotState = WalkingFSM::Prepared;
     return true;
@@ -1835,8 +2051,6 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         yError() << "[askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
         return false;
     }
-
-    yInfo() << "init Time before updateTrajectories " << initTime;
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
@@ -2008,25 +2222,29 @@ bool WalkingModule::startWalking()
 
     if(m_dumpData)
     {
-        m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                    "dcm_des_x", "dcm_des_y",
-                    "dcm_des_dx", "dcm_des_dy",
-                    "zmp_x", "zmp_y",
-                    "zmp_des_x", "zmp_des_y",
-                    "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y",
-                    "com_des_dx", "com_des_dy",
-                    "com_ik_x", "com_ik_y", "com_ik_z",
-                    "lf_x", "lf_y", "lf_z",
-                    "lf_roll", "lf_pitch", "lf_yaw",
-                    "rf_x", "rf_y", "rf_z",
-                    "rf_roll", "rf_pitch", "rf_yaw",
-                    "lf_des_x", "lf_des_y", "lf_des_z",
-                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    "rf_des_x", "rf_des_y", "rf_des_z",
-                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "torso_des_roll", "torso_des_pitch", "torso_des_yaw",
-                    "torso_roll", "torso_pitch", "torso_yaw"});
+        m_walkingLogger->startRecord({"record",
+                    "x_des", "y_des", "z_des",
+                    "x_ik_des", "y_ik_des", "z_ik_des",
+                    "x", "y", "z"});
+                    //" dcm_x", "dcm_y",
+                    // "dcm_des_x", "dcm_des_y",
+                    // "dcm_des_dx", "dcm_des_dy",
+                    // "zmp_x", "zmp_y",
+                    // "zmp_des_x", "zmp_des_y",
+                    // "com_x", "com_y", "com_z",
+                    // "com_des_x", "com_des_y",
+                    // "com_des_dx", "com_des_dy",
+                    // "com_ik_x", "com_ik_y", "com_ik_z",
+                    // "lf_x", "lf_y", "lf_z",
+                    // "lf_roll", "lf_pitch", "lf_yaw",
+                    // "rf_x", "rf_y", "rf_z",
+                    // "rf_roll", "rf_pitch", "rf_yaw",
+                    // "lf_des_x", "lf_des_y", "lf_des_z",
+                    // "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
+                    // "rf_des_x", "rf_des_y", "rf_des_z",
+                    // "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
+                    // "torso_des_roll", "torso_des_pitch", "torso_des_yaw",
+                    // "torso_roll", "torso_pitch", "torso_yaw"});
     }
 
     {

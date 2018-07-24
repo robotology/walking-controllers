@@ -42,6 +42,32 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
         m_comWeightMatrix.setFromConstTriplets(comWeightMatrix);
     }
 
+    if(m_useLeftHand || m_useRightHand)
+    {
+        tempValue = config.find("handWeightTriplets");
+        iDynTree::Triplets handWeightMatrix;
+        if(!iDynTreeHelper::Triplets::getTripletsFromValues(tempValue, 6, handWeightMatrix))
+        {
+            yError() << "Initialization failed while reading handWeightTriplets vector.";
+            return false;
+        }
+
+        m_handWeightMatrix.resize(6, 6);
+        m_handWeightMatrix.setFromConstTriplets(handWeightMatrix);
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "k_posHand", m_kPosHand))
+        {
+            yError() << "Initialization failed while reading k_posHand.";
+            return false;
+        }
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "k_attHand", m_kAttHand))
+        {
+            yError() << "Initialization failed while reading k_attHand.";
+            return false;
+        }
+    }
+
     // get the CoM weight
     tempValue = config.find("neckWeightTriplets");
     iDynTree::Triplets neckWeightMatrix;
@@ -77,6 +103,8 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
     m_neckJacobian.resize(3, m_numberOfVariables);
     m_leftFootJacobian.resize(6, m_numberOfVariables);
     m_rightFootJacobian.resize(6, m_numberOfVariables);
+    m_leftHandJacobian.resize(6, m_numberOfVariables);
+    m_rightHandJacobian.resize(6, m_numberOfVariables);
 
     tempValue = config.find("jointRegularizationGains");
     iDynTree::VectorDynSize jointRegularizationGains(m_actuatedDOFs);
@@ -173,6 +201,8 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
     }
 
     m_useCoMAsConstraint = config.check("useCoMAsConstraint", yarp::os::Value(false)).asBool();
+    m_useLeftHand = config.check("use_left_hand", yarp::os::Value(false)).asBool();
+    m_useRightHand = config.check("use_right_hand", yarp::os::Value(false)).asBool();
 
     // TODO in the future the number of constraints should be added inside
     // the configuration file
@@ -250,6 +280,15 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
 
     m_isFirstTime = true;
     return true;
+}
+
+void WalkingQPIK_qpOASES::setHandsState(const iDynTree::Transform& leftHandToWorldTransform,
+                                        const iDynTree::Transform& rightHandToWorldTransform)
+{
+    // in the future we should save only the measured hand
+    // transformation only for the left or right
+    m_leftHandToWorldTransform = leftHandToWorldTransform;
+    m_rightHandToWorldTransform = rightHandToWorldTransform;
 }
 
 bool WalkingQPIK_qpOASES::setRobotState(const iDynTree::VectorDynSize& jointPosition,
@@ -333,6 +372,42 @@ bool WalkingQPIK_qpOASES::setRightFootJacobian(const iDynTree::MatrixDynSize& ri
     return true;
 }
 
+bool WalkingQPIK_qpOASES::setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJacobian)
+{
+    if(leftHandJacobian.rows() != 6)
+    {
+        yError() << "[setLeftHandJacobian] the number of rows has to be equal to 6.";
+        return false;
+    }
+    if(leftHandJacobian.cols() != m_actuatedDOFs + 6)
+    {
+        yError() << "[setLeftHandJacobian] the number of rows has to be equal to" << m_actuatedDOFs + 6;
+        return false;
+    }
+
+    m_leftHandJacobian = leftHandJacobian;
+
+    return true;
+}
+
+bool WalkingQPIK_qpOASES::setRightHandJacobian(const iDynTree::MatrixDynSize& rightHandJacobian)
+{
+    if(rightHandJacobian.rows() != 6)
+    {
+        yError() << "[setRightHandJacobian] the number of rows has to be equal to 6.";
+        return false;
+    }
+    if(rightHandJacobian.cols() != m_actuatedDOFs + 6)
+    {
+        yError() << "[setRightHandJacobian] the number of rows has to be equal to" << m_actuatedDOFs + 6;
+        return false;
+    }
+
+    m_rightHandJacobian = rightHandJacobian;
+
+    return true;
+}
+
 bool WalkingQPIK_qpOASES::setNeckJacobian(const iDynTree::MatrixDynSize& neckJacobian)
 {
     if(neckJacobian.rows() != 6)
@@ -369,6 +444,23 @@ bool WalkingQPIK_qpOASES::setHessianMatrix()
             iDynTree::toEigen(m_comWeightMatrix) * iDynTree::toEigen(m_comJacobian);
     }
 
+    if(m_useLeftHand)
+    {
+        Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) =
+            Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) +
+            iDynTree::toEigen(m_leftHandJacobian).transpose() *
+            iDynTree::toEigen(m_handWeightMatrix) * iDynTree::toEigen(m_leftHandJacobian);
+    }
+
+    if(m_useRightHand)
+    {
+        Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) =
+            Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) +
+            iDynTree::toEigen(m_rightHandJacobian).transpose() *
+            iDynTree::toEigen(m_handWeightMatrix) * iDynTree::toEigen(m_rightHandJacobian);
+    }
+
+
     return true;
 }
 
@@ -376,26 +468,61 @@ bool WalkingQPIK_qpOASES::setGradientVector()
 {
     iDynTree::Matrix3x3 errorNeckAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_neckOrientation * m_desiredNeckOrientation.inverse());
 
-    if(m_useCoMAsConstraint)
+    Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
+        -iDynTree::toEigen(m_neckJacobian).transpose()
+        * iDynTree::toEigen(m_neckWeightMatrix)
+        * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
+        - iDynTree::toEigen(m_jointRegulatizationGradient) *
+        (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_regularizationTerm)
+                                                          - iDynTree::toEigen(m_jointPosition)));
+
+    if(!m_useCoMAsConstraint)
     {
         Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
-            -iDynTree::toEigen(m_neckJacobian).transpose()
-            * iDynTree::toEigen(m_neckWeightMatrix)
-            * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
-            - iDynTree::toEigen(m_jointRegulatizationGradient) *
-            (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_regularizationTerm)
-                                                              - iDynTree::toEigen(m_jointPosition)));
+            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
+            - iDynTree::toEigen(m_comJacobian).transpose()
+            * iDynTree::toEigen(m_comWeightMatrix) * iDynTree::toEigen(m_comVelocity);
     }
-    else
+
+    if(m_useLeftHand)
     {
-        Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
-            = -iDynTree::toEigen(m_comJacobian).transpose()
-            * iDynTree::toEigen(m_comWeightMatrix) * iDynTree::toEigen(m_comVelocity)
-            - iDynTree::toEigen(m_neckJacobian).transpose() * iDynTree::toEigen(m_neckWeightMatrix)
-            * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
-            - iDynTree::toEigen(m_jointRegulatizationGradient) *
-            (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_regularizationTerm)
-                                                              - iDynTree::toEigen(m_jointPosition)));
+        //  left hand
+        Eigen::VectorXd leftHandCorrection(6);
+        iDynTree::Position leftHandPositionError = m_leftHandToWorldTransform.getPosition()
+            - m_desiredLeftHandToWorldTransform.getPosition();
+        leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
+
+        iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
+                                                                                            m_desiredLeftHandToWorldTransform.getRotation().inverse());
+
+        leftHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
+
+        Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
+            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
+            - iDynTree::toEigen(m_leftHandJacobian).transpose()
+            * iDynTree::toEigen(m_handWeightMatrix) * (-leftHandCorrection);
+    }
+
+    if(m_useRightHand)
+    {
+        //  right hand
+        Eigen::VectorXd rightHandCorrection(6);
+        iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
+            - m_desiredRightHandToWorldTransform.getPosition();
+
+        yInfo() << "hand error " << rightHandPositionError.toString();
+
+        rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
+
+        iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
+                                                                                            m_desiredRightHandToWorldTransform.getRotation().inverse());
+
+        rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+
+        Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
+            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
+            - iDynTree::toEigen(m_rightHandJacobian).transpose()
+            * iDynTree::toEigen(m_handWeightMatrix) * (-rightHandCorrection);
     }
 
     return true;
@@ -434,7 +561,7 @@ bool WalkingQPIK_qpOASES::setLinearConstraintMatrix()
 }
 
 iDynTree::Position WalkingQPIK_qpOASES::evaluateIntegralError(std::unique_ptr<iCub::ctrl::Integrator>& integral,
-                                                                   const iDynTree::Position& error)
+                                                              const iDynTree::Position& error)
 {
     yarp::sig::Vector buffer(error.size());
     yarp::sig::Vector integralErrorYarp(error.size());
@@ -456,7 +583,6 @@ bool WalkingQPIK_qpOASES::setBounds()
         - m_desiredLeftFootToWorldTransform.getPosition();
     leftFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen(leftFootError)
         + m_kIPosFoot * iDynTree::toEigen(evaluateIntegralError(m_leftFootErrorIntegral, leftFootError));
-
 
     iDynTree::Matrix3x3 errorLeftAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_leftFootToWorldTransform.getRotation() *
                                                                                     m_desiredLeftFootToWorldTransform.getRotation().inverse());
@@ -555,6 +681,24 @@ void WalkingQPIK_qpOASES::setDesiredFeetTwist(const iDynTree::Twist& leftFootTwi
 {
     m_leftFootTwist = leftFootTwist;
     m_rightFootTwist = rightFootTwist;
+}
+
+void WalkingQPIK_qpOASES::setDesiredLeftHandTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform)
+{
+    m_desiredLeftHandToWorldTransform = desiredLeftHandToWorldTransform;
+}
+
+void WalkingQPIK_qpOASES::setDesiredRightHandTransformation(const iDynTree::Transform& desiredRightHandToWorldTransform)
+{
+    m_desiredRightHandToWorldTransform = desiredRightHandToWorldTransform;
+}
+
+// in the future they will be iDynTree::Transform
+void WalkingQPIK_qpOASES::setDesiredHandsTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform,
+                                                        const iDynTree::Transform& desiredRightHandToWorldTransform)
+{
+    setDesiredRightHandTransformation(desiredRightHandToWorldTransform);
+    setDesiredLeftHandTransformation(desiredLeftHandToWorldTransform);
 }
 
 void WalkingQPIK_qpOASES::setDesiredCoMVelocity(const iDynTree::Vector3& comVelocity)
