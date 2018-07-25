@@ -153,25 +153,6 @@ bool WalkingQPIK_qpOASES::initializeMatrices(const yarp::os::Searchable& config)
         return false;
     }
 
-
-    return true;
-}
-
-bool WalkingQPIK_qpOASES::setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                                            const iDynTree::VectorDynSize& maxJointsLimit)
-{
-    if(minJointsLimit.size() != maxJointsLimit.size())
-    {
-        yError() << "[setVelocityBounds] The size of the vector limits has to be equal.";
-        return false;
-    }
-    if(minJointsLimit.size() != m_actuatedDOFs)
-    {
-        yError() << "[setVelocityBounds] The size of the vector limits has to be equal to ."
-                 << "the number of the joint";
-        return false;
-    }
-
     // the first six values are related to the velocity (linear and angular) of the base
     for(int i = 0; i < 6; i++)
     {
@@ -179,24 +160,55 @@ bool WalkingQPIK_qpOASES::setVelocityBounds(const iDynTree::VectorDynSize& minJo
         m_maxJointLimit[i] = std::numeric_limits<double>::max();
     }
 
-    for(int i = 0; i < m_actuatedDOFs; i++)
+    return true;
+}
+
+bool WalkingQPIK_qpOASES::setJointBounds(const iDynTree::VectorDynSize& minJointsPosition,
+                                         const iDynTree::VectorDynSize& maxJointsPosition,
+                                         const iDynTree::VectorDynSize& minJointsVelocity,
+                                         const iDynTree::VectorDynSize& maxJointsVelocity)
+{
+    if(minJointsPosition.size() != maxJointsPosition.size() ||
+       minJointsVelocity.size() != maxJointsVelocity.size() ||
+       minJointsVelocity.size() != maxJointsPosition.size())
     {
-        m_minJointLimit[i + 6] = minJointsLimit(i);
-        m_maxJointLimit[i + 6] = maxJointsLimit(i);
+        yError() << "[setJointBounds] The size of the vector limits has to be equal.";
+        return false;
     }
+    if(minJointsVelocity.size() != m_actuatedDOFs)
+    {
+        yError() << "[setJointBounds] The size of the vector limits has to be equal to ."
+                 << "the number of the joint";
+        return false;
+    }
+
+    Eigen::Map<MatrixXd>(m_minJointPosition.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(minJointsPosition);
+    Eigen::Map<MatrixXd>(m_maxJointPosition.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(maxJointsPosition);
+
+    Eigen::Map<MatrixXd>(m_minJointVelocity.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(minJointsVelocity);
+    Eigen::Map<MatrixXd>(m_maxJointVelocity.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(maxJointsVelocity);
+
     return true;
 }
 
 bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
                                      const int& actuatedDOFs,
-                                     const iDynTree::VectorDynSize& minJointsLimit,
-                                     const iDynTree::VectorDynSize& maxJointsLimit)
+                                     const iDynTree::VectorDynSize& minJointsPosition,
+                                     const iDynTree::VectorDynSize& maxJointsPosition,
+                                     const iDynTree::VectorDynSize& minJointsVelocity,
+                                     const iDynTree::VectorDynSize& maxJointsVelocity)
 {
     m_actuatedDOFs = actuatedDOFs;
     // check if the config is empty
     if(config.isNull())
     {
         yError() << "[initialize] Empty configuration for QP-IK solver.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", m_dT))
+    {
+        yError() << "Initialization failed while reading sampling_time.";
         return false;
     }
 
@@ -224,8 +236,16 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
     m_constraintMatrix.resize(m_numberOfVariables * m_numberOfConstraints);
     m_upperBound.resize(m_numberOfConstraints);
     m_lowerBound.resize(m_numberOfConstraints);
+
     m_minJointLimit.resize(m_numberOfVariables);
     m_maxJointLimit.resize(m_numberOfVariables);
+
+    m_minJointPosition.resize(m_actuatedDOFs);
+    m_maxJointPosition.resize(m_actuatedDOFs);
+
+    m_minJointVelocity.resize(m_actuatedDOFs);
+    m_maxJointVelocity.resize(m_actuatedDOFs);
+
     m_regularizationTerm.resize(m_actuatedDOFs);
     m_jointPosition.resize(m_actuatedDOFs);
 
@@ -248,9 +268,10 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    if(!setVelocityBounds(minJointsLimit, maxJointsLimit))
+    if(!setJointBounds(minJointsPosition, maxJointsPosition,
+                       minJointsVelocity, maxJointsVelocity))
     {
-        yError() << "[initialize] Unable to set the velocity bounds.";
+        yError() << "[initialize] Unable to set the joint bounds.";
         return false;
     }
 
@@ -425,6 +446,26 @@ bool WalkingQPIK_qpOASES::setNeckJacobian(const iDynTree::MatrixDynSize& neckJac
                                                                               m_actuatedDOFs + 6);
 
     return true;
+}
+
+void WalkingQPIK_qpOASES::setJointLimits()
+{
+    double maxPos, minPos;
+    for(int i = 0; i < m_actuatedDOFs; i++)
+    {
+        minPos = (m_minJointPosition[i] - m_jointPosition(i)) / m_dT;
+        maxPos = (m_maxJointPosition[i] - m_jointPosition(i)) / m_dT;
+
+        if(minPos > m_minJointVelocity[i])
+            m_minJointLimit[i + 6] = minPos;
+        else
+            m_minJointLimit[i + 6] = m_minJointVelocity[i];
+
+        if(maxPos < m_maxJointVelocity[i])
+            m_maxJointLimit[i + 6] = maxPos;
+        else
+            m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
+    }
 }
 
 bool WalkingQPIK_qpOASES::setHessianMatrix()
@@ -738,6 +779,9 @@ bool WalkingQPIK_qpOASES::solve()
         yError() << "[solve] Unable to set the bounds.";
         return false;
     }
+
+    // the joint limits are set tacking into account the position and velocity limits
+    setJointLimits();
 
     int nWSR = 100;
 

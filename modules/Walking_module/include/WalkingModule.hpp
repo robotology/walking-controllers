@@ -145,8 +145,12 @@ class WalkingModule:
     iDynTree::VectorDynSize m_positionFeedbackInRadians; /**< Vector containing the current joint position [rad]. */
     iDynTree::VectorDynSize m_velocityFeedbackInRadians; /**< Vector containing the current joint velocity [rad/s]. */
     iDynTree::VectorDynSize m_toDegBuffer; /**< Vector containing the desired joint positions that will be sent to the robot [deg]. */
-    iDynTree::VectorDynSize m_minJointsLimit; /**< Vector containing the max negative limits [rad/s]. */
-    iDynTree::VectorDynSize m_maxJointsLimit; /**< Vector containing the max positive limits [rad/s]. */
+
+    iDynTree::VectorDynSize m_minJointsVelocity; /**< Vector containing the max negative velocity [rad/s]. */
+    iDynTree::VectorDynSize m_maxJointsVelocity; /**< Vector containing the max positive velocity [rad/s]. */
+
+    iDynTree::VectorDynSize m_minJointsPosition; /**< Vector containing the max negative position [rad]. */
+    iDynTree::VectorDynSize m_maxJointsPosition; /**< Vector containing the max positive position [rad]. */
 
     yarp::sig::Vector m_positionFeedbackInDegreesFiltered;
     yarp::sig::Vector m_velocityFeedbackInDegreesFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */

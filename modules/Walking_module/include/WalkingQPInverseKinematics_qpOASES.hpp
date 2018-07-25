@@ -39,6 +39,14 @@ class WalkingQPIK_qpOASES
     std::vector<double>  m_minJointLimit;
     std::vector<double>  m_maxJointLimit;
 
+    std::vector<double>  m_minJointPosition;
+    std::vector<double>  m_maxJointPosition;
+
+    std::vector<double>  m_minJointVelocity;
+    std::vector<double>  m_maxJointVelocity;
+
+    double m_dT;
+
     bool m_isFirstTime;
 
     iDynTree::MatrixDynSize m_comJacobian; /**< CoM jacobian (mixed representation). */
@@ -147,13 +155,22 @@ class WalkingQPIK_qpOASES
     bool setBounds();
 
     /**
-     * Set joints velocity bounds
-     * @param the minJointsLimit is a vector containing the min joints velocity limit;
-     * @param the minJointsLimit is a vector containing the max joints velocity limit.
+     * Set the joints limits tacking into account both velocity and position limits.
+     */
+    void setJointLimits();
+
+    /**
+     * Set joints bounds
+     * @param minJointsPosition is a vector containing the min joints position limit;
+     * @param maxJointsPosition is a vector containing the max joints position limit;
+     * @param minJointsVelocity is a vector containing the min joints velocity limit;
+     * @param maxJointsVelocity is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
-    bool setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                           const iDynTree::VectorDynSize& maxJointsLimit);
+    bool setJointBounds(const iDynTree::VectorDynSize& minJointsPosition,
+                        const iDynTree::VectorDynSize& maxJointsPosition,
+                        const iDynTree::VectorDynSize& minJointsVelocity,
+                        const iDynTree::VectorDynSize& maxJointsVelocity);
 
     /**
      * Evaluate the integral.
@@ -171,14 +188,18 @@ public:
      * @param config config of the QP-IK solver;
      * @param kinDyn reference to an already instantiate kinDynComputations object.
      * It will be used only for get jacobians
-     * @param the minJointsLimit is a vector containing the min joints velocity limit;
-     * @param the minJointsLimit is a vector containing the max joints velocity limit.
+     * @param minJointsPosition is a vector containing the min joints position limit;
+     * @param maxJointsPosition is a vector containing the max joints position limit;
+     * @param minJointsVelocity is a vector containing the min joints velocity limit;
+     * @param maxJointsVelocity is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
     bool initialize(const yarp::os::Searchable& config,
                     const int& actuatedDOFs,
-                    const iDynTree::VectorDynSize& minJointsLimit,
-                    const iDynTree::VectorDynSize& maxJointsLimit);
+                    const iDynTree::VectorDynSize& minJointsPosition,
+                    const iDynTree::VectorDynSize& maxJointsPosition,
+                    const iDynTree::VectorDynSize& minJointsVelocity,
+                    const iDynTree::VectorDynSize& maxJointsVelocity);
 
     /**
      * Set the robot state.

@@ -241,8 +241,11 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     m_dqDesired_osqp.resize(m_actuatedDOFs);
     m_dqDesired_qpOASES.resize(m_actuatedDOFs);
     m_toDegBuffer.resize(m_actuatedDOFs);
-    m_minJointsLimit.resize(m_actuatedDOFs);
-    m_maxJointsLimit.resize(m_actuatedDOFs);
+    m_minJointsVelocity.resize(m_actuatedDOFs);
+    m_maxJointsVelocity.resize(m_actuatedDOFs);
+
+    m_minJointsPosition.resize(m_actuatedDOFs);
+    m_maxJointsPosition.resize(m_actuatedDOFs);
 
     m_positionFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
     m_positionFeedbackInDegreesFiltered.zero();
@@ -338,14 +341,24 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     double max, min;
     for(int i = 0; i < m_actuatedDOFs; i++)
     {
+        // get position limits
+        if(!m_limitsInterface->getLimits(i, &min, &max))
+        {
+            yError() << "[configure] Unable get joints position limits.";
+            return false;
+        }
+        m_minJointsPosition(i) = iDynTree::deg2rad(min);
+        m_maxJointsPosition(i) = iDynTree::deg2rad(max);
+
+        // get velocity limits
         if(!m_limitsInterface->getVelLimits(i, &min, &max))
         {
             yError() << "[configure] Unable get joints velocity limits.";
             return false;
         }
 
-        m_minJointsLimit(i) = -iDynTree::deg2rad(max);
-        m_maxJointsLimit(i) = iDynTree::deg2rad(max);
+        m_minJointsVelocity(i) = -iDynTree::deg2rad(max);
+        m_maxJointsVelocity(i) = iDynTree::deg2rad(max);
     }
     return true;
 }
@@ -618,7 +631,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_QPIKSolver_osqp = std::make_unique<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_actuatedDOFs,
-                                          m_minJointsLimit, m_maxJointsLimit))
+                                          m_minJointsVelocity, m_maxJointsVelocity))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (osqp)";
             return false;
@@ -627,7 +640,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_QPIKSolver_qpOASES = std::make_unique<WalkingQPIK_qpOASES>();
         if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
                                              m_actuatedDOFs,
-                                             m_minJointsLimit, m_maxJointsLimit))
+                                             m_minJointsPosition, m_maxJointsPosition,
+                                             m_minJointsVelocity, m_maxJointsVelocity))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
             return false;
