@@ -702,6 +702,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
 
+    // TODO: do it in a better way
+    m_torsoOrientationPort.open("/robot_theta");
+
     yInfo() << "Option \t Value";
     yInfo() << "pos filt \t " << m_usePositionFilter;
     yInfo() << "vel filt \t " << m_useVelocityFilter;
@@ -756,6 +759,7 @@ bool WalkingModule::close()
     m_rpcPort.close();
     m_rightWrenchPort.close();
     m_leftWrenchPort.close();
+    m_torsoOrientationPort.close();
 
     return true;
 }
@@ -1350,8 +1354,15 @@ bool WalkingModule::updateModule()
         }
         else if(m_firstStep)
             m_firstStep = false;
-
     }
+
+    // data for the virtualizer
+    // do it in a better way.
+    yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
+    output.clear();
+    output.addDouble(m_FKSolver->getNeckOrientation().asRPY()(2));
+    m_torsoOrientationPort.write(false);
+
     return true;
 }
 

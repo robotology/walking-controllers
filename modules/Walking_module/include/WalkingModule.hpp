@@ -198,8 +198,13 @@ class WalkingModule:
     iDynTree::Transform m_desiredLeftHandToRootLinkTransform;
     yarp::sig::Vector m_desiredRightHandPoseYarp;
     iDynTree::Transform m_desiredRightHandToRootLinkTransform;
-    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredLeftHandPosePort; /**< Desired left hand port. */
-    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredRightHandPosePort; /**< Desired right hand port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredLeftHandPosePort; /**< Desired left hand
+                                                                            port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredRightHandPosePort; /**< Desired right hand
+                                                                             port. */
+
+    yarp::os::BufferedPort<yarp::os::Bottle> m_torsoOrientationPort; /**< Port contain the yaw angle
+                                                                        of the torso. */
 
     /**
      * Configure the Force torque sensors. The FT ports are only opened please use yarpamanger
