@@ -119,24 +119,17 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    m_frameLeftHandIndex = m_kinDyn.model().getFrameIndex("l_hand");
+    m_frameLeftHandIndex = m_kinDyn.model().getFrameIndex("l_hand_dh_frame");
     if(m_frameLeftHandIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[initialize] Unable to find the frame named: l_hand";
         return false;
     }
 
-    m_frameRightHandIndex = m_kinDyn.model().getFrameIndex("r_hand");
+    m_frameRightHandIndex = m_kinDyn.model().getFrameIndex("r_hand_dh_frame");
     if(m_frameRightHandIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[initialize] Unable to find the frame named: r_hand";
-        return false;
-    }
-
-    m_frameRootIndex = m_kinDyn.model().getFrameIndex("root_link");
-    if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
-    {
-        yError() << "[initialize] Unable to find the frame named: root_link";
         return false;
     }
 
