@@ -181,7 +181,7 @@ bool WalkingQPIK_qpOASES::setJointBounds(const iDynTree::VectorDynSize& minJoint
                  << "the number of the joint";
         return false;
     }
-
+    
     Eigen::Map<MatrixXd>(m_minJointPosition.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(minJointsPosition);
     Eigen::Map<MatrixXd>(m_maxJointPosition.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(maxJointsPosition);
 
@@ -533,6 +533,11 @@ bool WalkingQPIK_qpOASES::setGradientVector()
             - m_desiredLeftHandToWorldTransform.getPosition();
         leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
 
+	auto tmp = m_leftHandToWorldTransform.getRotation() *
+	  m_desiredLeftHandToWorldTransform.getRotation().inverse();
+	yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
+	yInfo() << "desired left" << m_desiredLeftHandToWorldTransform.getRotation().asRPY().toString();
+	
         iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
                                                                                             m_desiredLeftHandToWorldTransform.getRotation().inverse());
 
@@ -551,12 +556,16 @@ bool WalkingQPIK_qpOASES::setGradientVector()
         iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
             - m_desiredRightHandToWorldTransform.getPosition();
 
-        yInfo() << "hand error " << rightHandPositionError.toString();
-
+	auto tmp = m_rightHandToWorldTransform.getRotation() *
+	  m_desiredRightHandToWorldTransform.getRotation().inverse();
+	
+        yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
+	yInfo() << "desired right" << m_desiredRightHandToWorldTransform.getRotation().asRPY().toString();
+	
         rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
 
         iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
-                                                                                            m_desiredRightHandToWorldTransform.getRotation().inverse());
+											     m_desiredRightHandToWorldTransform.getRotation().inverse());
 
         rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
 

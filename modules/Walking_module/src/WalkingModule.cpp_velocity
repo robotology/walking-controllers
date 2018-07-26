@@ -86,12 +86,20 @@ bool WalkingModule::propagateReferenceSignals()
     // as soon as possible.
     if(!m_mergePoints.empty())
     {
+        m_stancePhase = false;
         for(auto& mergePoint : m_mergePoints)
             mergePoint--;
 
         if(m_mergePoints[0] == 0)
             m_mergePoints.pop_front();
     }
+    else
+    {
+        // if there are not any merge points the trajectory is finished so the
+        // robot enters in the stance phase
+        m_stancePhase = true;
+    }
+
     return true;
 }
 
@@ -241,14 +249,12 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     m_dqDesired_osqp.resize(m_actuatedDOFs);
     m_dqDesired_qpOASES.resize(m_actuatedDOFs);
     m_toDegBuffer.resize(m_actuatedDOFs);
-    m_minJointsVelocity.resize(m_actuatedDOFs);
-    m_maxJointsVelocity.resize(m_actuatedDOFs);
+    m_minJointsLimit.resize(m_actuatedDOFs);
+    m_maxJointsLimit.resize(m_actuatedDOFs);
 
-    m_minJointsPosition.resize(m_actuatedDOFs);
-    m_maxJointsPosition.resize(m_actuatedDOFs);
+    // m_positionFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
+    // m_positionFeedbackInDegreesFiltered.zero();
 
-    m_positionFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
-    m_positionFeedbackInDegreesFiltered.zero();
     m_velocityFeedbackInDegreesFiltered.resize(m_actuatedDOFs);
     m_velocityFeedbackInDegreesFiltered.zero();
 
@@ -278,22 +284,6 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     // set the inertial to world rotation
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
 
-    m_usePositionFilter = rf.check("use_joint_position_filter", yarp::os::Value("False")).asBool();
-    if(m_usePositionFilter)
-    {
-        double cutFrequency;
-        if(!YarpHelper::getDoubleFromSearchable(rf, "joint_position_cut_frequency", cutFrequency))
-        {
-            yError() << "[configure] Unable get double from searchable.";
-            return false;
-        }
-
-
-        m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, m_dT);
-        m_positionFilter->init(m_positionFeedbackInDegrees);
-    }
-
-
     m_useVelocityFilter = rf.check("use_joint_velocity_filter", yarp::os::Value("False")).asBool();
     if(m_useVelocityFilter)
     {
@@ -304,20 +294,9 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
             return false;
         }
 
-
         // set filters
         // m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(10, m_dT);
         m_velocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency, m_dT);
-
-        // double tau = 2 * M_PI / cutFrequency;
-        // yarp::sig::Vector num(2);
-        // yarp::sig::Vector den(2);
-        // num(0) = m_dT;
-        // num(1) = m_dT;
-        // den(0) = 2 * tau + m_dT;
-        // den(1) = -2 * tau + m_dT;
-        // m_velocityFilter = std::make_unique<WalkingLPFilter>();
-        // m_velocityFilter->initialize(m_dT, cutFrequency);
 
         // m_positionFilter->init(m_positionFeedbackInDegrees);
         m_velocityFilter->init(m_velocityFeedbackInDegrees);
@@ -341,109 +320,15 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     double max, min;
     for(int i = 0; i < m_actuatedDOFs; i++)
     {
-        // get position limits
-        if(!m_limitsInterface->getLimits(i, &min, &max))
-        {
-            yError() << "[configure] Unable get joints position limits.";
-            return false;
-        }
-        m_minJointsPosition(i) = iDynTree::deg2rad(min);
-        m_maxJointsPosition(i) = iDynTree::deg2rad(max);
-
-	yInfo() << min << " " << max;
-	
-        // get velocity limits
         if(!m_limitsInterface->getVelLimits(i, &min, &max))
         {
             yError() << "[configure] Unable get joints velocity limits.";
             return false;
         }
 
-        m_minJointsVelocity(i) = -iDynTree::deg2rad(max);
-        m_maxJointsVelocity(i) = iDynTree::deg2rad(max);
+        m_minJointsLimit(i) = -iDynTree::deg2rad(max);
+        m_maxJointsLimit(i) = iDynTree::deg2rad(max);
     }
-    return true;
-}
-
-bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
-{
-    std::string portInput, portOutput;
-
-    if(config.isNull())
-    {
-        yInfo() << "[configureHandRetargeting] No hand retargeting.";
-        m_useLeftHand = false;
-        m_useRightHand = false;
-        return true;
-    }
-
-    double smoothingTime;
-    if(!YarpHelper::getDoubleFromSearchable(config, "hand_smoothing_time", smoothingTime))
-    {
-        yError() << "[configureHandRetargeting] Initialization failed while reading smoothing time.";
-        return false;
-    }
-
-    m_useLeftHand = config.check("use_left_hand", yarp::os::Value("False")).asBool();
-    if(m_useLeftHand)
-    {
-        // open and connect left foot wrench
-        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseInputPort_name",
-                                                portInput))
-        {
-            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
-            return false;
-        }
-        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseOutputPort_name",
-                                                portOutput))
-        {
-            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
-            return false;
-        }
-        // open port
-        m_desiredLeftHandPosePort.open("/" + getName() + portInput);
-        // connect port
-        if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
-        {
-            yError() << "Unable to connect to port " << "/" + getName() + portInput;
-            return false;
-        }
-
-        // initialize the smoother
-        m_desiredLeftHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT,
-                                                                                 smoothingTime);
-    }
-
-    m_useRightHand = config.check("use_right_hand", yarp::os::Value("False")).asBool();
-    if(m_useRightHand)
-    {
-        // open and connect right foot wrench
-        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseInputPort_name",
-                                                portInput))
-        {
-            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
-            return false;
-        }
-        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseOutputPort_name",
-                                                portOutput))
-        {
-            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
-            return false;
-        }
-        // open port
-        m_desiredRightHandPosePort.open("/" + getName() + portInput);
-        // connect port
-        if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
-        {
-            yError() << "Unable to connect to port " << "/" + getName() + portInput;
-            return false;
-        }
-
-        // initialize the smoother
-        m_desiredRightHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT,
-                                                                                 smoothingTime);
-    }
-
     return true;
 }
 
@@ -498,13 +383,6 @@ bool WalkingModule::configureForceTorqueSensors(const yarp::os::Searchable& conf
         return false;
     }
 
-    // get the normal force threshold
-    if(!YarpHelper::getDoubleFromSearchable(config, "normalForceThreshold", m_normalForceThreshold))
-    {
-        yError() << "Initialization failed while reading normalForceThreshold.";
-        return false;
-    }
-
     return true;
 }
 
@@ -519,15 +397,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
     setName(string.c_str());
 
-    yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
-    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
-
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
-    m_useVelocity = rf.check("use_velocity", yarp::os::Value(false)).asBool();
-    m_useVelocityControllerAsIK = rf.check("use_velocity_controller_as_IK", yarp::os::Value(false)).asBool();
 
     if(!setControlledJoints(rf))
     {
@@ -547,18 +420,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
+    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
 
     yarp::os::Bottle& forceTorqueSensorsOptions = rf.findGroup("FT_SENSORS");
     if(!configureForceTorqueSensors(forceTorqueSensorsOptions))
     {
         yError() << "[configure] Unable to configure the Force Torque sensors.";
-        return false;
-    }
-
-    yarp::os::Bottle& handRetargetingOptions = rf.findGroup("HAND_RETARGETING");
-    if(!configureHandRetargeting(handRetargetingOptions))
-    {
-        yError() << "[configure] Unable to configure the hand retargeting.";
         return false;
     }
 
@@ -628,12 +496,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useQPIK)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
-        inverseKinematicsQPSolverOptions.append(generalOptions);
-        inverseKinematicsQPSolverOptions.append(handRetargetingOptions);
+
         m_QPIKSolver_osqp = std::make_unique<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_actuatedDOFs,
-                                          m_minJointsVelocity, m_maxJointsVelocity))
+                                          m_minJointsLimit, m_maxJointsLimit))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (osqp)";
             return false;
@@ -642,8 +509,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_QPIKSolver_qpOASES = std::make_unique<WalkingQPIK_qpOASES>();
         if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
                                              m_actuatedDOFs,
-                                             m_minJointsPosition, m_maxJointsPosition,
-                                             m_minJointsVelocity, m_maxJointsVelocity))
+                                             m_minJointsLimit, m_maxJointsLimit))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
             return false;
@@ -704,20 +570,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
 
-    // TODO: do it in a better way
-    m_torsoOrientationPort.open("/robot_theta");
-
-    yInfo() << "Option \t Value";
-    yInfo() << "pos filt \t " << m_usePositionFilter;
-    yInfo() << "vel filt \t " << m_useVelocityFilter;
-    yInfo() << "wre filt \t " << m_useWrenchFilter;
-    yInfo() << "useMPC \t " << m_useMPC;
-    yInfo() << "useQPIK \t " << m_useQPIK;
-    yInfo() << "useOSQP \t " << m_useOSQP;
-    yInfo() << "dump \t " << m_dumpData;
-    yInfo() << "velocity \t " << m_useVelocity;
-    yInfo() << "velocity controller as IK \t " << m_useVelocityControllerAsIK;
-
     yInfo() << "[configure] Ready to play!";
 
     return true;
@@ -761,46 +613,8 @@ bool WalkingModule::close()
     m_rpcPort.close();
     m_rightWrenchPort.close();
     m_leftWrenchPort.close();
-    m_torsoOrientationPort.close();
 
     return true;
-}
-
-void WalkingModule::updateDesiredHandsPose()
-{
-    if(m_useLeftHand)
-    {
-        yarp::sig::Vector *desiredLeftHandPose = NULL;
-        desiredLeftHandPose = m_desiredLeftHandPosePort.read(false);
-        if(desiredLeftHandPose != NULL)
-            m_desiredLeftHandPoseYarp = *desiredLeftHandPose;
-
-        m_desiredLeftHandSmoother->computeNextValues(m_desiredLeftHandPoseYarp);
-        yarp::sig::Vector desiredLeftHandPoseSmoothedYarp = m_desiredLeftHandSmoother->getPos();
-        iDynTree::Position leftPosition;
-        iDynTree::toiDynTree(desiredLeftHandPoseSmoothedYarp.subVector(0,2), leftPosition);
-        m_desiredLeftHandToRootLinkTransform.setPosition(leftPosition);
-        m_desiredLeftHandToRootLinkTransform.setRotation(iDynTree::Rotation::RPY(desiredLeftHandPoseSmoothedYarp(3),
-                                                                                 desiredLeftHandPoseSmoothedYarp(4),
-                                                                                 desiredLeftHandPoseSmoothedYarp(5)));
-    }
-
-    if(m_useRightHand)
-    {
-        yarp::sig::Vector *desiredRightHandPose = NULL;
-        desiredRightHandPose = m_desiredRightHandPosePort.read(false);
-        if(desiredRightHandPose != NULL)
-            m_desiredRightHandPoseYarp = *desiredRightHandPose;
-
-        m_desiredRightHandSmoother->computeNextValues(m_desiredRightHandPoseYarp);
-        yarp::sig::Vector desiredRightHandPoseSmoothedYarp = m_desiredRightHandSmoother->getPos();
-        iDynTree::Position rightPosition;
-        iDynTree::toiDynTree(desiredRightHandPoseSmoothedYarp.subVector(0,2), rightPosition);
-        m_desiredRightHandToRootLinkTransform.setPosition(rightPosition);
-        m_desiredRightHandToRootLinkTransform.setRotation(iDynTree::Rotation::RPY(desiredRightHandPoseSmoothedYarp(3),
-                                                                                 desiredRightHandPoseSmoothedYarp(4),
-                                                                                 desiredRightHandPoseSmoothedYarp(5)));
-    }
 }
 
 bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoMPosition,
@@ -809,16 +623,6 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
                               const iDynTree::Rotation& desiredNeckOrientation,
                               iDynTree::VectorDynSize &output)
 {
-
-    // set jacobians
-    iDynTree::MatrixDynSize jacobian, comJacobian;
-    jacobian.resize(6, m_actuatedDOFs + 6);
-    comJacobian.resize(3, m_actuatedDOFs + 6);
-
-
-    solver->setHandsState(m_FKSolver->getLeftHandToWorldTransform(),
-                          m_FKSolver->getRightHandToWorldTransform());
-
     if(!solver->setRobotState(m_positionFeedbackInRadians,
                               m_FKSolver->getLeftFootToWorldTransform(),
                               m_FKSolver->getRightFootToWorldTransform(),
@@ -841,24 +645,10 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
 
     solver->setDesiredCoMPosition(desiredCoMPosition);
 
-    if(m_useLeftHand)
-    {
-        solver->setDesiredLeftHandTransformation(m_FKSolver->getRootLinkToWorldTransform() *
-                                                 m_desiredLeftHandToRootLinkTransform);
-
-        m_FKSolver->getLeftHandJacobian(jacobian);
-        solver->setLeftHandJacobian(jacobian);
-
-    }
-
-    if(m_useRightHand)
-    {
-        solver->setDesiredRightHandTransformation(m_FKSolver->getRootLinkToWorldTransform() *
-                                                  m_desiredRightHandToRootLinkTransform);
-
-        m_FKSolver->getRightHandJacobian(jacobian);
-        solver->setRightHandJacobian(jacobian);
-    }
+    // set jacobians
+    iDynTree::MatrixDynSize jacobian, comJacobian;
+    jacobian.resize(6, m_actuatedDOFs + 6);
+    comJacobian.resize(3, m_actuatedDOFs + 6);
 
     m_FKSolver->getLeftFootJacobian(jacobian);
     solver->setLeftFootJacobian(jacobian);
@@ -957,9 +747,6 @@ bool WalkingModule::updateModule()
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
         }
-
-        // get desired hands pose
-        updateDesiredHandsPose();
 
         if(!updateFKSolver())
         {
@@ -1066,13 +853,7 @@ bool WalkingModule::updateModule()
         }
 
         // inner COM-ZMP controller
-        // if the the norm of desired DCM velocity is lower than a threshold then the robot
-        // is stopped
-        double threshold = 0.001;
-        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-        m_walkingZMPController->setPhase(stancePhase || m_robotState == WalkingFSM::OnTheFly);
-
-        // set feedback and the desired signal
+        m_walkingZMPController->setPhase(m_stancePhase || m_robotState == WalkingFSM::OnTheFly);
         m_walkingZMPController->setFeedback(measuredZMP, measuredCoM);
         m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
                                                    desiredCoMVelocityXY);
@@ -1130,31 +911,23 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_actuatedDOFs);
             yarp::sig::Vector bufferPosition(m_actuatedDOFs);
 
-            // Velocity controller as IK
-            if(m_useVelocityControllerAsIK)
+            if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired_osqp))
             {
-                auto dqDesired = m_useOSQP ? m_dqDesired_osqp : m_dqDesired_qpOASES;
-                if(!m_FKSolver->setInternalRobotState(m_qDesired, dqDesired))
-                {
-                    yError() << "[updateModule] Unable to set the internal robot state.";
-                    return false;
-                }
+                yError() << "[updateFKSolver] Unable to evaluate the CoM.";
+                return false;
             }
 
             if(m_useOSQP)
             {
-                // if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-                //               desiredCoMVelocity, measuredCoM,
-                //               yawRotation, m_dqDesired_osqp))
-                // {
-                //     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-                //     return false;
-                // }
+                if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
+                              desiredCoMVelocity, measuredCoM,
+                              yawRotation, m_dqDesired_osqp))
+                {
+                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                    return false;
+                }
 
-                // iDynTree::toYarp(m_dqDesired_osqp, bufferVelocity);
-
-                yError() << "[updateModule] no more implemented";
-                return false;
+                iDynTree::toYarp(m_dqDesired_osqp, bufferVelocity);
             }
             else
             {
@@ -1162,23 +935,14 @@ bool WalkingModule::updateModule()
                               desiredCoMVelocity, measuredCoM,
                               yawRotation, m_dqDesired_qpOASES))
                 {
-                    yError() << "[updateModule] Unable to solve the QP problem with qpOASES.";
+                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
                     return false;
                 }
 
                 iDynTree::toYarp(m_dqDesired_qpOASES, bufferVelocity);
             }
 
-            // Velocity controller as IK
-            if(m_useVelocityControllerAsIK)
-            {
-                if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians,
-                                                      m_velocityFeedbackInRadians))
-                {
-                    yError() << "[updateModule] Unable to set the internal robot state.";
-                    return false;
-                }
-            }
+
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
         }
@@ -1241,26 +1005,24 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        // if the velocity controller is used as inverse kinematics it is not possible to use
-        // set velocity
-        if(m_useQPIK && m_useVelocity && !m_useVelocityControllerAsIK)
+        if(m_useQPIK)
         {
-            if(m_useOSQP)
-            {
-                if(!setVelocityReferences(m_dqDesired_osqp))
-                {
-                    yError() << "[updateModule] Error while setting the reference velocity to iCub.";
-                    return false;
-                }
-            }
-            else
-            {
-                if(!setVelocityReferences(m_dqDesired_qpOASES))
-                {
-                    yError() << "[updateModule] Error while setting the reference velocity to iCub.";
-                    return false;
-                }
-            }
+	    if(m_useOSQP)
+	    {
+	        if(!setVelocityReferences(m_dqDesired_osqp))
+		{
+		    yError() << "[updateModule] Error while setting the reference velocity to iCub.";
+		    return false;
+		}
+	    }
+	    else
+	    {  
+	        if(!setVelocityReferences(m_dqDesired_qpOASES))
+	        {
+		    yError() << "[updateModule] Error while setting the reference velocity to iCub.";
+		    return false;
+		}
+	    }
         }
         else
         {
@@ -1274,55 +1036,39 @@ bool WalkingModule::updateModule()
         m_profiler->setEndTime("Total");
 
         // print timings
-        // m_profiler->profiling();
+        m_profiler->profiling();
+
+        iDynTree::VectorDynSize errorL(6), errorR(6);
+        if(m_robotState != WalkingFSM::OnTheFly && m_useQPIK)
+        {
+            if(m_useOSQP)
+            {
+                m_QPIKSolver_osqp->getRightFootError(errorR);
+                m_QPIKSolver_osqp->getLeftFootError(errorL);
+            }
+            else
+            {
+                m_QPIKSolver_qpOASES->getRightFootError(errorR);
+                m_QPIKSolver_qpOASES->getLeftFootError(errorL);
+            }
+        }
 
         // send data to the WalkingLogger
         if(m_dumpData)
         {
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-
-            // get the torso orientation error
-            iDynTree::Vector3 torsoDesired;
-            if(m_useQPIK)
-            {
-                if(m_useOSQP)
-                    m_QPIKSolver_osqp->getDesiredNeckOrientation(torsoDesired);
-                else
-                    m_QPIKSolver_qpOASES->getDesiredNeckOrientation(torsoDesired);
-            }
-            else
-                m_IKSolver->getDesiredNeckOrientation(torsoDesired);
-
-            // m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(),
-            //                           m_DCMVelocityDesired.front(),
-            //                           measuredZMP, desiredZMP,
-            //                           measuredCoM,
+            // m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
+            //                           measuredZMP, desiredZMP, measuredCoM,
             //                           desiredCoMPositionXY, desiredCoMVelocityXY,
-            //                           desiredCoMPosition,
             //                           leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
             //                           rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-            //                           m_leftTrajectory.front().getPosition(),
-            //                           m_leftTrajectory.front().getRotation().asRPY(),
-            //                           m_rightTrajectory.front().getPosition(),
-            //                           m_rightTrajectory.front().getRotation().asRPY(),
-            //                           torsoDesired,
-            //                           m_FKSolver->getNeckOrientation().asRPY());
-	    auto leftTemp = m_FKSolver->getRootLinkToWorldTransform() *
-	      m_desiredLeftHandToRootLinkTransform;
-	    auto rightTemp = m_FKSolver->getRootLinkToWorldTransform() *
-	      m_desiredRightHandToRootLinkTransform;
+            //                           m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
+            //                           m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
+            //                           errorL, errorR);
 
-            m_walkingLogger->sendData(m_FKSolver->getLeftHandToWorldTransform().getPosition(),
-				      m_FKSolver->getLeftHandToWorldTransform().getRotation().asRPY(),
-				      leftTemp.getPosition(),
-				      leftTemp.getRotation().asRPY(),
-				      m_FKSolver->getRightHandToWorldTransform().getPosition(),
-				      m_FKSolver->getRightHandToWorldTransform().getRotation().asRPY(),
-				      rightTemp.getPosition(),
-				      rightTemp.getRotation().asRPY());
-
-
+            // m_walkingLogger->sendData(m_dqDesired_osqp, m_dqDesired_qpOASES);
+	    m_walkingLogger->sendData(m_dqDesired_qpOASES, m_velocityFeedbackInRadians);
         }
 
         propagateTime();
@@ -1366,15 +1112,8 @@ bool WalkingModule::updateModule()
         }
         else if(m_firstStep)
             m_firstStep = false;
+
     }
-
-    // data for the virtualizer
-    // do it in a better way.
-    yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
-    output.clear();
-    output.addDouble(m_FKSolver->getNeckOrientation().asRPY()(2));
-    m_torsoOrientationPort.write(false);
-
     return true;
 }
 
@@ -1426,30 +1165,24 @@ bool WalkingModule::getFeedbacks(unsigned int maxAttempts)
 
         if(okVelocity && okPosition && okLeftWrench && okRightWrench)
         {
-            if(m_usePositionFilter)
-            {
-                m_positionFeedbackInDegreesFiltered = m_positionFilter->filt(m_positionFeedbackInDegrees);
-                for(unsigned j = 0; j < m_actuatedDOFs; ++j)
-                    m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegreesFiltered(j));
-            }
-            else
-            {
-                for(unsigned j = 0; j < m_actuatedDOFs; ++j)
-                    m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegrees(j));
-            }
-
             if(m_useVelocityFilter)
             {
+                // filter the joint position and the velocity
                 m_velocityFeedbackInDegreesFiltered = m_velocityFilter->filt(m_velocityFeedbackInDegrees);
                 for(unsigned j = 0; j < m_actuatedDOFs; ++j)
+                {
+                    m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegrees(j));
                     m_velocityFeedbackInRadians(j) = iDynTree::deg2rad(m_velocityFeedbackInDegreesFiltered(j));
+                }
             }
             else
             {
                 for(unsigned j = 0; j < m_actuatedDOFs; ++j)
+                {
+                    m_positionFeedbackInRadians(j) = iDynTree::deg2rad(m_positionFeedbackInDegrees(j));
                     m_velocityFeedbackInRadians(j) = iDynTree::deg2rad(m_velocityFeedbackInDegrees(j));
+                }
             }
-
             if(m_useWrenchFilter)
             {
                 if(m_firstStep)
@@ -1518,7 +1251,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     iDynTree::Position zmpLeft, zmpRight, zmpWorld;
     double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
 
-    if(m_rightWrench.getLinearVec3()(2) < m_normalForceThreshold)
+    if(m_rightWrench.getLinearVec3()(2) < 0.001)
         zmpRightDefined = 0.0;
     else
     {
@@ -1528,7 +1261,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
         zmpRightDefined = 1.0;
     }
 
-    if(m_leftWrench.getLinearVec3()(2) < m_normalForceThreshold)
+    if(m_leftWrench.getLinearVec3()(2) < 0.001)
         zmpLeftDefined = 0.0;
     else
     {
@@ -1741,13 +1474,13 @@ bool WalkingModule::setDirectPositionReferences(const iDynTree::VectorDynSize& d
         return false;
     }
 
-    // if(worstErrorRad.second > 1.0)
-    // {
-    //     yError() << "[setDirectPositionReferences] The worst error between the current and the "
-    //              << "desired position of the " << worstErrorRad.first
-    //              << "-th joint is greater than 1.0 rad.";
-    //     return false;
-    // }
+    if(worstErrorRad.second > 0.5)
+    {
+        yError() << "[setDirectPositionReferences] The worst error between the current and the "
+                 << "desired position of the " << worstErrorRad.first
+                 << "-th joint is greater than 0.5 rad.";
+        return false;
+    }
 
     iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(desiredPositionsRad) * iDynTree::rad2deg(1);
 
@@ -1781,30 +1514,27 @@ bool WalkingModule::setVelocityReferences(const iDynTree::VectorDynSize& desired
         return false;
     }
 
-    // // check if the desired velocity is higher than a threshold
+    
     // if((iDynTree::toEigen(desiredVelocityRad).minCoeff() < -1.0) ||
     //    (iDynTree::toEigen(desiredVelocityRad).maxCoeff() > 1.0))
     // {
-    //     yError() << "[setVelocityReferences] The absolute value of the desired velocity is higher "
-    //              << "than 1.0 rad/s.";
+    //     yError() << "[setVelocityReferences] The absolute value of the desired velocity is higher than 0.25 rad/s.";
     //     return false;
     // }
-
-    // convert rad/s into deg/s
+    
     iDynTree::toEigen(m_toDegBuffer) = iDynTree::toEigen(desiredVelocityRad) * iDynTree::rad2deg(1);
 
-    // since the velocity interface use a minimum jerk trajectory a very high acceleration is set in
-    // order to overcome this drawback
-    yarp::sig::Vector dummy(m_toDegBuffer.size(), std::numeric_limits<double>::max());
-    if(!m_velocityInterface->setRefAccelerations(dummy.data()))
-    {
-        yError() << "[setVelocityReferences] Error while setting the desired acceleration.";
-        return false;
-    }
+    //    yarp::sig::Vector acceleration(m_toDegBuffer.size(), 1000000);
 
+    // if(!m_velocityInterface->setRefAccelerations(acceleration.data()))
+    // {
+    //   yError() << "[setVelocityReferences] Error while setting the desired position.";
+    //   return false;
+    // }
+      
     if(!m_velocityInterface->velocityMove(m_toDegBuffer.data()))
     {
-        yError() << "[setVelocityReferences] Error while setting the desired velocity.";
+        yError() << "[setVelocityReferences] Error while setting the desired position.";
         return false;
     }
 
@@ -1818,8 +1548,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[prepareRobot] You cannot prepare the robot again.";
         return false;
     }
-
-    m_firstStep = true;
 
 
     iDynTree::Position measuredCoM;
@@ -1927,40 +1655,50 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-    {
-        yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-        return false;
-    }
-
-    // send the reference again in order to reduce error
-    if(!setDirectPositionReferences(m_qDesired))
-    {
-        yError() << "[prepareRobot] Error while setting the initial position using "
-                 << "POSITION DIRECT mode.";
-        return false;
-    }
-
     if(m_useQPIK)
     {
-        // if the velocity controller is used as IK you cannot use set velocity
-        if(m_useVelocity && !m_useVelocityControllerAsIK)
-            if(!switchToControlMode(VOCAB_CM_VELOCITY))
-            {
-                yError() << "[prepareRobot] Failed in setting VELOCITY mode.";
-                return false;
-            }
-    }
+        if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+        {
+            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
+            return false;
+        }
 
-    // get feedback to initialize integrator and hands minimum jerk trajectories
-    if(!getFeedbacks(10))
+	// send the reference again in order to reduce error
+	if(!setDirectPositionReferences(m_qDesired))
+	  {
+	    yError() << "[prepareRobot] Error while setting the initial position using "
+		     << "POSITION DIRECT mode.";
+	    return false;
+	  }
+
+	if(!switchToControlMode(VOCAB_CM_VELOCITY))
+	{
+            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
+            return false;
+        }
+
+
+    }
+    else
     {
-        yError() << "[prepareRobot] Unable to get the feedback.";
-        return false;
+        if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+        {
+            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
+            return false;
+        }
+
+	// send the reference again in order to reduce error
+	if(!setDirectPositionReferences(m_qDesired))
+	  {
+	    yError() << "[prepareRobot] Error while setting the initial position using "
+		     << "POSITION DIRECT mode.";
+	    return false;
+	  }
     }
 
-    yarp::sig::Vector buffer(m_positionFeedbackInRadians.size());
-    iDynTree::toYarp(m_positionFeedbackInRadians, buffer);
+
+    yarp::sig::Vector buffer(m_qDesired.size());
+    iDynTree::toYarp(m_qDesired, buffer);
     // instantiate Integrator object
     m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
 
@@ -1968,54 +1706,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     m_walkingZMPController->reset(m_DCMPositionDesired.front());
     m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
-    if(m_useLeftHand || m_useRightHand)
-    {
-        iDynTree::Position position;
-        iDynTree::Rotation rotation;
-        iDynTree::Transform handToRootLink;
-        yarp::sig::Vector handBuffer(6);
-        if(!updateFKSolver())
-        {
-            yError() << "[prepareRobot] Unable to update FK.";
-            return false;
-        }
-
-        if(m_useLeftHand)
-        {
-            handToRootLink = m_FKSolver->getRootLinkToWorldTransform().inverse() *
-                m_FKSolver->getLeftHandToWorldTransform();
-
-            position = handToRootLink.getPosition();
-            rotation = handToRootLink.getRotation();
-
-            for(int i = 0; i<3; i++)
-                handBuffer(i) = position(i);
-
-            rotation.getRPY(handBuffer(3), handBuffer(4), handBuffer(5));
-
-            m_desiredLeftHandPoseYarp = handBuffer;
-            m_desiredLeftHandSmoother->init(handBuffer);
-
-        }
-
-        if(m_useRightHand)
-        {
-            handToRootLink = m_FKSolver->getRootLinkToWorldTransform().inverse() *
-                m_FKSolver->getRightHandToWorldTransform();
-
-            position = handToRootLink.getPosition();
-            rotation = handToRootLink.getRotation();
-
-            for(int i = 0; i < 3; i++)
-                handBuffer(i) = position(i);
-
-            rotation.getRPY(handBuffer(3), handBuffer(4), handBuffer(5));
-
-            m_desiredRightHandPoseYarp = handBuffer;
-            m_desiredRightHandSmoother->init(handBuffer);
-        }
-    }
-
+    // trick: it is useful for the ZMP-CoM gain scheduling
+    m_mergePoints.pop_front();
 
     m_robotState = WalkingFSM::Prepared;
     return true;
@@ -2088,6 +1780,8 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         yError() << "[askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
         return false;
     }
+
+    yInfo() << "init Time before updateTrajectories " << initTime;
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
@@ -2259,12 +1953,7 @@ bool WalkingModule::startWalking()
 
     if(m_dumpData)
     {
-        m_walkingLogger->startRecord({"record",
-	      "l_arm_x", "l_arm_y", "l_arm_z", "l_arm_roll", "l_arm_pitch", "l_arm_yaw",
-	      "l_arm_des_x", "l_arm_des_y", "l_arm_des_z", "l_arm_des_roll", "l_arm_des_pitch", "l_arm_des_yaw",
-	      "r_arm_x", "r_arm_y", "r_arm_z", "r_arm_roll", "r_arm_pitch", "r_arm_yaw",
-	      "r_arm_des_x", "r_arm_des_y", "r_arm_des_z", "r_arm_des_roll", "r_arm_des_pitch", "r_arm_des_yaw"});
-                    //" dcm_x", "dcm_y",
+        m_walkingLogger->startRecord({"record",// "dcm_x", "dcm_y",
                     // "dcm_des_x", "dcm_des_y",
                     // "dcm_des_dx", "dcm_des_dy",
                     // "zmp_x", "zmp_y",
@@ -2272,7 +1961,6 @@ bool WalkingModule::startWalking()
                     // "com_x", "com_y", "com_z",
                     // "com_des_x", "com_des_y",
                     // "com_des_dx", "com_des_dy",
-                    // "com_ik_x", "com_ik_y", "com_ik_z",
                     // "lf_x", "lf_y", "lf_z",
                     // "lf_roll", "lf_pitch", "lf_yaw",
                     // "rf_x", "rf_y", "rf_z",
@@ -2281,13 +1969,37 @@ bool WalkingModule::startWalking()
                     // "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     // "rf_des_x", "rf_des_y", "rf_des_z",
                     // "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    // "torso_des_roll", "torso_des_pitch", "torso_des_yaw",
-                    // "torso_roll", "torso_pitch", "torso_yaw"});
+                    // "lf_err_x", "lf_err_y", "lf_err_z",
+                    // "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
+                    // "rf_err_x", "rf_err_y", "rf_err_z",
+                    // "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+	      "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
+	      "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des",
+	      "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des",
+	      "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
+	      "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
+	      "torso_pitch", "torso_roll", "torso_yaw",
+	      "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow",
+	      "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
+	      "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
+	      "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",});
+	      
+    // m_walkingLogger->startRecord({"record",
+    //             "torso_pitch_osqp", "torso_roll_osqp", "torso_yaw_osqp",
+    //             "l_shoulder_pitch_osqp", "l_shoulder_roll_osqp", "l_shoulder_yaw_osqp", "l_elbow_osqp",
+    //             "r_shoulder_pitch_osqp", "r_shoulder_roll_osqp", "r_shoulder_yaw_osqp", "r_elbow_osqp",
+    //             "l_hip_pitch_osqp", "l_hip_roll_osqp", "l_hip_yaw_osqp", "l_knee_osqp", "l_ankle_pitch_osqp", "l_ankle_roll_osqp",
+    //             "r_hip_pitch_osqp", "r_hip_roll_osqp", "r_hip_yaw_osqp", "r_knee_osqp", "r_ankle_pitch_osqp", "r_ankle_roll_osqp",
+    //             "torso_pitch_qpOASES", "torso_roll_qpOASES", "torso_yaw_qpOASES",
+    //             "l_shoulder_pitch_qpOASES", "l_shoulder_roll_qpOASES", "l_shoulder_yaw_qpOASES", "l_elbow_qpOASES",
+    //             "r_shoulder_pitch_qpOASES", "r_shoulder_roll_qpOASES", "r_shoulder_yaw_qpOASES", "r_elbow_qpOASES",
+    //             "l_hip_pitch_qpOASES", "l_hip_roll_qpOASES", "l_hip_yaw_qpOASES", "l_knee_qpOASES", "l_ankle_pitch_qpOASES", "l_ankle_roll_qpOASES",
+    //             "r_hip_pitch_qpOASES", "r_hip_roll_qpOASES", "r_hip_yaw_qpOASES", "r_knee_qpOASES", "r_ankle_pitch_qpOASES", "r_ankle_roll_qpOASES"});
     }
-
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         m_robotState = WalkingFSM::Stance;
+        m_firstStep = true;
     }
 
     return true;
@@ -2366,7 +2078,6 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
         yError() << "[prepareRobot] You cannot prepare the robot again.";
         return false;
     }
-
 
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -2467,6 +2178,8 @@ bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
     buff(1) = measuredCoM(1);
     m_walkingZMPController->reset(buff);
     m_stableDCMModel->reset(buff);
+    // todo
+    // yInfo() << measuredCoM(0) << " "<<measuredCoM(1) << " "<<measuredCoM(2);
 
     // reset the gains
     if (m_PIDHandler->usingGainScheduling())
