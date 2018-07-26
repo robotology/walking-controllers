@@ -181,7 +181,7 @@ bool WalkingQPIK_qpOASES::setJointBounds(const iDynTree::VectorDynSize& minJoint
                  << "the number of the joint";
         return false;
     }
-    
+
     Eigen::Map<MatrixXd>(m_minJointPosition.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(minJointsPosition);
     Eigen::Map<MatrixXd>(m_maxJointPosition.data(), m_actuatedDOFs, 1) = iDynTree::toEigen(maxJointsPosition);
 
@@ -213,6 +213,7 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
     }
 
     m_useCoMAsConstraint = config.check("useCoMAsConstraint", yarp::os::Value(false)).asBool();
+    m_useHandsAsConstraint = config.check("useHandsAsConstraint", yarp::os::Value(false)).asBool();
     m_useLeftHand = config.check("use_left_hand", yarp::os::Value(false)).asBool();
     m_useRightHand = config.check("use_right_hand", yarp::os::Value(false)).asBool();
 
@@ -225,10 +226,18 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
 
     // the number of constraints is equal to the number of joints plus
     // 12 (position + attitude) of the left and right feet
+    m_numberOfConstraints = 6 + 6;
+
     if(m_useCoMAsConstraint)
-        m_numberOfConstraints = 6 + 6 + 3;
-    else
-        m_numberOfConstraints = 6 + 6;
+        m_numberOfConstraints += 3;
+
+    if(m_useHandsAsConstraint)
+    {
+        if(m_useLeftHand)
+            m_numberOfConstraints += 6;
+        if(m_useRightHand)
+            m_numberOfConstraints += 6;
+    }
 
     // resize all vectors (matrices)
     m_hessian.resize(m_numberOfVariables * m_numberOfVariables);
@@ -288,6 +297,13 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
+
+    if(m_useHandsAsConstraint)
+        if(!YarpHelper::getDoubleFromSearchable(config, "handTolerance", m_handTolerance))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
 
     yarp::sig::Vector buffer(3, 0.0);
     m_leftFootErrorIntegral = std::make_unique<iCub::ctrl::Integrator>(samplingTime, buffer);
@@ -485,22 +501,24 @@ bool WalkingQPIK_qpOASES::setHessianMatrix()
             iDynTree::toEigen(m_comWeightMatrix) * iDynTree::toEigen(m_comJacobian);
     }
 
-    if(m_useLeftHand)
+    if(!m_useHandsAsConstraint)
     {
-        Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) =
-            Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) +
-            iDynTree::toEigen(m_leftHandJacobian).transpose() *
-            iDynTree::toEigen(m_handWeightMatrix) * iDynTree::toEigen(m_leftHandJacobian);
-    }
+        if(m_useLeftHand)
+        {
+            Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) =
+                Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) +
+                iDynTree::toEigen(m_leftHandJacobian).transpose() *
+                iDynTree::toEigen(m_handWeightMatrix) * iDynTree::toEigen(m_leftHandJacobian);
+        }
 
-    if(m_useRightHand)
-    {
-        Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) =
-            Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) +
-            iDynTree::toEigen(m_rightHandJacobian).transpose() *
-            iDynTree::toEigen(m_handWeightMatrix) * iDynTree::toEigen(m_rightHandJacobian);
+        if(m_useRightHand)
+        {
+            Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) =
+                Eigen::Map<MatrixXd>(m_hessian.data(), m_numberOfVariables, m_numberOfVariables) +
+                iDynTree::toEigen(m_rightHandJacobian).transpose() *
+                iDynTree::toEigen(m_handWeightMatrix) * iDynTree::toEigen(m_rightHandJacobian);
+        }
     }
-
 
     return true;
 }
@@ -524,55 +542,57 @@ bool WalkingQPIK_qpOASES::setGradientVector()
             - iDynTree::toEigen(m_comJacobian).transpose()
             * iDynTree::toEigen(m_comWeightMatrix) * iDynTree::toEigen(m_comVelocity);
     }
-
-    if(m_useLeftHand)
+    if(!m_useHandsAsConstraint)
     {
-        //  left hand
-        Eigen::VectorXd leftHandCorrection(6);
-        iDynTree::Position leftHandPositionError = m_leftHandToWorldTransform.getPosition()
-            - m_desiredLeftHandToWorldTransform.getPosition();
-        leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
+        if(m_useLeftHand)
+        {
+            //  left hand
+            Eigen::VectorXd leftHandCorrection(6);
+            iDynTree::Position leftHandPositionError = m_leftHandToWorldTransform.getPosition()
+                - m_desiredLeftHandToWorldTransform.getPosition();
+            leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
 
-	auto tmp = m_leftHandToWorldTransform.getRotation() *
-	  m_desiredLeftHandToWorldTransform.getRotation().inverse();
-	yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
-	yInfo() << "desired left" << m_desiredLeftHandToWorldTransform.getRotation().asRPY().toString();
-	
-        iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
-                                                                                            m_desiredLeftHandToWorldTransform.getRotation().inverse());
+            auto tmp = m_leftHandToWorldTransform.getRotation() *
+                m_desiredLeftHandToWorldTransform.getRotation().inverse();
+            yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
+            yInfo() << "desired left" << m_desiredLeftHandToWorldTransform.getRotation().asRPY().toString();
 
-        leftHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
+            iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
+                                                                                                m_desiredLeftHandToWorldTransform.getRotation().inverse());
 
-        Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
-            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
-            - iDynTree::toEigen(m_leftHandJacobian).transpose()
-            * iDynTree::toEigen(m_handWeightMatrix) * (-leftHandCorrection);
-    }
+            leftHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
 
-    if(m_useRightHand)
-    {
-        //  right hand
-        Eigen::VectorXd rightHandCorrection(6);
-        iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
-            - m_desiredRightHandToWorldTransform.getPosition();
+            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
+                Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
+                - iDynTree::toEigen(m_leftHandJacobian).transpose()
+                * iDynTree::toEigen(m_handWeightMatrix) * (-leftHandCorrection);
+        }
 
-	auto tmp = m_rightHandToWorldTransform.getRotation() *
-	  m_desiredRightHandToWorldTransform.getRotation().inverse();
-	
-        yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
-	yInfo() << "desired right" << m_desiredRightHandToWorldTransform.getRotation().asRPY().toString();
-	
-        rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
+        if(m_useRightHand)
+        {
+            //  right hand
+            Eigen::VectorXd rightHandCorrection(6);
+            iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
+                - m_desiredRightHandToWorldTransform.getPosition();
 
-        iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
-											     m_desiredRightHandToWorldTransform.getRotation().inverse());
+            auto tmp = m_rightHandToWorldTransform.getRotation() *
+                m_desiredRightHandToWorldTransform.getRotation().inverse();
 
-        rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+            yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
+            yInfo() << "desired right" << m_desiredRightHandToWorldTransform.getRotation().asRPY().toString();
 
-        Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
-            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
-            - iDynTree::toEigen(m_rightHandJacobian).transpose()
-            * iDynTree::toEigen(m_handWeightMatrix) * (-rightHandCorrection);
+            rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
+
+            iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
+                                                                                                 m_desiredRightHandToWorldTransform.getRotation().inverse());
+
+            rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+
+            Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1) =
+                Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
+                - iDynTree::toEigen(m_rightHandJacobian).transpose()
+                * iDynTree::toEigen(m_handWeightMatrix) * (-rightHandCorrection);
+        }
     }
 
     return true;
@@ -580,31 +600,59 @@ bool WalkingQPIK_qpOASES::setGradientVector()
 
 bool WalkingQPIK_qpOASES::setLinearConstraintMatrix()
 {
+    int subMatrixRowPosition = 0;
     // add left foot
     Eigen::Map<MatrixXd>(m_constraintMatrix.data(),
                          m_numberOfConstraints,
-                         m_numberOfVariables).block(0, 0, m_leftFootJacobian.rows(),
+                         m_numberOfVariables).block(subMatrixRowPosition, 0, m_leftFootJacobian.rows(),
                                                     m_leftFootJacobian.cols())=
         iDynTree::toEigen(m_leftFootJacobian);
+    subMatrixRowPosition += m_leftFootJacobian.rows();
 
     // add right foot
     Eigen::Map<MatrixXd>(m_constraintMatrix.data(),
                           m_numberOfConstraints,
-                          m_numberOfVariables).block(m_leftFootJacobian.rows(),
+                          m_numberOfVariables).block(subMatrixRowPosition,
                                                      0, m_rightFootJacobian.rows(),
                                                      m_rightFootJacobian.cols())=
         iDynTree::toEigen(m_rightFootJacobian);
-
+    subMatrixRowPosition += m_rightFootJacobian.rows();
 
     // add com as constraint
     if(m_useCoMAsConstraint)
     {
         Eigen::Map<MatrixXd>(m_constraintMatrix.data(),
                              m_numberOfConstraints,
-                             m_numberOfVariables).block(m_leftFootJacobian.rows() + m_leftFootJacobian.rows(),
+                             m_numberOfVariables).block(subMatrixRowPosition,
                                                         0, m_comJacobian.rows(),
                                                         m_comJacobian.cols())=
             iDynTree::toEigen(m_comJacobian);
+        subMatrixRowPosition += m_comJacobian.rows();
+    }
+
+    if(m_useHandsAsConstraint)
+    {
+        if(m_useLeftHand)
+        {
+            Eigen::Map<MatrixXd>(m_constraintMatrix.data(),
+                                 m_numberOfConstraints,
+                                 m_numberOfVariables).block(subMatrixRowPosition,
+                                                            0, m_leftHandJacobian.rows(),
+                                                            m_leftHandJacobian.cols())=
+                iDynTree::toEigen(m_leftHandJacobian);
+            subMatrixRowPosition += m_leftHandJacobian.rows();
+        }
+
+        if(m_useRightHand)
+        {
+            Eigen::Map<MatrixXd>(m_constraintMatrix.data(),
+                                 m_numberOfConstraints,
+                                 m_numberOfVariables).block(subMatrixRowPosition,
+                                                            0, m_rightHandJacobian.rows(),
+                                                            m_rightHandJacobian.cols())=
+                iDynTree::toEigen(m_rightHandJacobian);
+            subMatrixRowPosition += m_rightHandJacobian.rows();
+        }
     }
 
     return true;
@@ -627,6 +675,7 @@ iDynTree::Position WalkingQPIK_qpOASES::evaluateIntegralError(std::unique_ptr<iC
 
 bool WalkingQPIK_qpOASES::setBounds()
 {
+    int subVectorPosition = 0;
     //  left foot
     Eigen::VectorXd leftFootCorrection(6);
     iDynTree::Position leftFootError = m_leftFootToWorldTransform.getPosition()
@@ -638,6 +687,13 @@ bool WalkingQPIK_qpOASES::setBounds()
                                                                                     m_desiredLeftFootToWorldTransform.getRotation().inverse());
 
     leftFootCorrection.block(3,0,3,1) = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorLeftAttitude)));
+
+    Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
+      - leftFootCorrection;
+    Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
+      - leftFootCorrection;
+
+    subVectorPosition += leftFootCorrection.size();
 
     // right foot
     Eigen::VectorXd rightFootCorrection(6);
@@ -652,42 +708,12 @@ bool WalkingQPIK_qpOASES::setBounds()
 
     rightFootCorrection.block(3,0,3,1) = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorRightAttitude)));
 
-    // if((m_leftFootTwist(0) == m_leftFootTwist(1)) && (m_leftFootTwist(0) == 0))
-    // {
-    //     Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist);
-    //     Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist);
-    // }
-    // else
-    // {
-    //     Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
-    //         - leftFootCorrection;
-    //     Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
-    //         - leftFootCorrection;
-    // }
-
-    Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
-      - leftFootCorrection;
-    Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
-      - leftFootCorrection;
-
-    // if((m_rightFootTwist(0) == m_rightFootTwist(1)) && (m_rightFootTwist(0) == 0))
-    // {
-    //     Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist);
-    //     Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist);
-    // }
-    // else
-    // {
-    //     Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist)
-    //         - rightFootCorrection;
-    //     Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist)
-    //         - rightFootCorrection;
-    // }
-
-
-    Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist)
+    Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist)
       - rightFootCorrection;
-    Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist)
+    Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist)
       - rightFootCorrection;
+
+    subVectorPosition += rightFootCorrection.rows();
 
     if(m_useCoMAsConstraint)
     {
@@ -697,12 +723,61 @@ bool WalkingQPIK_qpOASES::setBounds()
         comCorrection = m_kCom * iDynTree::toEigen(comPositionError) +
             m_kICom * iDynTree::toEigen(evaluateIntegralError(m_comErrorIntegral, comPositionError));
 
-        Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity) + comCorrection;
+        Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 3, 1) = iDynTree::toEigen(m_comVelocity)
+            + comCorrection;
+        Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 3, 1) = iDynTree::toEigen(m_comVelocity)
+            + comCorrection;
 
-        Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(12, 0, 3, 1) = iDynTree::toEigen(m_comVelocity) + comCorrection;
-
+        subVectorPosition += comCorrection.rows();
     }
 
+    if(m_useHandsAsConstraint)
+    {
+        if(m_useLeftHand)
+        {
+            //  left hand
+            Eigen::VectorXd leftHandCorrection(6);
+
+            // linear position error
+            iDynTree::Position leftHandPositionError = m_leftHandToWorldTransform.getPosition()
+                - m_desiredLeftHandToWorldTransform.getPosition();
+            leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
+
+            // angular position error
+            iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
+                                                                                                m_desiredLeftHandToWorldTransform.getRotation().inverse());
+            leftHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
+
+            //
+            Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) =
+                - leftHandCorrection - Eigen::VectorXd::Ones(6) * m_handTolerance;
+            Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) =
+                - leftHandCorrection + Eigen::VectorXd::Ones(6) * m_handTolerance;
+
+            subVectorPosition += leftHandCorrection.rows();
+        }
+
+        if(m_useRightHand)
+        {
+            //  right hand
+            Eigen::VectorXd rightHandCorrection(6);
+
+            iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
+                - m_desiredRightHandToWorldTransform.getPosition();
+            rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
+
+            iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
+                                                                                                 m_desiredRightHandToWorldTransform.getRotation().inverse());
+            rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+
+            Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) =
+                - rightHandCorrection - Eigen::VectorXd::Ones(6) * m_handTolerance;
+            Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(subVectorPosition, 0, 6, 1) =
+                - rightHandCorrection + Eigen::VectorXd::Ones(6) * m_handTolerance;
+
+            subVectorPosition += rightHandCorrection.rows();
+        }
+    }
     return true;
 }
 

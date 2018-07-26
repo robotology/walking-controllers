@@ -96,8 +96,9 @@ class WalkingQPIK_qpOASES
     double m_kICom; /**< Gain related to the desired foot attitude (integral). */
 
     double m_kPosHand; /**< Gain related to the desired hand position. */
-
     double m_kAttHand; /**< Gain related to the desired hand attitude. */
+
+    double m_handTolerance; /**< Hand tolerance (this is used only if the Cartesian hand task is considered as constraint. */
 
     iDynSparseMatrix m_comWeightMatrix; /**< CoM weight matrix. */
     iDynSparseMatrix m_neckWeightMatrix; /**< Neck weight matrix. */
@@ -112,8 +113,10 @@ class WalkingQPIK_qpOASES
     bool m_isSolutionEvaluated{false}; /**< True if the solution is evaluated. */
 
     bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
+    bool m_useHandsAsConstraint; /**< True if the desired  hand position is considered as constraint. */
     bool m_useLeftHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
     bool m_useRightHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
+
 
     std::unique_ptr<iCub::ctrl::Integrator> m_leftFootErrorIntegral; /**< left foot error integrator */
     std::unique_ptr<iCub::ctrl::Integrator> m_rightFootErrorIntegral; /**< right foot error integrator  */
