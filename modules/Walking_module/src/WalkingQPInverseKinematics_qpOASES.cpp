@@ -575,12 +575,6 @@ bool WalkingQPIK_qpOASES::setGradientVector()
             iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
                 - m_desiredRightHandToWorldTransform.getPosition();
 
-            auto tmp = m_rightHandToWorldTransform.getRotation() *
-                m_desiredRightHandToWorldTransform.getRotation().inverse();
-
-            yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
-            yInfo() << "desired right" << m_desiredRightHandToWorldTransform.getRotation().asRPY().toString();
-
             rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
 
             iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *

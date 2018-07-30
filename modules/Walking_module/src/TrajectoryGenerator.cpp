@@ -135,14 +135,14 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setSlowWhenTurnGain(slowWhenTurningGain);
     ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatio);
     ok = ok && m_trajectoryGenerator.setPitchDelta(pitchDelta);
-    
+
     m_trajectoryGenerator.setStanceZMPDelta(leftZMPDelta, rightZMPDelta);
     m_trajectoryGenerator.addTerminalStep(false);
     m_trajectoryGenerator.startWithLeft(m_swingLeft);
     m_trajectoryGenerator.resetTimingsIfStill(startWithSameFoot);
 
-    
-    
+
+
     m_trajectoryGenerator.useMinimumJerkFootTrajectory(useMinimumJerkFootTrajectory);
 
     m_correctLeft = true;
@@ -472,6 +472,28 @@ bool TrajectoryGenerator::isTrajectoryAsked()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_generatorState == GeneratorState::Called;
+}
+
+
+bool TrajectoryGenerator::updateTimings(const double& minStepDuration,
+                                        const double& maxStepDuration,
+                                        const double& nominalStepDuration)
+{
+    // check if it is possible to change the timings
+    std::lock_guard<std::mutex> guard(m_mutex);
+    if(m_generatorState == GeneratorState::Called)
+    {
+        yError() << "[updateTimings] Timings cannot be update if a new trajectory is evaluating.";
+        return false;
+    }
+
+    bool ok = true;
+    ok = ok && m_trajectoryGenerator.setStepTimings(minStepDuration, maxStepDuration,
+                                                    nominalStepDuration);
+
+    ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalStepDuration);
+
+    return ok;
 }
 
 bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)

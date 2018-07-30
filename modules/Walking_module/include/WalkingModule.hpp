@@ -71,6 +71,7 @@ class WalkingModule:
     bool m_useVelocityControllerAsIK; /**< True the velocity controller is used as IK. */
     bool m_useLeftHand; /**< Use the left hand inside the  inverse kinematics. */
     bool m_useRightHand; /**< Use the right hand inside the  inverse kinematics. */
+    bool m_useVelocityModulation; /**< Use velocity modulation. */
 
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
@@ -206,6 +207,19 @@ class WalkingModule:
     yarp::os::BufferedPort<yarp::os::Bottle> m_torsoOrientationPort; /**< Port contain the yaw angle
                                                                         of the torso. */
 
+    // velocity modulation
+    double m_minForwardVelocity; /**< Minimal forward velocity. */
+    double m_maxForwardVelocity; /**< Maximal forward velocity. */
+
+    double m_minStepDurationIni; /**< Min step duration associated to minForwardVelocity. */
+    double m_minStepDurationFinal; /**< Min step duration associated to maxForwardVelocity. */
+
+    double m_maxStepDurationIni; /**< Max step duration associated to minForwardVelocity. */
+    double m_maxStepDurationFinal; /**< Max step duration associated to maxForwardVelocity. */
+
+    double m_nominalStepDurationIni; /**< Nominal step duration associated to minForwardVelocity. */
+    double m_nominalStepDurationFinal; /**< Nominal step duration associated to maxForwardVelocity. */
+
     /**
      * Configure the Force torque sensors. The FT ports are only opened please use yarpamanger
      * to connect them.
@@ -220,6 +234,13 @@ class WalkingModule:
      * @return true in case of success and false otherwise.
      */
     bool configureHandRetargeting(const yarp::os::Searchable& config);
+
+    /**
+     * Configure the Velocity modulation feature.
+     * @param config is the reference to a resource finder object.
+     * @return true in case of success and false otherwise.
+     */
+    bool configureVelocityModulation(yarp::os::Searchable& config);
 
     /**
      * Configure the Robot.
@@ -380,11 +401,23 @@ class WalkingModule:
      */
     bool updateTrajectories(const size_t& mergePoint);
 
-
     /**
      * Update the desired hands trajectories
      */
     void updateDesiredHandsPose();
+
+    /**
+     * Linear interpolation.
+     * @param x0
+     * @param y0
+     * @param xf
+     * @param yf
+     * @param x
+     * @return y
+     */
+    double linearInterpolation(const double& x0, const double& y0,
+                               const double& xf, const double& yf,
+                               const double& x);
 public:
 
     /**

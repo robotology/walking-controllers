@@ -136,6 +136,17 @@ public:
      */
     bool isTrajectoryAsked();
 
+
+    /**
+     * update the timings duration.
+     * @param minStepDuration minimum duration of a step;
+     * @param maxStepDuration maximum duration of a step;
+     * @param nominalStepDuration nominal duration of a step.
+     * @return true/false in case of success/failure.
+     */
+    bool updateTimings(const double& minStepDuration, const double& maxStepDuration,
+                       const double& nominalStepDuration);
+
     /**
      * Get the desired 2D-DCM position trajectory
      * @param DCMPositionTrajectory desired trajectory of the DCM.

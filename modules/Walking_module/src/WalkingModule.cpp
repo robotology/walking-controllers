@@ -1,3 +1,4 @@
+
 /**
  * @file WalkingModule.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
@@ -351,7 +352,7 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
         m_maxJointsPosition(i) = iDynTree::deg2rad(max);
 
 	yInfo() << min << " " << max;
-	
+
         // get velocity limits
         if(!m_limitsInterface->getVelLimits(i, &min, &max))
         {
@@ -508,6 +509,94 @@ bool WalkingModule::configureForceTorqueSensors(const yarp::os::Searchable& conf
     return true;
 }
 
+bool WalkingModule::configureVelocityModulation(yarp::os::Searchable& config)
+{
+    if(config.isNull())
+    {
+        yInfo() << "[configureVelocityModulation] No velocity modulation.";
+        m_useVelocityModulation = false;
+        return true;
+    }
+    m_useVelocityModulation  = true;
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "minForwardVelocity", m_minForwardVelocity))
+    {
+        yError() << "Initialization failed while reading minForwardVelocity.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "maxForwardVelocity", m_maxForwardVelocity))
+    {
+        yError() << "Initialization failed while reading maxForwardVelocity.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "minStepDurationIni", m_minStepDurationIni))
+    {
+        yError() << "Initialization failed while reading minStepDurationIni.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "minStepDurationFinal", m_minStepDurationFinal))
+    {
+        yError() << "Initialization failed while reading minStepDurationFinal.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "maxStepDurationIni", m_maxStepDurationIni))
+    {
+        yError() << "Initialization failed while reading maxStepDurationIni.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "maxStepDurationFinal", m_maxStepDurationFinal))
+    {
+        yError() << "Initialization failed while reading maxStepDurationFinal.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "nominalStepDurationIni", m_nominalStepDurationIni))
+    {
+        yError() << "Initialization failed while reading nominalStepDurationIni.";
+        return false;
+    }
+
+    if(!YarpHelper::getDoubleFromSearchable(config, "nominalStepDurationFinal", m_nominalStepDurationFinal))
+    {
+        yError() << "Initialization failed while reading nominalStepDurationFinal.";
+        return false;
+    }
+
+    // sanity check
+    if (m_minStepDurationIni > m_maxStepDurationIni)
+    {
+        yError() << "[configureVelocityModulation] The minTime needs to be greater than the maximum time.";
+        return false;
+    }
+
+    if ((m_nominalStepDurationIni < m_minStepDurationIni)||
+        (m_minStepDurationIni < m_nominalStepDurationIni))
+    {
+        yError() << "The nominal time is expected to be between minTime and maxTime.";
+        return false;
+    }
+
+    if (m_minStepDurationFinal > m_maxStepDurationFinal)
+    {
+        yError() << "[configureVelocityModulation] The minTime needs to be greater than the maximum time.";
+        return false;
+    }
+
+    if ((m_nominalStepDurationFinal < m_minStepDurationFinal)||
+        (m_minStepDurationFinal < m_nominalStepDurationFinal))
+    {
+        yError() << "The nominal time is expected to be between minTime and maxTime.";
+        return false;
+    }
+
+    return true;
+}
+
 bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 {
     // module name (used as prefix for opened ports)
@@ -559,6 +648,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(!configureHandRetargeting(handRetargetingOptions))
     {
         yError() << "[configure] Unable to configure the hand retargeting.";
+        return false;
+    }
+
+    yarp::os::Bottle& velocityModulationOptions = rf.findGroup("VELOCITY_MODULATION");
+    if(!configureVelocityModulation(velocityModulationOptions))
+    {
+        yError() << "[configure] Unable to configure the velocity modulation.";
         return false;
     }
 
@@ -774,6 +870,14 @@ void WalkingModule::updateDesiredHandsPose()
         desiredLeftHandPose = m_desiredLeftHandPosePort.read(false);
         if(desiredLeftHandPose != NULL)
             m_desiredLeftHandPoseYarp = *desiredLeftHandPose;
+
+        // m_desiredLeftHandPoseYarp(0) = -1;
+        // m_desiredLeftHandPoseYarp(1) = -0.5;
+        // m_desiredLeftHandPoseYarp(2) = 0.5;
+
+        // m_desiredLeftHandPoseYarp(3) = 0;
+        // m_desiredLeftHandPoseYarp(4) = 3.14;
+        // m_desiredLeftHandPoseYarp(5) = 0;
 
         m_desiredLeftHandSmoother->computeNextValues(m_desiredLeftHandPoseYarp);
         yarp::sig::Vector desiredLeftHandPoseSmoothedYarp = m_desiredLeftHandSmoother->getPos();
@@ -2249,6 +2353,15 @@ bool WalkingModule::evaluateDCM(iDynTree::Vector2& dcm)
     return true;
 }
 
+double WalkingModule::linearInterpolation(const double& x0, const double& y0,
+                                          const double& xf, const double& yf,
+                                          const double& x)
+{
+    double y;
+    y = (yf - y0)/(xf - x0) * (x - x0) + y0;
+    return y;
+}
+
 bool WalkingModule::startWalking()
 {
     if(m_robotState != WalkingFSM::Prepared)
@@ -2349,6 +2462,26 @@ bool WalkingModule::setGoal(double x, double y)
     {
         m_robotState = WalkingFSM::Walking;
         m_trajectoryGenerator->addTerminalStep(true);
+    }
+
+    // modulate the walking velocity according to the inputs
+    if(m_useVelocityModulation)
+    {
+        double minStepDuration, maxStepDuration, nominalStepDuration;
+        minStepDuration = linearInterpolation(m_minForwardVelocity, m_minStepDurationIni,
+                                              m_maxForwardVelocity, m_minStepDurationFinal, x);
+
+        maxStepDuration = linearInterpolation(m_minForwardVelocity, m_maxStepDurationIni,
+                                              m_maxForwardVelocity, m_maxStepDurationFinal, x);
+
+        maxStepDuration = linearInterpolation(m_minForwardVelocity, m_nominalStepDurationIni,
+                                              m_maxForwardVelocity, m_nominalStepDurationFinal, x);
+
+        if(!m_trajectoryGenerator->updateTimings(minStepDuration, maxStepDuration, nominalStepDuration))
+        {
+            yError() << "[setGoal] Unable to update timings.";
+            return false;
+        }
     }
 
     m_desiredPosition(0) = x;
