@@ -575,7 +575,7 @@ bool WalkingModule::configureVelocityModulation(yarp::os::Searchable& config)
     }
 
     if ((m_nominalStepDurationIni < m_minStepDurationIni)||
-        (m_minStepDurationIni < m_nominalStepDurationIni))
+        (m_maxStepDurationIni < m_nominalStepDurationIni))
     {
         yError() << "The nominal time is expected to be between minTime and maxTime.";
         return false;
@@ -588,7 +588,7 @@ bool WalkingModule::configureVelocityModulation(yarp::os::Searchable& config)
     }
 
     if ((m_nominalStepDurationFinal < m_minStepDurationFinal)||
-        (m_minStepDurationFinal < m_nominalStepDurationFinal))
+        (m_maxStepDurationFinal < m_nominalStepDurationFinal))
     {
         yError() << "The nominal time is expected to be between minTime and maxTime.";
         return false;
@@ -2474,8 +2474,8 @@ bool WalkingModule::setGoal(double x, double y)
         maxStepDuration = linearInterpolation(m_minForwardVelocity, m_maxStepDurationIni,
                                               m_maxForwardVelocity, m_maxStepDurationFinal, x);
 
-        maxStepDuration = linearInterpolation(m_minForwardVelocity, m_nominalStepDurationIni,
-                                              m_maxForwardVelocity, m_nominalStepDurationFinal, x);
+        nominalStepDuration = linearInterpolation(m_minForwardVelocity, m_nominalStepDurationIni,
+						  m_maxForwardVelocity, m_nominalStepDurationFinal, x);
 
         if(!m_trajectoryGenerator->updateTimings(minStepDuration, maxStepDuration, nominalStepDuration))
         {
