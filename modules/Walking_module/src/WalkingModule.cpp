@@ -129,7 +129,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     }
 
     // load the model in iDynTree::KinDynComputations
-    std::string model = rf.check("model",yarp::os::Value("model.urdf")).asString();
+    std::string model = rf.check("model",yarp::os::Value("modelForWalking.urdf")).asString();
     std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(model);
 
     yInfo() << "The model is found in: " << pathToModel;
