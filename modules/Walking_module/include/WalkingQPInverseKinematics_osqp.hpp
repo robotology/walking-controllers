@@ -15,15 +15,22 @@
 // YARP
 #include <yarp/os/Searchable.h>
 
+// iCub-ctrl
+#include <iCub/ctrl/pids.h>
+
 #include <OsqpEigen/OsqpEigen.h>
 #include "Utils.hpp"
 
 class WalkingQPIK_osqp
 {
+    double m_dT; /**< Sampling time. */
+
     iDynTree::MatrixDynSize m_comJacobian; /**< CoM jacobian (mixed representation). */
     iDynTree::MatrixDynSize m_neckJacobian; /**< Neck jacobian (mixed representation). */
     iDynTree::MatrixDynSize m_leftFootJacobian; /**< Left foot Jacobian (mixed representation). */
     iDynTree::MatrixDynSize m_rightFootJacobian; /**< Right foot Jacobian (mixed representation). */
+    iDynTree::MatrixDynSize m_leftHandJacobian; /**< Left hand Jacobian (mixed representation). */
+    iDynTree::MatrixDynSize m_rightHandJacobian; /**< Right hand Jacobian (mixed representation). */
 
     iDynTree::Twist m_leftFootTwist; /**< Desired Twist of the left foot. */
     iDynTree::Twist m_rightFootTwist; /**< Desired Twist of the right foot. */
@@ -31,6 +38,8 @@ class WalkingQPIK_osqp
     iDynTree::Position m_desiredComPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_desiredLeftFootToWorldTransform; /**< Desired left foot to world transformation.*/
     iDynTree::Transform m_desiredRightFootToWorldTransform; /**< Desired right foot to world transformation.*/
+    iDynTree::Transform m_desiredLeftHandToWorldTransform; /**< Desired left hand to world transformation.*/
+    iDynTree::Transform m_desiredRightHandToWorldTransform; /**< Desired right hand to world transformation.*/
     iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
     iDynTree::Rotation m_additionalRotation; /**< Additional rotation matrix (it is useful to rotate the
                                                 desiredNeckOrientation rotation matrix). */
@@ -39,6 +48,9 @@ class WalkingQPIK_osqp
     iDynTree::Position m_comPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_leftFootToWorldTransform; /**< Actual left foot to world transformation.*/
     iDynTree::Transform m_rightFootToWorldTransform; /**< Actual right foot to world transformation.*/
+    iDynTree::Transform m_leftHandToWorldTransform; /**< Actual left hand to world transformation.*/
+    iDynTree::Transform m_rightHandToWorldTransform; /**< Actual right hand to world transformation.*/
+
     iDynTree::Rotation m_neckOrientation; /**< Rotation matrix of the actual neck orientation. */
     iDynTree::VectorDynSize m_jointPosition; /**< Actual joint position .*/
 
@@ -47,12 +59,22 @@ class WalkingQPIK_osqp
     std::unique_ptr<OsqpEigen::Solver> m_optimizerSolver; /**< Optimization solver. */
 
     iDynSparseMatrix m_jointRegulatizationGains;  /**< Gain related to the joint regularization. */
+
     double m_kPosFoot; /**< Gain related to the desired foot position. */
+    double m_kIPosFoot; /**< Gain related to the desired foot position (integral). */
+
     double m_kAttFoot; /**< Gain related to the desired foot attitude. */
-    double m_kNeck; /**< Gain related to the desired neck attitude. */
-    double m_kCom; /**< Gain related to the desired CoM position. */
+    double m_kNeck; /**< Gain related to the desired foot attitude. */
+
+    double m_kCom; /**< Gain related to the desired foot attitude. */
+    double m_kICom; /**< Gain related to the desired foot attitude (integral). */
+
+    double m_kPosHand; /**< Gain related to the desired hand position. */
+    double m_kAttHand; /**< Gain related to the desired hand attitude. */
+
     iDynSparseMatrix m_comWeightMatrix; /**< CoM weight matrix. */
     iDynSparseMatrix m_neckWeightMatrix; /**< Neck weight matrix. */
+    iDynSparseMatrix m_handWeightMatrix; /**< Hands weight matrix. */
     iDynSparseMatrix m_jointRegulatizationHessian; /**< Contains a constant matrix that can be useful
                                                       in the hessian evaluation ($-\lambda H' H$). */
     iDynSparseMatrix m_jointRegulatizationGradient; /**< Contains a constant matrix that can be useful
@@ -66,11 +88,24 @@ class WalkingQPIK_osqp
     Eigen::MatrixXd m_hessianEigenDense;
     Eigen::MatrixXd m_constraintsMatrixEigenDense;
 
+    iDynTree::VectorDynSize m_minJointsPosition; /**< Vector containing the min joint limit */
+    iDynTree::VectorDynSize m_maxJointsPosition; /**< Vector containing the max joint limit */
+
+    iDynTree::VectorDynSize m_minJointsVelocity; /**< Vector containing the min velocity limit */
+    iDynTree::VectorDynSize m_maxJointsVelocity; /**< Vector containing the max velocity limit */
+
     int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
 
     bool m_isSolutionEvaluated{false}; /**< True if the solution is evaluated. */
 
     bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
+    bool m_useLeftHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
+    bool m_useRightHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
+
+    std::unique_ptr<iCub::ctrl::Integrator> m_leftFootErrorIntegral; /**< left foot error integrator */
+    std::unique_ptr<iCub::ctrl::Integrator> m_rightFootErrorIntegral; /**< right foot error integrator  */
+    std::unique_ptr<iCub::ctrl::Integrator> m_comErrorIntegral; /**< CoM error integrator  */
+
 
     /**
      * Initialize all the constant matrix from the configuration file.
@@ -107,13 +142,23 @@ class WalkingQPIK_osqp
     bool setBounds();
 
     /**
-     * Set joints velocity bounds
-     * @param the minJointsLimit is a vector containing the min joints velocity limit;
-     * @param the minJointsLimit is a vector containing the max joints velocity limit.
+     * Set the joints limits tacking into account both velocity and position limits.
+     */
+    void setJointLimits();
+
+    /**
+     * Set joints bounds
+     * @param minJointsPosition is a vector containing the min joints position limit;
+     * @param maxJointsPosition is a vector containing the max joints position limit;
+     * @param minJointsVelocity is a vector containing the min joints velocity limit;
+     * @param maxJointsVelocity is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
-    bool setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                           const iDynTree::VectorDynSize& maxJointsLimit);
+    bool setJointBounds(const iDynTree::VectorDynSize& minJointsPosition,
+                        const iDynTree::VectorDynSize& maxJointsPosition,
+                        const iDynTree::VectorDynSize& minJointsVelocity,
+                        const iDynTree::VectorDynSize& maxJointsVelocity);
+
 
     /**
      * Check if the solution is feasible.
@@ -121,20 +166,33 @@ class WalkingQPIK_osqp
      */
     bool isSolutionFeasible();
 
+    /**
+     * Evaluate the integral.
+     * @param integral object;
+     * @param error;
+     * @return the integral position.
+     */
+    iDynTree::Position evaluateIntegralError(std::unique_ptr<iCub::ctrl::Integrator>& integral,
+                                             const iDynTree::Position& error);
 public:
 
     /**
      * Initialize the QP-IK problem.
      * @param config config of the QP-IK solver;
-     * @param actuatedDOFs number of the actuated DoF
-     * @param the minJointsLimit is a vector containing the min joints velocity limit;
-     * @param the minJointsLimit is a vector containing the max joints velocity limit.
+     * @param kinDyn reference to an already instantiate kinDynComputations object.
+     * It will be used only for get jacobians
+     * @param minJointsPosition is a vector containing the min joints position limit;
+     * @param maxJointsPosition is a vector containing the max joints position limit;
+     * @param minJointsVelocity is a vector containing the min joints velocity limit;
+     * @param maxJointsVelocity is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
     bool initialize(const yarp::os::Searchable& config,
                     const int& actuatedDOFs,
-                    const iDynTree::VectorDynSize& minJointsLimit,
-                    const iDynTree::VectorDynSize& maxJointsLimit);
+                    const iDynTree::VectorDynSize& minJointsPosition,
+                    const iDynTree::VectorDynSize& maxJointsPosition,
+                    const iDynTree::VectorDynSize& minJointsVelocity,
+                    const iDynTree::VectorDynSize& maxJointsVelocity);
 
     /**
      * Set the robot state.
@@ -149,6 +207,17 @@ public:
                        const iDynTree::Transform& rightFootToWorldTransform,
                        const iDynTree::Rotation& neckOrientation,
                        const iDynTree::Position& comPosition);
+
+
+    /**
+     * Set the hand state.
+     * @param leftHandToWorldTransformation transformation between the inertial frame and the left
+     * hand;
+     * @param rightHandToWorldTransformation transformation between the inertial frame and the right
+     * hand.
+     */
+    void setHandsState(const iDynTree::Transform& leftHandToWorldTransform,
+                       const iDynTree::Transform& rightHandToWorldTransform);
 
     /**
      * Set the Jacobian of the CoM
@@ -170,6 +239,20 @@ public:
      * @return true/false in case of success/failure.
      */
     bool setRightFootJacobian(const iDynTree::MatrixDynSize& rightFootJacobian);
+
+    /**
+     * Set the Jacobian of the left hand.
+     * @param leftHandJacobian Jacobian of the left hand (mixed representation)
+     * @return true/false in case of success/failure.
+     */
+    bool setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJacobian);
+
+    /**
+     * Set the Jacobian of the right hand.
+     * @param rightHandJacobian Jacobian of the right hand (mixed representation)
+     * @return true/false in case of success/failure.
+     */
+    bool setRightHandJacobian(const iDynTree::MatrixDynSize& rightHandJacobian);
 
     /**
      * Set the Jacobian of the neck
@@ -207,6 +290,26 @@ public:
      */
     void setDesiredFeetTransformation(const iDynTree::Transform& desiredLeftFootToWorldTransform,
                                       const iDynTree::Transform& desiredRightFootToWorldTransform);
+
+    /**
+     * Set the desired left hand transformation
+     * @param desiredLeftHandToWorldTransform desired transformation between the inertial frame and the left hand;
+     */
+    void setDesiredLeftHandTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform);
+
+    /**
+     * Set the desired left hand transformation
+     * @param desiredRightHandToWorldTransform desired transformation between the inertial frame and the right hand.
+     */
+    void setDesiredRightHandTransformation(const iDynTree::Transform& desiredRightHandToWorldTransform);
+
+    /**
+     * Set the desired hands transformation
+     * @param desiredLeftHandToWorldTransform desired transformation between the inertial frame and the left hand;
+     * @param desiredRightHandToWorldTransform desired transformation between the inertial frame and the right hand.
+     */
+    void setDesiredHandsTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform,
+                                       const iDynTree::Transform& desiredRightHandToWorldTransform);
 
     /**
      * Set the desired orientation of the neck

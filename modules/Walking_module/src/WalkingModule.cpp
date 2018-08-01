@@ -129,7 +129,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     }
 
     // load the model in iDynTree::KinDynComputations
-    std::string model = rf.check("model",yarp::os::Value("modelForWalking.urdf")).asString();
+    std::string model = rf.check("model",yarp::os::Value("model.urdf")).asString();
     std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(model);
 
     yInfo() << "The model is found in: " << pathToModel;
@@ -395,14 +395,19 @@ bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
             yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
             return false;
         }
+
+        // open port
+        m_desiredLeftHandPosePort.open("/" + getName() + portInput);
+
+
         if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseOutputPort_name",
                                                 portOutput))
         {
             yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
             return false;
         }
-        // open port
-        m_desiredLeftHandPosePort.open("/" + getName() + portInput);
+
+
         // connect port
         if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
         {
@@ -425,14 +430,17 @@ bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
             yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
             return false;
         }
+
+        // open port
+        m_desiredRightHandPosePort.open("/" + getName() + portInput);
+
+
         if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseOutputPort_name",
                                                 portOutput))
         {
             yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
             return false;
         }
-        // open port
-        m_desiredRightHandPosePort.open("/" + getName() + portInput);
         // connect port
         if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
         {
@@ -729,6 +737,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_QPIKSolver_osqp = std::make_unique<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_actuatedDOFs,
+                                          m_minJointsPosition, m_maxJointsPosition,
                                           m_minJointsVelocity, m_maxJointsVelocity))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (osqp)";
@@ -801,7 +810,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_robotState = WalkingFSM::Configured;
 
     // TODO: do it in a better way
-    m_torsoOrientationPort.open("/robot_theta");
+    m_torsoOrientationPort.open("/" + getName() + "/torsoYaw:o");
 
     yInfo() << "Option \t Value";
     yInfo() << "pos filt \t " << m_usePositionFilter;
@@ -1247,18 +1256,15 @@ bool WalkingModule::updateModule()
 
             if(m_useOSQP)
             {
-                // if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-                //               desiredCoMVelocity, measuredCoM,
-                //               yawRotation, m_dqDesired_osqp))
-                // {
-                //     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-                //     return false;
-                // }
+                if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
+                              desiredCoMVelocity, measuredCoM,
+                              yawRotation, m_dqDesired_osqp))
+                {
+                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                    return false;
+                }
 
-                // iDynTree::toYarp(m_dqDesired_osqp, bufferVelocity);
-
-                yError() << "[updateModule] no more implemented";
-                return false;
+                iDynTree::toYarp(m_dqDesired_osqp, bufferVelocity);
             }
             else
             {
