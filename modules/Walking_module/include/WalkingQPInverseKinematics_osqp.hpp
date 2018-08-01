@@ -102,7 +102,7 @@ class WalkingQPIK_osqp
     bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
     bool m_useLeftHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
     bool m_useRightHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
-    bool m_useGainScheduling; /**< True if the hand gain scheduling is used. */;
+    bool m_useGainScheduling; /**< True if the hand gain scheduling is used. */
 
     std::unique_ptr<iCub::ctrl::Integrator> m_leftFootErrorIntegral; /**< left foot error integrator */
     std::unique_ptr<iCub::ctrl::Integrator> m_rightFootErrorIntegral; /**< right foot error integrator  */

@@ -1271,6 +1271,7 @@ bool WalkingModule::updateModule()
             }
             else
             {
+                m_QPIKSolver_qpOASES->setPhase(stancePhase || m_robotState == WalkingFSM::OnTheFly);
                 if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
                               desiredCoMVelocity, measuredCoM,
                               yawRotation, m_dqDesired_qpOASES))

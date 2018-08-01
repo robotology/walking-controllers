@@ -21,6 +21,7 @@
 
 // iCub-ctrl
 #include <iCub/ctrl/pids.h>
+#include <iCub/ctrl/minJerkCtrl.h>
 
 #include "Utils.hpp"
 
@@ -116,11 +117,19 @@ class WalkingQPIK_qpOASES
     bool m_useHandsAsConstraint; /**< True if the desired  hand position is considered as constraint. */
     bool m_useLeftHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
     bool m_useRightHand; /**< True if the desired pose of the left hand is take into account inside the IK problem. */
-
+    bool m_useGainScheduling; /**< True if the hand gain scheduling is used. */
 
     std::unique_ptr<iCub::ctrl::Integrator> m_leftFootErrorIntegral; /**< left foot error integrator */
     std::unique_ptr<iCub::ctrl::Integrator> m_rightFootErrorIntegral; /**< right foot error integrator  */
     std::unique_ptr<iCub::ctrl::Integrator> m_comErrorIntegral; /**< CoM error integrator  */
+
+    // gain scheduling
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_handWeightSmoother; /**< Minimum jerk trajectory
+                                                                         for the hand weight matrix. */
+    yarp::sig::Vector m_handWeightWalkingVector; /**< Weight matrix (only the diagonal) used for
+                                                    the hand retargeting during walking. */
+    yarp::sig::Vector m_handWeightStanceVector; /**< Weight matrix (only the diagonal) used for
+                                                   the hand retargeting during stance. */
 
 
     /**
@@ -335,6 +344,12 @@ public:
      * @return true/false in case of success/failure.
      */
     bool solve();
+
+    /**
+     * Set the phase (Walking or stance)
+     * @param isStancePhase true if the current phase is the stance phase.
+     */
+    void setPhase(const bool& isStancePhase);
 
     /**
      * Get the solution of the optimization problem.
