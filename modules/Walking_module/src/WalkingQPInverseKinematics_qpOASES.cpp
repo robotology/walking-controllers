@@ -338,7 +338,7 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
     m_optimizer = std::make_shared<qpOASES::SQProblem>(m_numberOfVariables,
                                                        m_numberOfConstraints);
 
-    m_optimizer->setPrintLevel(qpOASES::PL_LOW);
+    m_optimizer->setPrintLevel(qpOASES::PL_MEDIUM);
 
     m_isFirstTime = true;
     return true;
@@ -511,15 +511,18 @@ void WalkingQPIK_qpOASES::setJointLimits()
         minPos = (m_minJointPosition[i] - m_jointPosition(i)) / m_dT;
         maxPos = (m_maxJointPosition[i] - m_jointPosition(i)) / m_dT;
 
-        if(minPos > m_minJointVelocity[i])
-            m_minJointLimit[i + 6] = minPos;
-        else
-            m_minJointLimit[i + 6] = m_minJointVelocity[i];
+	m_minJointLimit[i + 6] = m_minJointVelocity[i];
+	m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
+	
+        // if(minPos > m_minJointVelocity[i])
+        //     m_minJointLimit[i + 6] = minPos;
+        // else
+        //     m_minJointLimit[i + 6] = m_minJointVelocity[i];
 
-        if(maxPos < m_maxJointVelocity[i])
-            m_maxJointLimit[i + 6] = maxPos;
-        else
-            m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
+        // if(maxPos < m_maxJointVelocity[i])
+        //     m_maxJointLimit[i + 6] = maxPos;
+        // else
+        //     m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
     }
 }
 
@@ -591,10 +594,11 @@ bool WalkingQPIK_qpOASES::setGradientVector()
                 - m_desiredLeftHandToWorldTransform.getPosition();
             leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
 
-            auto tmp = m_leftHandToWorldTransform.getRotation() *
-                m_desiredLeftHandToWorldTransform.getRotation().inverse();
-            yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
-            yInfo() << "desired left" << m_desiredLeftHandToWorldTransform.getRotation().asRPY().toString();
+	    // TODO
+            // auto tmp = m_leftHandToWorldTransform.getRotation() *
+            //     m_desiredLeftHandToWorldTransform.getRotation().inverse();
+            // yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
+            // yInfo() << "desired left" << m_desiredLeftHandToWorldTransform.getRotation().asRPY().toString();
 
             iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
                                                                                                 m_desiredLeftHandToWorldTransform.getRotation().inverse());

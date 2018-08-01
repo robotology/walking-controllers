@@ -299,7 +299,7 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
     m_optimizerSolver->data()->setNumberOfVariables(m_numberOfVariables);
     m_optimizerSolver->data()->setNumberOfConstraints(m_numberOfConstraints);
 
-    m_optimizerSolver->settings()->setVerbosity(false);
+    m_optimizerSolver->settings()->setVerbosity(true);
     m_optimizerSolver->settings()->setLinearSystemSolver(0);
 
     return true;
@@ -474,18 +474,20 @@ void WalkingQPIK_osqp::setJointLimits()
 
     for(int i = 0; i < m_actuatedDOFs; i++)
     {
-        minPos = (m_minJointsPosition(i) - m_jointPosition(i)) / m_dT;
-        maxPos = (m_maxJointsPosition(i) - m_jointPosition(i)) / m_dT;
+        m_lowerBound(i + numberOfTaskConstraints) = m_minJointsVelocity(i);
+        m_upperBound(i + numberOfTaskConstraints) = m_maxJointsVelocity(i);
+        // minPos = (m_minJointsPosition(i) - m_jointPosition(i)) / m_dT;
+        // maxPos = (m_maxJointsPosition(i) - m_jointPosition(i)) / m_dT;
 
-        if(minPos > m_minJointsVelocity(i))
-            m_lowerBound(i + numberOfTaskConstraints) = minPos;
-        else
-            m_lowerBound(i + numberOfTaskConstraints) = m_minJointsVelocity(i);
+        // if(minPos > m_minJointsVelocity(i))
+        //     m_lowerBound(i + numberOfTaskConstraints) = minPos;
+        // else
+        //     m_lowerBound(i + numberOfTaskConstraints) = m_minJointsVelocity(i);
 
-        if(maxPos < m_maxJointsVelocity(i))
-            m_upperBound(i + numberOfTaskConstraints) = maxPos;
-        else
-            m_upperBound(i + numberOfTaskConstraints) = m_maxJointsVelocity(i);
+        // if(maxPos < m_maxJointsVelocity(i))
+        //     m_upperBound(i + numberOfTaskConstraints) = maxPos;
+        // else
+        //     m_upperBound(i + numberOfTaskConstraints) = m_maxJointsVelocity(i);
     }
 }
 
@@ -594,7 +596,6 @@ bool WalkingQPIK_osqp::setGradientVector()
         m_gradient = m_gradient - iDynTree::toEigen(m_rightHandJacobian).transpose()
             * iDynTree::toEigen(m_handWeightMatrix) * (-rightHandCorrection);
     }
-
 
     if(m_optimizerSolver->isInitialized())
     {

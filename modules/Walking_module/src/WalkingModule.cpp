@@ -1,4 +1,3 @@
-
 /**
  * @file WalkingModule.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
@@ -810,7 +809,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_robotState = WalkingFSM::Configured;
 
     // TODO: do it in a better way
-    m_torsoOrientationPort.open("/" + getName() + "/torsoYaw:o");
+    m_torsoOrientationPort.open("/robot_theta");
 
     yInfo() << "Option \t Value";
     yInfo() << "pos filt \t " << m_usePositionFilter;
@@ -2368,7 +2367,12 @@ double WalkingModule::linearInterpolation(const double& x0, const double& y0,
                                           const double& x)
 {
     double y;
-    y = (yf - y0)/(xf - x0) * (x - x0) + y0;
+    double xAbs = std::fabs(x);
+    if(xAbs < xf)
+      y = (yf - y0)/(xf - x0) * (xAbs - x0) + y0;
+    else
+      y = yf;
+    
     return y;
 }
 
@@ -2477,15 +2481,16 @@ bool WalkingModule::setGoal(double x, double y)
     // modulate the walking velocity according to the inputs
     if(m_useVelocityModulation)
     {
+        double velocityModule = std::sqrt(std::pow(x, 2) + std::pow(y, 2));
         double minStepDuration, maxStepDuration, nominalStepDuration;
         minStepDuration = linearInterpolation(m_minForwardVelocity, m_minStepDurationIni,
-                                              m_maxForwardVelocity, m_minStepDurationFinal, x);
+                                              m_maxForwardVelocity, m_minStepDurationFinal, velocityModule);
 
         maxStepDuration = linearInterpolation(m_minForwardVelocity, m_maxStepDurationIni,
-                                              m_maxForwardVelocity, m_maxStepDurationFinal, x);
+                                              m_maxForwardVelocity, m_maxStepDurationFinal, velocityModule);
 
         nominalStepDuration = linearInterpolation(m_minForwardVelocity, m_nominalStepDurationIni,
-						  m_maxForwardVelocity, m_nominalStepDurationFinal, x);
+						  m_maxForwardVelocity, m_nominalStepDurationFinal, velocityModule);
 
         if(!m_trajectoryGenerator->updateTimings(minStepDuration, maxStepDuration, nominalStepDuration))
         {
