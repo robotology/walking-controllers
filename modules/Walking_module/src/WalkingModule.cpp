@@ -1256,6 +1256,9 @@ bool WalkingModule::updateModule()
 
             if(m_useOSQP)
             {
+                double threshold = 0.001;
+                bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
+                m_QPIKSolver_osqp->setPhase(stancePhase || m_robotState == WalkingFSM::OnTheFly);
                 if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
                               desiredCoMVelocity, measuredCoM,
                               yawRotation, m_dqDesired_osqp))

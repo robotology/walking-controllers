@@ -17,6 +17,7 @@
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/EigenSparseHelpers.h>
 #include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
 #include "iDynTree/yarp/YARPConfigurationsLoader.h"
 
@@ -45,17 +46,7 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
 
     if(m_useLeftHand || m_useRightHand)
     {
-        tempValue = config.find("handWeightTriplets");
-        iDynTree::Triplets handWeightMatrix;
-        if(!iDynTreeHelper::Triplets::getTripletsFromValues(tempValue, 6, handWeightMatrix))
-        {
-            yError() << "Initialization failed while reading handWeightTriplets vector.";
-            return false;
-        }
-
         m_handWeightMatrix.resize(6, 6);
-        m_handWeightMatrix.setFromConstTriplets(handWeightMatrix);
-
         if(!YarpHelper::getDoubleFromSearchable(config, "k_posHand", m_kPosHand))
         {
             yError() << "Initialization failed while reading k_posHand.";
@@ -67,8 +58,42 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
             yError() << "Initialization failed while reading k_attHand.";
             return false;
         }
+
+        m_handWeightWalkingVector.resize(6);
+        if(!YarpHelper::getYarpVectorFromSearchable(config, "handWeightWalking", m_handWeightWalkingVector))
+        {
+            yError() << "Initialization failed while reading handWeightWalking vector.";
+            return false;
+        }
+
+        m_useGainScheduling = config.check("useGainScheduling", yarp::os::Value(false)).asBool();
+        if(m_useGainScheduling)
+        {
+            yInfo() << "You are going to use the gain scheduling for IK-QP";
+            m_handWeightStanceVector.resize(6);
+            if(!YarpHelper::getYarpVectorFromSearchable(config, "handWeightStance", m_handWeightStanceVector))
+            {
+                yError() << "Initialization failed while reading handWeightStance vector.";
+                return false;
+            }
+
+            double smoothingTime;
+            if(!YarpHelper::getDoubleFromSearchable(config, "smoothingTime", smoothingTime))
+            {
+                yError() << "Initialization failed while reading smoothingTime.";
+                return false;
+            }
+
+            m_handWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT, smoothingTime);
+            m_handWeightSmoother->init(m_handWeightStanceVector);
+        }
+        else
+        {
+            Eigen::MatrixXd tmp = iDynTree::toEigen(m_handWeightWalkingVector).asDiagonal();
+            m_handWeightMatrix = iDynTreeHelper::SparseMatrix::fromEigen(tmp.sparseView());
+        }
     }
-   
+
     tempValue = config.find("neckWeightTriplets");
     iDynTree::Triplets neckWeightMatrix;
     if(!iDynTreeHelper::Triplets::getTripletsFromValues(tempValue, 3, neckWeightMatrix))
@@ -116,7 +141,6 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
     m_jointRegulatizationGains.resize(m_actuatedDOFs, m_actuatedDOFs);
     for(int i = 0; i < m_actuatedDOFs; i++)
         m_jointRegulatizationGains(i, i) = jointRegularizationGains(i);
-
 
     if(!YarpHelper::getDoubleFromSearchable(config, "k_posFoot", m_kPosFoot))
     {
@@ -279,6 +303,20 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
     m_optimizerSolver->settings()->setLinearSystemSolver(0);
 
     return true;
+}
+
+void WalkingQPIK_osqp::setPhase(const bool& isStancePhase)
+{
+    if(m_useGainScheduling)
+    {
+        if(isStancePhase)
+            m_handWeightSmoother->computeNextValues(m_handWeightStanceVector);
+        else
+            m_handWeightSmoother->computeNextValues(m_handWeightWalkingVector);
+
+        Eigen::MatrixXd tmp = iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal();
+        m_handWeightMatrix = iDynTreeHelper::SparseMatrix::fromEigen(tmp.sparseView());
+    }
 }
 
 void WalkingQPIK_osqp::setHandsState(const iDynTree::Transform& leftHandToWorldTransform,
