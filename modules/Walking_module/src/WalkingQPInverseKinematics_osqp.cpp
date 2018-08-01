@@ -43,6 +43,32 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
         m_comWeightMatrix.setFromConstTriplets(comWeightMatrix);
     }
 
+    if(m_useLeftHand || m_useRightHand)
+    {
+        tempValue = config.find("handWeightTriplets");
+        iDynTree::Triplets handWeightMatrix;
+        if(!iDynTreeHelper::Triplets::getTripletsFromValues(tempValue, 6, handWeightMatrix))
+        {
+            yError() << "Initialization failed while reading handWeightTriplets vector.";
+            return false;
+        }
+
+        m_handWeightMatrix.resize(6, 6);
+        m_handWeightMatrix.setFromConstTriplets(handWeightMatrix);
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "k_posHand", m_kPosHand))
+        {
+            yError() << "Initialization failed while reading k_posHand.";
+            return false;
+        }
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "k_attHand", m_kAttHand))
+        {
+            yError() << "Initialization failed while reading k_attHand.";
+            return false;
+        }
+    }
+   
     tempValue = config.find("neckWeightTriplets");
     iDynTree::Triplets neckWeightMatrix;
     if(!iDynTreeHelper::Triplets::getTripletsFromValues(tempValue, 3, neckWeightMatrix))
