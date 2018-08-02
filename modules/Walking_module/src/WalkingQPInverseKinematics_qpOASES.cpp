@@ -338,7 +338,7 @@ bool WalkingQPIK_qpOASES::initialize(const yarp::os::Searchable& config,
     m_optimizer = std::make_shared<qpOASES::SQProblem>(m_numberOfVariables,
                                                        m_numberOfConstraints);
 
-    m_optimizer->setPrintLevel(qpOASES::PL_MEDIUM);
+    m_optimizer->setPrintLevel(qpOASES::PL_LOW);
 
     m_isFirstTime = true;
     return true;
@@ -357,7 +357,6 @@ void WalkingQPIK_qpOASES::setPhase(const bool& isStancePhase)
         m_handWeightMatrix = iDynTreeHelper::SparseMatrix::fromEigen(tmp.sparseView());
     }
 }
-
 void WalkingQPIK_qpOASES::setHandsState(const iDynTree::Transform& leftHandToWorldTransform,
                                         const iDynTree::Transform& rightHandToWorldTransform)
 {
@@ -511,18 +510,26 @@ void WalkingQPIK_qpOASES::setJointLimits()
         minPos = (m_minJointPosition[i] - m_jointPosition(i)) / m_dT;
         maxPos = (m_maxJointPosition[i] - m_jointPosition(i)) / m_dT;
 
-	m_minJointLimit[i + 6] = m_minJointVelocity[i];
-	m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
-	
-        // if(minPos > m_minJointVelocity[i])
-        //     m_minJointLimit[i + 6] = minPos;
-        // else
-        //     m_minJointLimit[i + 6] = m_minJointVelocity[i];
-
-        // if(maxPos < m_maxJointVelocity[i])
-        //     m_maxJointLimit[i + 6] = maxPos;
-        // else
-        //     m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
+        if(minPos > m_minJointVelocity[i])
+        {
+            yInfo() << "min position "<<  minPos;
+            m_minJointLimit[i + 6] = minPos;
+        }
+        else
+        {
+            yInfo() << "min velocity " << m_minJointVelocity[i];
+            m_minJointLimit[i + 6] = m_minJointVelocity[i];
+        }
+        if(maxPos < m_maxJointVelocity[i])
+        {
+            yInfo() << "max position "<<  minPos;
+            m_maxJointLimit[i + 6] = maxPos;
+        }
+        else
+        {
+            yInfo() << "max velocity" << m_maxJointVelocity[i];
+            m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
+        }
     }
 }
 
@@ -595,10 +602,9 @@ bool WalkingQPIK_qpOASES::setGradientVector()
             leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
 
 	    // TODO
-            // auto tmp = m_leftHandToWorldTransform.getRotation() *
-            //     m_desiredLeftHandToWorldTransform.getRotation().inverse();
-            // yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
-            // yInfo() << "desired left" << m_desiredLeftHandToWorldTransform.getRotation().asRPY().toString();
+            auto tmp = m_leftHandToWorldTransform.getRotation() *
+                m_desiredLeftHandToWorldTransform.getRotation().inverse();
+            yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
 
             iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
                                                                                                 m_desiredLeftHandToWorldTransform.getRotation().inverse());
@@ -629,6 +635,11 @@ bool WalkingQPIK_qpOASES::setGradientVector()
                 Eigen::Map<MatrixXd>(m_gradient.data(), m_numberOfVariables, 1)
                 - iDynTree::toEigen(m_rightHandJacobian).transpose()
                 * iDynTree::toEigen(m_handWeightMatrix) * (-rightHandCorrection);
+
+            auto tmp = m_rightHandToWorldTransform.getRotation() *
+                m_desiredRightHandToWorldTransform.getRotation().inverse();
+            yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
+
         }
     }
 
@@ -848,11 +859,13 @@ void WalkingQPIK_qpOASES::setDesiredFeetTwist(const iDynTree::Twist& leftFootTwi
 void WalkingQPIK_qpOASES::setDesiredLeftHandTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform)
 {
     m_desiredLeftHandToWorldTransform = desiredLeftHandToWorldTransform;
+    yInfo() << "left transf " << m_desiredLeftHandToWorldTransform.getPosition().toString();
 }
 
 void WalkingQPIK_qpOASES::setDesiredRightHandTransformation(const iDynTree::Transform& desiredRightHandToWorldTransform)
 {
     m_desiredRightHandToWorldTransform = desiredRightHandToWorldTransform;
+    yInfo() << "right transf " << m_desiredRightHandToWorldTransform.getPosition().toString();
 }
 
 // in the future they will be iDynTree::Transform
