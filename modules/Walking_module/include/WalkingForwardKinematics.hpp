@@ -31,6 +31,7 @@ class WalkingFK
     iDynTree::FrameIndex m_frameLeftIndex; /**< Index of the frame attached to the left foot in which all the left foot transformations are expressed. */
     iDynTree::FrameIndex m_frameRightIndex; /**< Index of the frame attached to the right foot in which all the right foot transformations are expressed. */
     iDynTree::FrameIndex m_frameRootIndex; /**< Index of the frame attached to the root_link. */
+    iDynTree::FrameIndex m_frameHeadIndex; /**< Index of the frame attached to the imu_frame. */
     iDynTree::FrameIndex m_frameRightHandIndex; /**< Index of the frame attached to the right hand. */
     iDynTree::FrameIndex m_frameLeftHandIndex; /**< Index of the frame attached to the left hand. */
     iDynTree::FrameIndex m_frameNeckIndex; /**< Index of the frame attached to the neck_2. */
@@ -197,6 +198,12 @@ public:
      * @return the root link velocity expressed with the mixed representation.
      */
     iDynTree::Twist getRootLinkVelocity();
+
+    /**
+     * Return the transformation between the head frame and the world reference frame.
+     * @return world_H_head_frame (imu_frame).
+     */
+    iDynTree::Transform getHeadLinkToWorldTransform();
 
     /**
      * Return the neck orientation.

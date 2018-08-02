@@ -119,6 +119,14 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    m_frameHeadIndex = m_kinDyn.model().getFrameIndex("imu_frame");
+    if(m_frameHeadIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: root_link";
+        return false;
+    }
+
+
     m_frameLeftHandIndex = m_kinDyn.model().getFrameIndex("l_hand_dh_frame");
     if(m_frameLeftHandIndex == iDynTree::FRAME_INVALID_INDEX)
     {
@@ -450,6 +458,11 @@ iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
 iDynTree::Twist WalkingFK::getRootLinkVelocity()
 {
     return m_kinDyn.getFrameVel(m_frameRootIndex);
+}
+
+iDynTree::Transform WalkingFK::getHeadLinkToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameHeadIndex);
 }
 
 iDynTree::Rotation WalkingFK::getNeckOrientation()
