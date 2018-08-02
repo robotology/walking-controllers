@@ -355,6 +355,8 @@ void WalkingQPIK_qpOASES::setPhase(const bool& isStancePhase)
 
         Eigen::MatrixXd tmp = iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal();
         m_handWeightMatrix = iDynTreeHelper::SparseMatrix::fromEigen(tmp.sparseView());
+
+	// std::cerr << iDynTree::toEigen(m_handWeightMatrix) << "\n";
     }
 }
 void WalkingQPIK_qpOASES::setHandsState(const iDynTree::Transform& leftHandToWorldTransform,
@@ -512,22 +514,22 @@ void WalkingQPIK_qpOASES::setJointLimits()
 
         if(minPos > m_minJointVelocity[i])
         {
-            yInfo() << "min position "<<  minPos;
+            // yInfo() << "min position "<<  minPos;
             m_minJointLimit[i + 6] = minPos;
         }
         else
         {
-            yInfo() << "min velocity " << m_minJointVelocity[i];
+            // yInfo() << "min velocity " << m_minJointVelocity[i];
             m_minJointLimit[i + 6] = m_minJointVelocity[i];
         }
         if(maxPos < m_maxJointVelocity[i])
         {
-            yInfo() << "max position "<<  minPos;
+            // yInfo() << "max position "<<  minPos;
             m_maxJointLimit[i + 6] = maxPos;
         }
         else
         {
-            yInfo() << "max velocity" << m_maxJointVelocity[i];
+            // yInfo() << "max velocity" << m_maxJointVelocity[i];
             m_maxJointLimit[i + 6] = m_maxJointVelocity[i];
         }
     }
@@ -602,9 +604,9 @@ bool WalkingQPIK_qpOASES::setGradientVector()
             leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
 
 	    // TODO
-            auto tmp = m_leftHandToWorldTransform.getRotation() *
-                m_desiredLeftHandToWorldTransform.getRotation().inverse();
-            yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
+            // auto tmp = m_leftHandToWorldTransform.getRotation() *
+            //     m_desiredLeftHandToWorldTransform.getRotation().inverse();
+            // yInfo() << "hand error left" << leftHandPositionError.toString() <<" " << tmp.asRPY().toString();
 
             iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
                                                                                                 m_desiredLeftHandToWorldTransform.getRotation().inverse());
@@ -636,9 +638,9 @@ bool WalkingQPIK_qpOASES::setGradientVector()
                 - iDynTree::toEigen(m_rightHandJacobian).transpose()
                 * iDynTree::toEigen(m_handWeightMatrix) * (-rightHandCorrection);
 
-            auto tmp = m_rightHandToWorldTransform.getRotation() *
-                m_desiredRightHandToWorldTransform.getRotation().inverse();
-            yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
+            // auto tmp = m_rightHandToWorldTransform.getRotation() *
+            //     m_desiredRightHandToWorldTransform.getRotation().inverse();
+            // yInfo() << "hand error right" << rightHandPositionError.toString() <<" " << tmp.asRPY().toString();
 
         }
     }
@@ -859,13 +861,13 @@ void WalkingQPIK_qpOASES::setDesiredFeetTwist(const iDynTree::Twist& leftFootTwi
 void WalkingQPIK_qpOASES::setDesiredLeftHandTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform)
 {
     m_desiredLeftHandToWorldTransform = desiredLeftHandToWorldTransform;
-    yInfo() << "left transf " << m_desiredLeftHandToWorldTransform.getPosition().toString();
+    // yInfo() << "left transf " << m_desiredLeftHandToWorldTransform.getPosition().toString();
 }
 
 void WalkingQPIK_qpOASES::setDesiredRightHandTransformation(const iDynTree::Transform& desiredRightHandToWorldTransform)
 {
     m_desiredRightHandToWorldTransform = desiredRightHandToWorldTransform;
-    yInfo() << "right transf " << m_desiredRightHandToWorldTransform.getPosition().toString();
+    // yInfo() << "right transf " << m_desiredRightHandToWorldTransform.getPosition().toString();
 }
 
 // in the future they will be iDynTree::Transform

@@ -245,7 +245,7 @@ bool JoypadModule::updateModule()
         else
         {
             x = CVdata[0];
-            y = -CVdata[1];
+            y = -deadzone(CVdata[1]);
         }
 
         yarp::os::Bottle cmd, outcome;

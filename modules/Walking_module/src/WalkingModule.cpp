@@ -1387,7 +1387,7 @@ bool WalkingModule::updateModule()
         m_profiler->setEndTime("Total");
 
         // print timings
-        // m_profiler->profiling();
+        m_profiler->profiling();
 
         // send data to the WalkingLogger
         if(m_dumpData)
