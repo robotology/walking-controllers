@@ -1438,6 +1438,19 @@ bool WalkingModule::updateModule()
 
         }
 
+	// data for the virtualizer
+	// do it in a better way.
+	// double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
+	// double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
+	
+	// double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
+	// 			std::cos(yawLeft) + std::cos(yawRight));
+
+	yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
+	output.clear();
+	output.addDouble(meanYaw);
+	m_torsoOrientationPort.write(false);
+	
         propagateTime();
 
         if(m_robotState != WalkingFSM::OnTheFly)
@@ -1480,13 +1493,6 @@ bool WalkingModule::updateModule()
         else if(m_firstStep)
             m_firstStep = false;
     }
-
-    // data for the virtualizer
-    // do it in a better way.
-    yarp::os::Bottle& output = m_torsoOrientationPort.prepare();
-    output.clear();
-    output.addDouble(m_FKSolver->getNeckOrientation().asRPY()(2));
-    m_torsoOrientationPort.write(false);
 
     return true;
 }
