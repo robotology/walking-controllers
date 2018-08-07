@@ -424,7 +424,7 @@ bool WalkingPIDHandler::getAxisMap()
     }
     for (int ax = 0; ax < axes; ++ax) {
         std::string axisName;
-        yarp::os::ConstString yarpAxisName;
+        std::string yarpAxisName;
         if (m_axisInfo->getAxisName(ax, yarpAxisName)) {
             axisName = yarpAxisName.c_str();
             std::pair<AxisMap::iterator, bool> result = m_axisMap.insert(AxisMap::value_type(axisName, ax));
@@ -450,7 +450,7 @@ bool WalkingPIDHandler::getPID(PIDmap& output)
     for (int ax = 0; ax < axes; ++ax) {
         std::string axisName;
         yarp::dev::Pid pid;
-        yarp::os::ConstString yarpAxisName;
+        std::string yarpAxisName;
 
         if (m_axisInfo->getAxisName(ax, yarpAxisName)) {
             axisName = yarpAxisName.c_str();
