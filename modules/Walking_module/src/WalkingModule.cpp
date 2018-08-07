@@ -367,7 +367,7 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
 
 bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
 {
-    std::string portInput, portOutput;
+    std::string portName;
 
     if(config.isNull())
     {
@@ -387,32 +387,14 @@ bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
     m_useLeftHand = config.check("use_left_hand", yarp::os::Value("False")).asBool();
     if(m_useLeftHand)
     {
-        // open and connect left foot wrench
-        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseInputPort_name",
-                                                portInput))
+        // open left foot wrench
+        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPosePort_name",
+                                                portName))
         {
             yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
             return false;
         }
-
-        // open port
-        m_desiredLeftHandPosePort.open("/" + getName() + portInput);
-
-
-        if(!YarpHelper::getStringFromSearchable(config, "leftHandDesiredPoseOutputPort_name",
-                                                portOutput))
-        {
-            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
-            return false;
-        }
-
-
-        // connect port
-        if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
-        {
-            yError() << "Unable to connect to port " << "/" + getName() + portInput;
-            return false;
-        }
+        m_desiredLeftHandPosePort.open("/" + getName() + portName);
 
         // initialize the smoother
         m_desiredLeftHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT,
@@ -423,29 +405,15 @@ bool WalkingModule::configureHandRetargeting(const yarp::os::Searchable& config)
     if(m_useRightHand)
     {
         // open and connect right foot wrench
-        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseInputPort_name",
-                                                portInput))
+        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPosePort_name",
+                                                portName))
         {
             yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
             return false;
         }
 
         // open port
-        m_desiredRightHandPosePort.open("/" + getName() + portInput);
-
-
-        if(!YarpHelper::getStringFromSearchable(config, "rightHandDesiredPoseOutputPort_name",
-                                                portOutput))
-        {
-            yError() << "[configureHandRetargeting] Unable to get the string from searchable.";
-            return false;
-        }
-        // connect port
-        if(!yarp::os::Network::connect(portOutput, "/" + getName() + portInput))
-        {
-            yError() << "Unable to connect to port " << "/" + getName() + portInput;
-            return false;
-        }
+        m_desiredRightHandPosePort.open("/" + getName() + portName);
 
         // initialize the smoother
         m_desiredRightHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, m_dT,
@@ -879,14 +847,6 @@ void WalkingModule::updateDesiredHandsPose()
         if(desiredLeftHandPose != NULL)
             m_desiredLeftHandPoseYarp = *desiredLeftHandPose;
 
-        // m_desiredLeftHandPoseYarp(0) = -1;
-        // m_desiredLeftHandPoseYarp(1) = -0.5;
-        // m_desiredLeftHandPoseYarp(2) = 0.5;
-
-        // m_desiredLeftHandPoseYarp(3) = 0;
-        // m_desiredLeftHandPoseYarp(4) = 3.14;
-        // m_desiredLeftHandPoseYarp(5) = 0;
-
         m_desiredLeftHandSmoother->computeNextValues(m_desiredLeftHandPoseYarp);
         yarp::sig::Vector desiredLeftHandPoseSmoothedYarp = m_desiredLeftHandSmoother->getPos();
         iDynTree::Position leftPosition;
@@ -927,9 +887,11 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
     jacobian.resize(6, m_actuatedDOFs + 6);
     comJacobian.resize(3, m_actuatedDOFs + 6);
 
-
-    solver->setHandsState(m_FKSolver->getLeftHandToWorldTransform(),
-                          m_FKSolver->getRightHandToWorldTransform());
+    if(m_useLeftHand || m_useRightHand)
+    {
+        solver->setHandsState(m_FKSolver->getLeftHandToWorldTransform(),
+                              m_FKSolver->getRightHandToWorldTransform());
+    }
 
     if(!solver->setRobotState(m_positionFeedbackInRadians,
                               m_FKSolver->getLeftFootToWorldTransform(),
@@ -960,7 +922,6 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
 
         m_FKSolver->getLeftHandJacobian(jacobian);
         solver->setLeftHandJacobian(jacobian);
-
     }
 
     if(m_useRightHand)
@@ -1442,7 +1403,7 @@ bool WalkingModule::updateModule()
 	// do it in a better way.
 	// double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
 	// double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
-	
+
 	// double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
 	// 			std::cos(yawLeft) + std::cos(yawRight));
 
@@ -1450,7 +1411,7 @@ bool WalkingModule::updateModule()
 	output.clear();
 	output.addDouble(meanYaw);
 	m_torsoOrientationPort.write(false);
-	
+
         propagateTime();
 
         if(m_robotState != WalkingFSM::OnTheFly)
@@ -2378,7 +2339,7 @@ double WalkingModule::linearInterpolation(const double& x0, const double& y0,
       y = (yf - y0)/(xf - x0) * (xAbs - x0) + y0;
     else
       y = yf;
-    
+
     return y;
 }
 
