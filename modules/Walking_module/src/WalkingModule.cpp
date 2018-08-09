@@ -777,7 +777,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_robotState = WalkingFSM::Configured;
 
     // TODO: do it in a better way
-    m_torsoOrientationPort.open("/robot_theta");
+    m_torsoOrientationPort.open("/" + getName() + "/torsoYaw:o");
 
     yInfo() << "Option \t Value";
     yInfo() << "pos filt \t " << m_usePositionFilter;

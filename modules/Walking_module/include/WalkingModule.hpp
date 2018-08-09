@@ -421,7 +421,7 @@ class WalkingModule:
                                const double& x);
 public:
 
-    /**
+     /**
      * Get the period of the RFModule.
      * @return the period of the module.
      */
