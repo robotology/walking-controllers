@@ -128,7 +128,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     }
 
     // load the model in iDynTree::KinDynComputations
-    std::string model = rf.check("model",yarp::os::Value("model.urdf")).asString();
+    std::string model = rf.check("model",yarp::os::Value("modelForWalking.urdf")).asString();
     std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(model);
 
     yInfo() << "The model is found in: " << pathToModel;
@@ -917,7 +917,7 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
 
     if(m_useLeftHand)
     {
-        solver->setDesiredLeftHandTransformation(m_FKSolver->getRootLinkToWorldTransform() *
+        solver->setDesiredLeftHandTransformation(m_FKSolver->getHeadLinkToWorldTransform() *
                                                  m_desiredLeftHandToRootLinkTransform);
 
         m_FKSolver->getLeftHandJacobian(jacobian);
@@ -926,7 +926,7 @@ bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoM
 
     if(m_useRightHand)
     {
-        solver->setDesiredRightHandTransformation(m_FKSolver->getRootLinkToWorldTransform() *
+        solver->setDesiredRightHandTransformation(m_FKSolver->getHeadLinkToWorldTransform() *
                                                   m_desiredRightHandToRootLinkTransform);
 
         m_FKSolver->getRightHandJacobian(jacobian);
@@ -1382,9 +1382,9 @@ bool WalkingModule::updateModule()
             //                           m_rightTrajectory.front().getRotation().asRPY(),
             //                           torsoDesired,
             //                           m_FKSolver->getNeckOrientation().asRPY());
-	    auto leftTemp = m_FKSolver->getRootLinkToWorldTransform() *
+	    auto leftTemp = m_FKSolver->getHeadLinkToWorldTransform() *
 	      m_desiredLeftHandToRootLinkTransform;
-	    auto rightTemp = m_FKSolver->getRootLinkToWorldTransform() *
+	    auto rightTemp = m_FKSolver->getHeadLinkToWorldTransform() *
 	      m_desiredRightHandToRootLinkTransform;
 
             m_walkingLogger->sendData(m_FKSolver->getLeftHandToWorldTransform().getPosition(),
@@ -2062,7 +2062,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
         if(m_useLeftHand)
         {
-            handToRootLink = m_FKSolver->getRootLinkToWorldTransform().inverse() *
+            handToRootLink = m_FKSolver->getHeadLinkToWorldTransform().inverse() *
                 m_FKSolver->getLeftHandToWorldTransform();
 
             position = handToRootLink.getPosition();
@@ -2080,7 +2080,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
         if(m_useRightHand)
         {
-            handToRootLink = m_FKSolver->getRootLinkToWorldTransform().inverse() *
+            handToRootLink = m_FKSolver->getHeadLinkToWorldTransform().inverse() *
                 m_FKSolver->getRightHandToWorldTransform();
 
             position = handToRootLink.getPosition();
