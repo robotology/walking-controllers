@@ -14,8 +14,7 @@
 #include <yarp/dev/PolyDriver.h>
 #include <yarp/dev/IJoypadController.h>
 #include <yarp/os/RpcClient.h>
-#include <yarp/os/BufferedPort.h>
-#include <yarp/os/Bottle.h>
+
 /**
  * RFModule useful to handle the Joypad
  */
@@ -36,12 +35,7 @@ private:
     std::string m_joypadOutputPortName; /**< Name of the joypad output port name. */
     std::string m_joypadInputPortName; /**< Name of the joypad input port name (This is the name of the port opened by the main module). */
     yarp::os::RpcClient m_rpcPort; /**< RPC port. */
-    
-    int i;
 
-    yarp::os::BufferedPort<yarp::os::Bottle> port;
-    yarp::os::Bottle *input;
-    std::array<double, 2> CVdata;
     /**
      * Standard deadzone function.
      * @param input input of the deadzone
