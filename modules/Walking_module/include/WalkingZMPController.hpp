@@ -30,14 +30,23 @@
  */
 class WalkingZMPController
 {
-    double m_kZMP; /**< CoM controller gain. */
-    double m_kCoM; /**< ZMP controller gain. */
+    double m_kZMPX; /**< CoM controller gain. */
+    double m_kCoMX; /**< ZMP controller gain. */
 
-    double m_kCoMWalking; /**< Desired CoM controller gain during the walking phase. */
-    double m_kZMPWalking; /**< Desired ZMP controller gain during the walking phase. */
+    double m_kZMPY; /**< CoM controller gain. */
+    double m_kCoMY; /**< ZMP controller gain. */
+ 
+    double m_kCoMXWalking; /**< Desired CoM controller gain during the walking phase. */
+    double m_kZMPXWalking; /**< Desired ZMP controller gain during the walking phase. */
 
-    double m_kCoMStance; /**< Desired CoM controller gain during the stance phase. */
-    double m_kZMPStance; /**< Desired ZMP controller gain during the stance phase. */
+    double m_kCoMYWalking; /**< Desired CoM controller gain during the walking phase. */
+    double m_kZMPYWalking; /**< Desired ZMP controller gain during the walking phase. */
+
+    double m_kCoMXStance; /**< Desired CoM controller gain during the stance phase. */
+    double m_kZMPXStance; /**< Desired ZMP controller gain during the stance phase. */
+  
+    double m_kCoMYStance; /**< Desired CoM controller gain during the stance phase. */
+    double m_kZMPYStance; /**< Desired ZMP controller gain during the stance phase. */
 
     bool m_controlEvaluated; /**< True if the control output was correctly evaluated. */
 
@@ -57,9 +66,14 @@ class WalkingZMPController
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
     bool m_useGainScheduling; /**< True of the gain scheduling is used.*/
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kZMPSmoother; /**< Minimum jerk trajectory for the
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kZMPXSmoother; /**< Minimum jerk trajectory for the
                                                                    ZMP gain. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kCoMSmoother; /**< Minimum jerk trajectory for the
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kCoMXSmoother; /**< Minimum jerk trajectory for the
+                                                                   CoM gain. */
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kZMPYSmoother; /**< Minimum jerk trajectory for the
+                                                                   ZMP gain. */
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_kCoMYSmoother; /**< Minimum jerk trajectory for the
                                                                    CoM gain. */
 
 public:

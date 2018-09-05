@@ -29,19 +29,33 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
     m_useGainScheduling = config.check("useGainScheduling", yarp::os::Value(false)).asBool();
 
     // set the gain of the CoM controller
-    if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_walking", m_kCoMWalking))
+    if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_x_walking", m_kCoMXWalking))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
     // set the ZMP controller gain
-    if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_walking", m_kZMPWalking))
+    if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_x_walking", m_kZMPXWalking))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
+    if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_y_walking", m_kCoMYWalking))
+    {
+        yError() << "[initialize] Unable to get the double from searchable.";
+        return false;
+    }
+
+    // set the ZMP controller gain
+    if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_y_walking", m_kZMPYWalking))
+    {
+        yError() << "[initialize] Unable to get the double from searchable.";
+        return false;
+    }
+
+    
     // set the sampling time
     double samplingTime;
     if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", samplingTime))
@@ -72,34 +86,63 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
             return false;
         }
 
-        if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_stance", m_kCoMStance))
+        if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_x_stance", m_kCoMXStance))
         {
             yError() << "[initialize] Unable to get the double from searchable.";
             return false;
         }
 
-        if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_stance", m_kZMPStance))
+        if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_x_stance", m_kZMPXStance))
         {
             yError() << "[initialize] Unable to get the double from searchable.";
             return false;
         }
 
-        m_kZMPSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
+	if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_y_stance", m_kCoMYStance))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+        if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_y_stance", m_kZMPYStance))
+        {
+            yError() << "[initialize] Unable to get the double from searchable.";
+            return false;
+        }
+
+	
+        m_kZMPXSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
                                                                       smoothingTime);
-        m_kCoMSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
+        m_kCoMXSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
+                                                                      smoothingTime);
+
+	m_kZMPYSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
+                                                                      smoothingTime);
+        m_kCoMYSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, samplingTime,
                                                                       smoothingTime);
 
         // initialize the minimum jerk trajectories
-        m_kZMPSmoother->init(yarp::sig::Vector(1, m_kZMPStance));
-        m_kCoMSmoother->init(yarp::sig::Vector(1, m_kCoMStance));
+        m_kZMPXSmoother->init(yarp::sig::Vector(1, m_kZMPXStance));
+        m_kCoMXSmoother->init(yarp::sig::Vector(1, m_kCoMXStance));
 
-        m_kCoM = m_kCoMStance;
-        m_kZMP = m_kZMPStance;
+	m_kZMPYSmoother->init(yarp::sig::Vector(1, m_kZMPYStance));
+        m_kCoMYSmoother->init(yarp::sig::Vector(1, m_kCoMYStance));
+
+	
+        m_kCoMX = m_kCoMXStance;
+        m_kZMPX = m_kZMPXStance;
+
+        m_kCoMY = m_kCoMYStance;
+        m_kZMPY = m_kZMPYStance;
+
     }
     else
     {
-        m_kCoM = m_kCoMWalking;
-        m_kZMP = m_kZMPWalking;
+        m_kCoMX = m_kCoMXWalking;
+        m_kZMPX = m_kZMPXWalking;
+
+        m_kCoMY = m_kCoMYWalking;
+        m_kZMPY = m_kZMPYWalking;
     }
 
     return true;
@@ -111,16 +154,27 @@ void WalkingZMPController::setPhase(const bool& isStancePhase)
     {
         if(isStancePhase)
         {
-            m_kCoMSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMStance));
-            m_kZMPSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPStance));
+            m_kCoMXSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMXStance));
+            m_kZMPXSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPXStance));
+
+            m_kCoMYSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMYStance));
+            m_kZMPYSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPYStance));
+
         }
         else
         {
-            m_kCoMSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMWalking));
-            m_kZMPSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPWalking));
+	    m_kCoMXSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMXWalking));
+            m_kZMPXSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPXWalking));
+
+            m_kCoMYSmoother->computeNextValues(yarp::sig::Vector(1, m_kCoMYWalking));
+            m_kZMPYSmoother->computeNextValues(yarp::sig::Vector(1, m_kZMPYWalking));
+
         }
-        m_kCoM = m_kCoMSmoother->getPos()[0];
-        m_kZMP = m_kZMPSmoother->getPos()[0];
+        m_kCoMX = m_kCoMXSmoother->getPos()[0];
+        m_kZMPX = m_kZMPXSmoother->getPos()[0];
+
+	m_kCoMY = m_kCoMYSmoother->getPos()[0];
+        m_kZMPY = m_kZMPYSmoother->getPos()[0];
     }
 }
 
@@ -153,11 +207,13 @@ bool WalkingZMPController::evaluateControl()
     }
 
     // evaluate the control law
-    iDynTree::toEigen(m_desiredCoMVelocity) = m_kCoM * (iDynTree::toEigen(m_comPositionDesired) -
-                                                        iDynTree::toEigen(m_comFeedback))
-                                             -m_kZMP * (iDynTree::toEigen(m_zmpDesired) -
-                                                        iDynTree::toEigen(m_zmpFeedback))
-                                             +iDynTree::toEigen(m_comVelocityDesired);
+    m_desiredCoMVelocity(0) = m_kCoMX * (m_comPositionDesired(0) - m_comFeedback(0))
+                             -m_kZMPX * (m_zmpDesired(0) - m_zmpFeedback(0)) +
+                              m_comVelocityDesired(0);
+
+    m_desiredCoMVelocity(1) = m_kCoMY * (m_comPositionDesired(1) - m_comFeedback(1))
+                             -m_kZMPY * (m_zmpDesired(1) - m_zmpFeedback(1)) +
+                              m_comVelocityDesired(1);
 
     // integrate the velocity
     yarp::sig::Vector desiredCoMVelocityYarp(2);
