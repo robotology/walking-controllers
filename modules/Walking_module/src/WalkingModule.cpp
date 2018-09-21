@@ -2394,8 +2394,9 @@ bool WalkingModule::setGoal(double x, double y)
     if(m_robotState != WalkingFSM::Walking && m_robotState != WalkingFSM::Stance)
         return false;
 
-    if(x == 0 && y == 0 && m_robotState == WalkingFSM::Stance)
-        return true;
+    // remove because of the unicycle planner
+    // if(x == 0 && y == 0 && m_robotState == WalkingFSM::Stance)
+    //     return true;
 
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
@@ -2437,7 +2438,7 @@ bool WalkingModule::setGoal(double x, double y)
     if(x == 0 && y == 0)
     {
         m_robotState = WalkingFSM::Stance;
-        m_trajectoryGenerator->addTerminalStep(false);
+        m_trajectoryGenerator->addTerminalStep(true);
     }
     else
     {

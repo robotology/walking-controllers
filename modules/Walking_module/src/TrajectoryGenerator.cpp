@@ -137,7 +137,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setPitchDelta(pitchDelta);
 
     m_trajectoryGenerator.setStanceZMPDelta(leftZMPDelta, rightZMPDelta);
-    m_trajectoryGenerator.addTerminalStep(false);
+    m_trajectoryGenerator.addTerminalStep(true);
     m_trajectoryGenerator.startWithLeft(m_swingLeft);
     m_trajectoryGenerator.resetTimingsIfStill(startWithSameFoot);
 
