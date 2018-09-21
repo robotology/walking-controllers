@@ -18,7 +18,7 @@
 #include <yarp/sig/Vector.h>
 #include <yarp/dev/IEncodersTimed.h>
 #include <yarp/dev/IControlMode.h>
-#include <yarp/dev/IControlLimits2.h>
+#include <yarp/dev/IControlLimits.h>
 #include <yarp/dev/IPositionControl.h>
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
@@ -134,7 +134,7 @@ class WalkingModule:
     yarp::dev::IPositionControl *m_positionInterface{nullptr}; /**< Position control interface. */
     yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
     yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
-    yarp::dev::IControlLimits2 *m_limitsInterface{nullptr}; /**< Encorders interface. */
+    yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
     yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
 
     yarp::sig::Vector m_positionFeedbackInDegrees; /**< Vector containing the current joint position [deg]. */
