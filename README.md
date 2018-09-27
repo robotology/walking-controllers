@@ -28,12 +28,29 @@ Two different inverse kinematics solver are implemented:
 * a standard non-linear IK solver;
 * a standard QP Jacobian based IK solver.
 
+## Reference paper
+A paper describing some of the algorithms implemented in this repository  can be downloaded [here](https://arxiv.org/abs/1809.02167).
+If you're going to use the code developed for your work, please quote it within any resulting publication:
+~~~
+G. Romualdi, S. Dafarra, Y. Hu, D. Pucci "A Benchmarking of DCM Based Architectures for Position and Velocity Controlled Walking of Humanoid Robots", 2018
+~~~
+
+The bibtex code for including this citation is provided:
+~~~
+@misc{1809.02167,
+Author = {Giulio Romualdi and Stefano Dafarra and Yue Hu and Daniele Pucci},
+Title = {A Benchmarking of DCM Based Architectures for Position and Velocity Controlled Walking of Humanoid Robots},
+Year = {2018},
+Eprint = {arXiv:1809.02167},
+}
+~~~
+
 # :page_facing_up: Dependencies
 * [YARP](http://www.yarp.it/): to handle the comunication with the robot;
 * [osqp-eigen](https://github.com/robotology/osqp-eigen): to solve the MPC problem;
 * [qpOASES](https://github.com/robotology-dependencies/qpOASES): to solve the IK problem;
 * [Unicycle footstep planner](https://github.com/robotology/unicycle-footstep-planner/tree/dcmTrajectoryGenerator): to generate a trajectory for the DCM;
-* [Gazebo](http://gazebosim.org/): for the simulation (tested Gazebo 8).
+* [Gazebo](http://gazebosim.org/): for the simulation (tested Gazebo 8 and 9).
 
 # :hammer: Build the suite
 ## Linux/macOs
