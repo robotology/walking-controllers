@@ -31,7 +31,6 @@ set(${EXE_TARGET_NAME}_SRC
   src/WalkingDCMModelPredictiveController.cpp
   src/WalkingDCMReactiveController.cpp
   src/WalkingModule.cpp
-  src/Utils.cpp
   src/WalkingInverseKinematics.cpp
   src/WalkingQPInverseKinematics_osqp.cpp
   src/WalkingQPInverseKinematics_qpOASES.cpp
@@ -50,8 +49,6 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingDCMModelPredictiveController.hpp
   include/WalkingDCMReactiveController.hpp
   include/WalkingModule.hpp
-  include/Utils.hpp
-  include/Utils.tpp
   include/WalkingInverseKinematics.hpp
   include/WalkingQPInverseKinematics_osqp.hpp
   include/WalkingQPInverseKinematics_qpOASES.hpp
@@ -84,6 +81,7 @@ target_link_libraries(${EXE_TARGET_NAME}
   ${iDynTree_LIBRARIES}
   ctrlLib
   UnicyclePlanner
+  UtilityLibrary
   OsqpEigen::OsqpEigen
   osqp::osqp
   icubWalking-service

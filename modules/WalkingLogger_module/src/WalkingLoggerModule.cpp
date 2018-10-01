@@ -13,7 +13,8 @@
 #include "yarp/os/LogStream.h"
 #include <yarp/os/Time.h>
 
-#include "WalkingLoggerModule.hpp"
+#include <WalkingLoggerModule.hpp>
+#include <Utils.hpp>
 
 double WalkingLoggerModule::getPeriod()
 {
@@ -102,49 +103,31 @@ bool WalkingLoggerModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    yarp::os::Value* value;
-
-    // set the module name
-    if(!rf.check("name", value))
+    std::string name;
+    if(!YarpHelper::getStringFromSearchable(rf, "name", name))
     {
-        yError() << "[configure] Unable to find the module name.";
-        close();
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The module name is not a string.";
-        close();
-        return false;
-    }
-    std::string name = value->asString();
     setName(name.c_str());
 
     // set data port name
-    if(!rf.check("data_port_name", value))
+    std::string dataPortName;
+    if(!YarpHelper::getStringFromSearchable(rf, "data_port_name", dataPortName))
     {
-        yError() << "[configure] Missing field data_port_name.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The value is not a string.";
-        return false;
-    }
-    m_dataPort.open("/" + getName() + value->asString());
+    m_dataPort.open("/" + getName() + dataPortName);
 
     // set rpc port name
-    if(!rf.check("rpc_port_name", value))
+    std::string rpcPortName;
+    if(!YarpHelper::getStringFromSearchable(rf, "rpc_port_name", rpcPortName))
     {
-        yError() << "[configure] Missing field rpc_port_name.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The value is not a string.";
-        return false;
-    }
-    m_rpcPort.open("/" + getName() + value->asString());
+    m_rpcPort.open("/" + getName() + rpcPortName);
     attach(m_rpcPort);
 
     // set the RFModule period

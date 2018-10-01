@@ -3,7 +3,8 @@
 # Authors: Giulio Romualdi <giulio.romualdi@iit.it>
 
 # set target name
-set(EXE_TARGET_NAME WalkingJoypadModule)
+set(UTILITY_LIBRARY_NAME UtilityLibrary)
+message(${UTILITY_LIBRARY_NAME})
 
 option(ENABLE_RPATH "Enable RPATH for this library" ON)
 mark_as_advanced(ENABLE_RPATH)
@@ -15,26 +16,22 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
   USE_LINK_PATH)
 
 # set cpp files
-set(${EXE_TARGET_NAME}_SRC
-  src/main.cpp
-  src/JoypadModule.cpp
+set(${UTILITY_LIBRARY_NAME}_SRC
+  src/Utils.cpp
   )
 
 # set hpp files
-set(${EXE_TARGET_NAME}_HDR
-  include/JoypadModule.hpp
+set(${UTILITY_LIBRARY_NAME}_HDR
+  include/Utils.hpp
+  include/Utils.tpp
   )
-
-# add include directories to the build.
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # add an executable to the project using the specified source files.
-add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}_HDR})
+add_library(${UTILITY_LIBRARY_NAME} ${${UTILITY_LIBRARY_NAME}_SRC} ${${UTILITY_LIBRARY_NAME}_HDR})
 
-target_link_libraries(${EXE_TARGET_NAME}
+# add include directories to the build.
+target_include_directories(${UTILITY_LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_link_libraries(${UTILITY_LIBRARY_NAME}
   ${YARP_LIBRARIES}
-  UtilityLibrary
-  )
-
-install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
+  ${iDynTree_LIBRARIES})
