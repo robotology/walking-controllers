@@ -24,7 +24,7 @@
 #include <deque>
 
 // solver
-#include "MPCSolver.hpp"
+#include <MPCSolver.hpp>
 
 /**
  * WalkingController class contains the controller instances.

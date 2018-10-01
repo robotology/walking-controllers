@@ -23,8 +23,8 @@
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
 
-#include "WalkingModule.hpp"
-#include "Utils.hpp"
+#include <WalkingModule.hpp>
+#include <Utils.hpp>
 
 void WalkingModule::propagateTime()
 {

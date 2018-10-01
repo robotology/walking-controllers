@@ -13,12 +13,12 @@
 #include <yarp/os/LogStream.h>
 
 //iDynTree
-#include "iDynTree/Core/EigenHelpers.h"
+#include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 
-#include "StableDCMModel.hpp"
-#include "Utils.hpp"
+#include <StableDCMModel.hpp>
+#include <Utils.hpp>
 
 bool StableDCMModel::initialize(const yarp::os::Searchable& config)
 {

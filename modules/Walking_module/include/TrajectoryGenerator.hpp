@@ -19,7 +19,7 @@
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 
-#include "UnicycleTrajectoryGenerator.h"
+#include <UnicycleTrajectoryGenerator.h>
 
 /**
  * Enumerator useful to track the state of the trajectory generator

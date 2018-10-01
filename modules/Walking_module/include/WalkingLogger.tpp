@@ -6,7 +6,7 @@
  * @date 2018
  */
 
-#include "Utils.hpp"
+#include <Utils.hpp>
 
 template <typename... Args>
 void WalkingLogger::sendData(const Args&... args)

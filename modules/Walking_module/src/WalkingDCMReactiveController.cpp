@@ -14,8 +14,8 @@
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 
-#include "WalkingDCMReactiveController.hpp"
-#include "Utils.hpp"
+#include <WalkingDCMReactiveController.hpp>
+#include <Utils.hpp>
 
 
 bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config)

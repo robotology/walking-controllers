@@ -19,8 +19,8 @@
 #include <iDynTree/Model/Model.h>
 #include "iDynTree/yarp/YARPConfigurationsLoader.h"
 
-#include "WalkingQPInverseKinematics_osqp.hpp"
-#include "Utils.hpp"
+#include <WalkingQPInverseKinematics_osqp.hpp>
+#include <Utils.hpp>
 
 bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
 {

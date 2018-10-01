@@ -14,8 +14,8 @@
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 
-#include "WalkingZMPController.hpp"
-#include "Utils.hpp"
+#include <WalkingZMPController.hpp>
+#include <Utils.hpp>
 
 bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
 {

@@ -11,7 +11,7 @@
 #include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
 
-#include "WalkingModule.hpp"
+#include <WalkingModule.hpp>
 
 int main(int argc, char * argv[])
 {

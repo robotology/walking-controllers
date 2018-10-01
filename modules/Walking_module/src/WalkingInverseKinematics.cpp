@@ -21,12 +21,12 @@
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
 #include <iDynTree/yarp/YARPConfigurationsLoader.h>
-#include "iDynTree/KinDynComputations.h"
+#include <iDynTree/KinDynComputations.h>
 
 // Eigen
 #include <Eigen/Core>
 
-#include "WalkingInverseKinematics.hpp"
+#include <WalkingInverseKinematics.hpp>
 
 WalkingIK::WalkingIK()
     : m_verbose(false)

@@ -19,7 +19,7 @@
 // osqp-eigen
 #include <OsqpEigen/OsqpEigen.h>
 
-#include "Utils.hpp"
+#include <Utils.hpp>
 
 /**
  * MPCSolver class

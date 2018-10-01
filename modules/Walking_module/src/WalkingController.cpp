@@ -13,8 +13,8 @@
 #include <iDynTree/Core/EigenSparseHelpers.h>
 #include <iDynTree/Core/Direction.h>
 
-#include "WalkingController.hpp"
-#include "Utils.hpp"
+#include <WalkingController.hpp>
+#include <Utils.hpp>
 
 iDynSparseMatrix WalkingController::evaluateThetaMatrix()
 {

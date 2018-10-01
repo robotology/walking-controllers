@@ -19,7 +19,7 @@
 #include <iDynTree/KinDynComputations.h>
 #include <qpOASES.hpp>
 
-#include "Utils.hpp"
+#include <Utils.hpp>
 
 class WalkingQPIK_qpOASES
 {
