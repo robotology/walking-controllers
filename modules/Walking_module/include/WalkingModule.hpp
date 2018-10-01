@@ -30,7 +30,7 @@
 #include <iDynTree/ModelIO/ModelLoader.h>
 
 #include <TrajectoryGenerator.hpp>
-#include <WalkingController.hpp>
+#include <WalkingDCMModelPredictiveController.hpp>
 #include <WalkingDCMReactiveController.hpp>
 #include <WalkingZMPController.hpp>
 #include <WalkingInverseKinematics.hpp>

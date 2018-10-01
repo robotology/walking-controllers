@@ -28,7 +28,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/main.cpp
   src/TrajectoryGenerator.cpp
   src/MPCSolver.cpp
-  src/WalkingController.cpp
+  src/WalkingDCMModelPredictiveController.cpp
   src/WalkingDCMReactiveController.cpp
   src/WalkingModule.cpp
   src/Utils.cpp
@@ -47,7 +47,7 @@ set(${EXE_TARGET_NAME}_SRC
 set(${EXE_TARGET_NAME}_HDR
   include/TrajectoryGenerator.hpp
   include/MPCSolver.hpp
-  include/WalkingController.hpp
+  include/WalkingDCMModelPredictiveController.hpp
   include/WalkingDCMReactiveController.hpp
   include/WalkingModule.hpp
   include/Utils.hpp
