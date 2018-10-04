@@ -126,5 +126,7 @@ bool StableDCMModel::reset(const iDynTree::Vector2& initialValue)
     iDynTree::toYarp(initialValue, buffer);
 
     m_comIntegrator->reset(buffer);
+
+    m_comPosition = initialValue;
     return true;
 }
