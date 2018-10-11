@@ -16,6 +16,7 @@
 // YARP
 #include <yarp/os/Property.h>
 #include <yarp/os/Value.h>
+#include <yarp/os/BufferedPort.h>
 #include <yarp/sig/Vector.h>
 
 // iDynTree
