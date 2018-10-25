@@ -23,9 +23,6 @@ foreach (dir ${subdirs})
   file(GLOB scripts robots/${dir}/*.ini)
   yarp_install(FILES ${scripts} DESTINATION ${YARP_ROBOTS_INSTALL_DIR}/${dir})
   
-  file(GLOB scripts robots/${dir}/*.urdf)
-  yarp_install(FILES ${scripts} DESTINATION ${YARP_ROBOTS_INSTALL_DIR}/${dir})
-
   file(GLOB scripts robots/${dir}/*.xml)
   yarp_install(FILES ${scripts} DESTINATION ${YARP_APPLICATIONS_INSTALL_DIR}/${dir})
 endforeach ()

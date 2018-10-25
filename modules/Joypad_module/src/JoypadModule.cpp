@@ -7,16 +7,15 @@
  */
 
 // YARP
-#include "yarp/os/LogStream.h"
+#include <yarp/os/LogStream.h>
 #include <yarp/os/Property.h>
 #include <yarp/os/Bottle.h>
 
-#include "JoypadModule.hpp"
+#include <JoypadModule.hpp>
+#include <Utils.hpp>
 
 bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
 {
-    yarp::os::Value* value;
-
     // check if the configuration file is empty
     if(rf.isNull())
     {
@@ -28,107 +27,62 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     m_dT = rf.check("period", yarp::os::Value(0.1)).asDouble();
 
     // set the module name
-    if(!rf.check("name", value))
+    std::string name;
+    if(!YarpHelper::getStringFromSearchable(rf, "name", name))
     {
-        yError() << "[configure] Unable to find the module name.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The module name is not a string.";
-        return false;
-    }
-    std::string name = value->asString();
     setName(name.c_str());
 
     // set the deadzone interval
-    if(!rf.check("deadzone", value))
+    if(!YarpHelper::getDoubleFromSearchable(rf, "deadzone", m_deadzone))
     {
-        yError() << "[configure] Unable to find the deadzone.";
+        yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
-    if(!value->isDouble())
-    {
-        yError() << "[configure] The deadzone is not a double.";
-        return false;
-    }
-    m_deadzone = value->asDouble();
 
     // set the maximum value measured by the joypad
-    if(!rf.check("fullscale", value))
+    if(!YarpHelper::getDoubleFromSearchable(rf, "fullscale", m_fullscale))
     {
-        yError() << "[configure] Unable to find the fullscale.";
+        yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
-    if(!value->isDouble())
-    {
-        yError() << "[configure] fullscale is not a double.";
-        return false;
-    }
-    m_fullscale = value->asDouble();
 
-    // set the maximum value measured by the joypad
-    if(!rf.check("scale_x", value))
+    // set scaling factors
+    if(!YarpHelper::getDoubleFromSearchable(rf, "scale_x", m_scaleX))
     {
-        yError() << "[configure] Unable to find the fullscale.";
+        yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
-    if(!value->isDouble())
-    {
-        yError() << "[configure] fullscale is not a double.";
-        return false;
-    }
-    m_scaleX = value->asDouble();
 
-    // set the maximum value measured by the joypad
-    if(!rf.check("scale_y", value))
+    if(!YarpHelper::getDoubleFromSearchable(rf, "scale_y", m_scaleY))
     {
-        yError() << "[configure] Unable to find the fullscale.";
+        yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
-    if(!value->isDouble())
-    {
-        yError() << "[configure] fullscale is not a double.";
-        return false;
-    }
-    m_scaleY = value->asDouble();
 
     // set the polydriver
-    if(!rf.check("device", value))
+    std::string deviceName;
+    if(!YarpHelper::getStringFromSearchable(rf, "device", deviceName))
     {
-        yError() << "[configure] Unable to find the device name.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The device name is not a string.";
-        return false;
-    }
-    std::string deviceName = value->asString();
 
-    if(!rf.check("local", value))
+    std::string local;
+    if(!YarpHelper::getStringFromSearchable(rf, "local", local))
     {
-        yError() << "[configure] Unable to find local.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The local is not a string.";
-        return false;
-    }
-    std::string local = value->asString();
 
-    if(!rf.check("remote", value))
+    std::string remote;
+    if(!YarpHelper::getStringFromSearchable(rf, "remote", remote))
     {
-        yError() << "[configure] Unable to find remote.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] The remote is not a string.";
-        return false;
-    }
-    std::string remote = value->asString();
 
     yarp::os::Property conf;
     conf.put("device", deviceName);
@@ -150,30 +104,19 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    // open the communication with the WalkingModule
-    if(!rf.check("JoypadOutputPort_name", value))
+    std::string portName;
+    if(!YarpHelper::getStringFromSearchable(rf, "JoypadOutputPort_name", portName))
     {
-        yError() << "[configure] Unable to find JoypadOutputPort_name.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] JoypadOutputPort_name is not a string.";
-        return false;
-    }
-    m_joypadOutputPortName = "/" + name + value->asString();
+    m_joypadOutputPortName = "/" + name + portName;
 
-    if(!rf.check("JoypadInputPort_name", value))
+    if(!YarpHelper::getStringFromSearchable(rf, "JoypadInputPort_name", m_joypadInputPortName))
     {
-        yError() << "[configure] Unable to find JoypadInputPort_name.";
+        yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    if(!value->isString())
-    {
-        yError() << "[configure] JoypadInputPort_name is not a string.";
-        return false;
-    }
-    m_joypadInputPortName = value->asString();
 
     m_rpcPort.open(m_joypadOutputPortName);
     if(!yarp::os::Network::connect(m_joypadOutputPortName, m_joypadInputPortName))

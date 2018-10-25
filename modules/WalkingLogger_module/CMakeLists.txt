@@ -31,6 +31,7 @@ add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}
 
 target_link_libraries(${EXE_TARGET_NAME}
   ${YARP_LIBRARIES}
+  UtilityLibrary
   )
 
 install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)

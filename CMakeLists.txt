@@ -13,3 +13,5 @@ find_package(YARP REQUIRED)
 
 add_subdirectory(modules)
 add_subdirectory(app)
+
+include(AddUninstallTarget)

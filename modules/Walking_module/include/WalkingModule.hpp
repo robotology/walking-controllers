@@ -17,10 +17,11 @@
 #include <yarp/os/RFModule.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/dev/IEncodersTimed.h>
-#include <yarp/dev/IControlMode2.h>
-#include <yarp/dev/IControlLimits2.h>
-#include <yarp/dev/IPositionControl2.h>
+#include <yarp/dev/IControlMode.h>
+#include <yarp/dev/IControlLimits.h>
+#include <yarp/dev/IPositionControl.h>
 #include <yarp/dev/IPositionDirect.h>
+#include <yarp/dev/IVelocityControl.h>
 #include <yarp/dev/PolyDriver.h>
 #include <yarp/os/RpcClient.h>
 
@@ -125,10 +126,10 @@ class WalkingModule:
     // YARP Interfaces exposed by the remotecontrolboardremapper
     yarp::dev::IEncodersTimed *m_encodersInterface{nullptr}; /**< Encorders interface. */
     yarp::dev::IPositionDirect *m_positionDirectInterface{nullptr}; /**< Direct position control interface. */
-    yarp::dev::IPositionControl2 *m_positionInterface{nullptr}; /**< Position control interface. */
-    yarp::dev::IVelocityControl2 *m_velocityInterface{nullptr}; /**< Position control interface. */
-    yarp::dev::IControlMode2 *m_controlModeInterface{nullptr}; /**< Control mode interface. */
-    yarp::dev::IControlLimits2 *m_limitsInterface{nullptr}; /**< Encorders interface. */
+    yarp::dev::IPositionControl *m_positionInterface{nullptr}; /**< Position control interface. */
+    yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
+    yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
+    yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
     yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
 
     yarp::sig::Vector m_positionFeedbackInDegrees; /**< Vector containing the current joint position [deg]. */
