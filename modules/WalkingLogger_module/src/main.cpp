@@ -10,6 +10,7 @@
 #include <yarp/os/LogStream.h>
 #include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
+#include <yarp/os/BufferedPort.h>
 
 #include "WalkingLoggerModule.hpp"
 
