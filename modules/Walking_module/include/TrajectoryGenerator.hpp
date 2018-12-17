@@ -12,6 +12,7 @@
 // std
 #include <thread>
 #include <condition_variable>
+#include <memory>
 
 // YARP
 #include <yarp/os/Searchable.h>
@@ -19,7 +20,7 @@
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 
-#include <UnicycleTrajectoryGenerator.h>
+#include <UnicycleGenerator.h>
 
 /**
  * Enumerator useful to track the state of the trajectory generator
@@ -31,7 +32,12 @@ enum class GeneratorState {NotConfigured, Configured, FirstStep, Called, Returne
  */
 class TrajectoryGenerator
 {
-    UnicycleTrajectoryGenerator m_trajectoryGenerator; /**< UnicycleTrajectoryGenerator object. */
+    UnicycleGenerator m_trajectoryGenerator; /**< UnicycleTrajectoryGenerator object. */
+    std::shared_ptr<DCMTrajectoryGenerator> m_dcmGenerator;
+    std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGenerator;
+    std::shared_ptr<FeetCubicSplineGenerator> m_feetSplineGenerator;
+    std::shared_ptr<FeetMinimumJerkGenerator> m_feetMinimumJerkGenerator;
+    bool m_useMinimumJerk;
 
     bool m_swingLeft; /**< True if the first swing foot is the left. */
 
