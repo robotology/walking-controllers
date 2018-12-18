@@ -16,8 +16,8 @@
 #include <iDynTree/Model/Model.h>
 #include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
-#include "WalkingQPInverseKinematics_qpOASES.hpp"
-#include "Utils.hpp"
+#include <WalkingQPInverseKinematics_qpOASES.hpp>
+#include <Utils.hpp>
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 
@@ -445,7 +445,7 @@ bool WalkingQPIK_qpOASES::setBounds()
       - leftFootCorrection;
     Eigen::Map<MatrixXd>(m_upperBound.data(), m_numberOfConstraints, 1).block(0, 0, 6, 1) = iDynTree::toEigen(m_leftFootTwist)
       - leftFootCorrection;
-    
+
     // if((m_rightFootTwist(0) == m_rightFootTwist(1)) && (m_rightFootTwist(0) == 0))
     // {
     //     Eigen::Map<MatrixXd>(m_lowerBound.data(), m_numberOfConstraints, 1).block(6, 0, 6, 1) = iDynTree::toEigen(m_rightFootTwist);

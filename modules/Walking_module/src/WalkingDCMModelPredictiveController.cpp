@@ -1,5 +1,5 @@
 /**
- * @file WalkingController.cpp
+ * @file WalkingDCMModelPredictiveController.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
  * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
@@ -13,8 +13,8 @@
 #include <iDynTree/Core/EigenSparseHelpers.h>
 #include <iDynTree/Core/Direction.h>
 
-#include "WalkingController.hpp"
-#include "Utils.hpp"
+#include <WalkingDCMModelPredictiveController.hpp>
+#include <Utils.hpp>
 
 iDynSparseMatrix WalkingController::evaluateThetaMatrix()
 {

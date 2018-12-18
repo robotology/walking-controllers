@@ -29,24 +29,24 @@
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
 
-#include "TrajectoryGenerator.hpp"
-#include "WalkingController.hpp"
-#include "WalkingDCMReactiveController.hpp"
-#include "WalkingZMPController.hpp"
-#include "WalkingInverseKinematics.hpp"
-#include "WalkingQPInverseKinematics_osqp.hpp"
-#include "WalkingQPInverseKinematics_qpOASES.hpp"
-#include "WalkingForwardKinematics.hpp"
-#include "StableDCMModel.hpp"
-#include "WalkingPIDHandler.hpp"
-#include "WalkingLogger.hpp"
-#include "TimeProfiler.hpp"
+#include <TrajectoryGenerator.hpp>
+#include <WalkingDCMModelPredictiveController.hpp>
+#include <WalkingDCMReactiveController.hpp>
+#include <WalkingZMPController.hpp>
+#include <WalkingInverseKinematics.hpp>
+#include <WalkingQPInverseKinematics_osqp.hpp>
+#include <WalkingQPInverseKinematics_qpOASES.hpp>
+#include <WalkingForwardKinematics.hpp>
+#include <StableDCMModel.hpp>
+#include <WalkingPIDHandler.hpp>
+#include <WalkingLogger.hpp>
+#include <TimeProfiler.hpp>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
 #include <iCub/ctrl/minJerkCtrl.h>
 
-#include "thrifts/WalkingCommands.h"
+#include <thrifts/WalkingCommands.h>
 
 enum class WalkingFSM {Idle, Configured, Prepared, Walking, OnTheFly, Stance};
 

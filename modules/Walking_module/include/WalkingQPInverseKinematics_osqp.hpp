@@ -16,7 +16,7 @@
 #include <yarp/os/Searchable.h>
 
 #include <OsqpEigen/OsqpEigen.h>
-#include "Utils.hpp"
+#include <Utils.hpp>
 
 class WalkingQPIK_osqp
 {

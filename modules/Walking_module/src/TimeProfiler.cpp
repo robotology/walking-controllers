@@ -9,7 +9,7 @@
 // YARP
 #include <yarp/os/LogStream.h>
 
-#include "TimeProfiler.hpp"
+#include <TimeProfiler.hpp>
 
 const double& Timer::getAverageDuration() const
 {

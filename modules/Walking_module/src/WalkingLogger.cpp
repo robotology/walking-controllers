@@ -9,8 +9,8 @@
 // YARP
 #include <yarp/os/LogStream.h>
 
-#include "WalkingLogger.hpp"
-#include "Utils.hpp"
+#include <WalkingLogger.hpp>
+#include <Utils.hpp>
 
 bool WalkingLogger::configure(const yarp::os::Searchable& config, const std::string& name)
 {

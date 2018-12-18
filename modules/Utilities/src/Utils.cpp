@@ -14,7 +14,7 @@
 
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
-#include "Utils.hpp"
+#include <Utils.hpp>
 
 iDynTree::Matrix3x3 iDynTreeHelper::Rotation::skewSymmetric(const iDynTree::Matrix3x3& input)
 {

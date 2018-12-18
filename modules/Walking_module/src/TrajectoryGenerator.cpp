@@ -13,8 +13,8 @@
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
 
-#include "TrajectoryGenerator.hpp"
-#include "Utils.hpp"
+#include <TrajectoryGenerator.hpp>
+#include <Utils.hpp>
 
 TrajectoryGenerator::~TrajectoryGenerator()
 {
@@ -135,14 +135,14 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setSlowWhenTurnGain(slowWhenTurningGain);
     ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatio);
     ok = ok && m_trajectoryGenerator.setPitchDelta(pitchDelta);
-    
+
     m_trajectoryGenerator.setStanceZMPDelta(leftZMPDelta, rightZMPDelta);
     m_trajectoryGenerator.addTerminalStep(false);
     m_trajectoryGenerator.startWithLeft(m_swingLeft);
     m_trajectoryGenerator.resetTimingsIfStill(startWithSameFoot);
 
-    
-    
+
+
     m_trajectoryGenerator.useMinimumJerkFootTrajectory(useMinimumJerkFootTrajectory);
 
     m_correctLeft = true;
