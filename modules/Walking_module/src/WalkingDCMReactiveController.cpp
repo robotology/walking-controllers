@@ -28,14 +28,14 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
     }
 
     // set the gain of the DCM controller
-    if(!YarpHelper::getDoubleFromSearchable(config, "kDCM", m_kDCM))
+    if(!YarpHelper::getNumberFromSearchable(config, "kDCM", m_kDCM))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
     double comHeight;
-    if(!YarpHelper::getDoubleFromSearchable(config, "com_height", comHeight))
+    if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;

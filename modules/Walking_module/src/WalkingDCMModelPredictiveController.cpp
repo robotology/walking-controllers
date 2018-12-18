@@ -218,7 +218,7 @@ bool WalkingController::initializeMatrices(const yarp::os::Searchable& config)
 
     // get model parameters
     double comHeight;
-    if(!YarpHelper::getDoubleFromSearchable(config, "com_height", comHeight))
+    if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;

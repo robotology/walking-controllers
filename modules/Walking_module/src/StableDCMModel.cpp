@@ -29,7 +29,7 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     }
 
     double comHeight;
-    if(!YarpHelper::getDoubleFromSearchable(config, "com_height", comHeight))
+    if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
     {
         yError() << "[initialize] Unable to get a double from a searchable.";
         return false;
@@ -40,7 +40,7 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
 
     // set the sampling time
     double samplingTime;
-    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", samplingTime))
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
     {
         yError() << "[initialize] Unable to get a double from a searchable.";
         return false;

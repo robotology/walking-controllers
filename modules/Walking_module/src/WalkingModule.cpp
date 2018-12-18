@@ -280,7 +280,7 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     if(m_useVelocityFilter)
     {
         double cutFrequency;
-        if(!YarpHelper::getDoubleFromSearchable(rf, "joint_velocity_cut_frequency", cutFrequency))
+        if(!YarpHelper::getNumberFromSearchable(rf, "joint_velocity_cut_frequency", cutFrequency))
         {
             yError() << "[configure] Unable get double from searchable.";
             return false;
@@ -298,7 +298,7 @@ bool WalkingModule::configureRobot(const yarp::os::Searchable& rf)
     if(m_useWrenchFilter)
     {
         double cutFrequency;
-        if(!YarpHelper::getDoubleFromSearchable(rf, "wrench_cut_frequency", cutFrequency))
+        if(!YarpHelper::getNumberFromSearchable(rf, "wrench_cut_frequency", cutFrequency))
         {
             yError() << "[configure] Unable get double from searchable.";
             return false;

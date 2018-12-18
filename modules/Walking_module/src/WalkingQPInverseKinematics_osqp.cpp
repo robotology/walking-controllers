@@ -88,25 +88,25 @@ bool WalkingQPIK_osqp::initializeMatrices(const yarp::os::Searchable& config)
     for(int i = 0; i < m_actuatedDOFs; i++)
         m_jointRegulatizationGains(i, i) = jointRegularizationGains(i);
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_posFoot", m_kPosFoot))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_posFoot", m_kPosFoot))
     {
         yError() << "Initialization failed while reading k_posFoot.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_attFoot", m_kAttFoot))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_attFoot", m_kAttFoot))
     {
         yError() << "Initialization failed while reading k_attFoot.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_neck", m_kNeck))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_neck", m_kNeck))
     {
         yError() << "Initialization failed while reading k_neck.";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(config, "k_posCom", m_kCom))
+    if(!YarpHelper::getNumberFromSearchable(config, "k_posCom", m_kCom))
     {
         yError() << "Initialization failed while reading k_posCom.";
         return false;

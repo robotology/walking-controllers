@@ -127,7 +127,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
 
     double comHeight;
-    if(!YarpHelper::getDoubleFromSearchable(config, "com_height", comHeight))
+    if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
@@ -137,14 +137,14 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 
     // init filters
     double samplingTime;
-    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", samplingTime))
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
     double cutFrequency;
-    if(!YarpHelper::getDoubleFromSearchable(config, "cut_frequency", cutFrequency))
+    if(!YarpHelper::getNumberFromSearchable(config, "cut_frequency", cutFrequency))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
