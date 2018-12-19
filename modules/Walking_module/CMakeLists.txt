@@ -32,6 +32,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/WalkingDCMReactiveController.cpp
   src/WalkingModule.cpp
   src/WalkingInverseKinematics.cpp
+  src/WalkingQPInverseKinematics.cpp
   src/WalkingQPInverseKinematics_osqp.cpp
   src/WalkingQPInverseKinematics_qpOASES.cpp
   src/WalkingForwardKinematics.cpp
@@ -50,6 +51,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingDCMReactiveController.hpp
   include/WalkingModule.hpp
   include/WalkingInverseKinematics.hpp
+  include/WalkingQPInverseKinematics.hpp
   include/WalkingQPInverseKinematics_osqp.hpp
   include/WalkingQPInverseKinematics_qpOASES.hpp
   include/WalkingForwardKinematics.hpp
