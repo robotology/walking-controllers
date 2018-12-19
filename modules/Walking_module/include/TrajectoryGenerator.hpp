@@ -35,8 +35,7 @@ class TrajectoryGenerator
     UnicycleGenerator m_trajectoryGenerator; /**< UnicycleTrajectoryGenerator object. */
     std::shared_ptr<DCMTrajectoryGenerator> m_dcmGenerator;
     std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGenerator;
-    std::shared_ptr<FeetCubicSplineGenerator> m_feetSplineGenerator;
-    std::shared_ptr<FeetMinimumJerkGenerator> m_feetMinimumJerkGenerator;
+    std::shared_ptr<FeetGenerator> m_feetGenerator;
     bool m_useMinimumJerk;
 
     bool m_swingLeft; /**< True if the first swing foot is the left. */

@@ -136,18 +136,14 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
 
     if (m_useMinimumJerk) {
-        m_feetMinimumJerkGenerator = m_trajectoryGenerator.addFeetMinimumJerkGenerator();
-        ok = ok && m_feetMinimumJerkGenerator->setStepHeight(stepHeight);
-        ok = ok && m_feetMinimumJerkGenerator->setFootLandingVelocity(landingVelocity);
-        ok = ok && m_feetMinimumJerkGenerator->setFootApexTime(apexTime);
-        ok = ok && m_feetMinimumJerkGenerator->setPitchDelta(pitchDelta);
+        m_feetGenerator = m_trajectoryGenerator.addFeetMinimumJerkGenerator();
     } else {
-        m_feetSplineGenerator = m_trajectoryGenerator.addFeetCubicSplineGenerator();
-        ok = ok && m_feetSplineGenerator->setStepHeight(stepHeight);
-        ok = ok && m_feetSplineGenerator->setFootLandingVelocity(landingVelocity);
-        ok = ok && m_feetSplineGenerator->setFootApexTime(apexTime);
-        ok = ok && m_feetSplineGenerator->setPitchDelta(pitchDelta);
+        m_feetGenerator = m_trajectoryGenerator.addFeetCubicSplineGenerator();
     }
+    ok = ok && m_feetGenerator->setStepHeight(stepHeight);
+    ok = ok && m_feetGenerator->setFootLandingVelocity(landingVelocity);
+    ok = ok && m_feetGenerator->setFootApexTime(apexTime);
+    ok = ok && m_feetGenerator->setPitchDelta(pitchDelta);
 
     m_heightGenerator = m_trajectoryGenerator.addCoMHeightTrajectoryGenerator();
     ok = ok && m_heightGenerator->setCoMHeightSettings(comHeight, comHeightDelta);
@@ -527,11 +523,7 @@ bool TrajectoryGenerator::getFeetTrajectories(std::vector<iDynTree::Transform>& 
         return false;
     }
 
-    if (m_useMinimumJerk) {
-        m_feetMinimumJerkGenerator->getFeetTrajectories(lFootTrajectory, rFootTrajectory);
-    } else {
-        m_feetSplineGenerator->getFeetTrajectories(lFootTrajectory, rFootTrajectory);
-    }
+    m_feetGenerator->getFeetTrajectories(lFootTrajectory, rFootTrajectory);
 
     return true;
 }
@@ -545,12 +537,7 @@ bool TrajectoryGenerator::getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
         return false;
     }
 
-    if (!m_useMinimumJerk) {
-        yError() << "[getFeetTwist] Feet twists can be obtained pnly when using the minimum jerk generator.";
-        return false;
-    }
-
-    m_feetMinimumJerkGenerator->getFeetTwistsInMixedRepresentation(lFootTwist, rFootTwist);
+    m_feetGenerator->getFeetTwistsInMixedRepresentation(lFootTwist, rFootTwist);
 
     return true;
 }
