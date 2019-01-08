@@ -489,7 +489,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
 
-        m_QPIKSolver_osqp = std::make_unique<WalkingQPIK_osqp>();
+        m_QPIKSolver_osqp = std::make_shared<WalkingQPIK_osqp>();
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_actuatedDOFs,
                                           m_minJointsLimit, m_maxJointsLimit))
@@ -498,7 +498,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             return false;
         }
 
-        m_QPIKSolver_qpOASES = std::make_unique<WalkingQPIK_qpOASES>();
+        m_QPIKSolver_qpOASES = std::make_shared<WalkingQPIK_qpOASES>();
         if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
                                              m_actuatedDOFs,
                                              m_minJointsLimit, m_maxJointsLimit))
@@ -591,8 +591,8 @@ bool WalkingModule::close()
     m_walkingController.reset(nullptr);
     m_walkingZMPController.reset(nullptr);
     m_IKSolver.reset(nullptr);
-    m_QPIKSolver_osqp.reset(nullptr);
-    m_QPIKSolver_qpOASES.reset(nullptr);
+    m_QPIKSolver_osqp = nullptr;
+    m_QPIKSolver_qpOASES = nullptr;
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
     m_PIDHandler.reset(nullptr);
@@ -609,7 +609,7 @@ bool WalkingModule::close()
     return true;
 }
 
-bool WalkingModule::solveQPIK(auto& solver, const iDynTree::Position& desiredCoMPosition,
+bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const iDynTree::Position& desiredCoMPosition,
                               const iDynTree::Vector3& desiredCoMVelocity,
                               const iDynTree::Position& actualCoMPosition,
                               const iDynTree::Rotation& desiredNeckOrientation,

@@ -34,6 +34,7 @@
 #include <WalkingDCMReactiveController.hpp>
 #include <WalkingZMPController.hpp>
 #include <WalkingInverseKinematics.hpp>
+#include "WalkingQPInverseKinematics.hpp"
 #include <WalkingQPInverseKinematics_osqp.hpp>
 #include <WalkingQPInverseKinematics_qpOASES.hpp>
 #include <WalkingForwardKinematics.hpp>
@@ -74,8 +75,8 @@ class WalkingModule:
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
-    std::unique_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
-    std::unique_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
+    std::shared_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
+    std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
@@ -281,7 +282,8 @@ class WalkingModule:
      * @param output is the output of the solver (i.e. the desired joint velocity)
      * @return true in case of success and false otherwise.
      */
-    bool solveQPIK(auto& solver, const iDynTree::Position& desiredCoMPosition,
+    bool solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
+                   const iDynTree::Position& desiredCoMPosition,
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Position& actualCoMPosition,
                    const iDynTree::Rotation& desiredNeckOrientation,
@@ -375,19 +377,19 @@ public:
      * Start the robot motion from a generic two-feet-standing position.
      * @return true in case of success and false otherwise.
      */
-    bool onTheFlyStartWalking(const double smoothingTime = 2.0);
+    virtual bool onTheFlyStartWalking(const double smoothingTime = 2.0) override;
 
     /**
      * This allows you to put the robot in a home position for walking.
      * @return true in case of success and false otherwise.
      */
-    virtual bool prepareRobot(bool onTheFly = false);
+    virtual bool prepareRobot(bool onTheFly = false) override;
 
     /**
      * Start walking.
      * @return true in case of success and false otherwise.
      */
-    virtual bool startWalking();
+    virtual bool startWalking() override;
 
     /**
      * set the desired final position of the CoM.
@@ -395,6 +397,6 @@ public:
      * @param y desired y position of the CoM.
      * @return true in case of success and false otherwise.
      */
-    virtual bool setGoal(double x, double y);
+    virtual bool setGoal(double x, double y) override;
 };
 #endif
