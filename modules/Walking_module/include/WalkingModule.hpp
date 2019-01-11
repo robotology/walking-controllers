@@ -49,7 +49,7 @@
 
 #include <thrifts/WalkingCommands.h>
 
-enum class WalkingFSM {Idle, Configured, Prepared, Walking, OnTheFly, Stance};
+enum class WalkingFSM {Idle, Configured, Prepared, Walking, Stance};
 
 /**
  * RFModule of the 2D-DCM dynamics model.
@@ -83,19 +83,6 @@ class WalkingModule:
     std::unique_ptr<WalkingLogger> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
 
-    // related to the onTheFly feature
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointsSmoother; /**< Minimum jerk trajectory for the joint during the
-                                                                     onTheFly procedure. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_heightSmoother; /**< Minimum jerk trajectory for the CoM height during
-                                                                     the onTheFly procedure. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_additionalRotationWeightSmoother; /**< Minimum jerk trajectory for the weight
-                                                                                       of the additional rotation matrix during
-                                                                                       the onTheFly procedure. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_desiredJointWeightSmoother; /**< Minimum jerk trajectory for the weight
-                                                                                 of the desired joint position during the
-                                                                                 onTheFly procedure. */
-
-    double m_onTheFlySmoothingTime; /**< Duration of the on the fly procedure. */
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
     yarp::sig::Vector m_desiredJointInRadYarp; /**< Desired joint position (regularization task). */
@@ -372,12 +359,6 @@ public:
      * @return true in case of success and false otherwise.
      */
     bool close() override;
-
-    /**
-     * Start the robot motion from a generic two-feet-standing position.
-     * @return true in case of success and false otherwise.
-     */
-    virtual bool onTheFlyStartWalking(const double smoothingTime = 2.0) override;
 
     /**
      * This allows you to put the robot in a home position for walking.

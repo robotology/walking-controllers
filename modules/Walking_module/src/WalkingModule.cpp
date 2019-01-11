@@ -674,8 +674,7 @@ bool WalkingModule::updateModule()
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if(m_robotState == WalkingFSM::Walking
-       || m_robotState == WalkingFSM::Stance
-       || m_robotState == WalkingFSM::OnTheFly)
+       || m_robotState == WalkingFSM::Stance)
     {
         iDynTree::Vector2 measuredDCM, measuredZMP;
         iDynTree::Position measuredCoM;
@@ -849,7 +848,7 @@ bool WalkingModule::updateModule()
         // is stopped
         double threshold = 0.001;
         bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-        m_walkingZMPController->setPhase(stancePhase || m_robotState == WalkingFSM::OnTheFly);
+        m_walkingZMPController->setPhase(stancePhase);
 
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, measuredCoM);
@@ -876,14 +875,7 @@ bool WalkingModule::updateModule()
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-
-        if(m_robotState == WalkingFSM::OnTheFly)
-        {
-            m_heightSmoother->computeNextValues(yarp::sig::Vector(1,m_comHeightTrajectory.front()));
-            desiredCoMPosition(2) = m_heightSmoother->getPos()[0];
-        }
-        else
-            desiredCoMPosition(2) = m_comHeightTrajectory.front();
+        desiredCoMPosition(2) = m_comHeightTrajectory.front();
 
 
         iDynTree::Vector3 desiredCoMVelocity;
@@ -903,7 +895,7 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
-        if(m_useQPIK && m_robotState != WalkingFSM::OnTheFly)
+        if(m_useQPIK)
         {
             // integrate dq because velocity control mode seems not available
             yarp::sig::Vector bufferVelocity(m_actuatedDOFs);
@@ -946,41 +938,8 @@ bool WalkingModule::updateModule()
         }
         else
         {
-            if(m_robotState == WalkingFSM::OnTheFly)
-            {
-                iDynTree::VectorDynSize desiredJointInRad(m_actuatedDOFs);
-                m_jointsSmoother->computeNextValues(m_desiredJointInRadYarp);
-                iDynTree::toiDynTree(m_jointsSmoother->getPos(), desiredJointInRad);
-                if (!m_IKSolver->setDesiredJointConfiguration(desiredJointInRad))
-                {
-                    yError() << "[updateModule] Unable to set the desired Joint Configuration.";
-                    return false;
-                }
-            }
-
             if(m_IKSolver->usingAdditionalRotationTarget())
             {
-
-                if(m_robotState == WalkingFSM::OnTheFly)
-                {
-                    m_additionalRotationWeightSmoother->computeNextValues(yarp::sig::Vector(1,
-                                                                                            m_additionalRotationWeightDesired));
-                    double rotationWeight = m_additionalRotationWeightSmoother->getPos()[0];
-                    if (!m_IKSolver->setAdditionalRotationWeight(rotationWeight))
-                    {
-                        yError() << "[updateModule] Unable to set the additional rotational weight.";
-                        return false;
-                    }
-
-                    m_desiredJointWeightSmoother->computeNextValues(yarp::sig::Vector(1, m_desiredJointsWeight));
-                    double jointWeight = m_desiredJointWeightSmoother->getPos()[0];
-                    if (!m_IKSolver->setDesiredJointsWeight(jointWeight))
-                    {
-                        yError() << "[updateModule] Unable to set the desired joint weight.";
-                        return false;
-                    }
-                }
-
                 if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
                 {
                     yError() << "[updateModule] Error updating the inertia to world frame rotation.";
@@ -1026,7 +985,7 @@ bool WalkingModule::updateModule()
         m_profiler->profiling();
 
         iDynTree::VectorDynSize errorL(6), errorR(6);
-        if(m_robotState != WalkingFSM::OnTheFly && m_useQPIK)
+        if(m_useQPIK)
         {
             if(m_useOSQP)
             {
@@ -1059,44 +1018,10 @@ bool WalkingModule::updateModule()
 
         propagateTime();
 
-        if(m_robotState != WalkingFSM::OnTheFly)
-            // propagate all the signals
-            propagateReferenceSignals();
+        // propagate all the signals
+        propagateReferenceSignals();
 
-        if((m_robotState == WalkingFSM::OnTheFly) && (m_time > m_onTheFlySmoothingTime))
-        {
-            // reset gains and desired joint position
-            iDynTree::VectorDynSize desiredJointInRad(m_actuatedDOFs);
-            iDynTree::toiDynTree(m_desiredJointInRadYarp, desiredJointInRad);
-            if (!m_IKSolver->setDesiredJointConfiguration(desiredJointInRad))
-            {
-                yError() << "[updateModule] Unable to set the desired Joint Configuration.";
-                return false;
-            }
-
-            if (!m_IKSolver->setAdditionalRotationWeight(m_additionalRotationWeightDesired))
-            {
-                yError() << "[updateModule] Unable to set the additional rotational weight.";
-                return false;
-            }
-
-            if (!m_IKSolver->setDesiredJointsWeight(m_desiredJointsWeight))
-            {
-                yError() << "[updateModule] Unable to set the desired joint weight.";
-                return false;
-            }
-            m_robotState = WalkingFSM::Stance;
-            m_firstStep = true;
-
-            // reset time
-            m_time = 0.0;
-
-            yarp::sig::Vector buffer(m_qDesired.size());
-            iDynTree::toYarp(m_qDesired, buffer);
-            // instantiate Integrator object
-            m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
-        }
-        else if(m_firstStep)
+        if(m_firstStep)
             m_firstStep = false;
 
     }
@@ -2019,150 +1944,6 @@ bool WalkingModule::setGoal(double x, double y)
     m_desiredPosition(1) = y;
 
     m_newTrajectoryRequired = true;
-
-    return true;
-}
-
-bool WalkingModule::onTheFlyStartWalking(const double smoothingTime)
-{
-    if(m_robotState != WalkingFSM::Configured)
-    {
-        yError() << "[prepareRobot] You cannot prepare the robot again.";
-        return false;
-    }
-
-    std::lock_guard<std::mutex> guard(m_mutex);
-
-    iDynTree::Position measuredCoM;
-    iDynTree::Vector3 measuredCoMVelocity;
-    iDynTree::Transform leftToRightTransform;
-
-    if(smoothingTime < 0.01)
-    {
-        yError() << "[onTheFlyStartWalking] The smoothing time seems too short.";
-        return false;
-    }
-
-    m_onTheFlySmoothingTime = smoothingTime;
-
-    // get the current state of the robot
-    // this is necessary because the trajectories for the joints, CoM height and neck orientation
-    // depend on the current state of the robot
-    if(!getFeedbacks(10))
-    {
-        yError() << "[onTheFlyStartWalking] Unable to get the feedback.";
-        return false;
-    }
-
-    if(!m_FKSolver->setBaseOnTheFly())
-    {
-        yError() << "[onTheFlyStartWalking] Unable to set the onTheFly base.";
-        return false;
-    }
-
-    if(!m_FKSolver->setInternalRobotState(m_positionFeedbackInRadians, m_velocityFeedbackInRadians))
-    {
-        yError() << "[onTheFlyStartWalking] Unable to evaluate the CoM.";
-        return false;
-    }
-
-    // evaluate the left to right transformation, the inertial frame is on the left foot
-    leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
-
-    // evaluate the first trajectory. The robot does not move!
-    if(!generateFirstTrajectories(leftToRightTransform))
-    {
-        yError() << "[onTheFlyStartWalking] Failed to evaluate the first trajectories.";
-        return false;
-    }
-
-    if(!updateFKSolver())
-    {
-        yError() << "[onTheFlyStartWalking] Unable to update the FK solver.";
-        return false;
-    }
-
-    if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
-    {
-        yError() << "[onTheFlyStartWalking] Unable to evaluate the CoM position and velocity.";
-        return false;
-    }
-
-    // convert the initial position of the joint from iDynTree to YARP
-    yarp::sig::Vector initialJointValuesInRadYarp;
-    initialJointValuesInRadYarp.resize(m_actuatedDOFs);
-    iDynTree::toYarp(m_positionFeedbackInRadians, initialJointValuesInRadYarp);
-
-    m_jointsSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(initialJointValuesInRadYarp.size(),
-                                                                    m_dT, smoothingTime / 1.5);
-    m_heightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, m_dT, smoothingTime / 1.5);
-    m_additionalRotationWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, m_dT,
-                                                                                      smoothingTime);
-    m_desiredJointWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, m_dT,
-                                                                                smoothingTime);
-
-    // set the initial position of the trajectories (desired quantities and gains)
-    m_jointsSmoother->init(initialJointValuesInRadYarp);
-    m_heightSmoother->init(yarp::sig::Vector(1, measuredCoM(2)));
-
-    // the initial weight of the rotation matrix is 0
-    // Magic trick!
-    m_additionalRotationWeightSmoother->init(yarp::sig::Vector(1, 0.0));
-    m_additionalRotationWeightDesired = m_IKSolver->additionalRotationWeight();
-
-    // the initial weight for the joints position is 10 times the desired weight related to rotation
-    // Magic trick!
-    m_desiredJointWeightSmoother->init(yarp::sig::Vector(1, 10 * m_additionalRotationWeightDesired));
-    m_desiredJointsWeight = m_IKSolver->desiredJointWeight();
-
-    m_desiredJointInRadYarp.resize(m_actuatedDOFs);
-    iDynTree::toYarp(m_IKSolver->desiredJointConfiguration(), m_desiredJointInRadYarp);
-
-    if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-    {
-        yError() << "[onTheFlyStartWalking] Failed in setting POSITION DIRECT mode.";
-        return false;
-    }
-
-    // reset the models
-    iDynTree::Vector2 buff;
-    buff(0) = measuredCoM(0);
-    buff(1) = measuredCoM(1);
-    m_walkingZMPController->reset(buff);
-    m_stableDCMModel->reset(buff);
-
-    // reset the gains
-    if (m_PIDHandler->usingGainScheduling())
-    {
-        if (!(m_PIDHandler->reset()))
-            return false;
-    }
-
-    if(m_dumpData)
-    {
-        m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                    "dcm_des_x", "dcm_des_y",
-                    "dcm_des_dx", "dcm_des_dy",
-                    "zmp_x", "zmp_y",
-                    "zmp_des_x", "zmp_des_y",
-                    "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y",
-                    "com_des_dx", "com_des_dy",
-                    "lf_x", "lf_y", "lf_z",
-                    "lf_roll", "lf_pitch", "lf_yaw",
-                    "rf_x", "rf_y", "rf_z",
-                    "rf_roll", "rf_pitch", "rf_yaw",
-                    "lf_des_x", "lf_des_y", "lf_des_z",
-                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    "rf_des_x", "rf_des_y", "rf_des_z",
-                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_err_x", "lf_err_y", "lf_err_z",
-                    "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
-                    "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
-    }
-
-    m_robotState = WalkingFSM::OnTheFly;
 
     return true;
 }
