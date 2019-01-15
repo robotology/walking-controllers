@@ -36,7 +36,7 @@ private:
     std::string m_rpcServerPortName; /**< Name of the walking-module RPC port. */
     std::string m_rpcClientPortName; /**< Name of the joypad-module RPC port */
 
-    yarp::os::BufferedPort<yarp::sig::Vector> m_robotGoalPort; /**< Port used to specify the desired goal positio. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_robotGoalPort; /**< Port used to specify the desired goal position. */
     std::string m_robotGoalOutputPortName; /**< Name of the robotGoal port (opened by the joypad module) */
     std::string m_robotGoalInputPortName; /**< Name of the robotGoal port (opened by the walking module) */
 

@@ -176,17 +176,20 @@ bool JoypadModule::close()
 bool JoypadModule::updateModule()
 {
     yarp::os::Bottle cmd, outcome;
-    std::vector<float> buttonMapping(4);
+    float aButton, bButton, xButton, l1Button, r1Button;
 
     // prepare robot (A button)
-    m_joypadController->getButton(0, buttonMapping[0]);
+    m_joypadController->getButton(0, aButton);
 
     // start walking (B button)
-    m_joypadController->getButton(1, buttonMapping[1]);
+    m_joypadController->getButton(1, bButton);
+
+    // stop walking (X button)
+    m_joypadController->getButton(3, xButton);
 
     // reset connection (L1 + R1)
-    m_joypadController->getButton(6, buttonMapping[2]);
-    m_joypadController->getButton(7, buttonMapping[3]);
+    m_joypadController->getButton(6, l1Button);
+    m_joypadController->getButton(7, r1Button);
 
     // get the values from stick
     double x, y;
@@ -198,18 +201,23 @@ bool JoypadModule::updateModule()
 
     std::swap(x,y);
 
-    if(buttonMapping[0] > 0)
+    if(aButton > 0)
     {
         cmd.addString("prepareRobot");
         m_rpcClientPort.write(cmd, outcome);
     }
-    else if(buttonMapping[1] > 0)
+    else if(bButton > 0)
     {
         cmd.addString("startWalking");
         m_rpcClientPort.write(cmd, outcome);
     }
+    else if(xButton > 0)
+    {
+        cmd.addString("pauseWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
     // connect the ports
-    else if(buttonMapping[2] > 0 && buttonMapping[3] > 0)
+    else if(l1Button > 0 && r1Button > 0)
     {
         if(!yarp::os::Network::isConnected(m_rpcClientPortName, m_rpcServerPortName))
             yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);

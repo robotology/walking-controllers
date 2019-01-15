@@ -44,13 +44,12 @@
 
 #include <thrifts/WalkingCommands.h>
 
-
 /**
  * RFModule of the Walking controller
  */
 class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
-    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Stopped};
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Paused};
     WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     double m_dT; /**< RFModule period. */
@@ -271,6 +270,6 @@ public:
      * Stop walking.
      * @return true in case of success and false otherwise.
      */
-    virtual bool stopWalking() override;
+    virtual bool pauseWalking() override;
 };
 #endif

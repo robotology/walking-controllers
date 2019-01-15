@@ -30,8 +30,8 @@ service WalkingCommands
     bool setGoal(1:double x, 2:double y);
 
     /**
-     * Stop the walking controller
+     * Pause the walking controller
      * @return true/false in case of success/failure;
      */
-    bool stopWalking();
+    bool pauseWalking();
 }

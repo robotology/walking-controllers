@@ -1240,9 +1240,9 @@ bool WalkingModule::startWalking()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
-    if(m_robotState != WalkingFSM::Prepared && m_robotState != WalkingFSM::Stopped)
+    if(m_robotState != WalkingFSM::Prepared && m_robotState != WalkingFSM::Paused)
     {
-        yError() << "[startWalking] Unable to start walking if the robot is not prepared or stopped.";
+        yError() << "[startWalking] Unable to start walking if the robot is not prepared or paused.";
         return false;
     }
 
@@ -1348,7 +1348,7 @@ bool WalkingModule::setGoal(double x, double y)
     return setPlannerInput(x, y);
 }
 
-bool WalkingModule::stopWalking()
+bool WalkingModule::pauseWalking()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -1359,6 +1359,6 @@ bool WalkingModule::stopWalking()
     if(m_dumpData)
         m_walkingLogger->quit();
 
-    m_robotState = WalkingFSM::Stopped;
+    m_robotState = WalkingFSM::Paused;
     return true;
 }
