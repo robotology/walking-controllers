@@ -50,7 +50,7 @@
  */
 class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
-    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance};
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Stopped};
     WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     double m_dT; /**< RFModule period. */
@@ -266,5 +266,11 @@ public:
      * @return true in case of success and false otherwise.
      */
     virtual bool setGoal(double x, double y) override;
+
+    /**
+     * Stop walking.
+     * @return true in case of success and false otherwise.
+     */
+    virtual bool stopWalking() override;
 };
 #endif

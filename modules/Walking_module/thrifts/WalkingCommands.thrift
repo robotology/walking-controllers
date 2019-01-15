@@ -28,4 +28,10 @@ service WalkingCommands
      * @return true/false in case of success/failure;
      */
     bool setGoal(1:double x, 2:double y);
+
+    /**
+     * Stop the walking controller
+     * @return true/false in case of success/failure;
+     */
+    bool stopWalking();
 }

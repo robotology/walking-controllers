@@ -1238,9 +1238,11 @@ bool WalkingModule::evaluateDCM(iDynTree::Vector2& dcm)
 
 bool WalkingModule::startWalking()
 {
-    if(m_robotState != WalkingFSM::Prepared)
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    if(m_robotState != WalkingFSM::Prepared && m_robotState != WalkingFSM::Stopped)
     {
-        yError() << "[startWalking] Unable to start walking if the robot is not prepared.";
+        yError() << "[startWalking] Unable to start walking if the robot is not prepared or stopped.";
         return false;
     }
 
@@ -1267,17 +1269,16 @@ bool WalkingModule::startWalking()
                     "rf_err_x", "rf_err_y", "rf_err_z",
                     "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
     }
-    {
-        std::lock_guard<std::mutex> guard(m_mutex);
-        m_robotState = WalkingFSM::Walking;
-        m_firstStep = true;
 
+    // if the robot was only prepared the filters has to be reseted
+    if(m_robotState == WalkingFSM::Prepared)
         m_robotControlHelper->resetFilters();
-    }
+
+    m_robotState = WalkingFSM::Walking;
+    m_firstStep = true;
 
     return true;
 }
-
 
 bool WalkingModule::setPlannerInput(double x, double y)
 {
@@ -1345,4 +1346,19 @@ bool WalkingModule::setGoal(double x, double y)
         return false;
 
     return setPlannerInput(x, y);
+}
+
+bool WalkingModule::stopWalking()
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    if(m_robotState != WalkingFSM::Walking)
+        return false;
+
+    // close the logger
+    if(m_dumpData)
+        m_walkingLogger->quit();
+
+    m_robotState = WalkingFSM::Stopped;
+    return true;
 }
