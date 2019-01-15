@@ -410,8 +410,56 @@ bool WalkingModule::updateModule()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
-    if(m_robotState == WalkingFSM::Walking
-       || m_robotState == WalkingFSM::Stance)
+    if(m_robotState == WalkingFSM::Preparing)
+    {
+        bool motionDone = false;
+        if(!m_robotControlHelper->checkMotionDone(motionDone))
+        {
+            yError() << "[updateModule] Unable to check if the motion is done";
+            return false;
+        }
+        if(motionDone)
+        {
+            if(m_useQPIK)
+            {
+                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+                {
+                    yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
+                    return false;
+                }
+            }
+            else
+            {
+                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+                {
+                    yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
+                    return false;
+                }
+            }
+
+            // send the reference again in order to reduce error
+            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            {
+                yError() << "[prepareRobot] Error while setting the initial position using "
+                         << "POSITION DIRECT mode.";
+                return false;
+            }
+
+            yarp::sig::Vector buffer(m_qDesired.size());
+            iDynTree::toYarp(m_qDesired, buffer);
+            // instantiate Integrator object
+            m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
+
+            // reset the models
+            m_walkingZMPController->reset(m_DCMPositionDesired.front());
+            m_stableDCMModel->reset(m_DCMPositionDesired.front());
+
+            m_robotState = WalkingFSM::Prepared;
+
+            yInfo() << "[updateModule] The robot is prepared.";
+        }
+    }
+    else if(m_robotState == WalkingFSM::Walking || m_robotState == WalkingFSM::Stance)
     {
         iDynTree::Vector2 measuredDCM, measuredZMP;
         iDynTree::Position measuredCoM;
@@ -933,55 +981,12 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    // TODO remove from here should check in the update module
-    bool motionDone = false;
-    int maxAttemptTime = 0;
-    while(!motionDone && maxAttemptTime * 0.1 < 6)
     {
-        m_robotControlHelper->checkMotionDone(motionDone);
-        maxAttemptTime ++;
-        yarp::os::Time::delay(0.1);
-    }
-    if(!motionDone)
-    {
-        yError() << "Unable to complete the movement";
-        return false;
-    }
-    if(m_useQPIK)
-    {
-        if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-        {
-            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-            return false;
-        }
-    }
-    else
-    {
-        if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-        {
-            yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-            return false;
-        }
+        std::lock_guard<std::mutex> guard(m_mutex);
+        m_robotState = WalkingFSM::Preparing;
     }
 
-    // send the reference again in order to reduce error
-    if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-    {
-        yError() << "[prepareRobot] Error while setting the initial position using "
-                 << "POSITION DIRECT mode.";
-        return false;
-    }
 
-    yarp::sig::Vector buffer(m_qDesired.size());
-    iDynTree::toYarp(m_qDesired, buffer);
-    // instantiate Integrator object
-    m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
-
-    // reset the models
-    m_walkingZMPController->reset(m_DCMPositionDesired.front());
-    m_stableDCMModel->reset(m_DCMPositionDesired.front());
-
-    m_robotState = WalkingFSM::Prepared;
     return true;
 }
 

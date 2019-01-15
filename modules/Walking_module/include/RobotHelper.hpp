@@ -21,6 +21,7 @@
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
 #include <yarp/sig/Vector.h>
+#include <yarp/os/Timer.h>
 
 #include <iCub/ctrl/filters.h>
 
@@ -46,6 +47,8 @@ class RobotHelper
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
     yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
+
+    double m_positioningTime;
 
     yarp::sig::Vector m_positionFeedbackDeg; /**< Current joint position [deg]. */
     yarp::sig::Vector m_velocityFeedbackDeg; /**< Current joint velocity [deg/s]. */
@@ -74,6 +77,9 @@ class RobotHelper
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_leftWrenchFilter; /**< Left wrench low pass filter.*/
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
     bool m_useWrenchFilter; /**< True if the wrench filter is used. */
+
+    double m_startingPositionControlTime;
+    bool m_positionMoveSkipped;
 
     /**
      * Get the higher position error among all joints.

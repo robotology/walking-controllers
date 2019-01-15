@@ -461,6 +461,8 @@ bool RobotHelper::switchToControlMode(const int& controlMode)
 bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                                         const double& positioningTimeSec)
 {
+    m_positioningTime = positioningTimeSec;
+    m_positionMoveSkipped = false;
     if(m_positionInterface == nullptr)
     {
         yError() << "[setPositionReferences] Position I/F is not ready.";
@@ -478,7 +480,10 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
     }
 
     if(worstError.second < 0.03)
+    {
+        m_positionMoveSkipped = true;
         return true;
+    }
 
     if(positioningTimeSec < 0.01)
     {
@@ -520,27 +525,40 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
         return false;
     }
 
+    m_startingPositionControlTime = yarp::os::Time::now();
     return true;
 }
 
 bool RobotHelper::checkMotionDone(bool& motionDone)
 {
-    motionDone = false;
-    m_positionInterface->checkMotionDone(&motionDone);
-
-    if(motionDone)
+    // if the position move is skipped the motion is implicitly done
+    if(m_positionMoveSkipped)
     {
-        std::pair<std::string, double> worstError;
-        if (!getWorstError(m_desiredJointPositionRad, worstError))
-        {
-            yError() << "[setPositionReferences] Unable to get the worst error.";
-            return false;
-        }
-
-        if(worstError.second > 2.0)
-            motionDone = false;
+        motionDone = true;
+        return true;
     }
 
+    bool checkMotionDone = false;
+    m_positionInterface->checkMotionDone(&checkMotionDone);
+
+    std::pair<std::string, double> worstError;
+    if (!getWorstError(m_desiredJointPositionRad, worstError))
+    {
+        yError() << "[checkMotionDone] Unable to get the worst error.";
+        return false;
+    }
+
+    double now = yarp::os::Time::now();
+    double timeThreshold = 1;
+    if (now - m_startingPositionControlTime > m_positioningTime + timeThreshold)
+    {
+        yError() << "[checkMotionDone] The timer is expired but the joint "
+                 << worstError.first << " has an error of " << worstError.second
+                 << " radians";
+        return false;
+    }
+
+    motionDone = checkMotionDone && worstError.second < 0.1;
     return true;
 }
 

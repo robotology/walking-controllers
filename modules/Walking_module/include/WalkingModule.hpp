@@ -44,20 +44,18 @@
 
 #include <thrifts/WalkingCommands.h>
 
-enum class WalkingFSM {Idle, Configured, Prepared, Walking, Stance};
 
 /**
- * RFModule of the 2D-DCM dynamics model.
+ * RFModule of the Walking controller
  */
-class WalkingModule:
-    public yarp::os::RFModule,
-    public WalkingCommands
+class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance};
+    WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
+
     double m_dT; /**< RFModule period. */
     double m_time; /**< Current time. */
     std::string m_robot; /**< Robot name. */
-
-    WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
