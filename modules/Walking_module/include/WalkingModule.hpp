@@ -108,6 +108,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
     size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
@@ -216,6 +217,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      * @return true/false in case of success/failure.
      */
     bool updateTrajectories(const size_t& mergePoint);
+
+    bool setPlannerInput(double x, double y);
 
 public:
 

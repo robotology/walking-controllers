@@ -165,7 +165,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     this->yarp().attachAsServer(this->m_rpcPort);
     if(!m_rpcPort.open(rpcPortName))
     {
-        yError() << "Could not open" << rpcPortName.c_str() << "RPC port.";
+        yError() << "[configure] Could not open" << rpcPortName << " RPC port.";
+        return false;
+    }
+
+    std::string desiredUnyciclePositionPortName = "/" + getName() + "/goal:i";
+    if(!m_desiredUnyciclePositionPort.open(desiredUnyciclePositionPortName))
+    {
+        yError() << "[configure] Could not open" << desiredUnyciclePositionPortName << " port.";
         return false;
     }
 
@@ -459,7 +466,7 @@ bool WalkingModule::updateModule()
             yInfo() << "[updateModule] The robot is prepared.";
         }
     }
-    else if(m_robotState == WalkingFSM::Walking || m_robotState == WalkingFSM::Stance)
+    else if(m_robotState == WalkingFSM::Walking)
     {
         iDynTree::Vector2 measuredDCM, measuredZMP;
         iDynTree::Position measuredCoM;
@@ -468,6 +475,16 @@ bool WalkingModule::updateModule()
         bool resetTrajectory = false;
 
         m_profiler->setInitTime("Total");
+
+        // check desired planner input
+        yarp::sig::Vector* desiredUnicyclePosition = nullptr;
+        desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
+        if(desiredUnicyclePosition != nullptr)
+            if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
+            {
+                yError() << "[updateModule] Unable to set the planner input";
+                return false;
+            }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
         // the time to attach new one
@@ -1252,7 +1269,7 @@ bool WalkingModule::startWalking()
     }
     {
         std::lock_guard<std::mutex> guard(m_mutex);
-        m_robotState = WalkingFSM::Stance;
+        m_robotState = WalkingFSM::Walking;
         m_firstStep = true;
 
         m_robotControlHelper->resetFilters();
@@ -1261,16 +1278,9 @@ bool WalkingModule::startWalking()
     return true;
 }
 
-bool WalkingModule::setGoal(double x, double y)
+
+bool WalkingModule::setPlannerInput(double x, double y)
 {
-    std::lock_guard<std::mutex> guard(m_mutex);
-
-    if(m_robotState != WalkingFSM::Walking && m_robotState != WalkingFSM::Stance)
-        return false;
-
-    if(x == 0 && y == 0 && m_robotState == WalkingFSM::Stance)
-        return true;
-
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
     {
@@ -1308,16 +1318,16 @@ bool WalkingModule::setGoal(double x, double y)
         }
     }
 
-    if(x == 0 && y == 0)
-    {
-        m_robotState = WalkingFSM::Stance;
-        m_trajectoryGenerator->addTerminalStep(false);
-    }
-    else
-    {
-        m_robotState = WalkingFSM::Walking;
-        m_trajectoryGenerator->addTerminalStep(true);
-    }
+    // if(x == 0 && y == 0)
+    // {
+    //     m_robotState = WalkingFSM::Stance;
+    //     m_trajectoryGenerator->addTerminalStep(false);
+    // }
+    // else
+    // {
+    //     m_robotState = WalkingFSM::Walking;
+    //     m_trajectoryGenerator->addTerminalStep(true);
+    // }
 
     m_desiredPosition(0) = x;
     m_desiredPosition(1) = y;
@@ -1325,4 +1335,14 @@ bool WalkingModule::setGoal(double x, double y)
     m_newTrajectoryRequired = true;
 
     return true;
+}
+
+bool WalkingModule::setGoal(double x, double y)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    if(m_robotState != WalkingFSM::Walking)
+        return false;
+
+    return setPlannerInput(x, y);
 }
