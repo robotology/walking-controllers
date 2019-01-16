@@ -336,7 +336,7 @@ bool WalkingModule::close()
     // close the connection with robot
     if(!m_robotControlHelper->close())
     {
-        yError() << "[close] Unable to switch in position control.";
+        yError() << "[close] Unable to close the connection with the robot.";
         return false;
     }
 
