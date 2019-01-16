@@ -1128,23 +1128,6 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    // if(m_firstStep)
-    // {
-    //     if(!m_FKSolver->evaluateFirstWorldToBaseTransformation(m_leftTrajectory.front()))
-    //     {
-    //         yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
-    //         return false;
-    //     }
-    // }
-    // else
-    // {
-    //     if(!m_FKSolver->evaluateWorldToBaseTransformation(m_isLeftFixedFrame.front()))
-    //     {
-    //         yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
-    //         return false;
-    //     }
-    // }
-
     if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
                                                       m_rightTrajectory.front(),
                                                       m_isLeftFixedFrame.front()))
@@ -1297,17 +1280,6 @@ bool WalkingModule::setPlannerInput(double x, double y)
             m_newTrajectoryMergeCounter = 20;
         }
     }
-
-    // if(x == 0 && y == 0)
-    // {
-    //     m_robotState = WalkingFSM::Stance;
-    //     m_trajectoryGenerator->addTerminalStep(false);
-    // }
-    // else
-    // {
-    //     m_robotState = WalkingFSM::Walking;
-    //     m_trajectoryGenerator->addTerminalStep(true);
-    // }
 
     m_desiredPosition(0) = x;
     m_desiredPosition(1) = y;
