@@ -427,21 +427,10 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            if(m_useQPIK)
+            if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
             {
-                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-                {
-                    yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-                    return false;
-                }
-            }
-            else
-            {
-                if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-                {
-                    yError() << "[prepareRobot] Failed in setting POSITION DIRECT mode.";
-                    return false;
-                }
+                yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
+                return false;
             }
 
             // send the reference again in order to reduce error
@@ -760,21 +749,10 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        if(m_useQPIK)
+        if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
         {
-            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            {
-                yError() << "[updateModule] Error while setting the reference position to iCub.";
-                return false;
-            }
-        }
-        else
-        {
-            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            {
-                yError() << "[updateModule] Error while setting the reference position to iCub.";
-                return false;
-            }
+            yError() << "[updateModule] Error while setting the reference position to iCub.";
+            return false;
         }
 
         m_profiler->setEndTime("Total");
