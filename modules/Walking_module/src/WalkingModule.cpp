@@ -332,6 +332,7 @@ bool WalkingModule::close()
 
     // close the ports
     m_rpcPort.close();
+    m_desiredUnyciclePositionPort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
