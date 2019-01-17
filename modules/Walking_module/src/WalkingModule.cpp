@@ -101,7 +101,6 @@ double WalkingModule::getPeriod()
     return m_dT;
 }
 
-
 bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
 {
     // load the model in iDynTree::KinDynComputations
@@ -322,6 +321,17 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     return true;
 }
 
+void WalkingModule::reset()
+{
+    if(m_useMPC)
+        m_walkingController->reset();
+
+    m_trajectoryGenerator->reset();
+
+    if(m_dumpData)
+        m_walkingLogger->quit();
+}
+
 bool WalkingModule::close()
 {
     if(m_dumpData)
@@ -424,14 +434,20 @@ bool WalkingModule::updateModule()
         if(!m_robotControlHelper->checkMotionDone(motionDone))
         {
             yError() << "[updateModule] Unable to check if the motion is done";
-            return false;
+            yInfo() << "[updateModule] Try to prepare again";
+            reset();
+            m_robotState = WalkingFSM::Stopped;
+            return true;
         }
         if(motionDone)
         {
             if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
             {
                 yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
-                return false;
+                yInfo() << "[updateModule] Try to prepare again";
+                reset();
+                m_robotState = WalkingFSM::Stopped;
+                return true;
             }
 
             // send the reference again in order to reduce error
@@ -439,7 +455,10 @@ bool WalkingModule::updateModule()
             {
                 yError() << "[prepareRobot] Error while setting the initial position using "
                          << "POSITION DIRECT mode.";
-                return false;
+                yInfo() << "[updateModule] Try to prepare again";
+                reset();
+                m_robotState = WalkingFSM::Stopped;
+                return true;
             }
 
             yarp::sig::Vector buffer(m_qDesired.size());
@@ -862,9 +881,10 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 
 bool WalkingModule::prepareRobot(bool onTheFly)
 {
-    if(m_robotState != WalkingFSM::Configured)
+    if(m_robotState != WalkingFSM::Configured && m_robotState != WalkingFSM::Stopped)
     {
-        yError() << "[prepareRobot] You cannot prepare the robot again.";
+        yError() << "[prepareRobot] The robot can be prepared only at the "
+                 << "beginning or when the controller is stopped.";
         return false;
     }
 
@@ -1311,5 +1331,19 @@ bool WalkingModule::pauseWalking()
         m_walkingLogger->quit();
 
     m_robotState = WalkingFSM::Paused;
+    return true;
+}
+
+
+bool WalkingModule::stopWalking()
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    if(m_robotState != WalkingFSM::Walking)
+        return false;
+
+    reset();
+
+    m_robotState = WalkingFSM::Stopped;
     return true;
 }

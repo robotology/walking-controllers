@@ -34,4 +34,10 @@ service WalkingCommands
      * @return true/false in case of success/failure;
      */
     bool pauseWalking();
+
+    /**
+     * Stop the walking controller
+     * @return true/false in case of success/failure;
+     */
+    bool stopWalking();
 }

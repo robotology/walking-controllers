@@ -49,7 +49,7 @@
  */
 class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
-    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Paused};
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Paused, Stopped};
     WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     double m_dT; /**< RFModule period. */
@@ -219,6 +219,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     bool setPlannerInput(double x, double y);
 
+    void reset();
+
 public:
 
     /**
@@ -267,9 +269,16 @@ public:
     virtual bool setGoal(double x, double y) override;
 
     /**
-     * Stop walking.
+     * Pause walking.
      * @return true in case of success and false otherwise.
      */
     virtual bool pauseWalking() override;
+
+    /**
+     * Stop walking.
+     * @return true in case of success and false otherwise.
+     */
+    virtual bool stopWalking() override;
+
 };
 #endif
