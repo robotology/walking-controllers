@@ -603,3 +603,12 @@ bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
     m_trajectoryGenerator.getMergePoints(mergePoints);
     return true;
 }
+
+void TrajectoryGenerator::reset()
+{
+    // the mutex is automatically released when lock_guard goes out of its scope
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    // change the state of the generator
+    m_generatorState = GeneratorState::FirstStep;
+}
