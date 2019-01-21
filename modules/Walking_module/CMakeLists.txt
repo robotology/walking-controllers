@@ -74,11 +74,11 @@ set(${EXE_TARGET_NAME}_THRIFT_HDR
   )
 
 # Application target calls
-yarp_add_idl(${EXE_TARGET_NAME}_THRIFT_SRC ${${EXE_TARGET_NAME}_THRIFT_HDR})
+yarp_add_idl(${EXE_TARGET_NAME}_THRIFT_GEN_FILES ${${EXE_TARGET_NAME}_THRIFT_HDR})
 
 # add an executable to the project using the specified source files.
 add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}_HDR}
-  ${${EXE_TARGET_NAME}_THRIFT_SRC})
+  ${${EXE_TARGET_NAME}_THRIFT_GEN_FILES})
 
 target_link_libraries(${EXE_TARGET_NAME}
   ${YARP_LIBRARIES}
