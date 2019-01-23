@@ -16,7 +16,7 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
 
 # Find required package
 find_package(ICUB REQUIRED)
-find_package(UnicyclePlanner REQUIRED)
+find_package(UnicyclePlanner 0.1.102 REQUIRED)
 find_package(OsqpEigen REQUIRED)
 find_package(qpOASES REQUIRED)
 find_package(Threads REQUIRED)
