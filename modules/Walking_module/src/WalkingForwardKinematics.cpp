@@ -160,7 +160,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     m_comVelocityFilter->init(m_comVelocityFiltered);
 
     m_useFilters = config.check("use_filters", yarp::os::Value(false)).asBool();
-
+    m_firstStep = true;
     return true;
 }
 
@@ -266,7 +266,7 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
                                iDynTree::Twist::Zero(), velocityFeedbackInRadians,
                                gravity))
     {
-        yError() << "[setRobotState] Error while updating the state.";
+        yError() << "[setInternalRobotState] Error while updating the state.";
         return false;
     }
 
