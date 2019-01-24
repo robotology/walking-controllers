@@ -714,7 +714,7 @@ bool WalkingModule::updateModule()
 
             if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
             {
-                yError() << "[updateFKSolver] Unable to evaluate the CoM.";
+                yError() << "[updateModule] Unable to set the internal robot state.";
                 return false;
             }
 

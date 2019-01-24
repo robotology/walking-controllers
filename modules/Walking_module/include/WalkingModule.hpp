@@ -217,8 +217,19 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      */
     bool updateTrajectories(const size_t& mergePoint);
 
+    /**
+     * Set the input of the planner. The desired position is expressed using a
+     * reference frame attached to the robot. The X axis points forward while the
+     * Y axis points on the left.
+     * @param x desired forward position of the robot
+     * @param y desired lateral position of the robot
+     * @return true/false in case of success/failure.
+     */
     bool setPlannerInput(double x, double y);
 
+    /**
+     * Reset the entire controller architecture
+     */
     void reset();
 
 public:
