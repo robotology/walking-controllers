@@ -339,9 +339,6 @@ bool WalkingController::initialize(const yarp::os::Searchable& config)
         m_output(i) = inputPtr->get(i).asDouble();
     }
 
-    // used to indicate the first step.
-    m_feetStatus = std::make_pair<bool, bool>(false, false);
-
     if(!initializeMatrices(config))
     {
         yError() << "[initialize] Error while the matrices are initialized";
@@ -353,6 +350,9 @@ bool WalkingController::initialize(const yarp::os::Searchable& config)
         yError() << "[initialize] Error while the constraints are initialized";
         return false;
     }
+
+    // reset the solver
+    reset();
 
     return true;
 }
@@ -528,4 +528,12 @@ bool WalkingController::getControllerOutput(iDynTree::Vector2& controllerOutput)
     m_isSolutionEvaluated = false;
     controllerOutput = m_output;
     return true;
+}
+
+void WalkingController::reset()
+{
+    // used to indicate the first step.
+    m_feetStatus = std::make_pair<bool, bool>(false, false);
+
+    m_isSolutionEvaluated = false;
 }

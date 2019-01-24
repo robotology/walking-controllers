@@ -104,7 +104,6 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         conf.put("sticks", sticks);
     }
 
-
     // Open joypad polydriver
     if(!m_joypad.open(conf))
     {
@@ -121,22 +120,35 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     std::string portName;
-    if(!YarpHelper::getStringFromSearchable(rf, "JoypadOutputPort_name", portName))
+    if(!YarpHelper::getStringFromSearchable(rf, "rpcClientPort_name", portName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    m_joypadOutputPortName = "/" + name + portName;
+    m_rpcClientPortName = "/" + name + portName;
+    m_rpcClientPort.open(m_rpcClientPortName);
 
-    if(!YarpHelper::getStringFromSearchable(rf, "JoypadInputPort_name", m_joypadInputPortName))
+    if(!YarpHelper::getStringFromSearchable(rf, "rpcServerPort_name", m_rpcServerPortName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
+    yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
 
-    m_rpcPort.open(m_joypadOutputPortName);
+    if(!YarpHelper::getStringFromSearchable(rf, "robotGoalOutputPort_name", portName))
+    {
+        yError() << "[configure] Unable to get a string from searchable";
+        return false;
+    }
+    m_robotGoalOutputPortName = "/" + name + portName;
+    m_robotGoalPort.open(m_robotGoalOutputPortName);
 
-    yarp::os::Network::connect(m_joypadOutputPortName, m_joypadInputPortName);
+    if(!YarpHelper::getStringFromSearchable(rf, "robotGoalInputPort_name", m_robotGoalInputPortName))
+    {
+        yError() << "[configure] Unable to get a string from searchable";
+        return false;
+    }
+    yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
 
     return true;
 }
@@ -155,7 +167,8 @@ bool JoypadModule::close()
     }
 
     // close the ports
-    m_rpcPort.close();
+    m_rpcClientPort.close();
+    m_robotGoalPort.close();
 
     return true;
 }
@@ -163,17 +176,23 @@ bool JoypadModule::close()
 bool JoypadModule::updateModule()
 {
     yarp::os::Bottle cmd, outcome;
-    std::vector<float> buttonMapping(4);
+    float aButton, bButton, xButton, yButton, l1Button, r1Button;
 
     // prepare robot (A button)
-    m_joypadController->getButton(0, buttonMapping[0]);
+    m_joypadController->getButton(0, aButton);
 
     // start walking (B button)
-    m_joypadController->getButton(1, buttonMapping[1]);
+    m_joypadController->getButton(1, bButton);
+
+    // stop walking (X button)
+    m_joypadController->getButton(2, xButton);
+
+    // pause walking (Y button)
+    m_joypadController->getButton(3, yButton);
 
     // reset connection (L1 + R1)
-    m_joypadController->getButton(6, buttonMapping[2]);
-    m_joypadController->getButton(7, buttonMapping[3]);
+    m_joypadController->getButton(6, l1Button);
+    m_joypadController->getButton(7, r1Button);
 
     // get the values from stick
     double x, y;
@@ -185,22 +204,42 @@ bool JoypadModule::updateModule()
 
     std::swap(x,y);
 
-    if(buttonMapping[0] > 0)
+    if(aButton > 0)
+    {
         cmd.addString("prepareRobot");
-    else if(buttonMapping[1] > 0)
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(bButton > 0)
+    {
         cmd.addString("startWalking");
-    else if(buttonMapping[2] > 0 && buttonMapping[3] > 0 &&
-            !yarp::os::Network::isConnected(m_joypadOutputPortName, m_joypadInputPortName))
-        yarp::os::Network::connect(m_joypadOutputPortName, m_joypadInputPortName);
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(yButton > 0)
+    {
+        cmd.addString("pauseWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(xButton > 0)
+    {
+        cmd.addString("stopWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    // connect the ports
+    else if(l1Button > 0 && r1Button > 0)
+    {
+        if(!yarp::os::Network::isConnected(m_rpcClientPortName, m_rpcServerPortName))
+            yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
+        if(!yarp::os::Network::isConnected(m_robotGoalOutputPortName, m_robotGoalInputPortName))
+            yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
+    }
     else
     {
-        cmd.addString("setGoal");
-        cmd.addDouble(x);
-        cmd.addDouble(y);
+        yarp::sig::Vector& goal= m_robotGoalPort.prepare();
+        goal.clear();
+        goal.push_back(x);
+        goal.push_back(y);
+        m_robotGoalPort.write();
     }
-
-    m_rpcPort.write(cmd, outcome);
-
     return true;
 }
 

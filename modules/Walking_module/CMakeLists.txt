@@ -26,6 +26,7 @@ include(FindPackageHandleStandardArgs)
 # set cpp files
 set(${EXE_TARGET_NAME}_SRC
   src/main.cpp
+  src/RobotHelper.cpp
   src/TrajectoryGenerator.cpp
   src/MPCSolver.cpp
   src/WalkingDCMModelPredictiveController.cpp

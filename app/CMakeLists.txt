@@ -22,10 +22,14 @@ subdirlist(subdirs ${CMAKE_CURRENT_SOURCE_DIR}/robots/)
 foreach (dir ${subdirs})
   file(GLOB scripts robots/${dir}/*.ini)
   yarp_install(FILES ${scripts} DESTINATION ${YARP_ROBOTS_INSTALL_DIR}/${dir})
-  
+
   file(GLOB scripts robots/${dir}/*.xml)
   yarp_install(FILES ${scripts} DESTINATION ${YARP_APPLICATIONS_INSTALL_DIR}/${dir})
 endforeach ()
+
+# Install the application
+file(GLOB scripts scripts/*.xml)
+yarp_install(FILES ${scripts} DESTINATION ${YARP_APPLICATIONS_INSTALL_DIR})
 
 yarp_install(DIRECTORY dcmWalkingLogger DESTINATION ${YARP_CONTEXTS_INSTALL_DIR})
 yarp_install(DIRECTORY dcmWalkingJoypad DESTINATION ${YARP_CONTEXTS_INSTALL_DIR})

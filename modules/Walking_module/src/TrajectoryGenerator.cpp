@@ -290,6 +290,10 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     unicyclePlanner->clearDesiredTrajectory();
 
+    // clear left and right footsteps
+    m_trajectoryGenerator.getLeftFootPrint()->clearSteps();
+    m_trajectoryGenerator.getRightFootPrint()->clearSteps();
+
     // set initial and final times
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
@@ -339,6 +343,10 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     // clear the all trajectory
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     unicyclePlanner->clearDesiredTrajectory();
+
+    // clear left and right footsteps
+    m_trajectoryGenerator.getLeftFootPrint()->clearSteps();
+    m_trajectoryGenerator.getRightFootPrint()->clearSteps();
 
     // set initial and final times
     double initTime = 0;
@@ -602,4 +610,13 @@ bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
 
     m_trajectoryGenerator.getMergePoints(mergePoints);
     return true;
+}
+
+void TrajectoryGenerator::reset()
+{
+    // the mutex is automatically released when lock_guard goes out of its scope
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    // change the state of the generator
+    m_generatorState = GeneratorState::FirstStep;
 }

@@ -239,6 +239,11 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getControllerOutput(iDynTree::Vector2& controllerOutput);
+
+    /**
+     * Reset the controller
+     */
+    void reset();
 };
 
 #endif

@@ -210,6 +210,11 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getMergePoints(std::vector<size_t>& mergePoints);
+
+    /**
+     * Reset the planner
+     */
+    void reset();
 };
 
 #endif

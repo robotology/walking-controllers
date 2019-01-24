@@ -32,9 +32,13 @@ private:
     double m_scaleX; /**< Scale of the joypad x-axis. */
     double m_scaleY; /**< Scale of the joypad y-axis. */
 
-    std::string m_joypadOutputPortName; /**< Name of the joypad output port name. */
-    std::string m_joypadInputPortName; /**< Name of the joypad input port name (This is the name of the port opened by the main module). */
-    yarp::os::RpcClient m_rpcPort; /**< RPC port. */
+    yarp::os::RpcClient m_rpcClientPort; /**< RPC port. */
+    std::string m_rpcServerPortName; /**< Name of the walking-module RPC port. */
+    std::string m_rpcClientPortName; /**< Name of the joypad-module RPC port */
+
+    yarp::os::BufferedPort<yarp::sig::Vector> m_robotGoalPort; /**< Port used to specify the desired goal position. */
+    std::string m_robotGoalOutputPortName; /**< Name of the robotGoal port (opened by the joypad module) */
+    std::string m_robotGoalInputPortName; /**< Name of the robotGoal port (opened by the walking module) */
 
     /**
      * Standard deadzone function.

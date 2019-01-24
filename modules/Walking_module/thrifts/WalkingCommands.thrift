@@ -23,15 +23,21 @@ service WalkingCommands
     bool startWalking();
 
     /**
-     * Start the robot motion from a generic two-feet-standing position.
-     * @return true/false in case of success/failure;
-     */
-    bool onTheFlyStartWalking(1:double smoothingTime=2.0);
-
-    /**
      * Set the desired goal position. It is important to notice that
      * x and y are expressed in the iCub main frame.
      * @return true/false in case of success/failure;
      */
     bool setGoal(1:double x, 2:double y);
+
+    /**
+     * Pause the walking controller
+     * @return true/false in case of success/failure;
+     */
+    bool pauseWalking();
+
+    /**
+     * Stop the walking controller
+     * @return true/false in case of success/failure;
+     */
+    bool stopWalking();
 }
