@@ -32,7 +32,7 @@ void WalkingModule::propagateTime()
     m_time += m_dT;
 }
 
-bool WalkingModule::propagateReferenceSignals()
+bool WalkingModule::advanceReferenceSignals()
 {
     // check if vector is not initialized
     if(m_leftTrajectory.empty()
@@ -43,7 +43,7 @@ bool WalkingModule::propagateReferenceSignals()
        || m_DCMVelocityDesired.empty()
        || m_comHeightTrajectory.empty())
     {
-        yError() << "[propagateReferenceSignals] Cannot propagate empty reference signals.";
+        yError() << "[advanceReferenceSignals] Cannot advance empty reference signals.";
         return false;
     }
 
@@ -808,14 +808,12 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR);
-
-            // m_walkingLogger->sendData(m_dqDesired_osqp, m_dqDesired_qpOASES);
         }
 
         propagateTime();
 
-        // propagate all the signals
-        propagateReferenceSignals();
+        // advance all the signals
+        advanceReferenceSignals();
 
         if(m_firstStep)
             m_firstStep = false;

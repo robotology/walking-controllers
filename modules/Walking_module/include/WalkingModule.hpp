@@ -132,10 +132,10 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     void propagateTime();
 
     /**
-     * Propagate the reference signal.
+     * Advance the reference signal.
      * @return true in case of success and false otherwise.
      */
-    bool propagateReferenceSignals();
+    bool advanceReferenceSignals();
 
 
     /**
