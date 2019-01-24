@@ -290,6 +290,10 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     unicyclePlanner->clearDesiredTrajectory();
 
+    // clear left and right footsteps
+    m_trajectoryGenerator.getLeftFootPrint()->clearSteps();
+    m_trajectoryGenerator.getRightFootPrint()->clearSteps();
+
     // set initial and final times
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
@@ -339,6 +343,10 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     // clear the all trajectory
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     unicyclePlanner->clearDesiredTrajectory();
+
+    // clear left and right footsteps
+    m_trajectoryGenerator.getLeftFootPrint()->clearSteps();
+    m_trajectoryGenerator.getRightFootPrint()->clearSteps();
 
     // set initial and final times
     double initTime = 0;
