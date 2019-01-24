@@ -176,7 +176,7 @@ bool JoypadModule::close()
 bool JoypadModule::updateModule()
 {
     yarp::os::Bottle cmd, outcome;
-    float aButton, bButton, xButton, l1Button, r1Button;
+    float aButton, bButton, xButton, yButton, l1Button, r1Button;
 
     // prepare robot (A button)
     m_joypadController->getButton(0, aButton);
@@ -185,7 +185,10 @@ bool JoypadModule::updateModule()
     m_joypadController->getButton(1, bButton);
 
     // stop walking (X button)
-    m_joypadController->getButton(3, xButton);
+    m_joypadController->getButton(2, xButton);
+
+    // pause walking (Y button)
+    m_joypadController->getButton(3, yButton);
 
     // reset connection (L1 + R1)
     m_joypadController->getButton(6, l1Button);
@@ -211,9 +214,14 @@ bool JoypadModule::updateModule()
         cmd.addString("startWalking");
         m_rpcClientPort.write(cmd, outcome);
     }
-    else if(xButton > 0)
+    else if(yButton > 0)
     {
         cmd.addString("pauseWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(xButton > 0)
+    {
+        cmd.addString("stopWalking");
         m_rpcClientPort.write(cmd, outcome);
     }
     // connect the ports
