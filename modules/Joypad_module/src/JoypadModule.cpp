@@ -179,16 +179,16 @@ bool JoypadModule::updateModule()
     float aButton, bButton, xButton, yButton, l1Button, r1Button;
 
     // prepare robot (A button)
-    m_joypadController->getButton(0, aButton);
+    m_joypadController->getButton(0, aButton); 
 
     // start walking (B button)
     m_joypadController->getButton(1, bButton);
 
     // stop walking (X button)
-    m_joypadController->getButton(2, xButton);
+    m_joypadController->getButton(3, xButton);
 
     // pause walking (Y button)
-    m_joypadController->getButton(3, yButton);
+    m_joypadController->getButton(4, yButton);
 
     // reset connection (L1 + R1)
     m_joypadController->getButton(6, l1Button);
@@ -201,7 +201,7 @@ bool JoypadModule::updateModule()
 
     x = -m_scaleX * deadzone(x);
     y = -m_scaleY * deadzone(y);
-
+    
     std::swap(x,y);
 
     if(aButton > 0)
