@@ -16,24 +16,20 @@
 // YARP
 #include <yarp/os/RFModule.h>
 #include <yarp/sig/Vector.h>
-#include <yarp/dev/IEncodersTimed.h>
-#include <yarp/dev/IControlMode.h>
-#include <yarp/dev/IControlLimits.h>
-#include <yarp/dev/IPositionControl.h>
-#include <yarp/dev/IPositionDirect.h>
-#include <yarp/dev/IVelocityControl.h>
-#include <yarp/dev/PolyDriver.h>
+
 #include <yarp/os/RpcClient.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
 
+#include <RobotHelper.hpp>
 #include <TrajectoryGenerator.hpp>
 #include <WalkingDCMModelPredictiveController.hpp>
 #include <WalkingDCMReactiveController.hpp>
 #include <WalkingZMPController.hpp>
 #include <WalkingInverseKinematics.hpp>
+#include <WalkingQPInverseKinematics.hpp>
 #include <WalkingQPInverseKinematics_osqp.hpp>
 #include <WalkingQPInverseKinematics_qpOASES.hpp>
 #include <WalkingForwardKinematics.hpp>
@@ -48,20 +44,17 @@
 
 #include <thrifts/WalkingCommands.h>
 
-enum class WalkingFSM {Idle, Configured, Prepared, Walking, OnTheFly, Stance};
-
 /**
- * RFModule of the 2D-DCM dynamics model.
+ * RFModule of the Walking controller
  */
-class WalkingModule:
-    public yarp::os::RFModule,
-    public WalkingCommands
+class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Paused, Stopped};
+    WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
+
     double m_dT; /**< RFModule period. */
     double m_time; /**< Current time. */
     std::string m_robot; /**< Robot name. */
-
-    WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
@@ -69,32 +62,20 @@ class WalkingModule:
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
 
+    std::unique_ptr<RobotHelper> m_robotControlHelper; /**< Robot control helper. */
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
-    std::unique_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
-    std::unique_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
+    std::shared_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
+    std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
     std::unique_ptr<WalkingLogger> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
 
-    // related to the onTheFly feature
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointsSmoother; /**< Minimum jerk trajectory for the joint during the
-                                                                     onTheFly procedure. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_heightSmoother; /**< Minimum jerk trajectory for the CoM height during
-                                                                     the onTheFly procedure. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_additionalRotationWeightSmoother; /**< Minimum jerk trajectory for the weight
-                                                                                       of the additional rotation matrix during
-                                                                                       the onTheFly procedure. */
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_desiredJointWeightSmoother; /**< Minimum jerk trajectory for the weight
-                                                                                 of the desired joint position during the
-                                                                                 onTheFly procedure. */
-
-    double m_onTheFlySmoothingTime; /**< Duration of the on the fly procedure. */
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
     yarp::sig::Vector m_desiredJointInRadYarp; /**< Desired joint position (regularization task). */
@@ -117,55 +98,16 @@ class WalkingModule:
                                             In general a main frame of a foot is the fix frame only during the
                                             stance and the switch out phases. */
 
-    yarp::dev::PolyDriver m_robotDevice; /**< Main robot device. */
-    std::vector<std::string> m_axesList; /**< Vector containing the name of the controlled joints. */
-    int m_actuatedDOFs; /**< Number of the actuated DoFs. */
 
     iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
-    // YARP Interfaces exposed by the remotecontrolboardremapper
-    yarp::dev::IEncodersTimed *m_encodersInterface{nullptr}; /**< Encorders interface. */
-    yarp::dev::IPositionDirect *m_positionDirectInterface{nullptr}; /**< Direct position control interface. */
-    yarp::dev::IPositionControl *m_positionInterface{nullptr}; /**< Position control interface. */
-    yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
-    yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
-    yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
-    yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
-
-    yarp::sig::Vector m_positionFeedbackInDegrees; /**< Vector containing the current joint position [deg]. */
-    yarp::sig::Vector m_velocityFeedbackInDegrees; /**< Vector containing the current joint velocity [deg/s]. */
-
     iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */
-    // todo
-    iDynTree::VectorDynSize m_dqDesired_osqp; /**< Vector containing the results of the QP-IK algorithm [rad/s]. */
-    iDynTree::VectorDynSize m_dqDesired_qpOASES; /**< Vector containing the results of the QP-IK algorithm [rad/s]. */
-    iDynTree::VectorDynSize m_positionFeedbackInRadians; /**< Vector containing the current joint position [rad]. */
-    iDynTree::VectorDynSize m_velocityFeedbackInRadians; /**< Vector containing the current joint velocity [rad/s]. */
-    iDynTree::VectorDynSize m_toDegBuffer; /**< Vector containing the desired joint positions that will be sent to the robot [deg]. */
-    iDynTree::VectorDynSize m_minJointsLimit; /**< Vector containing the max negative limits [rad/s]. */
-    iDynTree::VectorDynSize m_maxJointsLimit; /**< Vector containing the max positive limits [rad/s]. */
-
-    // yarp::sig::Vector m_positionFeedbackInDegreesFiltered;
-    yarp::sig::Vector m_velocityFeedbackInDegreesFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
-    std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
-    std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_velocityFilter; /**< Joint velocity low pass filter .*/
-    bool m_useVelocityFilter; /**< True if the joint velocity filter is used. */
+    iDynTree::VectorDynSize m_dqDesired; /**< Vector containing the results of the IK algorithm [rad]. */
 
     iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
-    yarp::os::BufferedPort<yarp::sig::Vector> m_leftWrenchPort; /**< Left foot wrench port. */
-    yarp::os::BufferedPort<yarp::sig::Vector> m_rightWrenchPort; /**< Right foot wrench port. */
-    yarp::sig::Vector m_leftWrenchInput; /**< YARP vector that contains left foot wrench. */
-    yarp::sig::Vector m_rightWrenchInput; /**< YARP vector that contains right foot wrench. */
-    yarp::sig::Vector m_leftWrenchInputFiltered; /**< YARP vector that contains left foot filtered wrench. */
-    yarp::sig::Vector m_rightWrenchInputFiltered; /**< YARP vector that contains right foot filtered wrench. */
-    iDynTree::Wrench m_leftWrench; /**< iDynTree vector that contains left foot wrench. */
-    iDynTree::Wrench m_rightWrench; /**< iDynTree vector that contains right foot wrench. */
-    std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_leftWrenchFilter; /**< Left wrench low pass filter.*/
-    std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
-    bool m_useWrenchFilter; /**< True if the wrench filter is used. */
-
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
     size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
@@ -176,29 +118,6 @@ class WalkingModule:
 
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
-
-    /**
-     * Configure the Force torque sensors. The FT ports are only opened please use yarpamanger
-     * to connect them.
-     * @param config is the reference to a resource finder object.
-     * @return true in case of success and false otherwise.
-     */
-    bool configureForceTorqueSensors(const yarp::os::Searchable& config);
-
-    /**
-     * Configure the Robot.
-     * @param config is the reference to a resource finder object.
-     * @return true in case of success and false otherwise.
-     */
-    bool configureRobot(const yarp::os::Searchable& config);
-
-    /**
-     * Get the name of the controlled joints from the resource finder
-     * and set its.
-     * @param rf is the reference to a resource finder object.
-     * @return true in case of success and false otherwise.
-     */
-    bool setControlledJoints(const yarp::os::Searchable& rf);
 
     /**
      * Get the robot model from the resource finder and set it.
@@ -213,58 +132,11 @@ class WalkingModule:
     void propagateTime();
 
     /**
-     * Propagate the reference signal.
+     * Advance the reference signal.
      * @return true in case of success and false otherwise.
      */
-    bool propagateReferenceSignals();
+    bool advanceReferenceSignals();
 
-    /**
-     * Get all the feedback signal from the interfaces
-     * @return true in case of success and false otherwise.
-     */
-    bool getFeedbacks(unsigned int maxAttempts = 1);
-
-    /**
-     * Get the higher position error among all joints.
-     * @param desiredJointPositionsRad desired joint position in radiants;
-     * @param worstError is a pair containing the indices of the joint with the
-     * worst error and its value.
-     * @return true in case of success and false otherwise.
-     */
-    bool getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                       std::pair<int, double>& worstError);
-
-    /**
-     * Switch the control mode.
-     * @param controlMode is the control mode.
-     * @return true in case of success and false otherwise.
-     */
-    bool switchToControlMode(const int& controlMode);
-
-    /**
-     * Set the desired position reference. (The position will be sent using PositionControl mode)
-     * @param jointPositionsRadians desired final joint position;
-     * @param positioningTimeSec minimum jerk trajectory duration.
-     * @return true in case of success and false otherwise.
-     */
-    bool setPositionReferences(const iDynTree::VectorDynSize& jointPositionsRadians,
-                               const double& positioningTimeSec);
-
-    /**
-     * Set the desired position reference.
-     * (The position will be sent using DirectPositionControl mode)
-     * @param desiredPositionsRad desired final joint position;
-     * @return true in case of success and false otherwise.
-     */
-    bool setDirectPositionReferences(const iDynTree::VectorDynSize&  desiredPositionsRad);
-
-    /**
-     * Set the desired velocity reference.
-     * (The position will be sent using DirectPositionControl mode)
-     * @param desiredVelocityRad desired joints velocity;
-     * @return true in case of success and false otherwise.
-     */
-    bool setVelocityReferences(const iDynTree::VectorDynSize& desiredVelocityRad);
 
     /**
      * Update the FK solver.
@@ -281,7 +153,8 @@ class WalkingModule:
      * @param output is the output of the solver (i.e. the desired joint velocity)
      * @return true in case of success and false otherwise.
      */
-    bool solveQPIK(auto& solver, const iDynTree::Position& desiredCoMPosition,
+    bool solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
+                   const iDynTree::Position& desiredCoMPosition,
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Position& actualCoMPosition,
                    const iDynTree::Rotation& desiredNeckOrientation,
@@ -344,6 +217,21 @@ class WalkingModule:
      */
     bool updateTrajectories(const size_t& mergePoint);
 
+    /**
+     * Set the input of the planner. The desired position is expressed using a
+     * reference frame attached to the robot. The X axis points forward while the
+     * Y axis points on the left.
+     * @param x desired forward position of the robot
+     * @param y desired lateral position of the robot
+     * @return true/false in case of success/failure.
+     */
+    bool setPlannerInput(double x, double y);
+
+    /**
+     * Reset the entire controller architecture
+     */
+    void reset();
+
 public:
 
     /**
@@ -372,22 +260,16 @@ public:
     bool close() override;
 
     /**
-     * Start the robot motion from a generic two-feet-standing position.
-     * @return true in case of success and false otherwise.
-     */
-    bool onTheFlyStartWalking(const double smoothingTime = 2.0);
-
-    /**
      * This allows you to put the robot in a home position for walking.
      * @return true in case of success and false otherwise.
      */
-    virtual bool prepareRobot(bool onTheFly = false);
+    virtual bool prepareRobot(bool onTheFly = false) override;
 
     /**
      * Start walking.
      * @return true in case of success and false otherwise.
      */
-    virtual bool startWalking();
+    virtual bool startWalking() override;
 
     /**
      * set the desired final position of the CoM.
@@ -395,6 +277,19 @@ public:
      * @param y desired y position of the CoM.
      * @return true in case of success and false otherwise.
      */
-    virtual bool setGoal(double x, double y);
+    virtual bool setGoal(double x, double y) override;
+
+    /**
+     * Pause walking.
+     * @return true in case of success and false otherwise.
+     */
+    virtual bool pauseWalking() override;
+
+    /**
+     * Stop walking.
+     * @return true in case of success and false otherwise.
+     */
+    virtual bool stopWalking() override;
+
 };
 #endif

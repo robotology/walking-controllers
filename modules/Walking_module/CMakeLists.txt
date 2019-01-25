@@ -16,7 +16,7 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
 
 # Find required package
 find_package(ICUB REQUIRED)
-find_package(UnicyclePlanner REQUIRED)
+find_package(UnicyclePlanner 0.1.102 REQUIRED)
 find_package(OsqpEigen REQUIRED)
 find_package(qpOASES REQUIRED)
 find_package(Threads REQUIRED)
@@ -26,12 +26,14 @@ include(FindPackageHandleStandardArgs)
 # set cpp files
 set(${EXE_TARGET_NAME}_SRC
   src/main.cpp
+  src/RobotHelper.cpp
   src/TrajectoryGenerator.cpp
   src/MPCSolver.cpp
   src/WalkingDCMModelPredictiveController.cpp
   src/WalkingDCMReactiveController.cpp
   src/WalkingModule.cpp
   src/WalkingInverseKinematics.cpp
+  src/WalkingQPInverseKinematics.cpp
   src/WalkingQPInverseKinematics_osqp.cpp
   src/WalkingQPInverseKinematics_qpOASES.cpp
   src/WalkingForwardKinematics.cpp
@@ -50,6 +52,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingDCMReactiveController.hpp
   include/WalkingModule.hpp
   include/WalkingInverseKinematics.hpp
+  include/WalkingQPInverseKinematics.hpp
   include/WalkingQPInverseKinematics_osqp.hpp
   include/WalkingQPInverseKinematics_qpOASES.hpp
   include/WalkingForwardKinematics.hpp
@@ -67,14 +70,16 @@ include_directories(
   ${qpOASES_INCLUDEDIR}
 )
 
-# Thrift for the RPC commands
-yarp_add_idl(THRIFT "${CMAKE_CURRENT_SOURCE_DIR}/thrifts/WalkingCommands.thrift")
-add_library(icubWalking-service STATIC ${THRIFT})
-target_include_directories(icubWalking-service SYSTEM PUBLIC ${YARP_INCLUDE_DIRS})
-target_link_libraries(icubWalking-service YARP::YARP_init YARP::YARP_OS)
+set(${EXE_TARGET_NAME}_THRIFT_HDR
+  thrifts/WalkingCommands.thrift
+  )
+
+# Application target calls
+yarp_add_idl(${EXE_TARGET_NAME}_THRIFT_GEN_FILES ${${EXE_TARGET_NAME}_THRIFT_HDR})
 
 # add an executable to the project using the specified source files.
-add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}_HDR})
+add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}_HDR}
+  ${${EXE_TARGET_NAME}_THRIFT_GEN_FILES})
 
 target_link_libraries(${EXE_TARGET_NAME}
   ${YARP_LIBRARIES}
@@ -84,7 +89,6 @@ target_link_libraries(${EXE_TARGET_NAME}
   UtilityLibrary
   OsqpEigen::OsqpEigen
   osqp::osqp
-  icubWalking-service
   Threads::Threads
   ${qpOASES_LIBRARIES})
 

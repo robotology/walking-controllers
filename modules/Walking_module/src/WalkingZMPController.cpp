@@ -29,14 +29,14 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
     m_useGainScheduling = config.check("useGainScheduling", yarp::os::Value(false)).asBool();
 
     // set the gain of the CoM controller
-    if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_walking", m_kCoMWalking))
+    if(!YarpHelper::getNumberFromSearchable(config, "kCoM_walking", m_kCoMWalking))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
 
     // set the ZMP controller gain
-    if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_walking", m_kZMPWalking))
+    if(!YarpHelper::getNumberFromSearchable(config, "kZMP_walking", m_kZMPWalking))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
@@ -44,7 +44,7 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
 
     // set the sampling time
     double samplingTime;
-    if(!YarpHelper::getDoubleFromSearchable(config, "sampling_time", samplingTime))
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
     {
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
@@ -66,19 +66,19 @@ bool WalkingZMPController::initialize(const yarp::os::Searchable& config)
     if(m_useGainScheduling)
     {
         double smoothingTime;
-        if(!YarpHelper::getDoubleFromSearchable(config, "smoothingTime", smoothingTime))
+        if(!YarpHelper::getNumberFromSearchable(config, "smoothingTime", smoothingTime))
         {
             yError() << "[initialize] Unable to get the double from searchable.";
             return false;
         }
 
-        if(!YarpHelper::getDoubleFromSearchable(config, "kCoM_stance", m_kCoMStance))
+        if(!YarpHelper::getNumberFromSearchable(config, "kCoM_stance", m_kCoMStance))
         {
             yError() << "[initialize] Unable to get the double from searchable.";
             return false;
         }
 
-        if(!YarpHelper::getDoubleFromSearchable(config, "kZMP_stance", m_kZMPStance))
+        if(!YarpHelper::getNumberFromSearchable(config, "kZMP_stance", m_kZMPStance))
         {
             yError() << "[initialize] Unable to get the double from searchable.";
             return false;

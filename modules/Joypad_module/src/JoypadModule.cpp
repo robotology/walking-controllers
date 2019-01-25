@@ -36,33 +36,34 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     setName(name.c_str());
 
     // set the deadzone interval
-    if(!YarpHelper::getDoubleFromSearchable(rf, "deadzone", m_deadzone))
+    if(!YarpHelper::getNumberFromSearchable(rf, "deadzone", m_deadzone))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
     // set the maximum value measured by the joypad
-    if(!YarpHelper::getDoubleFromSearchable(rf, "fullscale", m_fullscale))
+    if(!YarpHelper::getNumberFromSearchable(rf, "fullscale", m_fullscale))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
     // set scaling factors
-    if(!YarpHelper::getDoubleFromSearchable(rf, "scale_x", m_scaleX))
+    if(!YarpHelper::getNumberFromSearchable(rf, "scale_x", m_scaleX))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
-    if(!YarpHelper::getDoubleFromSearchable(rf, "scale_y", m_scaleY))
+    if(!YarpHelper::getNumberFromSearchable(rf, "scale_y", m_scaleY))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
     // set the polydriver
+    yarp::os::Property conf;
     std::string deviceName;
     if(!YarpHelper::getStringFromSearchable(rf, "device", deviceName))
     {
@@ -70,24 +71,38 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    std::string local;
-    if(!YarpHelper::getStringFromSearchable(rf, "local", local))
-    {
-        yError() << "[configure] Unable to get a string from searchable";
-        return false;
-    }
-
-    std::string remote;
-    if(!YarpHelper::getStringFromSearchable(rf, "remote", remote))
-    {
-        yError() << "[configure] Unable to get a string from searchable";
-        return false;
-    }
-
-    yarp::os::Property conf;
     conf.put("device", deviceName);
-    conf.put("local", local);
-    conf.put("remote", remote);
+
+    if(deviceName == "JoypadControlClient")
+    {
+        std::string local;
+        if(!YarpHelper::getStringFromSearchable(rf, "local", local))
+        {
+            yError() << "[configure] Unable to get a string from searchable";
+            return false;
+        }
+
+        std::string remote;
+        if(!YarpHelper::getStringFromSearchable(rf, "remote", remote))
+        {
+            yError() << "[configure] Unable to get a string from searchable";
+            return false;
+        }
+
+        conf.put("local", local);
+        conf.put("remote", remote);
+    }
+    else
+    {
+        int sticks;
+        if(!YarpHelper::getNumberFromSearchable(rf, "sticks", sticks))
+        {
+            yError() << "[configure] Unable to get a number from searchable";
+            return false;
+        }
+
+        conf.put("sticks", sticks);
+    }
 
     // Open joypad polydriver
     if(!m_joypad.open(conf))
@@ -97,7 +112,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     // get the interface
-    if (!m_joypad.view(m_joypadController))
+    if (!m_joypad.view(m_joypadController) || !m_joypadController)
     {
         yError() << "[configure] Unable to attach JoypadController interface to the "
                  << "PolyDriver object";
@@ -105,24 +120,35 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     std::string portName;
-    if(!YarpHelper::getStringFromSearchable(rf, "JoypadOutputPort_name", portName))
+    if(!YarpHelper::getStringFromSearchable(rf, "rpcClientPort_name", portName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    m_joypadOutputPortName = "/" + name + portName;
+    m_rpcClientPortName = "/" + name + portName;
+    m_rpcClientPort.open(m_rpcClientPortName);
 
-    if(!YarpHelper::getStringFromSearchable(rf, "JoypadInputPort_name", m_joypadInputPortName))
+    if(!YarpHelper::getStringFromSearchable(rf, "rpcServerPort_name", m_rpcServerPortName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
+    yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
 
-    m_rpcPort.open(m_joypadOutputPortName);
-    if(!yarp::os::Network::connect(m_joypadOutputPortName, m_joypadInputPortName))
-        yInfo() << "Unable to connect to port " << m_joypadOutputPortName << " to "
-                << m_joypadInputPortName
-                << " I'll try to connect the port in the updateModule";
+    if(!YarpHelper::getStringFromSearchable(rf, "robotGoalOutputPort_name", portName))
+    {
+        yError() << "[configure] Unable to get a string from searchable";
+        return false;
+    }
+    m_robotGoalOutputPortName = "/" + name + portName;
+    m_robotGoalPort.open(m_robotGoalOutputPortName);
+
+    if(!YarpHelper::getStringFromSearchable(rf, "robotGoalInputPort_name", m_robotGoalInputPortName))
+    {
+        yError() << "[configure] Unable to get a string from searchable";
+        return false;
+    }
+    yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
 
     return true;
 }
@@ -141,36 +167,78 @@ bool JoypadModule::close()
     }
 
     // close the ports
-    m_rpcPort.close();
+    m_rpcClientPort.close();
+    m_robotGoalPort.close();
 
     return true;
 }
 
 bool JoypadModule::updateModule()
 {
-    if(yarp::os::Network::isConnected(m_joypadOutputPortName,
-                                      m_joypadInputPortName))
+    yarp::os::Bottle cmd, outcome;
+    float aButton, bButton, xButton, yButton, l1Button, r1Button;
+
+    // prepare robot (A button)
+    m_joypadController->getButton(0, aButton); 
+
+    // start walking (B button)
+    m_joypadController->getButton(1, bButton);
+
+    // stop walking (X button)
+    m_joypadController->getButton(3, xButton);
+
+    // pause walking (Y button)
+    m_joypadController->getButton(4, yButton);
+
+    // reset connection (L1 + R1)
+    m_joypadController->getButton(6, l1Button);
+    m_joypadController->getButton(7, r1Button);
+
+    // get the values from stick
+    double x, y;
+    m_joypadController->getAxis(0, x);
+    m_joypadController->getAxis(1, y);
+
+    x = -m_scaleX * deadzone(x);
+    y = -m_scaleY * deadzone(y);
+    
+    std::swap(x,y);
+
+    if(aButton > 0)
     {
-        double x, y;
-        m_joypadController->getAxis(0, x);
-        m_joypadController->getAxis(1, y);
-
-        x = -m_scaleX * deadzone(x);
-        y = -m_scaleY * deadzone(y);
-
-        std::swap(x,y);
-
-        yarp::os::Bottle cmd, outcome;
-        cmd.addString("setGoal");
-        cmd.addDouble(x);
-        cmd.addDouble(y);
-        m_rpcPort.write(cmd, outcome);
+        cmd.addString("prepareRobot");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(bButton > 0)
+    {
+        cmd.addString("startWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(yButton > 0)
+    {
+        cmd.addString("pauseWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    else if(xButton > 0)
+    {
+        cmd.addString("stopWalking");
+        m_rpcClientPort.write(cmd, outcome);
+    }
+    // connect the ports
+    else if(l1Button > 0 && r1Button > 0)
+    {
+        if(!yarp::os::Network::isConnected(m_rpcClientPortName, m_rpcServerPortName))
+            yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
+        if(!yarp::os::Network::isConnected(m_robotGoalOutputPortName, m_robotGoalInputPortName))
+            yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
     }
     else
     {
-        // try to connect the ports
-        yarp::os::Network::connect(m_joypadOutputPortName,
-                                   m_joypadInputPortName);
+        yarp::sig::Vector& goal= m_robotGoalPort.prepare();
+        goal.clear();
+        goal.push_back(x);
+        goal.push_back(y);
+        m_robotGoalPort.write();
     }
     return true;
 }

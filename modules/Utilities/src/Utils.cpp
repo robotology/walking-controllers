@@ -212,7 +212,7 @@ bool YarpHelper::getStringFromSearchable(const yarp::os::Searchable& config, con
     return true;
 }
 
-bool YarpHelper::getDoubleFromSearchable(const yarp::os::Searchable& config, const std::string& key,
+bool YarpHelper::getNumberFromSearchable(const yarp::os::Searchable& config, const std::string& key,
                                          double& number)
 {
     yarp::os::Value* value;
@@ -229,6 +229,26 @@ bool YarpHelper::getDoubleFromSearchable(const yarp::os::Searchable& config, con
     }
 
     number = value->asDouble();
+    return true;
+}
+
+bool YarpHelper::getNumberFromSearchable(const yarp::os::Searchable& config, const std::string& key,
+                                         int& number)
+{
+    yarp::os::Value* value;
+    if(!config.check(key, value))
+    {
+        yError() << "[getNumberFromSearchable] Missing field "<< key;
+        return false;
+    }
+
+    if(!value->isInt())
+    {
+        yError() << "[getNumberFromSearchable] the value is not an integer.";
+        return false;
+    }
+
+    number = value->asInt();
     return true;
 }
 

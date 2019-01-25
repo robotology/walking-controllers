@@ -106,44 +106,52 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     m_swingLeft = config.check("swingLeft", yarp::os::Value(true)).asBool();
     bool startWithSameFoot = config.check("startAlwaysSameFoot", yarp::os::Value(false)).asBool();
-    bool useMinimumJerkFootTrajectory = config.check("useMinimumJerkFootTrajectory",
-                                                     yarp::os::Value(false)).asBool();
+    m_useMinimumJerk = config.check("useMinimumJerkFootTrajectory",
+                                    yarp::os::Value(false)).asBool();
     double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asDouble();
 
     // try to configure the planner
+    std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     bool ok = true;
-    ok = ok && m_trajectoryGenerator.setDesiredPersonDistance(m_referencePointDistance(0),
+    ok = ok && unicyclePlanner->setDesiredPersonDistance(m_referencePointDistance(0),
                                                               m_referencePointDistance(1));
-    ok = ok && m_trajectoryGenerator.setControllerGain(unicycleGain);
-    ok = ok && m_trajectoryGenerator.setMaximumIntegratorStepSize(m_dT);
-    ok = ok && m_trajectoryGenerator.setMaxStepLength(maxStepLength);
-    ok = ok && m_trajectoryGenerator.setWidthSetting(minWidth, m_nominalWidth);
-    ok = ok && m_trajectoryGenerator.setMaxAngleVariation(maxAngleVariation);
-    ok = ok && m_trajectoryGenerator.setCostWeights(positionWeight, timeWeight);
-    ok = ok && m_trajectoryGenerator.setStepTimings(minStepDuration,
-                                                    maxStepDuration, nominalDuration);
-    ok = ok && m_trajectoryGenerator.setPlannerPeriod(m_dT);
-    ok = ok && m_trajectoryGenerator.setMinimumAngleForNewSteps(minAngleVariation);
-    ok = ok && m_trajectoryGenerator.setMinimumStepLength(minStepLength);
+    ok = ok && unicyclePlanner->setControllerGain(unicycleGain);
+    ok = ok && unicyclePlanner->setMaximumIntegratorStepSize(m_dT);
+    ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength);
+    ok = ok && unicyclePlanner->setWidthSetting(minWidth, m_nominalWidth);
+    ok = ok && unicyclePlanner->setMaxAngleVariation(maxAngleVariation);
+    ok = ok && unicyclePlanner->setCostWeights(positionWeight, timeWeight);
+    ok = ok && unicyclePlanner->setStepTimings(minStepDuration,
+                                               maxStepDuration, nominalDuration);
+    ok = ok && unicyclePlanner->setPlannerPeriod(m_dT);
+    ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
+    ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
+    ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
+    unicyclePlanner->addTerminalStep(false);
+    unicyclePlanner->startWithLeft(m_swingLeft);
+    unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
+
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
-    ok = ok && m_trajectoryGenerator.setStepHeight(stepHeight);
-    ok = ok && m_trajectoryGenerator.setFootLandingVelocity(landingVelocity);
-    ok = ok && m_trajectoryGenerator.setFootApexTime(apexTime);
     ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
-    ok = ok && m_trajectoryGenerator.setCoMHeightSettings(comHeight, comHeightDelta);
-    ok = ok && m_trajectoryGenerator.setSlowWhenTurnGain(slowWhenTurningGain);
+
+    if (m_useMinimumJerk) {
+        m_feetGenerator = m_trajectoryGenerator.addFeetMinimumJerkGenerator();
+    } else {
+        m_feetGenerator = m_trajectoryGenerator.addFeetCubicSplineGenerator();
+    }
+    ok = ok && m_feetGenerator->setStepHeight(stepHeight);
+    ok = ok && m_feetGenerator->setFootLandingVelocity(landingVelocity);
+    ok = ok && m_feetGenerator->setFootApexTime(apexTime);
+    ok = ok && m_feetGenerator->setPitchDelta(pitchDelta);
+
+    m_heightGenerator = m_trajectoryGenerator.addCoMHeightTrajectoryGenerator();
+    ok = ok && m_heightGenerator->setCoMHeightSettings(comHeight, comHeightDelta);
     ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatio);
-    ok = ok && m_trajectoryGenerator.setPitchDelta(pitchDelta);
 
-    m_trajectoryGenerator.setStanceZMPDelta(leftZMPDelta, rightZMPDelta);
-    m_trajectoryGenerator.addTerminalStep(false);
-    m_trajectoryGenerator.startWithLeft(m_swingLeft);
-    m_trajectoryGenerator.resetTimingsIfStill(startWithSameFoot);
-
-
-
-    m_trajectoryGenerator.useMinimumJerkFootTrajectory(useMinimumJerkFootTrajectory);
+    m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
+    m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
+    m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
 
     m_correctLeft = true;
 
@@ -164,7 +172,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
 void TrajectoryGenerator::addTerminalStep(bool terminalStep)
 {
-    m_trajectoryGenerator.addTerminalStep(terminalStep);
+    m_trajectoryGenerator.unicyclePlanner()->addTerminalStep(terminalStep);
 }
 
 void TrajectoryGenerator::computeThread()
@@ -219,10 +227,11 @@ void TrajectoryGenerator::computeThread()
         }
 
         // clear the old trajectory
-        m_trajectoryGenerator.clearDesiredTrajectory();
+        std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+        unicyclePlanner->clearDesiredTrajectory();
 
         // add new point
-        if(!m_trajectoryGenerator.addDesiredTrajectoryPoint(endTime, desiredPoint))
+        if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, desiredPoint))
         {
             // something goes wrong
             std::lock_guard<std::mutex> guard(m_mutex);
@@ -236,10 +245,20 @@ void TrajectoryGenerator::computeThread()
         measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
         measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
 
-        if(m_trajectoryGenerator.reGenerateDCM(initTime, dT, endTime,
-                                               DCMBoundaryConditionAtMergePointPosition,
-                                               DCMBoundaryConditionAtMergePointVelocity,
-                                               correctLeft, measuredPosition, measuredAngle))
+        DCMInitialState initialState;
+        initialState.initialPosition = DCMBoundaryConditionAtMergePointPosition;
+        initialState.initialVelocity = DCMBoundaryConditionAtMergePointVelocity;
+
+        if (!m_dcmGenerator->setDCMInitialState(initialState)) {
+            // something goes wrong
+            std::lock_guard<std::mutex> guard(m_mutex);
+            m_generatorState = GeneratorState::Configured;
+            yError() << "[TrajectoryGenerator_Thread] Failed to set the initial state.";
+            break;
+        }
+
+        if(m_trajectoryGenerator.reGenerate(initTime, dT, endTime,
+                                            correctLeft, measuredPosition, measuredAngle))
         {
             std::lock_guard<std::mutex> guard(m_mutex);
             m_generatorState = GeneratorState::Returned;
@@ -268,7 +287,12 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     }
 
     // clear the all trajectory
-    m_trajectoryGenerator.clearDesiredTrajectory();
+    std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+    unicyclePlanner->clearDesiredTrajectory();
+
+    // clear left and right footsteps
+    m_trajectoryGenerator.getLeftFootPrint()->clearSteps();
+    m_trajectoryGenerator.getRightFootPrint()->clearSteps();
 
     // set initial and final times
     double initTime = 0;
@@ -279,21 +303,21 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     m_desiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
-    if(!m_trajectoryGenerator.addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
     }
 
     // add the final point
-    if(!m_trajectoryGenerator.addDesiredTrajectoryPoint(endTime, m_desiredPoint))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
         return false;
     }
 
     // generate the first trajectories
-    if(!m_trajectoryGenerator.generateAndInterpolateDCM(initTime, m_dT, endTime))
+    if(!m_trajectoryGenerator.generate(initTime, m_dT, endTime))
     {
         yError() << "[generateFirstTrajectories] Error while computing the first trajectories.";
         return false;
@@ -317,7 +341,12 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     }
 
     // clear the all trajectory
-    m_trajectoryGenerator.clearDesiredTrajectory();
+    std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+    unicyclePlanner->clearDesiredTrajectory();
+
+    // clear left and right footsteps
+    m_trajectoryGenerator.getLeftFootPrint()->clearSteps();
+    m_trajectoryGenerator.getRightFootPrint()->clearSteps();
 
     // set initial and final times
     double initTime = 0;
@@ -328,14 +357,14 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     m_desiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
-    if(!m_trajectoryGenerator.addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
     }
 
     // add the final point
-    if(!m_trajectoryGenerator.addDesiredTrajectoryPoint(endTime, m_desiredPoint))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
         return false;
@@ -344,11 +373,10 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     // add real position of the feet
     std::shared_ptr<FootPrint> left, right;
 
-    left = std::make_shared<FootPrint>();
-    right = std::make_shared<FootPrint>();
-
-    left->setFootName("left");
-    right->setFootName("right");
+    left = m_trajectoryGenerator.getLeftFootPrint();
+    left->clearSteps();
+    right = m_trajectoryGenerator.getRightFootPrint();
+    right->clearSteps();
 
     iDynTree::Vector2 leftPosition, rightPosition;
     double leftAngle, rightAngle;
@@ -379,12 +407,8 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
         right->addStep(rightPosition, rightAngle, 0.0);
     }
 
-    // iDynTree::Vector2 initialCOMPositionXY;
-    // initialCOMPositionXY(0) = initialCOMPosition(0);
-    // initialCOMPositionXY(1) = initialCOMPosition(1);
-
     // generate the first trajectories
-    if(!m_trajectoryGenerator.generateAndInterpolateDCM(left, right, initTime, m_dT, endTime))
+    if(!m_trajectoryGenerator.generate(initTime, m_dT, endTime))
     {
         yError() << "[generateFirstTrajectories] Error while computing the first trajectories.";
         return false;
@@ -482,7 +506,7 @@ bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2
         return false;
     }
 
-    DCMPositionTrajectory = m_trajectoryGenerator.getDCMPosition();
+    DCMPositionTrajectory = m_dcmGenerator->getDCMPosition();
     return true;
 }
 
@@ -494,7 +518,7 @@ bool TrajectoryGenerator::getDCMVelocityTrajectory(std::vector<iDynTree::Vector2
         return false;
     }
 
-    DCMVelocityTrajectory = m_trajectoryGenerator.getDCMVelocity();
+    DCMVelocityTrajectory = m_dcmGenerator->getDCMVelocity();
     return true;
 }
 
@@ -507,7 +531,8 @@ bool TrajectoryGenerator::getFeetTrajectories(std::vector<iDynTree::Transform>& 
         return false;
     }
 
-    m_trajectoryGenerator.getFeetTrajectories(lFootTrajectory, rFootTrajectory);
+    m_feetGenerator->getFeetTrajectories(lFootTrajectory, rFootTrajectory);
+
     return true;
 }
 
@@ -520,7 +545,8 @@ bool TrajectoryGenerator::getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
         return false;
     }
 
-    m_trajectoryGenerator.getFeetTwist(lFootTwist, rFootTwist);
+    m_feetGenerator->getFeetTwistsInMixedRepresentation(lFootTwist, rFootTwist);
+
     return true;
 }
 
@@ -558,7 +584,7 @@ bool TrajectoryGenerator::getCoMHeightTrajectory(std::vector<double>& CoMHeightT
         return false;
     }
 
-    m_trajectoryGenerator.getCoMHeightTrajectory(CoMHeightTrajectory);
+    m_heightGenerator->getCoMHeightTrajectory(CoMHeightTrajectory);
     return true;
 }
 
@@ -570,7 +596,7 @@ bool TrajectoryGenerator::getCoMHeightVelocity(std::vector<double>& CoMHeightVel
         return false;
     }
 
-    m_trajectoryGenerator.getCoMHeightVelocity(CoMHeightVelocity);
+    m_heightGenerator->getCoMHeightVelocity(CoMHeightVelocity);
     return true;
 }
 
@@ -584,4 +610,13 @@ bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
 
     m_trajectoryGenerator.getMergePoints(mergePoints);
     return true;
+}
+
+void TrajectoryGenerator::reset()
+{
+    // the mutex is automatically released when lock_guard goes out of its scope
+    std::lock_guard<std::mutex> guard(m_mutex);
+
+    // change the state of the generator
+    m_generatorState = GeneratorState::FirstStep;
 }

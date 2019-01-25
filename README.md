@@ -31,19 +31,21 @@ Two different inverse kinematics solver are implemented:
 ## Reference paper
 A paper describing some of the algorithms implemented in this repository  can be downloaded [here](https://arxiv.org/abs/1809.02167).
 If you're going to use the code developed for your work, please quote it within any resulting publication:
-~~~
-G. Romualdi, S. Dafarra, Y. Hu, D. Pucci "A Benchmarking of DCM Based Architectures for Position and Velocity Controlled Walking of Humanoid Robots", 2018
-~~~
+```
+G. Romualdi, S. Dafarra, Y. Hu, D. Pucci "A Benchmarking of DCM Based
+Architectures for Position and Velocity Controlled Walking of Humanoid Robots",
+2018
+```
 
 The bibtex code for including this citation is provided:
-~~~
+```
 @misc{1809.02167,
 Author = {Giulio Romualdi and Stefano Dafarra and Yue Hu and Daniele Pucci},
 Title = {A Benchmarking of DCM Based Architectures for Position and Velocity Controlled Walking of Humanoid Robots},
 Year = {2018},
 Eprint = {arXiv:1809.02167},
 }
-~~~
+```
 
 # :page_facing_up: Dependencies
 * [YARP](http://www.yarp.it/): to handle the comunication with the robot;
@@ -106,23 +108,48 @@ export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
    the following commands are allowed:
    * `prepareRobot`: put iCub in the home position;
    * `startWalking`: run the controller;
+   * `pauseWalking`: the controller is paused, you can start again the
+     controller sending `startWalking` command;
+   * `stopWalking`: the controller is stopped, in order to start again the
+     controller you have to prepare again the robot.
    * `setGoal x y`: send the desired final position, `x` and `y` are expressed in iCub fixed frame.
 
 ## How to run the Joypad Module
-If you want to control iCub with the Joypad:
-1. Run the Joypad device:
+Suppose that you want to run the Joypad application, called
+`WalkingJoypadModule` in the same machine where the physical device is
+connected. The only think that you have to do is running the following command from
+the terminal
+
+``` sh
+YARP_CLOCK=/clock WalkingJoypadModule
+```
+The application will take care to open an [`SDLJoypad`](http://www.yarp.it/classyarp_1_1dev_1_1SDLJoypad.html) device.
+
+
+While, if you want to control run the `WalkingJoypadModule` in a machine that is
+different form the one where the phisical devce is connected. The
+[`JoypadControlServer`](http://www.yarp.it/classyarp_1_1dev_1_1JoypadControlServer.html) -
+[`JoypadControlClient`](http://www.yarp.it/classyarp_1_1dev_1_1JoypadControlClient.html)
+architecture is required. In details:
+1. Run the `JoypadControlServer` device in the computer where the joypad is
+   physically connected:
 
     ``` sh
-    yarpdev --device JoypadControlServer --use_separate_ports 1 --period 10 --name /joypadDevice/xbox --subdevice SDLJoypad --sticks 0
+    YARP_CLOCK=/clock yarpdev --device JoypadControlServer --use_separate_ports 1 --period 10 --name /joypadDevice/xbox --subdevice SDLJoypad --sticks 0
 
     ```
-2. Run the Joypad Module
+2. Run the `WalkingJoypadModule` in the other computer
 
-    ``` sh
-    YARP_CLOCK=/clock WalkingJoypadModule
+    ```
+    YARP_CLOCK=/clock WalkingJoypadModule --device JoypadControlClient --local /joypadInput --remote /joypadDevice/xbox
     ```
 
-3. Enjoy
+The Joypad allows you to send all the rpc commands using the buttons. In
+details:
+ * `A` for preparing the robot
+ * `B` for start walking
+ * `Y` for pause walking
+ * `X` for stop walking
 
 ## How to dump data
 Before run `WalkingModule` check if [`dump_data`](app/robots/iCubGazeboV2_5/dcmWalkingCoordinator.ini#L33) is set to 1
@@ -142,11 +169,9 @@ You can follows the same instructions of the simulation section without using `Y
 ## :warning: Warning
 Currently the supported robots are only:
 - ``iCubGenova04``
-- ``iCubGenova02``
 - ``icubGazeboSim``
 - ``icubGazeboV2_5``
 
-Yet, it is possible to use these controllers provided that the robot has V2.5 legs. In this case, the user should define the robot specific configuration files (those of ``iCubGenova04`` are a good starting point). 
+Yet, it is possible to use these controllers provided that the robot has V2.5 legs. In this case, the user should define the robot specific configuration files (those of ``iCubGenova04`` are a good starting point).
 
 :warning: The STRAIN F/T sensors normally mounted on iCub may suffer from saturations due to the strong impacts the robot has with the ground, which may lead to a failure of the controller. It is suggested to use these controllers with STRAIN2 sensors only (as in ``iCubGenova04``) to avoid such saturations.
-

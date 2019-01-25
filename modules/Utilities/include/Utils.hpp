@@ -149,8 +149,20 @@ namespace YarpHelper
      * @param number is the double.
      * @return true/false in case of success/failure
      */
-    bool getDoubleFromSearchable(const yarp::os::Searchable& config, const std::string& key,
+    bool getNumberFromSearchable(const yarp::os::Searchable& config, const std::string& key,
                                  double& number);
+
+
+    /**
+     * Extract a double from a searchable object.
+     * @param config is the searchable object;
+     * @param key the name to check for;
+     * @param number is the integer.
+     * @return true/false in case of success/failure
+     */
+    bool getNumberFromSearchable(const yarp::os::Searchable& config, const std::string& key,
+                                 int& number);
+
 
     /**
      * Convert a yarp value into an iDynTree::VectorFixSize<n>
