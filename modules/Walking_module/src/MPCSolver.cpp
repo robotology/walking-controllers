@@ -154,7 +154,7 @@ bool MPCSolver::setBounds(const iDynTree::Vector2& currentState,
 
     if(m_optimizerSolver->isInitialized())
     {
-        if(!m_optimizerSolver->updateBounds(m_lowerBound, m_upperBound))
+        if(!m_optimizerSolver->updateBounds<Eigen::Dynamic>(m_lowerBound, m_upperBound))
         {
             std::cerr << "[setBounds] Unable to update the bounds."
                       << std::endl;
@@ -163,14 +163,14 @@ bool MPCSolver::setBounds(const iDynTree::Vector2& currentState,
     }
     else
     {
-        if(!m_optimizerSolver->data()->setLowerBound(m_lowerBound))
+        if(!m_optimizerSolver->data()->setLowerBound<Eigen::Dynamic>(m_lowerBound))
         {
             std::cerr << "[setBounds] Unable to set the first time the lower bound."
                       << std::endl;
             return false;
         }
 
-        if(!m_optimizerSolver->data()->setUpperBound(m_upperBound))
+        if(!m_optimizerSolver->data()->setUpperBound<Eigen::Dynamic>(m_upperBound))
         {
             std::cerr << "[setBounds] Unable to set the first time the upper bound."
                       << std::endl;
@@ -246,7 +246,7 @@ bool MPCSolver::setGradient(const std::deque<iDynTree::Vector2>& referenceSignal
 
     if(m_optimizerSolver->isInitialized())
     {
-        if(!m_optimizerSolver->updateGradient(m_gradient))
+        if(!m_optimizerSolver->updateGradient<Eigen::Dynamic>(m_gradient))
         {
             std::cerr << "[setGradient] Unable to update the gradient."
                       << std::endl;
@@ -255,7 +255,7 @@ bool MPCSolver::setGradient(const std::deque<iDynTree::Vector2>& referenceSignal
     }
     else
     {
-        if(!m_optimizerSolver->data()->setGradient(m_gradient))
+        if(!m_optimizerSolver->data()->setGradient<Eigen::Dynamic>(m_gradient))
         {
             std::cerr << "[setGradient] Unable to set first time the gradient."
                       << std::endl;
