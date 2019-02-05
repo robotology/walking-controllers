@@ -6,6 +6,8 @@
  * @date 2018
  */
 
+#include <ctime>
+
 // YARP
 #include <yarp/os/LogStream.h>
 
