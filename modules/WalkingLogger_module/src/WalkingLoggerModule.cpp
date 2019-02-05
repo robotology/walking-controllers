@@ -31,6 +31,8 @@ bool WalkingLoggerModule::close()
     // close the ports
     m_dataPort.close();
     m_rpcPort.close();
+
+    return true;
 }
 
 bool WalkingLoggerModule::respond(const yarp::os::Bottle& command, yarp::os::Bottle& reply)
