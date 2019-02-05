@@ -6,6 +6,10 @@
  * @date 2018
  */
 
+// std 
+#define NOMINMAX
+#include <algorithm>
+
 // yarp
 #include <yarp/os/LogStream.h>
 
@@ -362,7 +366,7 @@ bool WalkingController::setConvexHullConstraint(const std::deque<iDynTree::Trans
                                                 const std::deque<bool>& leftInContact,
                                                 const std::deque<bool>& rightInContact)
 {
-    auto feetStatus = std::make_pair<bool, bool>((bool)leftInContact.front(), (bool)rightInContact.front());
+    auto feetStatus = std::make_pair(leftInContact.front(), rightInContact.front());
 
     // the status of the feet is the same of the previous iteration
     // the convexHull is already evaluated: do nothing
@@ -372,7 +376,7 @@ bool WalkingController::setConvexHullConstraint(const std::deque<iDynTree::Trans
     m_feetStatus = feetStatus;
 
     // evaluate the convex hull
-    if(feetStatus == std::make_pair<bool, bool>(true, true))
+    if(feetStatus == std::make_pair(true, true))
     {
         if(!buildConvexHull(leftFoot.front(), rightFoot.front()))
         {
@@ -381,7 +385,7 @@ bool WalkingController::setConvexHullConstraint(const std::deque<iDynTree::Trans
         }
     }
 
-    if(feetStatus == std::make_pair<bool, bool>(true, false))
+    if(feetStatus == std::make_pair(true, false))
     {
         if(!buildConvexHull(leftFoot.front()))
         {
@@ -390,7 +394,7 @@ bool WalkingController::setConvexHullConstraint(const std::deque<iDynTree::Trans
         }
     }
 
-    if(feetStatus == std::make_pair<bool, bool>(false, true))
+    if(feetStatus == std::make_pair(false, true))
     {
         if(!buildConvexHull(rightFoot.front()))
         {
@@ -399,7 +403,7 @@ bool WalkingController::setConvexHullConstraint(const std::deque<iDynTree::Trans
         }
     }
 
-    if(feetStatus == std::make_pair<bool, bool>(false, false))
+    if(feetStatus == std::make_pair(false, false))
     {
         yError() << "[setConvexHullConstraint] None foot is in contact How is it possible?.";
         return false;

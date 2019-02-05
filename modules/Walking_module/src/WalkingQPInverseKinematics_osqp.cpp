@@ -198,7 +198,7 @@ bool WalkingQPIK_osqp::setGradientVector()
 
     if(m_optimizerSolver->isInitialized())
     {
-        if(!m_optimizerSolver->updateGradient(m_gradient))
+        if(!m_optimizerSolver->updateGradient<Eigen::Dynamic>(m_gradient))
         {
             yError() << "[setGradient] Unable to update the gradient.";
             return false;
@@ -206,7 +206,7 @@ bool WalkingQPIK_osqp::setGradientVector()
     }
     else
     {
-        if(!m_optimizerSolver->data()->setGradient(m_gradient))
+        if(!m_optimizerSolver->data()->setGradient<Eigen::Dynamic>(m_gradient))
         {
             yError() << "[setGradient] Unable to set first time the gradient.";
             return false;
@@ -314,7 +314,7 @@ bool WalkingQPIK_osqp::setBounds()
 
     if(m_optimizerSolver->isInitialized())
     {
-        if(!m_optimizerSolver->updateBounds(m_lowerBound, m_upperBound))
+        if(!m_optimizerSolver->updateBounds<Eigen::Dynamic>(m_lowerBound, m_upperBound))
         {
             yError() << "[setBounds] Unable to update the bounds.";
             return false;
@@ -322,13 +322,13 @@ bool WalkingQPIK_osqp::setBounds()
     }
     else
     {
-        if(!m_optimizerSolver->data()->setLowerBound(m_lowerBound))
+        if(!m_optimizerSolver->data()->setLowerBound<Eigen::Dynamic>(m_lowerBound))
         {
             yError() << "[setBounds] Unable to set the first time the lower bound.";
             return false;
         }
 
-        if(!m_optimizerSolver->data()->setUpperBound(m_upperBound))
+        if(!m_optimizerSolver->data()->setUpperBound<Eigen::Dynamic>(m_upperBound))
         {
             yError() << "[setBounds] Unable to set the first time the upper bound.";
             return false;

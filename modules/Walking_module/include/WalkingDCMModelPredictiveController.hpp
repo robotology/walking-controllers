@@ -9,6 +9,9 @@
 #ifndef WALKING_CONTROLLER_HPP
 #define WALKING_CONTROLLER_HPP
 
+// std
+#include <memory>
+
 // eigen
 #include <Eigen/Sparse>
 
