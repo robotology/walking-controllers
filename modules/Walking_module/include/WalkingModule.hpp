@@ -108,6 +108,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_desiredJointPositionPort; /**< Desired robot joint position port. */
+    iDynTree::VectorDynSize m_desiredJointPositionFromExternalSource; /**< Desired robot joint position from a external source. */
 
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
     size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */

@@ -175,6 +175,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    std::string desiredJointPositionPortName = "/" + getName() + "/jointPosition:i";
+    if(!m_desiredJointPositionPort.open(desiredJointPositionPortName))
+    {
+        yError() << "[configure] Could not open" << desiredJointPositionPortName << " port.";
+        return false;
+    }
+
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
@@ -315,6 +322,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_desiredJointPositionFromExternalSource.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[configure] Ready to play!";
 
@@ -343,6 +351,7 @@ bool WalkingModule::close()
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
+    m_desiredJointPositionPort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
@@ -484,6 +493,23 @@ bool WalkingModule::updateModule()
         bool resetTrajectory = false;
 
         m_profiler->setInitTime("Total");
+
+        // check desired joint positions (coming from external source)
+        yarp::sig::Vector* desiredJointPosition = nullptr;
+        desiredJointPosition = m_desiredJointPositionPort.read(false);
+        if(desiredJointPosition != nullptr)
+        {
+            if(!iDynTree::toiDynTree(*desiredJointPosition, m_desiredJointPositionFromExternalSource))
+            {
+                yError() << "[updateModule] Unable to set the convert the yarp vector into iDynTree vector";
+                return false;
+            }
+
+            if(m_useOSQP)
+                m_QPIKSolver_osqp->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
+            else
+                m_QPIKSolver_qpOASES->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
+        }
 
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
