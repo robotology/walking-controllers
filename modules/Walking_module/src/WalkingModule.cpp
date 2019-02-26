@@ -324,6 +324,17 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_desiredJointPositionFromExternalSource.resize(m_robotControlHelper->getActuatedDoFs());
 
+    yarp::os::Value jointRegularization = rf.find("jointRegularization");
+    if(!YarpHelper::yarpListToiDynTreeVectorDynSize(jointRegularization, m_desiredJointPositionFromExternalSource))
+    {
+        yError() << "[initialize] Unable to convert a YARP list to an iDynTree::VectorDynSize, "
+                 << "joint regularization";
+        return false;
+    }
+
+    iDynTree::toEigen(m_desiredJointPositionFromExternalSource) = iDynTree::toEigen(m_desiredJointPositionFromExternalSource) * iDynTree::deg2rad(1);
+
+
     yInfo() << "[configure] Ready to play!";
 
     return true;
@@ -499,11 +510,15 @@ bool WalkingModule::updateModule()
         desiredJointPosition = m_desiredJointPositionPort.read(false);
         if(desiredJointPosition != nullptr)
         {
-            if(!iDynTree::toiDynTree(*desiredJointPosition, m_desiredJointPositionFromExternalSource))
+            iDynTree::VectorDynSize desiredJointPositionFromExternalSource(20);
+            if(!iDynTree::toiDynTree(*desiredJointPosition, desiredJointPositionFromExternalSource))
             {
                 yError() << "[updateModule] Unable to set the convert the yarp vector into iDynTree vector";
                 return false;
             }
+
+            iDynTree::toEigen(m_desiredJointPositionFromExternalSource).block(0,0,20,1) =
+                iDynTree::toEigen(desiredJointPositionFromExternalSource);
 
             if(m_useOSQP)
                 m_QPIKSolver_osqp->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
@@ -833,7 +848,8 @@ bool WalkingModule::updateModule()
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+                                      errorL, errorR,
+                                      m_robotControlHelper->getJointPosition(), m_desiredJointPositionFromExternalSource);
         }
 
         propagateTime();
@@ -1273,7 +1289,19 @@ bool WalkingModule::startWalking()
                     "lf_err_x", "lf_err_y", "lf_err_z",
                     "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
                     "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw",
+                    "neck_pitch", "neck_roll", "neck_yaw",
+                    "torso_pitch", "torso_roll", "torso_yaw",
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw","l_elbow", "l_wrist_prosup", "l_wrist_pitch", "l_wrist_yaw",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw","r_elbow", "r_wrist_prosup", "r_wrist_pitch", "r_wrist_yaw",
+                    "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
+                    "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
+                    "neck_pitch_des", "neck_roll_des", "neck_yaw_des",
+                    "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des","l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des","r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
+                    "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
+                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des"});
     }
 
     // if the robot was only prepared the filters has to be reseted
