@@ -759,6 +759,12 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
+	    if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
+	    {
+		yError() << "[updateModule] Unable to evaluate the CoM.";
+		return false;
+	    }
+
             if(m_useOSQP)
             {
                 if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
@@ -779,7 +785,22 @@ bool WalkingModule::updateModule()
                     return false;
                 }
             }
-            iDynTree::toYarp(m_dqDesired, bufferVelocity);
+
+	    if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+						  m_robotControlHelper->getJointVelocity()))
+            {
+                yError() << "[updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
+	    if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
+	    {
+		yError() << "[updateModule] Unable to evaluate the CoM.";
+		return false;
+	    }
+
+
+	    iDynTree::toYarp(m_dqDesired, bufferVelocity);
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
