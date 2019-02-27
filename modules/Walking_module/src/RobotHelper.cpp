@@ -591,13 +591,13 @@ bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& des
         return false;
     }
 
-    if(worstError.second > 0.5)
-    {
-        yError() << "[setDirectPositionReferences] The worst error between the current and the "
-                 << "desired position of the " << worstError.first
-                 << "-th joint is greater than 0.5 rad.";
-        return false;
-    }
+    // if(worstError.second > 0.5)
+    // {
+    //     yError() << "[setDirectPositionReferences] The worst error between the current and the "
+    //              << "desired position of the " << worstError.first
+    //              << "-th joint is greater than 0.5 rad.";
+    //     return true;
+    // }
 
     for(unsigned i = 0; i < m_actuatedDOFs; i++)
         m_desiredJointValueDeg(i) = iDynTree::rad2deg(desiredPositionRad(i));
