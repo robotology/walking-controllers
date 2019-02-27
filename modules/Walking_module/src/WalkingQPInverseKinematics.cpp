@@ -142,7 +142,7 @@ bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
 
 void WalkingQPIK::setDesiredNeckOrientation(const iDynTree::Rotation& desiredNeckOrientation)
 {
-    m_desiredNeckOrientation =  desiredNeckOrientation * m_additionalRotation;
+    m_desiredNeckOrientation =  desiredNeckOrientation; //  * m_additionalRotation;
 }
 
 bool WalkingQPIK::setCoMJacobian(const iDynTree::MatrixDynSize& comJacobian)
@@ -254,4 +254,3 @@ void WalkingQPIK::setDesiredCoMPosition(const iDynTree::Position& desiredComPosi
 {
     m_desiredComPosition = desiredComPosition;
 }
-

@@ -274,6 +274,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    m_FKSolverHumanAndRobot = std::make_unique<WalkingFK>();
+    if(!m_FKSolverHumanAndRobot->initialize(forwardKinematicsSolverOptions, m_loader.model()))
+    {
+        yError() << "[configure] Failed to configure the ";
+        return false;
+    }
+
+
     // initialize the linear inverted pendulum model
     m_stableDCMModel = std::make_unique<StableDCMModel>();
     if(!m_stableDCMModel->initialize(generalOptions))
@@ -400,7 +408,8 @@ bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const i
         return false;
     }
 
-    solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
+    //solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
+    solver->setDesiredNeckOrientation(desiredNeckOrientation);
 
     solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
                                          m_rightTrajectory.front());
@@ -491,6 +500,10 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             m_robotState = WalkingFSM::Prepared;
+
+            // TODO remove magic numbers
+            for(int i = 0; i< 20; i++)
+                m_desiredJointPositionFromExternalSource(i) = m_qDesired(i);
 
             yInfo() << "[updateModule] The robot is prepared.";
         }
@@ -759,17 +772,41 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-	    if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
-	    {
-		yError() << "[updateModule] Unable to evaluate the CoM.";
-		return false;
-	    }
+            if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
+            {
+                yError() << "[updateModule] Unable to evaluate the CoM.";
+                return false;
+            }
+
+
+            if(!m_FKSolverHumanAndRobot->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                                            m_rightTrajectory.front(),
+                                                                            m_isLeftFixedFrame.front()))
+            {
+                yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
+                return false;
+            }
+
+
+            iDynTree::VectorDynSize jointCentauro(m_robotControlHelper->getActuatedDoFs());
+
+            for(int i = 0; i< 20; i++)
+                jointCentauro(i) = m_desiredJointPositionFromExternalSource(i);
+
+            for(int i = 20; i < m_robotControlHelper->getActuatedDoFs(); i++)
+                jointCentauro(i) = m_qDesired(i);
+
+            if(!m_FKSolverHumanAndRobot->setInternalRobotState(jointCentauro, m_dqDesired))
+            {
+                yError() << "[updateFKSolver] Unable to evaluate the CoM.";
+                return false;
+            }
 
             if(m_useOSQP)
             {
                 if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
                               desiredCoMVelocity, measuredCoM,
-                              yawRotation, m_dqDesired))
+                              m_FKSolverHumanAndRobot->getNeckOrientation(), m_dqDesired))
                 {
                     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
                     return false;
@@ -779,28 +816,28 @@ bool WalkingModule::updateModule()
             {
                 if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
                               desiredCoMVelocity, measuredCoM,
-                              yawRotation, m_dqDesired))
+                              m_FKSolverHumanAndRobot->getNeckOrientation(), m_dqDesired))
                 {
                     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
                     return false;
                 }
             }
 
-	    if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-						  m_robotControlHelper->getJointVelocity()))
+            if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                  m_robotControlHelper->getJointVelocity()))
             {
                 yError() << "[updateModule] Unable to set the internal robot state.";
                 return false;
             }
 
-	    if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
-	    {
-		yError() << "[updateModule] Unable to evaluate the CoM.";
-		return false;
-	    }
+            if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
+            {
+                yError() << "[updateModule] Unable to evaluate the CoM.";
+                return false;
+            }
 
 
-	    iDynTree::toYarp(m_dqDesired, bufferVelocity);
+            iDynTree::toYarp(m_dqDesired, bufferVelocity);
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
