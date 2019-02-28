@@ -50,7 +50,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     }
 
     double samplingTime;
-    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", smoothingTime))
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
     {
         yError() << "Initialization failed while reading smoothingTime.";
         return false;
@@ -112,7 +112,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 
     m_jointRegularizationWeightsXsensWalking.resize(m_actuatedDOFs);
     if(!YarpHelper::getYarpVectorFromSearchable(config, "jointRegularizationWeightsXsensWalking",
-                                                m_jointRegularizationWeightsXsensStance))
+                                                m_jointRegularizationWeightsXsensWalking))
     {
         yError() << "Initialization failed while reading jointRegularizationWeightsXsensWalking vector.";
         return false;
@@ -128,7 +128,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 
     m_jointRegularizationWeightsWalking.resize(m_actuatedDOFs);
     if(!YarpHelper::getYarpVectorFromSearchable(config, "jointRegularizationWeightsWalking",
-                                                m_jointRegularizationWeightsStance))
+                                                m_jointRegularizationWeightsWalking))
     {
         yError() << "Initialization failed while reading jointRegularizationWeightsWalking vector.";
         return false;
@@ -137,13 +137,12 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     m_jointRegularizationWeightsSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(m_actuatedDOFs,
                                                                                         samplingTime,
                                                                                         smoothingTime);
-
     m_jointRegularizationWeightsSmoother->init(m_jointRegularizationWeightsStance);
 
 
     m_jointRegularizationWeightsXsensSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(m_actuatedDOFs,
-                                                                                        samplingTime,
-                                                                                        smoothingTime);
+                                                                                             samplingTime,
+                                                                                             smoothingTime);
 
     m_jointRegularizationWeightsXsensSmoother->init(m_jointRegularizationWeightsXsensStance);
 
@@ -220,7 +219,6 @@ void WalkingQPIK::setPhase(const bool& isStancePhase)
 
         m_neckWeightSmoother->computeNextValues(m_neckWeightWalking);
         m_neckWeightXsensSmoother->computeNextValues(m_neckWeightXsensWalking);
-
     }
 
     auto jointRegularizationWeight =  m_jointRegularizationWeightsSmoother->getPos();
@@ -228,7 +226,6 @@ void WalkingQPIK::setPhase(const bool& isStancePhase)
 
     auto neckWeight = m_neckWeightSmoother->getPos();
     auto neckWeightXsens = m_neckWeightXsensSmoother->getPos();
-
 
     for(int i = 0; i < m_actuatedDOFs; i++)
     {
