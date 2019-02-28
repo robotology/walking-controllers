@@ -240,6 +240,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useQPIK)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
+        inverseKinematicsQPSolverOptions.append(generalOptions);
 
         iDynTree::VectorDynSize negativeJointVelocityLimits(m_robotControlHelper->getActuatedDoFs());
         iDynTree::toEigen(negativeJointVelocityLimits) = -iDynTree::toEigen(m_robotControlHelper->getVelocityLimits());
@@ -392,7 +393,8 @@ bool WalkingModule::close()
     return true;
 }
 
-bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const iDynTree::Position& desiredCoMPosition,
+bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
+                              const iDynTree::Position& desiredCoMPosition,
                               const iDynTree::Vector3& desiredCoMVelocity,
                               const iDynTree::Position& actualCoMPosition,
                               const iDynTree::Rotation& desiredNeckOrientation,
@@ -407,6 +409,10 @@ bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const i
         yError() << "[solveQPIK] Unable to update the QP-IK solver";
         return false;
     }
+
+    double threshold = 0.001;
+    bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
+    solver->setPhase(stancePhase);
 
     //solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
     solver->setDesiredNeckOrientation(desiredNeckOrientation);

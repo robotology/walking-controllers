@@ -87,6 +87,7 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
     m_upperBound = Eigen::VectorXd::Zero(m_numberOfConstraints);
 
     m_regularizationTerm.resize(m_actuatedDOFs);
+    m_jointTermXsens.resize(m_actuatedDOFs);
     m_jointPosition.resize(m_actuatedDOFs);
 
     // get the regularization term
@@ -100,6 +101,8 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
 
     iDynTree::toEigen(m_regularizationTerm) = iDynTree::toEigen(m_regularizationTerm) *
         iDynTree::deg2rad(1);
+
+    m_jointTermXsens = m_regularizationTerm;
 
     // preprare constant matrix necessary for the QP problem
     if(!initializeMatrices(config))
@@ -139,7 +142,8 @@ bool WalkingQPIK_osqp::setHessianMatrix()
 
     // in that case the hessian matrix is related only to neck orientation and to
     // the joint angle
-    m_hessianEigenDense = Eigen::MatrixXd(iDynTree::toEigen(m_jointRegulatizationHessian)) +
+    m_hessianEigenDense = iDynTree::toEigen(m_jointRegulatizationHessian) +
+        iDynTree::toEigen(m_jointRegulatizationXsensHessian) +
         iDynTree::toEigen(m_neckJacobian).transpose() *
         iDynTree::toEigen(m_neckWeightMatrix) *
         iDynTree::toEigen(m_neckJacobian);
@@ -178,11 +182,14 @@ bool WalkingQPIK_osqp::setGradientVector()
     // todo
     if(m_useCoMAsConstraint)
     {
-        m_gradient = -iDynTree::toEigen(m_neckJacobian).transpose()
+        m_gradient = - iDynTree::toEigen(m_neckJacobian).transpose()
             * iDynTree::toEigen(m_neckWeightMatrix) *
             m_kAttFoot * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
             - iDynTree::toEigen(m_jointRegulatizationGradient) *
             (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_regularizationTerm)
+                                                              - iDynTree::toEigen(m_jointPosition)))
+            - iDynTree::toEigen(m_jointRegulatizationXsensGradient) *
+            (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_jointTermXsens)
                                                               - iDynTree::toEigen(m_jointPosition)));
     }
     else
@@ -193,6 +200,9 @@ bool WalkingQPIK_osqp::setGradientVector()
             m_kAttFoot * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
             - iDynTree::toEigen(m_jointRegulatizationGradient) *
             (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_regularizationTerm)
+                                                              - iDynTree::toEigen(m_jointPosition)))
+            - iDynTree::toEigen(m_jointRegulatizationXsensGradient) *
+            (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_jointTermXsens)
                                                               - iDynTree::toEigen(m_jointPosition)));
     }
 

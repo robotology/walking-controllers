@@ -20,6 +20,8 @@
 #include <iDynTree/Core/Twist.h>
 #include <iDynTree/Core/Transform.h>
 
+#include <iCub/ctrl/minJerkCtrl.h>
+
 #include "Utils.hpp"
 
 class WalkingQPIK
@@ -36,10 +38,13 @@ protected:
     iDynTree::Position m_desiredComPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_desiredLeftFootToWorldTransform; /**< Desired left foot to world transformation.*/
     iDynTree::Transform m_desiredRightFootToWorldTransform; /**< Desired right foot to world transformation.*/
-    iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
+
+   iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
+    iDynTree::Rotation m_desiredNeckOrientationRegularization; /**< Desired neck orientation.*/
     iDynTree::Rotation m_additionalRotation; /**< Additional rotation matrix (it is useful to rotate the
                                                 desiredNeckOrientation rotation matrix). */
 
+    iDynTree::VectorDynSize m_jointTermXsens; /**< Desired joint position (regularization term).*/
     iDynTree::VectorDynSize m_regularizationTerm; /**< Desired joint position (regularization term).*/
 
     iDynTree::Position m_comPosition; /**< Desired Linear velocity of the CoM. */
@@ -51,6 +56,16 @@ protected:
     int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 6) */
     int m_numberOfConstraints; /**<Number of constraints in the QP problem (# of joints + 12) */
 
+    yarp::sig::Vector m_jointRegularizationWeightsXsensStance;
+    yarp::sig::Vector m_jointRegularizationWeightsXsensWalking;
+
+    yarp::sig::Vector m_jointRegularizationWeightsStance;
+    yarp::sig::Vector m_jointRegularizationWeightsWalking;
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRegularizationWeightsSmoother;
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRegularizationWeightsXsensSmoother;
+
     iDynSparseMatrix m_jointRegulatizationGains;  /**< Gain related to the joint regularization. */
     double m_kPosFoot; /**< Gain related to the desired foot position. */
     double m_kAttFoot; /**< Gain related to the desired foot attitude. */
@@ -58,10 +73,17 @@ protected:
     double m_kCom; /**< Gain related to the desired CoM position. */
     iDynSparseMatrix m_comWeightMatrix; /**< CoM weight matrix. */
     iDynSparseMatrix m_neckWeightMatrix; /**< Neck weight matrix. */
+
+    iDynSparseMatrix m_jointRegulatizationXsensHessian; /**< Contains a constant matrix that can be useful
+                                                      in the hessian evaluation ($-\lambda H' H$). */
+    iDynSparseMatrix m_jointRegulatizationXsensGradient; /**< Contains a constant matrix that can be useful
+                                                       in the gradient evaluation ($-\lambda H'$). */
+
     iDynSparseMatrix m_jointRegulatizationHessian; /**< Contains a constant matrix that can be useful
                                                       in the hessian evaluation ($-\lambda H' H$). */
     iDynSparseMatrix m_jointRegulatizationGradient; /**< Contains a constant matrix that can be useful
                                                        in the gradient evaluation ($-\lambda H'$). */
+
 
     int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
 
@@ -205,6 +227,9 @@ public:
      * @return true/false in case of success/failure.
      */
     virtual bool getRightFootError(iDynTree::VectorDynSize& output) = 0;
+
+
+    void setPhase(const bool& isStancePhase);
 
 };
 

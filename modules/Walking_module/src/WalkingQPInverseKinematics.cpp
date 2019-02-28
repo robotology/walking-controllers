@@ -53,23 +53,89 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     m_neckWeightMatrix.setFromConstTriplets(neckWeightMatrix);
 
     // set the matrix related to the joint regularization
-    tempValue = config.find("jointRegularizationWeights");
-    iDynTree::VectorDynSize jointRegularizationWeights(m_actuatedDOFs);
-    if(!YarpHelper::yarpListToiDynTreeVectorDynSize(tempValue, jointRegularizationWeights))
+    m_jointRegularizationWeightsXsensStance.resize(m_actuatedDOFs);
+    if(!YarpHelper::getYarpVectorFromSearchable(config, "jointRegularizationWeightsXsensStance",
+                                                m_jointRegularizationWeightsXsensStance))
     {
-        yError() << "Initialization failed while reading jointRegularizationWeights vector.";
+        yError() << "Initialization failed while reading jointRegularizationWeightsXsensStance vector.";
         return false;
     }
 
+    m_jointRegularizationWeightsXsensWalking.resize(m_actuatedDOFs);
+    if(!YarpHelper::getYarpVectorFromSearchable(config, "jointRegularizationWeightsXsensWalking",
+                                                m_jointRegularizationWeightsXsensStance))
+    {
+        yError() << "Initialization failed while reading jointRegularizationWeightsXsensWalking vector.";
+        return false;
+    }
+
+    m_jointRegularizationWeightsStance.resize(m_actuatedDOFs);
+    if(!YarpHelper::getYarpVectorFromSearchable(config, "jointRegularizationWeightsStance",
+                                                m_jointRegularizationWeightsStance))
+    {
+        yError() << "Initialization failed while reading jointRegularizationWeightsStance vector.";
+        return false;
+    }
+
+    m_jointRegularizationWeightsWalking.resize(m_actuatedDOFs);
+    if(!YarpHelper::getYarpVectorFromSearchable(config, "jointRegularizationWeightsWalking",
+                                                m_jointRegularizationWeightsStance))
+    {
+        yError() << "Initialization failed while reading jointRegularizationWeightsWalking vector.";
+        return false;
+    }
+
+
+    double smoothingTime;
+    if(!YarpHelper::getNumberFromSearchable(config, "smoothingTime", smoothingTime))
+    {
+        yError() << "Initialization failed while reading smoothingTime.";
+        return false;
+    }
+
+    double samplingTime;
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", smoothingTime))
+    {
+        yError() << "Initialization failed while reading smoothingTime.";
+        return false;
+    }
+
+
+    m_jointRegularizationWeightsSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(m_actuatedDOFs,
+                                                                                        samplingTime,
+                                                                                        smoothingTime);
+
+    m_jointRegularizationWeightsSmoother->init(m_jointRegularizationWeightsStance);
+
+
+    m_jointRegularizationWeightsXsensSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(m_actuatedDOFs,
+                                                                                        samplingTime,
+                                                                                        smoothingTime);
+
+    m_jointRegularizationWeightsXsensSmoother->init(m_jointRegularizationWeightsXsensStance);
+
     //  m_jointRegulatizationHessian = H' \lamda H
     m_jointRegulatizationHessian.resize(m_numberOfVariables, m_numberOfVariables);
-    for(int i = 0; i < m_actuatedDOFs; i++)
-        m_jointRegulatizationHessian(i + 6, i + 6) = jointRegularizationWeights(i);
+    m_jointRegulatizationXsensHessian.resize(m_numberOfVariables, m_numberOfVariables);
 
-    // evaluate constant sub-matrix of the gradient matrix
+    m_jointRegulatizationXsensGradient.resize(m_numberOfVariables, m_actuatedDOFs);
     m_jointRegulatizationGradient.resize(m_numberOfVariables, m_actuatedDOFs);
-    for(int i = 0; i < m_actuatedDOFs; i++)
-        m_jointRegulatizationGradient(i + 6, i) = jointRegularizationWeights(i);
+
+
+    // // evaluate constant sub-matrix of the gradient matrix
+    // m_jointRegulatizationGradient.resize(m_numberOfVariables, m_actuatedDOFs);
+    // for(int i = 0; i < m_actuatedDOFs; i++)
+    //     m_jointRegulatizationGradient(i + 6, i) = jointRegularizationWeights(i);
+
+
+
+    // for(int i = 0; i < m_actuatedDOFs; i++)
+    //     m_jointRegulatizationHessian(i + 6, i + 6) = jointRegularizationWeights(i);
+
+    // // evaluate constant sub-matrix of the gradient matrix
+
+    // for(int i = 0; i < m_actuatedDOFs; i++)
+    //     m_jointRegulatizationGradient(i + 6, i) = jointRegularizationWeights(i);
 
     // resize matrices
     m_comJacobian.resize(3, m_numberOfVariables);
@@ -118,6 +184,33 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 WalkingQPIK::~WalkingQPIK()
 { }
 
+void WalkingQPIK::setPhase(const bool& isStancePhase)
+{
+    if(isStancePhase)
+    {
+        m_jointRegularizationWeightsSmoother->computeNextValues(m_jointRegularizationWeightsStance);
+        m_jointRegularizationWeightsXsensSmoother->computeNextValues(m_jointRegularizationWeightsXsensStance);
+    }
+    else
+    {
+        m_jointRegularizationWeightsSmoother->computeNextValues(m_jointRegularizationWeightsWalking);
+        m_jointRegularizationWeightsXsensSmoother->computeNextValues(m_jointRegularizationWeightsXsensWalking);
+    }
+
+    auto jointRegularizationWeight =  m_jointRegularizationWeightsSmoother->getPos();
+    auto jointRegularizationXsensWeight =  m_jointRegularizationWeightsXsensSmoother->getPos();
+
+
+    for(int i = 0; i < m_actuatedDOFs; i++)
+    {
+        m_jointRegulatizationXsensHessian(i + 6, i + 6) = jointRegularizationXsensWeight(i);
+        m_jointRegulatizationXsensGradient(i + 6, i) = jointRegularizationXsensWeight(i);
+
+        m_jointRegulatizationHessian(i + 6, i + 6) = jointRegularizationWeight(i);
+        m_jointRegulatizationGradient(i + 6, i) = jointRegularizationWeight(i);
+    }
+}
+
 bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
                                      const iDynTree::Transform& leftFootToWorldTransform,
                                      const iDynTree::Transform& rightFootToWorldTransform,
@@ -139,6 +232,11 @@ bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
 
     return true;
 }
+
+// void WalkingQPIK::setDesiredNeckOrientationRegularization(const iDynTree::Rotation& desiredNeckOrientationRegularization)
+// {
+//     m_desiredNeckOrientationRegularization =  desiredNeckOrientationRegularization * m_additionalRotation;
+// }
 
 void WalkingQPIK::setDesiredNeckOrientation(const iDynTree::Rotation& desiredNeckOrientation)
 {
@@ -226,13 +324,13 @@ bool WalkingQPIK::setDesiredJointPosition(const iDynTree::VectorDynSize& regular
         return false;
     }
 
-    m_regularizationTerm = regularizationTerm;
+    m_jointTermXsens = regularizationTerm;
 
     return true;
 }
 
 void WalkingQPIK::setDesiredFeetTransformation(const iDynTree::Transform& desiredLeftFootToWorldTransform,
-                                                    const iDynTree::Transform& desiredRightFootToWorldTransform)
+                                               const iDynTree::Transform& desiredRightFootToWorldTransform)
 {
     m_desiredLeftFootToWorldTransform = desiredLeftFootToWorldTransform;
     m_desiredRightFootToWorldTransform = desiredRightFootToWorldTransform;
