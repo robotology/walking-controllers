@@ -909,12 +909,13 @@ bool WalkingModule::updateModule()
             m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
                                       measuredZMP, desiredZMP, measuredCoM,
                                       desiredCoMPositionXY, desiredCoMVelocityXY,
+                                      desiredCoMPosition,
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,
-                                      m_robotControlHelper->getJointPosition(), m_desiredJointPositionFromExternalSource);
+                                      m_qDesired, m_desiredJointPositionFromExternalSource, m_robotControlHelper->getJointPosition());
         }
 
         propagateTime();
@@ -1343,6 +1344,7 @@ bool WalkingModule::startWalking()
                     "com_x", "com_y", "com_z",
                     "com_des_x", "com_des_y",
                     "com_des_dx", "com_des_dy",
+                    "com_des_x_ik", "com_des_y_ik", "com_des_z_ik",
                     "lf_x", "lf_y", "lf_z",
                     "lf_roll", "lf_pitch", "lf_yaw",
                     "rf_x", "rf_y", "rf_z",
@@ -1366,7 +1368,13 @@ bool WalkingModule::startWalking()
                     "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des","l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
                     "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des","r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
                     "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
-                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des"});
+                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
+                    "neck_pitch_fbk", "neck_roll_fbk", "neck_yaw_fbk",
+                    "torso_pitch_fbk", "torso_roll_fbk", "torso_yaw_fbk",
+                    "l_shoulder_pitch_fbk", "l_shoulder_roll_fbk", "l_shoulder_yaw_fbk","l_elbow_fbk", "l_wrist_prosup_fbk", "l_wrist_pitch_fbk", "l_wrist_yaw_fbk",
+                    "r_shoulder_pitch_fbk", "r_shoulder_roll_fbk", "r_shoulder_yaw_fbk","r_elbow_fbk", "r_wrist_prosup_fbk", "r_wrist_pitch_fbk", "r_wrist_yaw_fbk",
+                    "l_hip_pitch_fbk", "l_hip_roll_fbk", "l_hip_yaw_fbk", "l_knee_fbk", "l_ankle_pitch_fbk", "l_ankle_roll_fbk",
+                    "r_hip_pitch_fbk", "r_hip_roll_fbk", "r_hip_yaw_fbk", "r_knee_fbk", "r_ankle_pitch_fbk", "r_ankle_roll_fbk"});
     }
 
     // if the robot was only prepared the filters has to be reseted
