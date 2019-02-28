@@ -39,8 +39,8 @@ protected:
     iDynTree::Transform m_desiredLeftFootToWorldTransform; /**< Desired left foot to world transformation.*/
     iDynTree::Transform m_desiredRightFootToWorldTransform; /**< Desired right foot to world transformation.*/
 
-   iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
-    iDynTree::Rotation m_desiredNeckOrientationRegularization; /**< Desired neck orientation.*/
+    iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
+    iDynTree::Rotation m_desiredNeckOrientationXsens; /**< Desired neck orientation.*/
     iDynTree::Rotation m_additionalRotation; /**< Additional rotation matrix (it is useful to rotate the
                                                 desiredNeckOrientation rotation matrix). */
 
@@ -62,8 +62,13 @@ protected:
     yarp::sig::Vector m_jointRegularizationWeightsStance;
     yarp::sig::Vector m_jointRegularizationWeightsWalking;
 
-    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRegularizationWeightsSmoother;
+    yarp::sig::Vector m_neckWeightStance;
+    yarp::sig::Vector m_neckWeightWalking;
 
+    yarp::sig::Vector m_neckWeightXsensStance;
+    yarp::sig::Vector m_neckWeightXsensWalking;
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRegularizationWeightsSmoother;
     std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRegularizationWeightsXsensSmoother;
 
     iDynSparseMatrix m_jointRegulatizationGains;  /**< Gain related to the joint regularization. */
@@ -72,7 +77,14 @@ protected:
     double m_kNeck; /**< Gain related to the desired neck attitude. */
     double m_kCom; /**< Gain related to the desired CoM position. */
     iDynSparseMatrix m_comWeightMatrix; /**< CoM weight matrix. */
+
+    iDynSparseMatrix m_neckWeightMatrixXsens; /**< Neck weight matrix. */
     iDynSparseMatrix m_neckWeightMatrix; /**< Neck weight matrix. */
+
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_neckWeightSmoother;
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_neckWeightXsensSmoother;
+
+
 
     iDynSparseMatrix m_jointRegulatizationXsensHessian; /**< Contains a constant matrix that can be useful
                                                       in the hessian evaluation ($-\lambda H' H$). */
@@ -192,6 +204,8 @@ public:
      * @param desiredNeckOrientation rotation matrix between the neck and the world frame.
      */
     void setDesiredNeckOrientation(const iDynTree::Rotation& desiredNeckOrientation);
+
+    void setDesiredNeckOrientationXsens(const iDynTree::Rotation& desiredNeckOrientation);
 
     /**
      * Set the desired CoMPosition

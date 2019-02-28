@@ -146,7 +146,10 @@ bool WalkingQPIK_osqp::setHessianMatrix()
         iDynTree::toEigen(m_jointRegulatizationXsensHessian) +
         iDynTree::toEigen(m_neckJacobian).transpose() *
         iDynTree::toEigen(m_neckWeightMatrix) *
-        iDynTree::toEigen(m_neckJacobian);
+        iDynTree::toEigen(m_neckJacobian) +
+        iDynTree::toEigen(m_neckJacobian).transpose() *
+        iDynTree::toEigen(m_neckWeightMatrixXsens) *
+        iDynTree::toEigen(m_neckJacobian);;
 
     if(!m_useCoMAsConstraint)
     {
@@ -179,12 +182,17 @@ bool WalkingQPIK_osqp::setGradientVector()
 {
     iDynTree::Matrix3x3 errorNeckAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_neckOrientation * m_desiredNeckOrientation.inverse());
 
+    iDynTree::Matrix3x3 errorNeckAttitudeXsens = iDynTreeHelper::Rotation::skewSymmetric(m_neckOrientation * m_desiredNeckOrientationXsens.inverse());
+
     // todo
     if(m_useCoMAsConstraint)
     {
-        m_gradient = - iDynTree::toEigen(m_neckJacobian).transpose()
+        m_gradient = -iDynTree::toEigen(m_neckJacobian).transpose()
             * iDynTree::toEigen(m_neckWeightMatrix) *
-            m_kAttFoot * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
+            (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)))
+            -iDynTree::toEigen(m_neckJacobian).transpose()
+            * iDynTree::toEigen(m_neckWeightMatrixXsens) *
+            (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitudeXsens)))
             - iDynTree::toEigen(m_jointRegulatizationGradient) *
             (iDynTree::toEigen(m_jointRegulatizationGains) * (iDynTree::toEigen(m_regularizationTerm)
                                                               - iDynTree::toEigen(m_jointPosition)))

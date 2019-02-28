@@ -162,6 +162,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Position& actualCoMPosition,
                    const iDynTree::Rotation& desiredNeckOrientation,
+                   const iDynTree::Rotation& desiredNeckOrientationXsens,
                    iDynTree::VectorDynSize &output);
     /**
      * Evaluate the position of CoM.

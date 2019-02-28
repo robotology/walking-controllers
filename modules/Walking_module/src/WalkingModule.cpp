@@ -398,6 +398,7 @@ bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
                               const iDynTree::Vector3& desiredCoMVelocity,
                               const iDynTree::Position& actualCoMPosition,
                               const iDynTree::Rotation& desiredNeckOrientation,
+                              const iDynTree::Rotation& desiredNeckOrientationXsens,
                               iDynTree::VectorDynSize &output)
 {
     if(!solver->setRobotState(m_robotControlHelper->getJointPosition(),
@@ -414,8 +415,8 @@ bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
     bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
     solver->setPhase(stancePhase);
 
-    //solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
-    solver->setDesiredNeckOrientation(desiredNeckOrientation);
+    solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
+    solver->setDesiredNeckOrientationXsens(desiredNeckOrientationXsens);
 
     solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
                                          m_rightTrajectory.front());
@@ -811,7 +812,7 @@ bool WalkingModule::updateModule()
             if(m_useOSQP)
             {
                 if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-                              desiredCoMVelocity, measuredCoM,
+                              desiredCoMVelocity, measuredCoM, yawRotation,
                               m_FKSolverHumanAndRobot->getNeckOrientation(), m_dqDesired))
                 {
                     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
@@ -821,7 +822,7 @@ bool WalkingModule::updateModule()
             else
             {
                 if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
-                              desiredCoMVelocity, measuredCoM,
+                              desiredCoMVelocity, measuredCoM, yawRotation,
                               m_FKSolverHumanAndRobot->getNeckOrientation(), m_dqDesired))
                 {
                     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
