@@ -165,6 +165,16 @@ namespace YarpHelper
 
 
     /**
+     * Extract a vector from a searchable object.
+     * @param config is the searchable object;
+     * @param key the name to check for;
+     * @param vector is the vector.
+     * @return true/false in case of success/failure
+     */
+    bool getYarpVectorFromSearchable(const yarp::os::Searchable& config, const std::string& key,
+                                     yarp::sig::Vector& vector);
+
+    /**
      * Convert a yarp value into an iDynTree::VectorFixSize<n>
      * @param input yarp value;
      * @param output iDynTree::VectorFixSize<n>.
