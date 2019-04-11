@@ -10,6 +10,9 @@ project(walking-controllers)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 find_package(YARP REQUIRED)
+find_package(ICUBcontrib REQUIRED)
+
+list(APPEND CMAKE_MODULE_PATH ${ICUBCONTRIB_MODULE_PATH})
 
 add_subdirectory(modules)
 add_subdirectory(app)
