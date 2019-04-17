@@ -233,24 +233,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useQPIK)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
+        if(m_useOSQP)
+            m_QPIKSolver = std::make_unique<WalkingQPIK_osqp>();
+        else
+            m_QPIKSolver = std::make_unique<WalkingQPIK_qpOASES>();
 
-        iDynTree::VectorDynSize negativeJointVelocityLimits(m_robotControlHelper->getActuatedDoFs());
-        iDynTree::toEigen(negativeJointVelocityLimits) = -iDynTree::toEigen(m_robotControlHelper->getVelocityLimits());
-        m_QPIKSolver_osqp = std::make_shared<WalkingQPIK_osqp>();
-        if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
-                                          m_robotControlHelper->getActuatedDoFs(),
-                                          negativeJointVelocityLimits,
-                                          m_robotControlHelper->getVelocityLimits()))
-        {
-            yError() << "[configure] Failed to configure the QP-IK solver (osqp)";
-            return false;
-        }
-
-        m_QPIKSolver_qpOASES = std::make_shared<WalkingQPIK_qpOASES>();
-        if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
-                                             m_robotControlHelper->getActuatedDoFs(),
-                                             negativeJointVelocityLimits,
-                                             m_robotControlHelper->getVelocityLimits()))
+        if(!m_QPIKSolver->initialize(inverseKinematicsQPSolverOptions,
+                                     m_robotControlHelper->getActuatedDoFs(),
+                                     m_robotControlHelper->getVelocityLimits(),
+                                     m_robotControlHelper->getPositionUpperLimits(),
+                                     m_robotControlHelper->getPositionLowerLimits()))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
             return false;
@@ -356,15 +348,14 @@ bool WalkingModule::close()
     m_walkingController.reset(nullptr);
     m_walkingZMPController.reset(nullptr);
     m_IKSolver.reset(nullptr);
-    m_QPIKSolver_osqp = nullptr;
-    m_QPIKSolver_qpOASES = nullptr;
+    m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
 
     return true;
 }
 
-bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const iDynTree::Position& desiredCoMPosition,
+bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const iDynTree::Position& desiredCoMPosition,
                               const iDynTree::Vector3& desiredCoMVelocity,
                               const iDynTree::Position& actualCoMPosition,
                               const iDynTree::Rotation& desiredNeckOrientation,
@@ -415,11 +406,7 @@ bool WalkingModule::solveQPIK(const std::shared_ptr<WalkingQPIK> solver, const i
         return false;
     }
 
-    if(!solver->getSolution(output))
-    {
-        yError() << "[solveQPIK] Unable to get the QP-IK problem solution.";
-        return false;
-    }
+    output = solver->getDesiredJointVelocities();
 
     return true;
 }
@@ -464,7 +451,14 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
             // instantiate Integrator object
-            m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
+
+            yarp::sig::Matrix jointLimits(m_robotControlHelper->getActuatedDoFs(), 2);
+            for(int i = 0; i < m_robotControlHelper->getActuatedDoFs(); i++)
+            {
+                jointLimits(i, 0) = m_robotControlHelper->getPositionLowerLimits()(i);
+                jointLimits(i, 1) = m_robotControlHelper->getPositionUpperLimits()(i);
+            }
+            m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
 
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
@@ -718,26 +712,14 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(m_useOSQP)
+            if(!solveQPIK(m_QPIKSolver, desiredCoMPosition,
+                          desiredCoMVelocity, measuredCoM,
+                          yawRotation, m_dqDesired))
             {
-                if(!solveQPIK(m_QPIKSolver_osqp, desiredCoMPosition,
-                              desiredCoMVelocity, measuredCoM,
-                              yawRotation, m_dqDesired))
-                {
-                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-                    return false;
-                }
+                yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                return false;
             }
-            else
-            {
-                if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
-                              desiredCoMVelocity, measuredCoM,
-                              yawRotation, m_dqDesired))
-                {
-                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-                    return false;
-                }
-            }
+
             iDynTree::toYarp(m_dqDesired, bufferVelocity);
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
@@ -783,16 +765,8 @@ bool WalkingModule::updateModule()
         iDynTree::VectorDynSize errorL(6), errorR(6);
         if(m_useQPIK)
         {
-            if(m_useOSQP)
-            {
-                m_QPIKSolver_osqp->getRightFootError(errorR);
-                m_QPIKSolver_osqp->getLeftFootError(errorL);
-            }
-            else
-            {
-                m_QPIKSolver_qpOASES->getRightFootError(errorR);
-                m_QPIKSolver_qpOASES->getLeftFootError(errorL);
-            }
+            errorR = m_QPIKSolver->getRightFootError();
+            errorL = m_QPIKSolver->getLeftFootError();
         }
 
         // send data to the WalkingLogger

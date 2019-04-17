@@ -68,8 +68,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
-    std::shared_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
-    std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
+    std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
@@ -153,7 +152,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      * @param output is the output of the solver (i.e. the desired joint velocity)
      * @return true in case of success and false otherwise.
      */
-    bool solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
+    bool solveQPIK(const std::unique_ptr<WalkingQPIK>& solver,
                    const iDynTree::Position& desiredCoMPosition,
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Position& actualCoMPosition,
