@@ -234,7 +234,9 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_velocityFeedbackRad.resize(m_actuatedDOFs);
     m_desiredJointPositionRad.resize(m_actuatedDOFs);
     m_desiredJointValueDeg.resize(m_actuatedDOFs);
-    m_jointsVelocityLimit.resize(m_actuatedDOFs);
+    m_jointVelocitiesBounds.resize(m_actuatedDOFs);
+    m_jointPositionsUpperBounds.resize(m_actuatedDOFs);
+    m_jointPositionsLowerBounds.resize(m_actuatedDOFs);
 
     // m_positionFeedbackDegFiltered.resize(m_actuatedDOFs);
     // m_positionFeedbackDegFiltered.zero();
@@ -285,16 +287,29 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     }
 
     // get the limits
-    double max, min;
+    double maxVelocity, minAngle, maxAngle, dummy;
     for(unsigned int i = 0; i < m_actuatedDOFs; i++)
     {
-        if(!m_limitsInterface->getVelLimits(i, &min, &max))
+        if(!m_limitsInterface->getVelLimits(i, &dummy, &maxVelocity))
         {
-            yError() << "[configure] Unable get joints velocity limits.";
+            yError() << "[configure] Unable get the velocity limits of the joint: "
+                     << m_axesList[i];
             return false;
         }
 
-        m_jointsVelocityLimit(i) = iDynTree::deg2rad(max);
+        m_jointVelocitiesBounds(i) = iDynTree::deg2rad(maxVelocity);
+
+
+        if(!m_limitsInterface->getLimits(i, &minAngle, &maxAngle))
+        {
+            yError() << "[configure] Unable get the position limits of the joint: "
+                     << m_axesList[i];
+            return false;
+        }
+
+        m_jointPositionsUpperBounds(i) = iDynTree::deg2rad(maxAngle);
+        m_jointPositionsLowerBounds(i) = iDynTree::deg2rad(minAngle);
+
     }
     return true;
 }
@@ -585,19 +600,19 @@ bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& des
 
     std::pair<std::string, double> worstError("", 0.0);
 
-    if(!getWorstError(desiredPositionRad, worstError))
-    {
-        yError() << "[setPositionReferences] Unable to get the worst error.";
-        return false;
-    }
+    // if(!getWorstError(desiredPositionRad, worstError))
+    // {
+    //     yError() << "[setPositionReferences] Unable to get the worst error.";
+    //     return false;
+    // }
 
-    if(worstError.second > 0.5)
-    {
-        yError() << "[setDirectPositionReferences] The worst error between the current and the "
-                 << "desired position of the " << worstError.first
-                 << "-th joint is greater than 0.5 rad.";
-        return false;
-    }
+    // if(worstError.second > 0.5)
+    // {
+    //     yError() << "[setDirectPositionReferences] The worst error between the current and the "
+    //              << "desired position of the " << worstError.first
+    //              << "-th joint is greater than 0.5 rad.";
+    //     return false;
+    // }
 
     for(unsigned i = 0; i < m_actuatedDOFs; i++)
         m_desiredJointValueDeg(i) = iDynTree::rad2deg(desiredPositionRad(i));
@@ -678,7 +693,17 @@ const iDynTree::Wrench& RobotHelper::getRightWrench() const
 
 const iDynTree::VectorDynSize& RobotHelper::getVelocityLimits() const
 {
-    return m_jointsVelocityLimit;
+    return m_jointVelocitiesBounds;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getPositionUpperLimits() const
+{
+    return m_jointPositionsUpperBounds;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getPositionLowerLimits() const
+{
+    return m_jointPositionsLowerBounds;
 }
 
 const std::vector<std::string>& RobotHelper::getAxesList() const
