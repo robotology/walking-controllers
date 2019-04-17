@@ -4,7 +4,6 @@
 
 # set target name
 set(UTILITY_LIBRARY_NAME UtilityLibrary)
-message(${UTILITY_LIBRARY_NAME})
 
 option(ENABLE_RPATH "Enable RPATH for this library" ON)
 mark_as_advanced(ENABLE_RPATH)
