@@ -46,6 +46,21 @@ bool YarpHelper::yarpListToiDynTreeVectorFixSize(const yarp::os::Value& input, i
     return true;
 }
 
+template <unsigned int n>
+bool YarpHelper::getiDynTreeVectorFixSizeFromSearchable(const yarp::os::Searchable& config,
+                                                        const std::string& key,
+                                                        iDynTree::VectorFixSize<n>& vector)
+{
+    yarp::os::Value* value;
+    if(!config.check(key, value))
+    {
+        yError() << "[getiDynTreeVectorFixSizeFromSearchable] Missing field "<< key;
+        return false;
+    }
+
+    return yarpListToiDynTreeVectorFixSize(*value, vector);
+}
+
 template <typename T>
 void YarpHelper::mergeSigVector(yarp::sig::Vector& vector, const T& t)
 {
