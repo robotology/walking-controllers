@@ -151,6 +151,20 @@ bool YarpHelper::yarpListToiDynTreeVectorDynSize(const yarp::os::Value& input, i
     return true;
 }
 
+bool YarpHelper::getiDynTreeVectorDynSizeFromSearchable(const yarp::os::Searchable& config,
+                                                        const std::string& key,
+                                                        iDynTree::VectorDynSize& vector)
+{
+    yarp::os::Value* value;
+    if(!config.check(key, value))
+    {
+        yError() << "[getiDynTreeVectorDynSizeFromSearchable] Missing field "<< key;
+        return false;
+    }
+
+    return yarpListToiDynTreeVectorDynSize(*value, vector);
+}
+
 bool YarpHelper::addVectorOfStringToProperty(yarp::os::Property& prop, const std::string& key,
                                              const std::vector<std::string>& list)
 {
