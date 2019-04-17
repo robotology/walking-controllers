@@ -806,6 +806,8 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     iDynTree::Position zmpLeft, zmpRight, zmpWorld;
+    zmpLeft.zero();
+    zmpRight.zero();
     double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
 
     const iDynTree::Wrench& rightWrench = m_robotControlHelper->getRightWrench();
