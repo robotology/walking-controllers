@@ -41,7 +41,6 @@ set(${EXE_TARGET_NAME}_SRC
   src/StableDCMModel.cpp
   src/WalkingPIDHandler.cpp
   src/RetargetingClient.cpp
-  src/TimeProfiler.cpp
   )
 
 # set hpp files
@@ -60,7 +59,6 @@ set(${EXE_TARGET_NAME}_HDR
   include/StableDCMModel.hpp
   include/WalkingPIDHandler.hpp
   include/RetargetingClient.hpp
-  include/TimeProfiler.hpp
   )
 
 # add include directories to the build.
