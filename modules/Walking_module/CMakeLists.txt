@@ -40,6 +40,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/WalkingZMPController.cpp
   src/StableDCMModel.cpp
   src/WalkingPIDHandler.cpp
+  src/RetargetingClient.cpp
   src/WalkingLogger.cpp
   src/TimeProfiler.cpp
   )
@@ -59,6 +60,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingZMPController.hpp
   include/StableDCMModel.hpp
   include/WalkingPIDHandler.hpp
+  include/RetargetingClient.hpp
   include/WalkingLogger.hpp
   include/WalkingLogger.tpp
   include/TimeProfiler.hpp
