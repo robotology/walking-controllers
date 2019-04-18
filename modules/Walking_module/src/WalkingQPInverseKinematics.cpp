@@ -268,7 +268,7 @@ bool WalkingQPIK::initializeHandRetargeting(const yarp::os::Searchable& config)
     double dT;
     if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", dT))
     {
-        yError() << "Initialization failed while reading smoothingTime.";
+        yError() << "Initialization failed while a double.";
         return false;
     }
 
