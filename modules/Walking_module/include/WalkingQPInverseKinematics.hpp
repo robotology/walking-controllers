@@ -20,6 +20,9 @@
 #include <iDynTree/Core/Twist.h>
 #include <iDynTree/Core/Transform.h>
 
+// iCub-ctrl
+#include <iCub/ctrl/minJerkCtrl.h>
+
 #include <Utils.hpp>
 
 template<class T>
@@ -74,6 +77,8 @@ protected:
     iDynTree::Position m_comPosition; /**< Desired Linear velocity of the CoM. */
     iDynTree::Transform m_leftFootToWorldTransform; /**< Actual left foot to world transformation.*/
     iDynTree::Transform m_rightFootToWorldTransform; /**< Actual right foot to world transformation.*/
+    iDynTree::Transform m_leftHandToWorldTransform; /**< Actual left foot to world transformation.*/
+    iDynTree::Transform m_rightHandToWorldTransform; /**< Actual right foot to world transformation.*/
     iDynTree::Rotation m_neckOrientation; /**< Rotation matrix of the actual neck orientation. */
     iDynTree::VectorDynSize m_jointPosition; /**< Actual joint position .*/
 
@@ -94,12 +99,19 @@ protected:
                                                       in the hessian evaluation ($-\lambda H' H$). */
     iDynSparseMatrix m_jointRegularizationGradient; /**< Contains a constant matrix that can be useful
                                                        in the gradient evaluation ($-\lambda H'$). */
-
     double m_kJointLimitsUpperBound; /**< Gain related to the the joint upper bound */
     double m_kJointLimitsLowerBound; /**< Gain related to the the joint lower bound */
     iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Bounds on the joint velocities*/
     iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Upper Bounds on the joint position*/
     iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Lower Bounds on the joint position*/
+
+    // gain scheduling
+    std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_handWeightSmoother; /**< Minimum jerk trajectory
+                                                                         for the hand weight matrix. */
+    yarp::sig::Vector m_handWeightWalkingVector; /**< Weight matrix (only the diagonal) used for
+                                                    the hand retargeting during walking. */
+    yarp::sig::Vector m_handWeightStanceVector; /**< Weight matrix (only the diagonal) used for
+                                                   the hand retargeting during stance. */
 
     bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
     bool m_useJointsLimitsConstraint; /**< True if the CoM is added as a constraint. */
@@ -115,9 +127,17 @@ protected:
 
     /**
      * Initialize all the constant matrix from the configuration file.
+     * @param config configuration parameters
      * @return true/false in case of success/failure.
      */
-    virtual bool initializeMatrices(const yarp::os::Searchable& config);
+    bool initializeMatrices(const yarp::os::Searchable& config);
+
+    /**
+     * Initialize hand retargeting.
+     * @param config configuration parameters
+     * @return true/false in case of success/failure.
+     */
+    bool initializeHandRetargeting(const yarp::os::Searchable& config);
 
     /**
      * Instantiate the solver
@@ -180,6 +200,8 @@ public:
      * @param jointPosition vector of joint positions (in rad);
      * @param leftFootToWorldTransform transformation between the inertial frame and the left foot;
      * @param rightFootToWorldTransform transformation between the inertial frame and the right foot;
+     * @param leftHandToWorldTransform transformation between the inertial frame and the left foot;
+     * @param rightHandToWorldTransform transformation between the inertial frame and the right foot;
      * @param neckOrientation rotation between the inertial frame and the neck;
      * @param comPosition position of the CoM
      * @return true/false in case of success/failure.
@@ -187,6 +209,8 @@ public:
     bool setRobotState(const iDynTree::VectorDynSize& jointPosition,
                        const iDynTree::Transform& leftFootToWorldTransform,
                        const iDynTree::Transform& rightFootToWorldTransform,
+                       const iDynTree::Transform& leftHandToWorldTransform,
+                       const iDynTree::Transform& rightHandToWorldTransform,
                        const iDynTree::Rotation& neckOrientation,
                        const iDynTree::Position& comPosition);
 
@@ -290,6 +314,12 @@ public:
      * @param desiredComPosition contain the desired CoM position.
      */
     void setDesiredCoMPosition(const iDynTree::Position& desiredComPosition);
+
+    /**
+     * Set the robot phase. This is used by the minimum jerk trajectory.
+     * @param isStancePhase true if the robot is in the stance phase
+     */
+    void setPhase(const bool& isStancePhase);
 
     /**
      * Solve the optimization problem.
