@@ -275,6 +275,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    yarp::os::Bottle& retargetingOptions = rf.findGroup("RETARGETING");
+    m_retargetingClient = std::make_unique<RetargetingClient>();
+    if (!m_retargetingClient->initialize(retargetingOptions, getName(), m_dT))
+    {
+        yError() << "[configure] Failed to configure the retargeting";
+        return false;
+    }
+
     // initialize the logger
     if(m_dumpData)
     {
@@ -361,15 +369,18 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
                               const iDynTree::Rotation& desiredNeckOrientation,
                               iDynTree::VectorDynSize &output)
 {
-    if(!solver->setRobotState(m_robotControlHelper->getJointPosition(),
-                              m_FKSolver->getLeftFootToWorldTransform(),
-                              m_FKSolver->getRightFootToWorldTransform(),
-                              m_FKSolver->getNeckOrientation(),
-                              actualCoMPosition))
-    {
-        yError() << "[solveQPIK] Unable to update the QP-IK solver";
-        return false;
-    }
+    bool ok = true;
+    double threshold = 0.001;
+    bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
+    solver->setPhase(stancePhase);
+
+    ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
+                                m_FKSolver->getLeftFootToWorldTransform(),
+                                m_FKSolver->getRightFootToWorldTransform(),
+                                m_FKSolver->getLeftHandToWorldTransform(),
+                                m_FKSolver->getRightHandToWorldTransform(),
+                                m_FKSolver->getNeckOrientation(),
+                                actualCoMPosition);
 
     solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
 
@@ -380,25 +391,40 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
                                 m_rightTwistTrajectory.front());
 
     solver->setDesiredCoMVelocity(desiredCoMVelocity);
-
     solver->setDesiredCoMPosition(desiredCoMPosition);
+
+    // TODO probably the problem can be written locally w.r.t. the root or the base
+    solver->setDesiredHandsTransformation(m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->leftHandTransform(),
+                                          m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->rightHandTransform());
 
     // set jacobians
     iDynTree::MatrixDynSize jacobian, comJacobian;
     jacobian.resize(6, m_robotControlHelper->getActuatedDoFs() + 6);
     comJacobian.resize(3, m_robotControlHelper->getActuatedDoFs() + 6);
 
-    m_FKSolver->getLeftFootJacobian(jacobian);
-    solver->setLeftFootJacobian(jacobian);
+    ok &= m_FKSolver->getLeftFootJacobian(jacobian);
+    ok &= solver->setLeftFootJacobian(jacobian);
 
-    m_FKSolver->getRightFootJacobian(jacobian);
-    solver->setRightFootJacobian(jacobian);
+    ok &= m_FKSolver->getRightFootJacobian(jacobian);
+    ok &= solver->setRightFootJacobian(jacobian);
 
-    m_FKSolver->getNeckJacobian(jacobian);
-    solver->setNeckJacobian(jacobian);
+    ok &= m_FKSolver->getNeckJacobian(jacobian);
+    ok &= solver->setNeckJacobian(jacobian);
 
-    m_FKSolver->getCoMJacobian(comJacobian);
+    ok &= m_FKSolver->getCoMJacobian(comJacobian);
     solver->setCoMJacobian(comJacobian);
+
+    ok &= m_FKSolver->getLeftHandJacobian(jacobian);
+    ok &= solver->setLeftHandJacobian(jacobian);
+
+    ok &= m_FKSolver->getRightHandJacobian(jacobian);
+    ok &= solver->setRightHandJacobian(jacobian);
+
+    if(!ok)
+    {
+        yError() << "[solveQPIK] Error while setting the jacobians.";
+        return false;
+    }
 
     if(!solver->solve())
     {
@@ -463,6 +489,13 @@ bool WalkingModule::updateModule()
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
+
+            // reset the retargeting
+            m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
+                                       * m_FKSolver->getLeftHandToWorldTransform(),
+                                       m_FKSolver->getHeadToWorldTransform().inverse()
+                                       * m_FKSolver->getRightHandToWorldTransform());
+
 
             m_robotState = WalkingFSM::Prepared;
 
@@ -543,6 +576,8 @@ bool WalkingModule::updateModule()
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
         }
+
+        m_retargetingClient->getFeedback();
 
         if(!updateFKSolver())
         {
