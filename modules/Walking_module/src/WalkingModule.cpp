@@ -286,7 +286,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // initialize the logger
     if(m_dumpData)
     {
-        m_walkingLogger = std::make_unique<WalkingLogger>();
+        m_walkingLogger = std::make_unique<LoggerClient>();
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
         if(!m_walkingLogger->configure(loggerOptions, getName()))
         {
