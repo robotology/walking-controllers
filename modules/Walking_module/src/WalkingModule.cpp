@@ -341,6 +341,9 @@ bool WalkingModule::close()
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
 
+    // close retargeting ports
+    m_retargetingClient->close();
+
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
