@@ -124,3 +124,12 @@ const iDynTree::Transform& RetargetingClient::rightHandTransform() const
 {
     return m_rightHandTransform;
 }
+
+void RetargetingClient::close()
+{
+    if(!m_useHandRetargeting)
+        return;
+
+    m_leftHandTransformPort.close();
+    m_rightHandTransformPort.close();
+}
