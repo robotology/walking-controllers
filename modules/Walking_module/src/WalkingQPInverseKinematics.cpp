@@ -16,8 +16,9 @@
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/EigenSparseHelpers.h>
+#include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
-#include "iDynTree/yarp/YARPConfigurationsLoader.h"
+#include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
 #include <WalkingQPInverseKinematics.hpp>
 #include <Utils.hpp>
@@ -85,6 +86,12 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
 
     initializeSolverSpecificMatrices();
 
+    if(m_enableHandRetargeting)
+        if(!initializeHandRetargeting(config))
+        {
+            yError() << "[initialize] Unable to Initialize the hand retargeting.";
+            return false;
+        }
 
     if(!setJointsBounds(maxJointsVelocity, maxJointsPosition, minJointsPosition))
     {
@@ -220,9 +227,63 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     return true;
 }
 
+bool WalkingQPIK::initializeHandRetargeting(const yarp::os::Searchable& config)
+{
+    if(!YarpHelper::getNumberFromSearchable(config, "k_posHand", m_kPosHand))
+    {
+        yError() << "Initialization failed while reading k_posHand.";
+        return false;
+    }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "k_attHand", m_kAttHand))
+    {
+        yError() << "Initialization failed while reading k_attHand.";
+        return false;
+    }
+
+    m_handWeightWalkingVector.resize(6);
+    if(!YarpHelper::getYarpVectorFromSearchable(config, "hand_weight_stance",
+                                                m_handWeightWalkingVector))
+    {
+        yError() << "Initialization failed while reading the yarp vector.";
+        return false;
+    }
+
+
+    m_handWeightStanceVector.resize(6);
+    if(!YarpHelper::getYarpVectorFromSearchable(config, "hand_weight_stance",
+                                                m_handWeightStanceVector))
+    {
+        yError() << "Initialization failed while reading the yarp vector.";
+        return false;
+    }
+
+    double smoothingTime;
+    if(!YarpHelper::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
+    {
+        yError() << "Initialization failed while reading smoothingTime.";
+        return false;
+    }
+
+    double dT;
+    if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", dT))
+    {
+        yError() << "Initialization failed while reading smoothingTime.";
+        return false;
+    }
+
+
+    m_handWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, dT, smoothingTime);
+    m_handWeightSmoother->init(m_handWeightStanceVector);
+
+    return true;
+}
+
 bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
                                 const iDynTree::Transform& leftFootToWorldTransform,
                                 const iDynTree::Transform& rightFootToWorldTransform,
+                                const iDynTree::Transform& leftHandToWorldTransform,
+                                const iDynTree::Transform& rightHandToWorldTransform,
                                 const iDynTree::Rotation& neckOrientation,
                                 const iDynTree::Position& comPosition)
 {
@@ -231,6 +292,13 @@ bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
         yError() << "[setRobotState] The size of the jointPosition vector is not coherent with the "
                  << "number of the actuated Joint";
         return false;
+    }
+
+    // avoid to copy the vector if the application is not ran in retargeting mode
+    if(m_enableHandRetargeting)
+    {
+        m_leftHandToWorldTransform = leftHandToWorldTransform;
+        m_rightHandToWorldTransform = rightHandToWorldTransform;
     }
 
     m_jointPosition = jointPosition;
@@ -302,6 +370,9 @@ bool WalkingQPIK::setRightFootJacobian(const iDynTree::MatrixDynSize& rightFootJ
 
 bool WalkingQPIK::setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJacobian)
 {
+    if(!m_enableHandRetargeting)
+        return true;
+
     if(leftHandJacobian.rows() != 6)
     {
         yError() << "[setLeftHandJacobian] the number of rows has to be equal to 6.";
@@ -320,6 +391,9 @@ bool WalkingQPIK::setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJac
 
 bool WalkingQPIK::setRightHandJacobian(const iDynTree::MatrixDynSize& rightHandJacobian)
 {
+    if(!m_enableHandRetargeting)
+        return true;
+
     if(rightHandJacobian.rows() != 6)
     {
         yError() << "[setRightHandJacobian] the number of rows has to be equal to 6.";
@@ -386,6 +460,9 @@ void WalkingQPIK::setDesiredFeetTwist(const iDynTree::Twist& leftFootTwist,
 void WalkingQPIK::setDesiredHandsTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform,
                                                 const iDynTree::Transform& desiredRightHandToWorldTransform)
 {
+    if(!m_enableHandRetargeting)
+        return;
+
     m_desiredLeftHandToWorldTransform = desiredLeftHandToWorldTransform;
     m_desiredRightHandToWorldTransform = desiredRightHandToWorldTransform;
 }
@@ -421,7 +498,14 @@ void WalkingQPIK::evaluateHessianMatrix()
         hessianDense += iDynTree::toEigen(m_jointRegularizationHessian);
     else
     {
-        // TODO
+        // think about the possibility to project in the null space the joint regularization
+        hessianDense += iDynTree::toEigen(m_jointRegularizationHessian)
+            + iDynTree::toEigen(m_leftHandJacobian).transpose()
+            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal()
+            * iDynTree::toEigen(m_leftHandJacobian)
+            + iDynTree::toEigen(m_rightHandJacobian).transpose()
+            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal()
+            * iDynTree::toEigen(m_rightHandJacobian);
     }
 
     if(!m_useCoMAsConstraint)
@@ -459,12 +543,42 @@ void WalkingQPIK::evaluateGradientVector()
            * (regularizationTerm - jointPosition);
     else
     {
-        // TODO
+        //  left hand
+        Eigen::VectorXd leftHandCorrection(6);
+        iDynTree::Position leftHandPositionError = m_leftHandToWorldTransform.getPosition()
+            - m_desiredLeftHandToWorldTransform.getPosition();
+        leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
+
+        iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
+                                                                                            m_desiredLeftHandToWorldTransform.getRotation().inverse());
+
+        leftHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
+
+        //  right hand
+        Eigen::VectorXd rightHandCorrection(6);
+        iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
+            - m_desiredRightHandToWorldTransform.getPosition();
+
+        rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
+
+        iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
+                                                                                             m_desiredRightHandToWorldTransform.getRotation().inverse());
+
+        rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+
+
+        gradient +=
+            -jointRegularizationGradient * jointRegularizationGains.asDiagonal()
+            * (regularizationTerm - jointPosition)
+            - iDynTree::toEigen(m_leftHandJacobian).transpose()
+            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-leftHandCorrection)
+            - iDynTree::toEigen(m_rightHandJacobian).transpose()
+            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-rightHandCorrection);
     }
 
     if(!m_useCoMAsConstraint)
     {
-        gradient +=  - comJacobian.transpose() * comWeight.asDiagonal() *
+        gradient += -comJacobian.transpose() * comWeight.asDiagonal() *
             (desiredComVelocity - m_kCom * (comPosition - desiredComPosition));
     }
 }
