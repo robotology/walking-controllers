@@ -17,12 +17,14 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
 # set cpp files
 set(${UTILITY_LIBRARY_NAME}_SRC
   src/Utils.cpp
+  src/TimeProfiler.cpp
   )
 
 # set hpp files
 set(${UTILITY_LIBRARY_NAME}_HDR
   include/Utils.hpp
   include/Utils.tpp
+  include/TimeProfiler.hpp
   )
 
 # add an executable to the project using the specified source files.
