@@ -233,6 +233,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useQPIK)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
+        inverseKinematicsQPSolverOptions.append(generalOptions);
         if(m_useOSQP)
             m_QPIKSolver = std::make_unique<WalkingQPIK_osqp>();
         else
