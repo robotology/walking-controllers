@@ -157,23 +157,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool solveQPIK(const std::unique_ptr<WalkingQPIK>& solver,
                    const iDynTree::Position& desiredCoMPosition,
                    const iDynTree::Vector3& desiredCoMVelocity,
-                   const iDynTree::Position& actualCoMPosition,
                    const iDynTree::Rotation& desiredNeckOrientation,
                    iDynTree::VectorDynSize &output);
-    /**
-     * Evaluate the position of CoM.
-     * @param comPosition position of the center of mass;
-     * @param comVelocity velocity of the center of mass.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateCoM(iDynTree::Position& comPosition, iDynTree::Vector3& comVelocity);
-
-    /**
-     * Evaluate the position of 2D-Divergent component of motion.
-     * @param dcm 2d-Divergent component of motion.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateDCM(iDynTree::Vector2& dcm);
 
     /**
      * Evaluate the position of Zero momentum point.

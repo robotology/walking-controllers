@@ -369,7 +369,6 @@ bool WalkingModule::close()
 
 bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const iDynTree::Position& desiredCoMPosition,
                               const iDynTree::Vector3& desiredCoMVelocity,
-                              const iDynTree::Position& actualCoMPosition,
                               const iDynTree::Rotation& desiredNeckOrientation,
                               iDynTree::VectorDynSize &output)
 {
@@ -384,7 +383,7 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
                                 m_FKSolver->getLeftHandToWorldTransform(),
                                 m_FKSolver->getRightHandToWorldTransform(),
                                 m_FKSolver->getNeckOrientation(),
-                                actualCoMPosition);
+                                m_FKSolver->getCoMPosition());
 
     solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
 
@@ -508,9 +507,7 @@ bool WalkingModule::updateModule()
     }
     else if(m_robotState == WalkingFSM::Walking)
     {
-        iDynTree::Vector2 measuredDCM, measuredZMP;
-        iDynTree::Position measuredCoM;
-        iDynTree::Vector3 measuredCoMVelocity;
+        iDynTree::Vector2 measuredZMP;
 
         bool resetTrajectory = false;
 
@@ -589,18 +586,6 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        if(!evaluateCoM(measuredCoM, measuredCoMVelocity))
-        {
-            yError() << "[updateModule] Unable to evaluate the CoM.";
-            return false;
-        }
-
-        if(!evaluateDCM(measuredDCM))
-        {
-            yError() << "[updateModule] Unable to evaluate the DCM.";
-            return false;
-        }
-
         if(!evaluateZMP(measuredZMP))
         {
             yError() << "[updateModule] Unable to evaluate the ZMP.";
@@ -642,7 +627,7 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(!m_walkingController->setFeedback(measuredDCM))
+            if(!m_walkingController->setFeedback(m_FKSolver->getDCM()))
             {
                 yError() << "[updateModule] unable to set the feedback.";
                 return false;
@@ -670,7 +655,7 @@ bool WalkingModule::updateModule()
         }
         else
         {
-            m_walkingDCMReactiveController->setFeedback(measuredDCM);
+            m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
             m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(),
                                                                m_DCMVelocityDesired.front());
 
@@ -695,7 +680,7 @@ bool WalkingModule::updateModule()
         m_walkingZMPController->setPhase(stancePhase);
 
         // set feedback and the desired signal
-        m_walkingZMPController->setFeedback(measuredZMP, measuredCoM);
+        m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
         m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
                                                    desiredCoMVelocityXY);
 
@@ -752,7 +737,7 @@ bool WalkingModule::updateModule()
             }
 
             if(!solveQPIK(m_QPIKSolver, desiredCoMPosition,
-                          desiredCoMVelocity, measuredCoM,
+                          desiredCoMVelocity,
                           yawRotation, m_dqDesired))
             {
                 yError() << "[updateModule] Unable to solve the QP problem with osqp.";
@@ -763,6 +748,14 @@ bool WalkingModule::updateModule()
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+            if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                  m_robotControlHelper->getJointVelocity()))
+            {
+                yError() << "[updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
         }
         else
         {
@@ -813,8 +806,8 @@ bool WalkingModule::updateModule()
         {
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-            m_walkingLogger->sendData(measuredDCM, m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP, measuredCoM,
+            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
+                                      measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
                                       desiredCoMPositionXY, desiredCoMVelocityXY,
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
@@ -834,7 +827,6 @@ bool WalkingModule::updateModule()
     }
     return true;
 }
-
 
 bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 {
@@ -901,8 +893,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    iDynTree::Position measuredCoM;
-    iDynTree::Vector3 measuredCoMVelocity;
     iDynTree::Transform leftToRightTransform;
 
     // get the current state of the robot
@@ -1173,58 +1163,6 @@ bool WalkingModule::updateFKSolver()
                                           m_robotControlHelper->getJointVelocity()))
     {
         yError() << "[updateFKSolver] Unable to evaluate the CoM.";
-        return false;
-    }
-
-    return true;
-}
-
-bool WalkingModule::evaluateCoM(iDynTree::Position& comPosition, iDynTree::Vector3& comVelocity)
-{
-    if(m_FKSolver == nullptr)
-    {
-        yError() << "[evaluateCoM] The FK solver is not ready.";
-        return false;
-    }
-
-    if(!m_FKSolver->evaluateCoM())
-    {
-        yError() << "[evaluateCoM] Unable to evaluate the CoM.";
-        return false;
-    }
-
-    if(!m_FKSolver->getCoMPosition(comPosition))
-    {
-        yError() << "[evaluateCoM] Unable to get the CoM position.";
-        return false;
-    }
-
-    if(!m_FKSolver->getCoMVelocity(comVelocity))
-    {
-        yError() << "[evaluateCoM] Unable to get the CoM velocity.";
-        return false;
-    }
-
-    return true;
-}
-
-bool WalkingModule::evaluateDCM(iDynTree::Vector2& dcm)
-{
-    if(m_FKSolver == nullptr)
-    {
-        yError() << "[evaluateDCM] The FK solver is not ready.";
-        return false;
-    }
-
-    if(!m_FKSolver->evaluateDCM())
-    {
-        yError() << "[evaluateDCM] Unable to evaluate the DCM.";
-        return false;
-    }
-
-    if(!m_FKSolver->getDCM(dcm))
-    {
-        yError() << "[evaluateDCM] Unable to get the DCM.";
         return false;
     }
 
