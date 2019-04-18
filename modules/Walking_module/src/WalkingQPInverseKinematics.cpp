@@ -310,6 +310,17 @@ bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
     return true;
 }
 
+void WalkingQPIK::setPhase(const bool& isStancePhase)
+{
+    if(!m_enableHandRetargeting)
+        return;
+
+    if(isStancePhase)
+        m_handWeightSmoother->computeNextValues(m_handWeightStanceVector);
+    else
+        m_handWeightSmoother->computeNextValues(m_handWeightWalkingVector);
+}
+
 void WalkingQPIK::setDesiredNeckOrientation(const iDynTree::Rotation& desiredNeckOrientation)
 {
     m_desiredNeckOrientation =  desiredNeckOrientation * m_additionalRotation;
