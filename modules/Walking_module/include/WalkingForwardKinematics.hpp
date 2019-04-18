@@ -32,6 +32,9 @@ class WalkingFK
     iDynTree::FrameIndex m_frameRightIndex; /**< Index of the frame attached to the right foot in which all the right foot transformations are expressed. */
     iDynTree::FrameIndex m_frameRootIndex; /**< Index of the frame attached to the root_link. */
     iDynTree::FrameIndex m_frameNeckIndex; /**< Index of the frame attached to the neck_2. */
+    iDynTree::FrameIndex m_frameLeftHandIndex; /**< Index of the frame attached to the left hand. */
+    iDynTree::FrameIndex m_frameRightHandIndex; /**< Index of the frame attached to the right hand. */
+    iDynTree::FrameIndex m_frameHeadIndex; /**< Index of the frame attached to the head. */
 
     std::string m_baseFrameLeft; /**< Name of the left base frame. */
     std::string m_baseFrameRight;  /**< Name of the right base frame. */
@@ -173,6 +176,24 @@ public:
     iDynTree::Transform getRightFootToWorldTransform();
 
     /**
+     * Return the transformation between the left hand frame and the world reference frame.
+     * @return world_H_left_hand.
+     */
+    iDynTree::Transform getLeftHandToWorldTransform();
+
+    /**
+     * Return the transformation between the right hand frame and the world reference frame.
+     * @return world_H_right_hand.
+     */
+    iDynTree::Transform getRightHandToWorldTransform();
+
+    /**
+     * Return the transformation between the head frame and the world reference frame.
+     * @return world_H_head.
+     */
+    iDynTree::Transform getHeadToWorldTransform();
+
+    /**
      * Return the transformation between the root frame and the world reference frame.
      * @return world_H_root_frame.
      */
@@ -203,6 +224,20 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getRightFootJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the left hand jacobian.
+     * @oaram jacobian is the left hand jacobian matrix
+     * @return true/false in case of success/failure.
+     */
+    bool getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the right hand jacobian.
+     * @oaram jacobian is the right hand jacobian matrix
+     * @return true/false in case of success/failure.
+     */
+    bool getRightHandJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the neck jacobian.
