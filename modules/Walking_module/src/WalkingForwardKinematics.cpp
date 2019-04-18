@@ -112,6 +112,47 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    // set the left hand frame
+    std::string lHandFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "left_hand_frame", lHandFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameLeftHandIndex = m_kinDyn.model().getFrameIndex(lHandFrame);
+    if(m_frameLeftHandIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: " << lHandFrame;
+        return false;
+    }
+
+    // set the right hand frame
+    std::string rHandFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "right_hand_frame", rHandFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameRightHandIndex = m_kinDyn.model().getFrameIndex(rHandFrame);
+    if(m_frameRightHandIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: " << rHandFrame;
+        return false;
+    }
+
+    std::string headFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "head_frame", headFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameHeadIndex = m_kinDyn.model().getFrameIndex(headFrame);
+    if(m_frameHeadIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[initialize] Unable to find the frame named: " << headFrame;
+        return false;
+    }
+
     m_frameRootIndex = m_kinDyn.model().getFrameIndex("root_link");
     if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
     {
@@ -418,6 +459,21 @@ iDynTree::Transform WalkingFK::getRightFootToWorldTransform()
     return m_kinDyn.getWorldTransform(m_frameRightIndex);
 }
 
+iDynTree::Transform WalkingFK::getLeftHandToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameLeftHandIndex);
+}
+
+iDynTree::Transform WalkingFK::getRightHandToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameRightHandIndex);
+}
+
+iDynTree::Transform WalkingFK::getHeadToWorldTransform()
+{
+    return m_kinDyn.getWorldTransform(m_frameHeadIndex);
+}
+
 iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
 {
     return m_kinDyn.getWorldTransform(m_frameRootIndex);
@@ -441,6 +497,16 @@ bool WalkingFK::getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 bool WalkingFK::getRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightIndex, jacobian);
+}
+
+bool WalkingFK::getRightHandJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightHandIndex, jacobian);
+}
+
+bool WalkingFK::getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian)
+{
+    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftHandIndex, jacobian);
 }
 
 bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)
