@@ -79,16 +79,16 @@ void RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
     m_leftHandTransform = leftHandTransform;
     m_rightHandTransform = rightHandTransform;
 
-    iDynTree::toEigen(m_leftHandTransformYarp).block(0, 0, 3, 1) =
+    iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(0) =
         iDynTree::toEigen(m_leftHandTransform.getPosition());
 
-    iDynTree::toEigen(m_leftHandTransformYarp).block(3, 0, 3, 1) =
+    iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(3) =
         iDynTree::toEigen(m_leftHandTransform.getRotation().asRPY());
 
-    iDynTree::toEigen(m_rightHandTransformYarp).block(0, 0, 3, 1) =
+    iDynTree::toEigen(m_rightHandTransformYarp).segment<3>(0) =
         iDynTree::toEigen(m_rightHandTransform.getPosition());
 
-    iDynTree::toEigen(m_rightHandTransformYarp).block(3, 0, 3, 1) =
+    iDynTree::toEigen(m_rightHandTransformYarp).segment<3>(3) =
         iDynTree::toEigen(m_rightHandTransform.getRotation().asRPY());
 
     m_leftHandSmoother->init(m_leftHandTransformYarp);
