@@ -132,7 +132,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     // get the CoM weight
     if(!m_useCoMAsConstraint)
     {
-        if(!YarpHelper::getiDynTreeVectorFixSizeFromSearchable(config, "com_weight", m_comWeight))
+        if(!YarpHelper::getVectorFromSearchable(config, "com_weight", m_comWeight))
         {
             yError() << "Initialization failed while reading com_weight vector.";
             return false;
@@ -147,7 +147,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 
     // set the matrix related to the joint regularization
     iDynTree::VectorDynSize jointRegularizationWeights(m_actuatedDOFs);
-    if(!YarpHelper::getiDynTreeVectorDynSizeFromSearchable(config, "joint_regularization_weights", jointRegularizationWeights))
+    if(!YarpHelper::getVectorFromSearchable(config, "joint_regularization_weights", jointRegularizationWeights))
     {
         yError() << "Initialization failed while reading jointRegularizationWeights vector.";
         return false;
@@ -164,8 +164,8 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
         m_jointRegularizationGradient(i + 6, i) = jointRegularizationWeights(i);
 
     m_jointRegularizationGains.resize(m_actuatedDOFs);
-    if(!YarpHelper::getiDynTreeVectorDynSizeFromSearchable(config, "joint_regularization_gains",
-                                                           m_jointRegularizationGains))
+    if(!YarpHelper::getVectorFromSearchable(config, "joint_regularization_gains",
+                                            m_jointRegularizationGains))
     {
         yError() << "Initialization failed while reading jointRegularizationGains vector.";
         return false;
@@ -196,8 +196,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     }
 
     // get the regularization term
-    if(!YarpHelper::getiDynTreeVectorDynSizeFromSearchable(config, "joint_regularization",
-                                                           m_regularizationTerm))
+    if(!YarpHelper::getVectorFromSearchable(config, "joint_regularization", m_regularizationTerm))
     {
         yError() << "[initialize] Unable to get the iDynTreeVector from searchable.";
         return false;
@@ -242,8 +241,7 @@ bool WalkingQPIK::initializeHandRetargeting(const yarp::os::Searchable& config)
     }
 
     m_handWeightWalkingVector.resize(6);
-    if(!YarpHelper::getYarpVectorFromSearchable(config, "hand_weight_stance",
-                                                m_handWeightWalkingVector))
+    if(!YarpHelper::getVectorFromSearchable(config, "hand_weight_walking", m_handWeightWalkingVector))
     {
         yError() << "Initialization failed while reading the yarp vector.";
         return false;
@@ -251,8 +249,7 @@ bool WalkingQPIK::initializeHandRetargeting(const yarp::os::Searchable& config)
 
 
     m_handWeightStanceVector.resize(6);
-    if(!YarpHelper::getYarpVectorFromSearchable(config, "hand_weight_stance",
-                                                m_handWeightStanceVector))
+    if(!YarpHelper::getVectorFromSearchable(config, "hand_weight_stance", m_handWeightStanceVector))
     {
         yError() << "Initialization failed while reading the yarp vector.";
         return false;
