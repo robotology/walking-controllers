@@ -165,55 +165,24 @@ namespace YarpHelper
 
 
     /**
-     * Convert a yarp value into an iDynTree::VectorFixSize<n>
+     * Convert a yarp value into a vector
      * @param input yarp value;
-     * @param output iDynTree::VectorFixSize<n>.
+     * @param output vector
      * @return true/false in case of success/failure.
      */
-    template <unsigned int n>
-    bool yarpListToiDynTreeVectorFixSize(const yarp::os::Value& input, iDynTree::VectorFixSize<n>& output);
+    template <typename T>
+    bool yarpListToVector(const yarp::os::Value& input, T& output);
 
     /**
-     * Extract an iDynTree VectorFixSize from searchable
+     * Extract a vector from searchable
      * @param config is the searchable object;
      * @param key the name to check for;
-     * @param vector the iDynTree vector.
+     * @param vector a vector.
      * @return true/false in case of success/failure
      */
-    template <unsigned int n>
-    bool getiDynTreeVectorFixSizeFromSearchable(const yarp::os::Searchable& config,
-                                                const std::string& key,
-                                                iDynTree::VectorFixSize<n>& vector);
-
-    /**
-     * Extract a vector from a searchable object.
-     * @param config is the searchable object;
-     * @param key the name to check for;
-     * @param vector is the vector.
-     * @return true/false in case of success/failure
-     */
-    bool getYarpVectorFromSearchable(const yarp::os::Searchable& config, const std::string& key,
-                                     yarp::sig::Vector& vector);
-
-    /**
-     * Convert a yarp value into an iDynTree::VectorDynSize
-     * @param input yarp value;
-     * @param output iDynTree::VectorDynSize if the size of this vector is different from the size of the
-     * YARP list it will be resized.
-     * @return true/false in case of success/failure.
-     */
-    bool yarpListToiDynTreeVectorDynSize(const yarp::os::Value& input, iDynTree::VectorDynSize& output);
-
-    /**
-     * Extract an iDynTree VectorDynSize from searchable
-     * @param config is the searchable object;
-     * @param key the name to check for;
-     * @param vector the iDynTree vector.
-     * @return true/false in case of success/failure
-     */
-    bool getiDynTreeVectorDynSizeFromSearchable(const yarp::os::Searchable& config,
-                                                const std::string& key,
-                                                iDynTree::VectorDynSize& vector);
+    template <typename T>
+    bool getVectorFromSearchable(const yarp::os::Searchable& config, const std::string& key,
+                                 T& vector);
 
     /**
      * Merge two vectors. vector = [vector, t]
