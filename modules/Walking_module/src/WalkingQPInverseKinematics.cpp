@@ -551,37 +551,37 @@ void WalkingQPIK::evaluateGradientVector()
            * (regularizationTerm - jointPosition);
     else
     {
+        auto leftHandCorrectionLinear(iDynTree::toEigen(m_leftHandCorrection.getLinearVec3()));
+        auto leftHandCorrectionAngular(iDynTree::toEigen(m_leftHandCorrection.getAngularVec3()));
+        auto rightHandCorrectionLinear(iDynTree::toEigen(m_rightHandCorrection.getLinearVec3()));
+        auto rightHandCorrectionAngular(iDynTree::toEigen(m_rightHandCorrection.getAngularVec3()));
+
         //  left hand
-        Eigen::VectorXd leftHandCorrection(6);
-        iDynTree::Position leftHandPositionError = m_leftHandToWorldTransform.getPosition()
-            - m_desiredLeftHandToWorldTransform.getPosition();
-        leftHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(leftHandPositionError);
+        leftHandCorrectionLinear = m_kPosHand * iDynTree::toEigen(m_leftHandToWorldTransform.getPosition()
+                                                                  - m_desiredLeftHandToWorldTransform.getPosition());
 
         iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
                                                                                             m_desiredLeftHandToWorldTransform.getRotation().inverse());
 
-        leftHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
+        leftHandCorrectionAngular = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
 
         //  right hand
-        Eigen::VectorXd rightHandCorrection(6);
-        iDynTree::Position rightHandPositionError = m_rightHandToWorldTransform.getPosition()
-            - m_desiredRightHandToWorldTransform.getPosition();
-
-        rightHandCorrection.block(0,0,3,1) = m_kPosHand * iDynTree::toEigen(rightHandPositionError);
+        rightHandCorrectionLinear = m_kPosHand * iDynTree::toEigen(m_rightHandToWorldTransform.getPosition()
+                                                                   - m_desiredRightHandToWorldTransform.getPosition());
 
         iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeHelper::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
                                                                                              m_desiredRightHandToWorldTransform.getRotation().inverse());
 
-        rightHandCorrection.block(3,0,3,1) = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+        rightHandCorrectionAngular = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
 
 
         gradient +=
             -jointRegularizationGradient * jointRegularizationGains.asDiagonal()
             * (regularizationTerm - jointPosition)
             - iDynTree::toEigen(m_leftHandJacobian).transpose()
-            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-leftHandCorrection)
+            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-iDynTree::toEigen(m_leftHandCorrection))
             - iDynTree::toEigen(m_rightHandJacobian).transpose()
-            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-rightHandCorrection);
+            * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-iDynTree::toEigen(m_rightHandCorrection));
     }
 
     if(!m_useCoMAsConstraint)
@@ -604,51 +604,55 @@ void WalkingQPIK::evaluateBounds()
 {
     auto lowerBound(iDynTree::toEigen(m_lowerBound));
     auto upperBound(iDynTree::toEigen(m_upperBound));
+    auto leftFootCorrectionLinear(iDynTree::toEigen(m_leftFootCorrection.getLinearVec3()));
+    auto leftFootCorrectionAngular(iDynTree::toEigen(m_leftFootCorrection.getAngularVec3()));
+    auto rightFootCorrectionLinear(iDynTree::toEigen(m_rightFootCorrection.getLinearVec3()));
+    auto rightFootCorrectionAngular(iDynTree::toEigen(m_rightFootCorrection.getAngularVec3()));
 
-    Eigen::VectorXd leftFootCorrection(6);
-    leftFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen((m_leftFootToWorldTransform.getPosition() -
-                                                                        m_desiredLeftFootToWorldTransform.getPosition()));
+    // left foot
+    leftFootCorrectionLinear = m_kPosFoot * iDynTree::toEigen((m_leftFootToWorldTransform.getPosition() -
+                                                               m_desiredLeftFootToWorldTransform.getPosition()));
 
     iDynTree::Matrix3x3 errorLeftAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_leftFootToWorldTransform.getRotation() *
                                                                                     m_desiredLeftFootToWorldTransform.getRotation().inverse());
 
-    leftFootCorrection.block(3,0,3,1) = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorLeftAttitude)));
+    leftFootCorrectionAngular = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorLeftAttitude)));
 
-    Eigen::VectorXd rightFootCorrection(6);
-    rightFootCorrection.block(0,0,3,1) = m_kPosFoot * iDynTree::toEigen((m_rightFootToWorldTransform.getPosition() -
+    // right foot
+    rightFootCorrectionLinear = m_kPosFoot * iDynTree::toEigen((m_rightFootToWorldTransform.getPosition() -
                                                                          m_desiredRightFootToWorldTransform.getPosition()));
 
     iDynTree::Matrix3x3 errorRightAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_rightFootToWorldTransform.getRotation() *
                                                                                      m_desiredRightFootToWorldTransform.getRotation().inverse());
 
-    rightFootCorrection.block(3,0,3,1) = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorRightAttitude)));
+    rightFootCorrectionAngular = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorRightAttitude)));
 
     if((m_desiredLeftFootTwist(0) == m_desiredLeftFootTwist(1)) && (m_desiredLeftFootTwist(0) == 0))
     {
-        lowerBound.block(0, 0, 6, 1) = iDynTree::toEigen(m_desiredLeftFootTwist);
-        upperBound.block(0, 0, 6, 1) = iDynTree::toEigen(m_desiredLeftFootTwist);
+        lowerBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist);
+        upperBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist);
     }
     else
     {
-        lowerBound.block(0, 0, 6, 1) = iDynTree::toEigen(m_desiredLeftFootTwist) - leftFootCorrection;
-        upperBound.block(0, 0, 6, 1) = lowerBound.block(0, 0, 6, 1);
+        lowerBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist) - iDynTree::toEigen(m_leftFootCorrection);
+        upperBound.segment<6>(0) = lowerBound.segment<6>(0);
     }
 
     if((m_desiredRightFootTwist(0) == m_desiredRightFootTwist(1)) && (m_desiredRightFootTwist(0) == 0))
     {
-        lowerBound.block(6, 0, 6, 1) = iDynTree::toEigen(m_desiredRightFootTwist);
-        upperBound.block(6, 0, 6, 1) = iDynTree::toEigen(m_desiredRightFootTwist);
+        lowerBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist);
+        upperBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist);
     }
     else
     {
-        lowerBound.block(6, 0, 6, 1) = iDynTree::toEigen(m_desiredRightFootTwist) - rightFootCorrection;
-        upperBound.block(6, 0, 6, 1) = lowerBound.block(6, 0, 6, 1);
+        lowerBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist) - iDynTree::toEigen(m_rightFootCorrection);
+        upperBound.segment<6>(6) = lowerBound.segment<6>(6);
     }
     if(m_useCoMAsConstraint)
     {
-        lowerBound.block(12, 0, 3, 1) = iDynTree::toEigen(m_desiredComVelocity)
+        lowerBound.segment<3>(12) = iDynTree::toEigen(m_desiredComVelocity)
             - m_kCom * (iDynTree::toEigen(m_comPosition) -  iDynTree::toEigen(m_desiredComPosition));
-        upperBound.block(12, 0, 3, 1) = lowerBound.block(12, 0, 3, 1);
+        upperBound.segment<3>(12) = lowerBound.segment<3>(12);
     }
 
     setJointVelocitiesBounds();
