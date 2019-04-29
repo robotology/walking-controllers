@@ -59,6 +59,9 @@ protected:
 
     iDynTree::Twist m_desiredLeftFootTwist; /**< Desired Twist of the left foot. */
     iDynTree::Twist m_desiredRightFootTwist; /**< Desired Twist of the right foot. */
+    iDynTree::Twist m_leftFootCorrection; /**< Correction of the desired velocity related to the left foot (evaluated using the position error). */
+    iDynTree::Twist m_rightFootCorrection; /**< Correction of the desired velocity related to the left foot (evaluated using the position error). */
+
     iDynTree::Twist m_desiredLeftHandTwist; /**< Desired Twist of the left hand. */
     iDynTree::Twist m_desiredRightHandTwist; /**< Desired Twist of the right hand. */
     iDynTree::Vector3 m_desiredComVelocity; /**< Desired Linear velocity of the CoM. */
@@ -68,6 +71,8 @@ protected:
     iDynTree::Transform m_desiredRightFootToWorldTransform; /**< Desired right foot to world transformation.*/
     iDynTree::Transform m_desiredLeftHandToWorldTransform; /**< Desired left hand to world transformation.*/
     iDynTree::Transform m_desiredRightHandToWorldTransform; /**< Desired right hand to world transformation.*/
+    iDynTree::Twist m_leftHandCorrection; /**< Correction of the desired velocity related to the left hand (evaluated using the position error). */
+    iDynTree::Twist m_rightHandCorrection; /**< Correction of the desired velocity related to the left hand (evaluated using the position error). */
     iDynTree::Rotation m_desiredNeckOrientation; /**< Desired neck orientation.*/
     iDynTree::Rotation m_additionalRotation; /**< Additional rotation matrix (it is useful to rotate the
                                                 desiredNeckOrientation rotation matrix). */
