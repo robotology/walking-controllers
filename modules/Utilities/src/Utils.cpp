@@ -118,53 +118,6 @@ iDynSparseMatrix iDynTreeHelper::SparseMatrix::fromEigen(const Eigen::SparseMatr
     return iDynTreeSparseMatrix;
 }
 
-bool YarpHelper::yarpListToiDynTreeVectorDynSize(const yarp::os::Value& input, iDynTree::VectorDynSize& output)
-{
-    if (input.isNull())
-    {
-        yError() << "[yarpListToiDynTreeVectorDynSize] Empty input value.";
-        return false;
-    }
-    if (!input.isList() || !input.asList())
-    {
-        yError() << "[yarpListToiDynTreeVectorDynSize] Unable to read the input list.";
-        return false;
-    }
-    yarp::os::Bottle *inputPtr = input.asList();
-
-    if (inputPtr->size() != output.size())
-    {
-        yError() << "[yarpListToiDynTreeVectorDynSize] The size of the iDynTree vector and the size of "
-                 << "the YARP list are not coherent.";
-        return false;
-    }
-
-    for (int i = 0; i < inputPtr->size(); i++)
-    {
-        if (!inputPtr->get(i).isDouble() && !inputPtr->get(i).isInt())
-        {
-            yError() << "[yarpListToiDynTreeVectorDynSize] The input is expected to be a double or a int";
-            return false;
-        }
-        output(i) = inputPtr->get(i).asDouble();
-    }
-    return true;
-}
-
-bool YarpHelper::getiDynTreeVectorDynSizeFromSearchable(const yarp::os::Searchable& config,
-                                                        const std::string& key,
-                                                        iDynTree::VectorDynSize& vector)
-{
-    yarp::os::Value* value;
-    if(!config.check(key, value))
-    {
-        yError() << "[getiDynTreeVectorDynSizeFromSearchable] Missing field "<< key;
-        return false;
-    }
-
-    return yarpListToiDynTreeVectorDynSize(*value, vector);
-}
-
 bool YarpHelper::addVectorOfStringToProperty(yarp::os::Property& prop, const std::string& key,
                                              const std::vector<std::string>& list)
 {
@@ -266,44 +219,6 @@ bool YarpHelper::getNumberFromSearchable(const yarp::os::Searchable& config, con
     }
 
     number = value->asInt();
-    return true;
-}
-
-bool YarpHelper::getYarpVectorFromSearchable(const yarp::os::Searchable& config, const std::string& key,
-                                             yarp::sig::Vector& output)
-{
-    yarp::os::Value* value;
-    if(!config.check(key, value))
-    {
-        yError() << "[getNumberFromSearchable] Missing field "<< key;
-        return false;
-    }
-
-    if(!value->isList())
-    {
-        yError() << "[getNumberFromSearchable] the value is not a double.";
-        return false;
-    }
-
-    yarp::os::Bottle *inputPtr = value->asList();
-
-    if (inputPtr->size() != output.size())
-    {
-        yError() << "[getYarpVectorFromSearchable] The size of the YARP vector and the size of "
-                 << "the YARP list are not coherent.";
-        return false;
-    }
-
-    for (int i = 0; i < inputPtr->size(); i++)
-    {
-        if (!inputPtr->get(i).isDouble() && !inputPtr->get(i).isInt())
-        {
-            yError() << "[getYarpVectorFromSearchable] The input is expected to be a double or a int";
-            return false;
-        }
-        output(i) = inputPtr->get(i).asDouble();
-    }
-
     return true;
 }
 
