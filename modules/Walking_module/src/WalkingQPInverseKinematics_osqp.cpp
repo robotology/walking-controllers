@@ -21,42 +21,64 @@
 
 #include <WalkingQPInverseKinematics_osqp.hpp>
 
-bool WalkingQPIK_osqp::setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                                         const iDynTree::VectorDynSize& maxJointsLimit)
+bool WalkingQPIK_osqp::setJointsBounds(const iDynTree::VectorDynSize& jointVelocitiesBounds,
+                                       const iDynTree::VectorDynSize& jointPositionsUpperBounds,
+                                       const iDynTree::VectorDynSize& jointPositionsLowerBounds)
 {
-    if(minJointsLimit.size() != maxJointsLimit.size())
+    if(jointVelocitiesBounds.size() != jointPositionsUpperBounds.size() ||
+       jointPositionsLowerBounds.size() != jointPositionsUpperBounds.size())
     {
-        yError() << "[setVelocityBounds] The size of the vector limits has to be equal.";
+        yError() << "[setJointsBounds] The size of the vector limits has to be equal.";
         return false;
     }
-    if(minJointsLimit.size() != m_actuatedDOFs)
+    if(jointVelocitiesBounds.size() != m_actuatedDOFs)
     {
-        yError() << "[setVelocityBounds] The size of the vector limits has to be equal to ."
+        yError() << "[setJointsBounds] The size of the vector limits has to be equal to ."
                  << "the number of the joint";
         return false;
     }
-
-    int numberOfTaskConstraints;
-    if(m_useCoMAsConstraint)
-        numberOfTaskConstraints = 6 + 6 + 3;
-    else
-        numberOfTaskConstraints = 6 + 6;
-
-    for(int i = numberOfTaskConstraints; i < m_numberOfConstraints; i++)
-    {
-        m_lowerBound(i) = minJointsLimit(i - numberOfTaskConstraints);
-        m_upperBound(i) = maxJointsLimit(i - numberOfTaskConstraints);
-    }
-
+    m_jointVelocitiesBounds = jointVelocitiesBounds;
+    m_jointPositionsUpperBounds = jointPositionsUpperBounds;
+    m_jointPositionsLowerBounds = jointPositionsLowerBounds;
     return true;
 }
 
-bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
-                                  const int& actuatedDOFs,
-                                  const iDynTree::VectorDynSize& minJointsLimit,
-                                  const iDynTree::VectorDynSize& maxJointsLimit)
-{
+// bool WalkingQPIK_osqp::setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
+//                                          const iDynTree::VectorDynSize& maxJointsLimit)
+// {
+//     if(minJointsLimit.size() != maxJointsLimit.size())
+//     {
+//         yError() << "[setVelocityBounds] The size of the vector limits has to be equal.";
+//         return false;
+//     }
+//     if(minJointsLimit.size() != m_actuatedDOFs)
+//     {
+//         yError() << "[setVelocityBounds] The size of the vector limits has to be equal to ."
+//                  << "the number of the joint";
+//         return false;
+//     }
 
+//     int numberOfTaskConstraints;
+//     if(m_useCoMAsConstraint)
+//         numberOfTaskConstraints = 6 + 6 + 3;
+//     else
+//         numberOfTaskConstraints = 6 + 6;
+
+//     for(int i = numberOfTaskConstraints; i < m_numberOfConstraints; i++)
+//     {
+//         m_lowerBound(i) = minJointsLimit(i - numberOfTaskConstraints);
+//         m_upperBound(i) = maxJointsLimit(i - numberOfTaskConstraints);
+//     }
+
+//     return true;
+// }
+
+bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable &config,
+                                  const int &actuatedDOFs,
+                                  const iDynTree::VectorDynSize& maxJointsVelocity,
+                                  const iDynTree::VectorDynSize& maxJointsPosition,
+                                  const iDynTree::VectorDynSize& minJointsPosition)
+{
     m_actuatedDOFs = actuatedDOFs;
     // check if the config is empty
     if(config.isNull())
@@ -111,18 +133,31 @@ bool WalkingQPIK_osqp::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    if(!setVelocityBounds(minJointsLimit, maxJointsLimit))
+    if(!setJointsBounds(maxJointsVelocity, maxJointsPosition, minJointsPosition))
     {
-        yError() << "[initialize] Unable to set the velocity bounds.";
+        yError() << "[initialize] Unable to set the joint bounds.";
         return false;
     }
-
 
     if(!iDynTree::parseRotationMatrix(config, "additional_rotation", m_additionalRotation))
     {
         yError() << "[initialize] Unable to set the additional rotation.";
         return false;
     }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "k_joint_limit_lower_bound", m_kJointLimitsLowerBound))
+    {
+        yError() << "Initialization failed while reading a double.";
+        return false;
+    }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "k_joint_limit_upper_bound", m_kJointLimitsUpperBound))
+    {
+        yError() << "Initialization failed while reading a double.";
+        return false;
+    }
+
+    m_jointRegularizationLinearConstraintTriplets.addDiagonalMatrix(0, 6, 1, m_actuatedDOFs);
 
     // instantiate the solver
     m_optimizerSolver = std::make_unique<OsqpEigen::Solver>();
@@ -330,13 +365,30 @@ bool WalkingQPIK_osqp::setBounds()
             - m_kCom * (iDynTree::toEigen(m_comPosition) -  iDynTree::toEigen(m_desiredComPosition));
     }
 
+    int numberOfTaskConstraints;
+    if(m_useCoMAsConstraint)
+        numberOfTaskConstraints = 6 + 6 + 3;
+    else
+        numberOfTaskConstraints = 6 + 6;
+
+    for(int i = 0; i < m_actuatedDOFs; i++)
+    {
+        m_lowerBound(i + numberOfTaskConstraints) = m_kJointLimitsLowerBound *
+            std::tanh(m_jointPosition(i) - m_jointPositionsLowerBounds(i))
+            * (-m_jointVelocitiesBounds(i));
+
+        m_upperBound(i + numberOfTaskConstraints) = m_kJointLimitsUpperBound *
+            std::tanh(m_jointPositionsUpperBounds(i) - m_jointPosition(i))
+            * m_jointVelocitiesBounds(i);
+    }
+
     if(m_optimizerSolver->isInitialized())
     {
         if(!m_optimizerSolver->updateBounds<Eigen::Dynamic>(m_lowerBound, m_upperBound))
-        {
-            yError() << "[setBounds] Unable to update the bounds.";
-            return false;
-        }
+         {
+             yError() << "[setBounds] Unable to update the bounds.";
+             return false;
+         }
     }
     else
     {

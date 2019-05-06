@@ -58,7 +58,9 @@ class RobotHelper
     iDynTree::VectorDynSize m_desiredJointPositionRad; /**< Desired Joint Position [rad]. */
     iDynTree::VectorDynSize m_desiredJointValueDeg; /**< Desired joint position or velocity [deg or deg/s]. */
 
-    iDynTree::VectorDynSize m_jointsVelocityLimit; /**< JointVeloc [rad/s]. */
+    iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
+    iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
+    iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
 
     // yarp::sig::Vector m_positionFeedbackDegFiltered;
     yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
@@ -159,6 +161,18 @@ public:
     const iDynTree::VectorDynSize& getJointVelocity() const;
 
     const iDynTree::VectorDynSize& getVelocityLimits() const;
+
+    /**
+     * Get the joint upper limit
+     * @return the joint upper bound in radiants
+     */
+    const iDynTree::VectorDynSize& getPositionUpperLimits() const;
+
+    /**
+     * Get the joint lower limit
+     * @return the joint lower bound in radiants
+     */
+    const iDynTree::VectorDynSize& getPositionLowerLimits() const;
 
     const iDynTree::Wrench& getLeftWrench() const;
     const iDynTree::Wrench& getRightWrench() const;

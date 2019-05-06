@@ -241,28 +241,27 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
         inverseKinematicsQPSolverOptions.append(generalOptions);
-
-        iDynTree::VectorDynSize negativeJointVelocityLimits(m_robotControlHelper->getActuatedDoFs());
-        iDynTree::toEigen(negativeJointVelocityLimits) = -iDynTree::toEigen(m_robotControlHelper->getVelocityLimits());
         m_QPIKSolver_osqp = std::make_shared<WalkingQPIK_osqp>();
+
         if(!m_QPIKSolver_osqp->initialize(inverseKinematicsQPSolverOptions,
                                           m_robotControlHelper->getActuatedDoFs(),
-                                          negativeJointVelocityLimits,
-                                          m_robotControlHelper->getVelocityLimits()))
+                                          m_robotControlHelper->getVelocityLimits(),
+                                          m_robotControlHelper->getPositionUpperLimits(),
+                                          m_robotControlHelper->getPositionLowerLimits()))
         {
             yError() << "[configure] Failed to configure the QP-IK solver (osqp)";
             return false;
         }
 
-        m_QPIKSolver_qpOASES = std::make_shared<WalkingQPIK_qpOASES>();
-        if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
-                                             m_robotControlHelper->getActuatedDoFs(),
-                                             negativeJointVelocityLimits,
-                                             m_robotControlHelper->getVelocityLimits()))
-        {
-            yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
-            return false;
-        }
+        // m_QPIKSolver_qpOASES = std::make_shared<WalkingQPIK_qpOASES>();
+        // if(!m_QPIKSolver_qpOASES->initialize(inverseKinematicsQPSolverOptions,
+        //                                      m_robotControlHelper->getActuatedDoFs(),
+        //                                      negativeJointVelocityLimits,
+        //                                      m_robotControlHelper->getVelocityLimits()))
+        // {
+        //     yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
+        //     return false;
+        // }
     }
 
     // initialize the forward kinematics solver
@@ -386,7 +385,7 @@ bool WalkingModule::close()
     m_walkingZMPController.reset(nullptr);
     m_IKSolver.reset(nullptr);
     m_QPIKSolver_osqp = nullptr;
-    m_QPIKSolver_qpOASES = nullptr;
+    // m_QPIKSolver_qpOASES = nullptr;
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
 
@@ -499,8 +498,17 @@ bool WalkingModule::updateModule()
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
+
+            yarp::sig::Matrix jointLimits(m_robotControlHelper->getActuatedDoFs(), 2);
+            for(int i = 0; i < m_robotControlHelper->getActuatedDoFs(); i++)
+            {
+                jointLimits(i, 0) = m_robotControlHelper->getPositionLowerLimits()(i);
+                jointLimits(i, 1) = m_robotControlHelper->getPositionUpperLimits()(i);
+            }
+
             // instantiate Integrator object
-            m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer);
+
+            m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
 
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
@@ -540,10 +548,12 @@ bool WalkingModule::updateModule()
             iDynTree::toEigen(m_desiredJointPositionFromExternalSource).block(0,0,20,1) =
                 iDynTree::toEigen(desiredJointPositionFromExternalSource);
 
-            if(m_useOSQP)
-                m_QPIKSolver_osqp->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
-            else
-                m_QPIKSolver_qpOASES->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
+            m_QPIKSolver_osqp->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
+
+            // if(m_useOSQP)
+
+            // else
+            //     m_QPIKSolver_qpOASES->setDesiredJointPosition(m_desiredJointPositionFromExternalSource);
         }
 
         // check desired planner input
@@ -821,13 +831,16 @@ bool WalkingModule::updateModule()
             }
             else
             {
-                if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
-                              desiredCoMVelocity, measuredCoM, yawRotation,
-                              m_FKSolverHumanAndRobot->getNeckOrientation(), m_dqDesired))
-                {
-                    yError() << "[updateModule] Unable to solve the QP problem with osqp.";
-                    return false;
-                }
+                yError() << "[updateModule] NOT IMPLEMENTED I'M SORRY YOU CANNOT USE QPOASES.";
+                return false;
+
+                // if(!solveQPIK(m_QPIKSolver_qpOASES, desiredCoMPosition,
+                //               desiredCoMVelocity, measuredCoM, yawRotation,
+                //               m_FKSolverHumanAndRobot->getNeckOrientation(), m_dqDesired))
+                // {
+                //     yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                //     return false;
+                // }
             }
 
             if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
@@ -896,8 +909,11 @@ bool WalkingModule::updateModule()
             }
             else
             {
-                m_QPIKSolver_qpOASES->getRightFootError(errorR);
-                m_QPIKSolver_qpOASES->getLeftFootError(errorL);
+                yError() << "[updateModule] NOT IMPLEMENTED I'M SORRY YOU CANNOT USE QPOASES.";
+                return false;
+
+                // m_QPIKSolver_qpOASES->getRightFootError(errorR);
+                // m_QPIKSolver_qpOASES->getLeftFootError(errorL);
             }
         }
 

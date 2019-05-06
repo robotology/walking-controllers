@@ -85,7 +85,6 @@ protected:
     std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_neckWeightXsensSmoother;
 
 
-
     iDynSparseMatrix m_jointRegulatizationXsensHessian; /**< Contains a constant matrix that can be useful
                                                       in the hessian evaluation ($-\lambda H' H$). */
     iDynSparseMatrix m_jointRegulatizationXsensGradient; /**< Contains a constant matrix that can be useful
@@ -122,10 +121,11 @@ public:
      * @param maxJointsLimit is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
-    virtual bool initialize(const yarp::os::Searchable& config,
-                            const int& actuatedDOFs,
-                            const iDynTree::VectorDynSize& minJointsLimit,
-                            const iDynTree::VectorDynSize& maxJointsLimit) = 0;
+    virtual bool initialize(const yarp::os::Searchable &config,
+                            const int &actuatedDOFs,
+                            const iDynTree::VectorDynSize& maxJointsVelocity,
+                            const iDynTree::VectorDynSize& maxJointsPosition,
+                            const iDynTree::VectorDynSize& minJointsPosition) = 0;
 
     /**
      * Set the robot state.

@@ -31,7 +31,7 @@
 #include <WalkingInverseKinematics.hpp>
 #include <WalkingQPInverseKinematics.hpp>
 #include <WalkingQPInverseKinematics_osqp.hpp>
-#include <WalkingQPInverseKinematics_qpOASES.hpp>
+// #include <WalkingQPInverseKinematics_qpOASES.hpp>
 #include <WalkingForwardKinematics.hpp>
 #include <StableDCMModel.hpp>
 #include <WalkingPIDHandler.hpp>
@@ -69,7 +69,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
     std::shared_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
-    std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
+    // std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
 
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<WalkingFK> m_FKSolverHumanAndRobot; /**< Pointer to the forward kinematics solver. */

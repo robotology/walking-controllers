@@ -24,6 +24,13 @@ class WalkingQPIK_osqp : public WalkingQPIK
     Eigen::MatrixXd m_hessianEigenDense;
     Eigen::MatrixXd m_constraintsMatrixEigenDense;
 
+    double m_kJointLimitsUpperBound; /**< Gain related to the the joint upper bound */
+    double m_kJointLimitsLowerBound; /**< Gain related to the the joint lower bound */
+    iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Bounds on the joint velocities*/
+    iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Upper Bounds on the joint position*/
+    iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Lower Bounds on the joint position*/
+
+
     /**
      * Set the Hessian matrix.
      * If the optimization problem was already initialized the hessian matrix is updated.
@@ -52,14 +59,17 @@ class WalkingQPIK_osqp : public WalkingQPIK
      */
     bool setBounds();
 
+
     /**
-     * Set joints velocity bounds
-     * @param minJointsLimit is a vector containing the min joints velocity limit;
-     * @param maxJointsLimit is a vector containing the max joints velocity limit.
+     * Set the joint positions and velocities bounds
+     * @param jointVelocitiesBounds  joint velocities bounds in [rad/s]
+     * @param jointPositionsUpperBounds joint position upper bounds in [rad]
+     * @param jointPositionsLowerBounds joint position lower bounds in [rad]
      * @return true/false in case of success/failure.
      */
-    bool setVelocityBounds(const iDynTree::VectorDynSize& minJointsLimit,
-                           const iDynTree::VectorDynSize& maxJointsLimit);
+    bool setJointsBounds(const iDynTree::VectorDynSize& jointVelocitiesBounds,
+                         const iDynTree::VectorDynSize& jointPositionsUpperBounds,
+                         const iDynTree::VectorDynSize& jointPositionsLowerBounds);
 
     /**
      * Check if the solution is feasible.
@@ -77,11 +87,11 @@ public:
      * @param maxJointsLimit is a vector containing the max joints velocity limit.
      * @return true/false in case of success/failure.
      */
-    virtual bool initialize(const yarp::os::Searchable& config,
-                            const int& actuatedDOFs,
-                            const iDynTree::VectorDynSize& minJointsLimit,
-                            const iDynTree::VectorDynSize& maxJointsLimit) final;
-
+    virtual bool initialize(const yarp::os::Searchable &config,
+                            const int &actuatedDOFs,
+                            const iDynTree::VectorDynSize& maxJointsVelocity,
+                            const iDynTree::VectorDynSize& maxJointsPosition,
+                            const iDynTree::VectorDynSize& minJointsPosition) final;
     /**
      * Solve the optimization problem.
      * @return true/false in case of success/failure.
