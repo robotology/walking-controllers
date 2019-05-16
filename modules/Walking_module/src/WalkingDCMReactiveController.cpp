@@ -62,8 +62,6 @@ void WalkingDCMReactiveController::setReferenceSignal(const iDynTree::Vector2& d
 
 bool WalkingDCMReactiveController::evaluateControl()
 {
-    m_controlEvaluated = false;
-
     if(!m_isInitialized)
     {
         yError() << "[evaluateControl] The controller is not initialized. "
@@ -77,18 +75,10 @@ bool WalkingDCMReactiveController::evaluateControl()
         m_kDCM * (iDynTree::toEigen(m_dcmPositionDesired) -
                   iDynTree::toEigen(m_dcmFeedback));
 
-    m_controlEvaluated = true;
     return true;
 }
 
-bool WalkingDCMReactiveController::getControllerOutput(iDynTree::Vector2& controllerOutput)
+const iDynTree::Vector2& WalkingDCMReactiveController::getControllerOutput() const
 {
-    if(!m_controlEvaluated)
-    {
-        yError() << "[getControllerOutput] Please before call evaluateControl() method.";
-        return false;
-    }
-
-    controllerOutput = m_controllerOutput;
-    return true;
+    return m_controllerOutput;
 }
