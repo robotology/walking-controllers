@@ -157,6 +157,6 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
         return;
     yarp::sig::Vector& output = m_robotOrientationPort.prepare();
     output.clear();
-    output(0) = rotation.asRPY()(2);
+    output.push_back(rotation.asRPY()(2));
     m_robotOrientationPort.write(false);
 }
