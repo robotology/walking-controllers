@@ -153,14 +153,26 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    m_frameRootIndex = m_kinDyn.model().getFrameIndex("root_link");
+    std::string rootFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "root_frame", rootFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameRootIndex = m_kinDyn.model().getFrameIndex(rootFrame);
     if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[initialize] Unable to find the frame named: root_link";
         return false;
     }
 
-    m_frameNeckIndex = m_kinDyn.model().getFrameIndex("neck_2");
+    std::string torsoFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "torso_frame", torsoFrame))
+    {
+        yError() << "[initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameNeckIndex = m_kinDyn.model().getFrameIndex(torsoFrame);
     if(m_frameNeckIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[initialize] Unable to find the frame named: root_link";
