@@ -57,7 +57,6 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_time; /**< Current time. */
     std::string m_robot; /**< Robot name. */
 
-    bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */

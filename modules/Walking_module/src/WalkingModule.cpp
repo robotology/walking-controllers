@@ -308,7 +308,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_profiler->addTimer("Total");
 
     // initialize some variables
-    m_firstStep = false;
     m_newTrajectoryRequired = false;
     m_newTrajectoryMergeCounter = -1;
     m_robotState = WalkingFSM::Configured;
@@ -797,10 +796,6 @@ bool WalkingModule::updateModule()
         advanceReferenceSignals();
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
-
-        if(m_firstStep)
-            m_firstStep = false;
-
     }
     return true;
 }
@@ -1178,7 +1173,6 @@ bool WalkingModule::startWalking()
         m_robotControlHelper->resetFilters();
 
     m_robotState = WalkingFSM::Walking;
-    m_firstStep = true;
 
     return true;
 }
