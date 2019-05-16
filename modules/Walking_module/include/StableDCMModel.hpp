@@ -35,8 +35,6 @@ class StableDCMModel
     iDynTree::Vector2 m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector2 m_comVelocity; /**< Velocity of the CoM. */
 
-    bool m_isModelPropagated{false}; /**< True if the model is propagated. */
-
 public:
 
     /**
@@ -59,17 +57,15 @@ public:
 
     /**
      * Get the position of the CoM.
-     * @param comPosition position of the CoM.
-     * @return true on success, false otherwise.
+     * @return position of the CoM.
      */
-    bool getCoMPosition(iDynTree::Vector2& comPosition);
+    const iDynTree::Vector2& getCoMPosition() const;
 
     /**
      * Get the velocity of the CoM.
-     * @param comVelocity velocity of the CoM.
-     * @return true on success, false otherwise.
+     * @return velocity of the CoM.
      */
-    bool getCoMVelocity(iDynTree::Vector2& comVelocity);
+    const iDynTree::Vector2& getCoMVelocity() const;
 
     /**
      * Reset the Model
