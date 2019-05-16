@@ -50,7 +50,7 @@
  */
 class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
-    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Paused, Stopped};
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Paused, Stopped};
     WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     double m_dT; /**< RFModule period. */
