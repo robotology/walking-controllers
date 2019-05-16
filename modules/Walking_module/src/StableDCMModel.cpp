@@ -62,8 +62,6 @@ void StableDCMModel::setInput(const iDynTree::Vector2& input)
 
 bool StableDCMModel::integrateModel()
 {
-    m_isModelPropagated = false;
-
     if(m_comIntegrator == nullptr)
     {
         yError() << "[integrateModel] The dcm integrator object is not ready. "
@@ -84,33 +82,17 @@ bool StableDCMModel::integrateModel()
     iDynTree::toiDynTree(comVelocityYarp, m_comVelocity);
     iDynTree::toiDynTree(comPositionYarp, m_comPosition);
 
-    m_isModelPropagated = true;
-
     return true;
 }
 
-bool StableDCMModel::getCoMPosition(iDynTree::Vector2& comPosition)
+const iDynTree::Vector2& StableDCMModel::getCoMPosition() const
 {
-    if(!m_isModelPropagated)
-    {
-        yError() << "[getCoMPosition] The Model is not prrpagated. "
-                 << "Please call 'propagateModel()' method.";
-        return false;
-    }
-    comPosition = m_comPosition;
-    return true;
+    return m_comPosition;
 }
 
-bool StableDCMModel::getCoMVelocity(iDynTree::Vector2& comVelocity)
+const iDynTree::Vector2& StableDCMModel::getCoMVelocity() const
 {
-    if(!m_isModelPropagated)
-    {
-        yError() << "[getCoMPosition] The Model is not prrpagated. "
-                 << "Please call 'propagateModel()' method.";
-        return false;
-    }
-    comVelocity = m_comVelocity;
-    return true;
+    return m_comVelocity;
 }
 
 bool StableDCMModel::reset(const iDynTree::Vector2& initialValue)
