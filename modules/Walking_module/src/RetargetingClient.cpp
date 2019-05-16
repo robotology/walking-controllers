@@ -7,6 +7,7 @@
  */
 
 #include <yarp/os/LogStream.h>
+#include <yarp/sig/Vector.h>
 
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Core/EigenHelpers.h>
@@ -29,43 +30,59 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     {
         yInfo() << "[RetargetingClient::initialize] the hand retargeting is disable";
         m_useHandRetargeting = false;
+        m_useVirtualizer = false;
         return true;
     }
 
-    m_useHandRetargeting = true;
+    m_useHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
+    m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
 
     std::string portName;
 
-    // open left hand port
-    if(!YarpHelper::getStringFromSearchable(config, "left_hand_transform_port_name",
-                                            portName))
+    if(m_useHandRetargeting)
     {
-        yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
-        return false;
-    }
-    m_leftHandTransformPort.open("/" + name + portName);
+        // open left hand port
+        if(!YarpHelper::getStringFromSearchable(config, "left_hand_transform_port_name",
+                                                portName))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+            return false;
+        }
+        m_leftHandTransformPort.open("/" + name + portName);
 
-    // open right hand port
-    if(!YarpHelper::getStringFromSearchable(config, "right_hand_transform_port_name",
-                                            portName))
+        // open right hand port
+        if(!YarpHelper::getStringFromSearchable(config, "right_hand_transform_port_name",
+                                                portName))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+            return false;
+        }
+        m_rightHandTransformPort.open("/" + name + portName);
+
+        m_leftHandTransformYarp.resize(6);
+        m_rightHandTransformYarp.resize(6);
+
+        double smoothingTime;
+        if(!YarpHelper::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+
+        m_leftHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
+        m_rightHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
+    }
+
+    if(m_useVirtualizer)
     {
-        yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
-        return false;
+        if(!YarpHelper::getStringFromSearchable(config, "robot_orientation_port_name",
+                                                portName))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+            return false;
+        }
+        m_robotOrientationPort.open("/" + name + portName);
     }
-    m_rightHandTransformPort.open("/" + name + portName);
-
-    m_leftHandTransformYarp.resize(6);
-    m_rightHandTransformYarp.resize(6);
-
-    double smoothingTime;
-    if(!YarpHelper::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
-    {
-        yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-        return false;
-    }
-
-    m_leftHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
-    m_rightHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
 
     return true;
 }
@@ -132,4 +149,14 @@ void RetargetingClient::close()
 
     m_leftHandTransformPort.close();
     m_rightHandTransformPort.close();
+}
+
+void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotation)
+{
+    if(!m_useVirtualizer)
+        return;
+    yarp::sig::Vector& output = m_robotOrientationPort.prepare();
+    output.clear();
+    output(0) = rotation.asRPY()(2);
+    m_robotOrientationPort.write(false);
 }

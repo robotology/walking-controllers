@@ -30,6 +30,7 @@ class RetargetingClient
 private:
 
     bool m_useHandRetargeting; /**< True if the hand retargeting is used */
+    bool m_useVirtualizer; /**< True if the virtualizer is used */
 
     iDynTree::Transform m_leftHandTransform; /**< Left hand transform head_T_leftHand */
     iDynTree::Transform m_rightHandTransform; /**< Right hand transform head_T_rightHand*/
@@ -46,6 +47,7 @@ private:
     std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_rightHandSmoother; /**< Minimum jerk trajectory
                                                                         for the right hand. */
 
+    yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
     /**
      * Convert a yarp vector containing position + rpy into an iDynTree homogeneous transform
@@ -95,6 +97,11 @@ public:
      * Get the homogeneous transform of the right hand w.r.t. the head frame head_T_rightHand
      */
     const iDynTree::Transform& rightHandTransform() const;
+
+    /**
+     * Get the homogeneous transform of the right hand w.r.t. the head frame head_T_rightHand
+     */
+    void setRobotBaseOrientation(const iDynTree::Rotation& rotation);
 };
 
 #endif
