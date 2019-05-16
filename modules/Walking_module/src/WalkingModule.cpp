@@ -796,6 +796,8 @@ bool WalkingModule::updateModule()
         // advance all the signals
         advanceReferenceSignals();
 
+        m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
+
         if(m_firstStep)
             m_firstStep = false;
 
