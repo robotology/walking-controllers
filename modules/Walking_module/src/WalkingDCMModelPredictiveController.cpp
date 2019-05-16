@@ -6,7 +6,7 @@
  * @date 2018
  */
 
-// std 
+// std
 #define NOMINMAX
 #include <algorithm>
 
@@ -490,7 +490,6 @@ bool WalkingController::buildConvexHull(const iDynTree::Transform& footTransform
 
 bool WalkingController::solve()
 {
-    m_isSolutionEvaluated = false;
     if(!m_currentController->isInitialized())
     {
         if(!m_currentController->initialize())
@@ -516,28 +515,16 @@ bool WalkingController::solve()
         return false;
     }
 
-    m_isSolutionEvaluated = true;
     return true;
 }
 
-bool WalkingController::getControllerOutput(iDynTree::Vector2& controllerOutput)
+const iDynTree::Vector2& WalkingController::getControllerOutput() const
 {
-    if(!m_isSolutionEvaluated)
-    {
-        yError() << "[getControllerOutput] The solution is not evaluated. "
-                 << "Please call 'solve()' method.";
-        return false;
-    }
-
-    m_isSolutionEvaluated = false;
-    controllerOutput = m_output;
-    return true;
+    return m_output;
 }
 
 void WalkingController::reset()
 {
     // used to indicate the first step.
     m_feetStatus = std::make_pair<bool, bool>(false, false);
-
-    m_isSolutionEvaluated = false;
 }

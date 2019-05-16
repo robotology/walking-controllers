@@ -592,7 +592,6 @@ bool WalkingModule::updateModule()
         }
 
         // DCM controller
-        iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
         {
             // Model predictive controller
@@ -618,13 +617,7 @@ bool WalkingModule::updateModule()
 
             if(!m_walkingController->solve())
             {
-                yError() << "[updateModule] Unable to solve the problem.";
-                return false;
-            }
-
-            if(!m_walkingController->getControllerOutput(desiredZMP))
-            {
-                yError() << "[updateModule] Unable to get the MPC output.";
+                yError() << "[WalkingModule::updateModule] Unable to solve the problem.";
                 return false;
             }
 
@@ -638,13 +631,7 @@ bool WalkingModule::updateModule()
 
             if(!m_walkingDCMReactiveController->evaluateControl())
             {
-                yError() << "[updateModule] Unable to evaluate the DCM control output.";
-                return false;
-            }
-
-            if(!m_walkingDCMReactiveController->getControllerOutput(desiredZMP))
-            {
-                yError() << "[updateModule] Unable to get the DCM control output.";
+                yError() << "[WalkingModule::updateModule] Unable to evaluate the DCM control output.";
                 return false;
             }
         }
@@ -655,6 +642,10 @@ bool WalkingModule::updateModule()
         double threshold = 0.001;
         bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
         m_walkingZMPController->setPhase(stancePhase);
+
+        iDynTree::Vector2 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+        if(m_useMPC)
+            desiredZMP = m_walkingController->getControllerOutput();
 
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
@@ -781,6 +772,10 @@ bool WalkingModule::updateModule()
         // send data to the WalkingLogger
         if(m_dumpData)
         {
+            iDynTree::Vector2 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+            if(m_useMPC)
+                desiredZMP = m_walkingController->getControllerOutput();
+
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
