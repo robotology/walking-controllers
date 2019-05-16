@@ -43,7 +43,7 @@ bool WalkingModule::advanceReferenceSignals()
        || m_DCMVelocityDesired.empty()
        || m_comHeightTrajectory.empty())
     {
-        yError() << "[advanceReferenceSignals] Cannot advance empty reference signals.";
+        yError() << "[WalkingModule::advanceReferenceSignals] Cannot advance empty reference signals.";
         return false;
     }
 
@@ -107,12 +107,12 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
     std::string model = rf.check("model",yarp::os::Value("model.urdf")).asString();
     std::string pathToModel = yarp::os::ResourceFinder::getResourceFinderSingleton().findFileByName(model);
 
-    yInfo() << "The model is found in: " << pathToModel;
+    yInfo() << "[WalkingModule::setRobotModel] The model is found in: " << pathToModel;
 
     // only the controlled joints are extracted from the URDF file
     if(!m_loader.loadReducedModelFromFile(pathToModel, m_robotControlHelper->getAxesList()))
     {
-        yError() << "[setRobotModel] Error while loading the model from " << pathToModel;
+        yError() << "[WalkingModule::setRobotModel] Error while loading the model from " << pathToModel;
         return false;
     }
     return true;
@@ -131,7 +131,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     std::string name;
     if(!YarpHelper::getStringFromSearchable(generalOptions, "name", name))
     {
-        yError() << "[configure] Unable to get the string from searchable.";
+        yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
         return false;
     }
     setName(name.c_str());
@@ -141,7 +141,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     robotControlHelperOptions.append(generalOptions);
     if(!m_robotControlHelper->configureRobot(robotControlHelperOptions))
     {
-        yError() << "[configure] Unable to configure the robot.";
+        yError() << "[WalkingModule::configure] Unable to configure the robot.";
         return false;
     }
 
@@ -149,7 +149,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     forceTorqueSensorsOptions.append(generalOptions);
     if(!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
     {
-        yError() << "[configure] Unable to configure the Force Torque sensors.";
+        yError() << "[WalkingModule::configure] Unable to configure the Force Torque sensors.";
         return false;
     }
 
@@ -164,14 +164,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     this->yarp().attachAsServer(this->m_rpcPort);
     if(!m_rpcPort.open(rpcPortName))
     {
-        yError() << "[configure] Could not open" << rpcPortName << " RPC port.";
+        yError() << "[WalkingModule::configure] Could not open" << rpcPortName << " RPC port.";
         return false;
     }
 
     std::string desiredUnyciclePositionPortName = "/" + getName() + "/goal:i";
     if(!m_desiredUnyciclePositionPort.open(desiredUnyciclePositionPortName))
     {
-        yError() << "[configure] Could not open" << desiredUnyciclePositionPortName << " port.";
+        yError() << "[WalkingModule::configure] Could not open" << desiredUnyciclePositionPortName << " port.";
         return false;
     }
 
@@ -193,7 +193,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         dcmControllerOptions.append(generalOptions);
         if(!m_walkingController->initialize(dcmControllerOptions))
         {
-            yError() << "[configure] Unable to initialize the controller.";
+            yError() << "[WalkingModule::configure] Unable to initialize the controller.";
             return false;
         }
     }
@@ -205,7 +205,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         dcmControllerOptions.append(generalOptions);
         if(!m_walkingDCMReactiveController->initialize(dcmControllerOptions))
         {
-            yError() << "[configure] Unable to initialize the controller.";
+            yError() << "[WalkingModule::configure] Unable to initialize the controller.";
             return false;
         }
     }
@@ -216,7 +216,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     zmpControllerOptions.append(generalOptions);
     if(!m_walkingZMPController->initialize(zmpControllerOptions))
     {
-        yError() << "[configure] Unable to initialize the ZMP controller.";
+        yError() << "[WalkingModule::configure] Unable to initialize the ZMP controller.";
         return false;
     }
 
@@ -226,7 +226,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(!m_IKSolver->initialize(inverseKinematicsSolverOptions, m_loader.model(),
                                m_robotControlHelper->getAxesList()))
     {
-        yError() << "[configure] Failed to configure the ik solver";
+        yError() << "[WalkingModule::configure] Failed to configure the ik solver";
         return false;
     }
 
@@ -245,7 +245,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
                                      m_robotControlHelper->getPositionUpperLimits(),
                                      m_robotControlHelper->getPositionLowerLimits()))
         {
-            yError() << "[configure] Failed to configure the QP-IK solver (qpOASES)";
+            yError() << "[WalkingModule::configure] Failed to configure the QP-IK solver (qpOASES)";
             return false;
         }
     }
@@ -256,7 +256,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     forwardKinematicsSolverOptions.append(generalOptions);
     if(!m_FKSolver->initialize(forwardKinematicsSolverOptions, m_loader.model()))
     {
-        yError() << "[configure] Failed to configure the fk solver";
+        yError() << "[WalkingModule::configure] Failed to configure the fk solver";
         return false;
     }
 
@@ -264,7 +264,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_stableDCMModel = std::make_unique<StableDCMModel>();
     if(!m_stableDCMModel->initialize(generalOptions))
     {
-        yError() << "[configure] Failed to configure the lipm.";
+        yError() << "[WalkingModule::configure] Failed to configure the lipm.";
         return false;
     }
 
@@ -272,15 +272,17 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle& pidOptions = rf.findGroup("PID");
     if (!m_robotControlHelper->configurePIDHandler(pidOptions))
     {
-        yError() << "[configure] Failed to configure the PIDs.";
+        yError() << "[WalkingModule::configure] Failed to configure the PIDs.";
         return false;
     }
 
-    yarp::os::Bottle& retargetingOptions = rf.findGroup("RETARGETING");
+    // configure the retargeting
+    yarp::os::Bottle retargetingOptions = rf.findGroup("RETARGETING");
+    retargetingOptions.append(generalOptions);
     m_retargetingClient = std::make_unique<RetargetingClient>();
     if (!m_retargetingClient->initialize(retargetingOptions, getName(), m_dT))
     {
-        yError() << "[configure] Failed to configure the retargeting";
+        yError() << "[WalkingModule::configure] Failed to configure the retargeting";
         return false;
     }
 
@@ -291,7 +293,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
         if(!m_walkingLogger->configure(loggerOptions, getName()))
         {
-            yError() << "[configure] Unable to configure the logger.";
+            yError() << "[WalkingModule::configure] Unable to configure the logger.";
             return false;
         }
     }
@@ -317,7 +319,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
-    yInfo() << "[configure] Ready to play!";
+    yInfo() << "[WalkingModule::configure] Ready to play!";
 
     return true;
 }
@@ -351,7 +353,7 @@ bool WalkingModule::close()
     // close the connection with robot
     if(!m_robotControlHelper->close())
     {
-        yError() << "[close] Unable to close the connection with the robot.";
+        yError() << "[WalkingModule::close] Unable to close the connection with the robot.";
         return false;
     }
 
@@ -425,13 +427,13 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
 
     if(!ok)
     {
-        yError() << "[solveQPIK] Error while setting the jacobians.";
+        yError() << "[WalkingModule::solveQPIK] Error while setting the jacobians.";
         return false;
     }
 
     if(!solver->solve())
     {
-        yError() << "[solveQPIK] Unable to solve the QP-IK problem.";
+        yError() << "[WalkingModule::solveQPIK] Unable to solve the QP-IK problem.";
         return false;
     }
 
@@ -449,8 +451,8 @@ bool WalkingModule::updateModule()
         bool motionDone = false;
         if(!m_robotControlHelper->checkMotionDone(motionDone))
         {
-            yError() << "[updateModule] Unable to check if the motion is done";
-            yInfo() << "[updateModule] Try to prepare again";
+            yError() << "[WalkingModule::updateModule] Unable to check if the motion is done";
+            yInfo() << "[WalkingModule::updateModule] Try to prepare again";
             reset();
             m_robotState = WalkingFSM::Stopped;
             return true;
@@ -462,7 +464,7 @@ bool WalkingModule::updateModule()
             {
                 yError() << "[prepareRobot] Error while setting the initial position using "
                          << "POSITION DIRECT mode.";
-                yInfo() << "[updateModule] Try to prepare again";
+                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
                 reset();
                 m_robotState = WalkingFSM::Stopped;
                 return true;
@@ -493,7 +495,7 @@ bool WalkingModule::updateModule()
 
             m_robotState = WalkingFSM::Prepared;
 
-            yInfo() << "[updateModule] The robot is prepared.";
+            yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
         }
     }
     else if(m_robotState == WalkingFSM::Walking)
@@ -510,7 +512,7 @@ bool WalkingModule::updateModule()
         if(desiredUnicyclePosition != nullptr)
             if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
             {
-                yError() << "[updateModule] Unable to set the planner input";
+                yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
             }
 
@@ -534,7 +536,7 @@ bool WalkingModule::updateModule()
                                        measuredTransform, m_newTrajectoryMergeCounter,
                                        m_desiredPosition))
                 {
-                    yError() << "[updateModule] Unable to ask for a new trajectory.";
+                    yError() << "[WalkingModule::updateModule] Unable to ask for a new trajectory.";
                     return false;
                 }
             }
@@ -543,7 +545,7 @@ bool WalkingModule::updateModule()
             {
                 if(!updateTrajectories(m_newTrajectoryMergeCounter))
                 {
-                    yError() << "[updateModule] Error while updating trajectories. They were not computed yet.";
+                    yError() << "[WalkingModule::updateModule] Error while updating trajectories. They were not computed yet.";
                     return false;
                 }
                 m_newTrajectoryRequired = false;
@@ -557,7 +559,7 @@ bool WalkingModule::updateModule()
         {
             if (!m_robotControlHelper->getPIDHandler().updatePhases(m_leftInContact, m_rightInContact, m_time))
             {
-                yError() << "[updateModule] Unable to get the update PID.";
+                yError() << "[WalkingModule::updateModule] Unable to get the update PID.";
                 return false;
             }
         }
@@ -565,7 +567,7 @@ bool WalkingModule::updateModule()
         // get feedbacks and evaluate useful quantities
         if(!m_robotControlHelper->getFeedbacks(10))
         {
-            yError() << "[updateModule] Unable to get the feedback.";
+            yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
         }
 
@@ -573,13 +575,13 @@ bool WalkingModule::updateModule()
 
         if(!updateFKSolver())
         {
-            yError() << "[updateModule] Unable to update the FK solver.";
+            yError() << "[WalkingModule::updateModule] Unable to update the FK solver.";
             return false;
         }
 
         if(!evaluateZMP(measuredZMP))
         {
-            yError() << "[updateModule] Unable to evaluate the ZMP.";
+            yError() << "[WalkingModule::updateModule] Unable to evaluate the ZMP.";
             return false;
         }
 
@@ -599,19 +601,19 @@ bool WalkingModule::updateModule()
             if(!m_walkingController->setConvexHullConstraint(m_leftTrajectory, m_rightTrajectory,
                                                              m_leftInContact, m_rightInContact))
             {
-                yError() << "[updateModule] unable to evaluate the convex hull.";
+                yError() << "[WalkingModule::updateModule] unable to evaluate the convex hull.";
                 return false;
             }
 
             if(!m_walkingController->setFeedback(m_FKSolver->getDCM()))
             {
-                yError() << "[updateModule] unable to set the feedback.";
+                yError() << "[WalkingModule::updateModule] unable to set the feedback.";
                 return false;
             }
 
             if(!m_walkingController->setReferenceSignal(m_DCMPositionDesired, resetTrajectory))
             {
-                yError() << "[updateModule] unable to set the reference Signal.";
+                yError() << "[WalkingModule::updateModule] unable to set the reference Signal.";
                 return false;
             }
 
@@ -654,7 +656,7 @@ bool WalkingModule::updateModule()
 
         if(!m_walkingZMPController->evaluateControl())
         {
-            yError() << "[updateModule] Unable to evaluate the ZMP control output.";
+            yError() << "[WalkingModule::updateModule] Unable to evaluate the ZMP control output.";
             return false;
         }
 
@@ -662,7 +664,7 @@ bool WalkingModule::updateModule()
         if(!m_walkingZMPController->getControllerOutput(outputZMPCoMControllerPosition,
                                                         outputZMPCoMControllerVelocity))
         {
-            yError() << "[updateModule] Unable to get the ZMP controller output.";
+            yError() << "[WalkingModule::updateModule] Unable to get the ZMP controller output.";
             return false;
         }
 
@@ -700,7 +702,7 @@ bool WalkingModule::updateModule()
 
             if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
             {
-                yError() << "[updateModule] Unable to set the internal robot state.";
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
             }
 
@@ -708,7 +710,7 @@ bool WalkingModule::updateModule()
                           desiredCoMVelocity,
                           yawRotation, m_dqDesired))
             {
-                yError() << "[updateModule] Unable to solve the QP problem with osqp.";
+                yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with osqp.";
                 return false;
             }
 
@@ -720,7 +722,7 @@ bool WalkingModule::updateModule()
             if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                                   m_robotControlHelper->getJointVelocity()))
             {
-                yError() << "[updateModule] Unable to set the internal robot state.";
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
             }
 
@@ -731,20 +733,20 @@ bool WalkingModule::updateModule()
             {
                 if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
                 {
-                    yError() << "[updateModule] Error updating the inertia to world frame rotation.";
+                    yError() << "[WalkingModule::updateModule] Error updating the inertia to world frame rotation.";
                     return false;
                 }
 
                 if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
                 {
-                    yError() << "[updateModule] Error while setting the feedback to the inverse Kinematics.";
+                    yError() << "[WalkingModule::updateModule] Error while setting the feedback to the inverse Kinematics.";
                     return false;
                 }
 
                 if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
                                           desiredCoMPosition, m_qDesired))
                 {
-                    yError() << "[updateModule] Error during the inverse Kinematics iteration.";
+                    yError() << "[WalkingModule::updateModule] Error during the inverse Kinematics iteration.";
                     return false;
                 }
             }
@@ -753,7 +755,7 @@ bool WalkingModule::updateModule()
 
         if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
         {
-            yError() << "[updateModule] Error while setting the reference position to iCub.";
+            yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
             return false;
         }
 
@@ -861,7 +863,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 {
     if(m_robotState != WalkingFSM::Configured && m_robotState != WalkingFSM::Stopped)
     {
-        yError() << "[prepareRobot] The robot can be prepared only at the "
+        yError() << "[WalkingModule::prepareRobot] The robot can be prepared only at the "
                  << "beginning or when the controller is stopped.";
         return false;
     }
@@ -873,7 +875,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // depend on the current state of the robot
     if(!m_robotControlHelper->getFeedbacksRaw(10))
     {
-        yError() << "[prepareRobot] Unable to get the feedback.";
+        yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
     }
 
@@ -881,14 +883,14 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     {
         if(!m_FKSolver->setBaseOnTheFly())
         {
-            yError() << "[prepareRobot] Unable to set the onTheFly base.";
+            yError() << "[WalkingModule::prepareRobot] Unable to set the onTheFly base.";
             return false;
         }
 
         if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                               m_robotControlHelper->getJointVelocity()))
         {
-            yError() << "[prepareRobot] Unable to evaluate the CoM.";
+            yError() << "[WalkingModule::prepareRobot] Unable to set joint state.";
             return false;
         }
 
@@ -898,7 +900,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         // evaluate the first trajectory. The robot does not move!
         if(!generateFirstTrajectories(leftToRightTransform))
         {
-            yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
+            yError() << "[WalkingModule::prepareRobot] Failed to evaluate the first trajectories.";
             return false;
         }
     }
@@ -907,7 +909,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         // evaluate the first trajectory. The robot does not move! So the first trajectory
         if(!generateFirstTrajectories())
         {
-            yError() << "[prepareRobot] Failed to evaluate the first trajectories.";
+            yError() << "[WalkingModule::prepareRobot] Failed to evaluate the first trajectories.";
             return false;
         }
     }
@@ -921,7 +923,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
     {
-        yError() << "[prepareRobot] Error while setting the feedback to the IK solver.";
+        yError() << "[WalkingModule::prepareRobot] Error while setting the feedback to the IK solver.";
         return false;
     }
 
@@ -949,7 +951,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
         if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
         {
-            yError() << "[prepareRobot] Error updating the inertia to world frame rotation.";
+            yError() << "[WalkingModule::prepareRobot] Error updating the inertia to world frame rotation.";
             return false;
         }
     }
@@ -963,7 +965,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
     {
-        yError() << "[prepareRobot] Error while setting the initial position.";
+        yError() << "[WalkingModule::prepareRobot] Error while setting the initial position.";
         return false;
     }
 
@@ -972,7 +974,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         m_robotState = WalkingFSM::Preparing;
     }
 
-
     return true;
 }
 
@@ -980,19 +981,19 @@ bool WalkingModule::generateFirstTrajectories(const iDynTree::Transform &leftToR
 {
     if(m_trajectoryGenerator == nullptr)
     {
-        yError() << "[generateFirstTrajectories] Unicycle planner not available.";
+        yError() << "[WalkingModule::generateFirstTrajectories] Unicycle planner not available.";
         return false;
     }
 
     if(!m_trajectoryGenerator->generateFirstTrajectories(leftToRightTransform))
     {
-        yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+        yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
         return false;
     }
 
     if(!updateTrajectories(0))
     {
-        yError() << "[generateFirstTrajectories] Unable to update the trajectory.";
+        yError() << "[WalkingModule::generateFirstTrajectories] Unable to update the trajectory.";
         return false;
     }
 
@@ -1006,19 +1007,19 @@ bool WalkingModule::generateFirstTrajectories()
 {
     if(m_trajectoryGenerator == nullptr)
     {
-        yError() << "[generateFirstTrajectories] Unicycle planner not available.";
+        yError() << "[WalkingModule::generateFirstTrajectories] Unicycle planner not available.";
         return false;
     }
 
     if(!m_trajectoryGenerator->generateFirstTrajectories())
     {
-        yError() << "[generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+        yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
         return false;
     }
 
     if(!updateTrajectories(0))
     {
-        yError() << "[generateFirstTrajectories] Unable to update the trajectory.";
+        yError() << "[WalkingModule::generateFirstTrajectories] Unable to update the trajectory.";
         return false;
     }
 
@@ -1034,13 +1035,13 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
 {
     if(m_trajectoryGenerator == nullptr)
     {
-        yError() << "[askNewTrajectories] Unicycle planner not available.";
+        yError() << "[WalkingModule::askNewTrajectories] Unicycle planner not available.";
         return false;
     }
 
     if(mergePoint >= m_DCMPositionDesired.size())
     {
-        yError() << "[askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
+        yError() << "[WalkingModule::askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
         return false;
     }
 
@@ -1048,7 +1049,7 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
                                                   measuredTransform, desiredPosition))
     {
-        yError() << "[askNewTrajectories] Unable to update the trajectory.";
+        yError() << "[WalkingModule::askNewTrajectories] Unable to update the trajectory.";
         return false;
     }
     return true;
@@ -1122,14 +1123,14 @@ bool WalkingModule::updateFKSolver()
                                                       m_rightTrajectory.front(),
                                                       m_isLeftFixedFrame.front()))
     {
-        yError() << "[updateFKSolver] Unable to evaluate the world to base transformation.";
+        yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
         return false;
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                           m_robotControlHelper->getJointVelocity()))
     {
-        yError() << "[updateFKSolver] Unable to evaluate the CoM.";
+        yError() << "[WalkingModule::updateFKSolver] Unable to set the robot state.";
         return false;
     }
 
@@ -1142,7 +1143,7 @@ bool WalkingModule::startWalking()
 
     if(m_robotState != WalkingFSM::Prepared && m_robotState != WalkingFSM::Paused)
     {
-        yError() << "[startWalking] Unable to start walking if the robot is not prepared or paused.";
+        yError() << "[WalkingModule::startWalking] Unable to start walking if the robot is not prepared or paused.";
         return false;
     }
 
@@ -1187,7 +1188,7 @@ bool WalkingModule::setPlannerInput(double x, double y)
     {
         if(!(m_leftInContact.front() && m_rightInContact.front()))
         {
-            yError() << "[setGoal] The trajectory has already finished but the system is not in double support.";
+            yError() << "[WalkingModule::setPlannerInput] The trajectory has already finished but the system is not in double support.";
             return false;
         }
 
@@ -1251,7 +1252,6 @@ bool WalkingModule::pauseWalking()
     m_robotState = WalkingFSM::Paused;
     return true;
 }
-
 
 bool WalkingModule::stopWalking()
 {
