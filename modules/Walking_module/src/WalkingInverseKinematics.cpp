@@ -126,7 +126,7 @@ bool WalkingIK::initialize(yarp::os::Searchable& ikOption, const iDynTree::Model
 
         if(guessValue->size() > 0 && static_cast<size_t>(guessValue->size()) != m_ik.reducedModel().getNrOfDOFs())
         {
-            yError("[ERROR WALKIK] The jointRegularization list should have the same dimension of the number of DoFs of the provided model. Model = %lu, Guess = %d.",
+            yError("[ERROR WALKIK] The jointRegularization list should have the same dimension of the number of DoFs of the provided model. Model = %lu, Guess = %lu.",
                    m_ik.reducedModel().getNrOfDOFs(), guessValue->size());
             return false;
         }
