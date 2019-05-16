@@ -162,7 +162,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     m_frameRootIndex = m_kinDyn.model().getFrameIndex(rootFrame);
     if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
     {
-        yError() << "[WalkingFK::initialize] Unable to find the frame named: root_link";
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rootFrame;
         return false;
     }
 
@@ -175,7 +175,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     m_frameNeckIndex = m_kinDyn.model().getFrameIndex(torsoFrame);
     if(m_frameNeckIndex == iDynTree::FRAME_INVALID_INDEX)
     {
-        yError() << "[WalkingFK::initialize] Unable to find the frame named: root_link";
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << torsoFrame;
         return false;
     }
 
