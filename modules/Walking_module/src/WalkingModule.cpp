@@ -457,15 +457,6 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION_DIRECT))
-            {
-                yError() << "[updateModule] Failed in setting POSITION DIRECT mode.";
-                yInfo() << "[updateModule] Try to prepare again";
-                reset();
-                m_robotState = WalkingFSM::Stopped;
-                return true;
-            }
-
             // send the reference again in order to reduce error
             if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
             {
@@ -984,13 +975,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
                               desiredCoMPosition, m_qDesired))
     {
-        yError() << "[prepareRobot] Inverse Kinematics failed while computing the initial position.";
-        return false;
-    }
-
-    if(!m_robotControlHelper->switchToControlMode(VOCAB_CM_POSITION))
-    {
-        yError() << "[prepareRobot] Error while setting the position control.";
+        yError() << "[WalkingModule::prepareRobot] Inverse Kinematics failed while computing the initial position.";
         return false;
     }
 

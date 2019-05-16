@@ -83,6 +83,8 @@ class RobotHelper
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
 
+    int m_controlMode{-1}; /**< Current position control mode */
+
     /**
      * Get the higher position error among all joints.
      * @param desiredJointPositionsRad desired joint position in radiants;
@@ -92,6 +94,13 @@ class RobotHelper
      */
     bool getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                        std::pair<std::string, double>& worstError);
+
+    /**
+     * Switch the control mode.
+     * @param controlMode is the control mode.
+     * @return true in case of success and false otherwise.
+     */
+    bool switchToControlMode(const int& controlMode);
 public:
 
     /**
@@ -119,13 +128,6 @@ public:
     bool getFeedbacks(unsigned int maxAttempts = 1);
 
     bool getFeedbacksRaw(unsigned int maxAttempts = 1);
-
-    /**
-     * Switch the control mode.
-     * @param controlMode is the control mode.
-     * @return true in case of success and false otherwise.
-     */
-    bool switchToControlMode(const int& controlMode);
 
     /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)
