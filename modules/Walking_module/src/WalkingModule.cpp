@@ -587,21 +587,7 @@ bool WalkingModule::updateModule()
         m_stableDCMModel->setInput(m_DCMPositionDesired.front());
         if(!m_stableDCMModel->integrateModel())
         {
-            yError() << "[updateModule] Unable to propagate the 3D-LIPM.";
-            return false;
-        }
-
-        iDynTree::Vector2 desiredCoMPositionXY;
-        if(!m_stableDCMModel->getCoMPosition(desiredCoMPositionXY))
-        {
-            yError() << "[updateModule] Unable to get the desired CoM position.";
-            return false;
-        }
-
-        iDynTree::Vector2 desiredCoMVelocityXY;
-        if(!m_stableDCMModel->getCoMVelocity(desiredCoMVelocityXY))
-        {
-            yError() << "[updateModule] Unable to get the desired CoM velocity.";
+            yError() << "[WalkingModule::updateModule] Unable to propagate the 3D-LIPM.";
             return false;
         }
 
@@ -672,8 +658,8 @@ bool WalkingModule::updateModule()
 
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
-        m_walkingZMPController->setReferenceSignal(desiredZMP, desiredCoMPositionXY,
-                                                   desiredCoMVelocityXY);
+        m_walkingZMPController->setReferenceSignal(desiredZMP, m_stableDCMModel->getCoMPosition(),
+                                                   m_stableDCMModel->getCoMVelocity());
 
         if(!m_walkingZMPController->evaluateControl())
         {
@@ -799,7 +785,8 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-                                      desiredCoMPositionXY, desiredCoMVelocityXY,
+                                      m_stableDCMModel->getCoMPosition(),
+                                      m_stableDCMModel->getCoMVelocity(),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
