@@ -644,9 +644,11 @@ bool WalkingModule::updateModule()
         bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
         m_walkingZMPController->setPhase(stancePhase);
 
-        iDynTree::Vector2 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+        iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
             desiredZMP = m_walkingController->getControllerOutput();
+        else
+            desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
@@ -773,9 +775,11 @@ bool WalkingModule::updateModule()
         // send data to the WalkingLogger
         if(m_dumpData)
         {
-            iDynTree::Vector2 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+            iDynTree::Vector2 desiredZMP;
             if(m_useMPC)
                 desiredZMP = m_walkingController->getControllerOutput();
+            else
+                desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
@@ -865,8 +869,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         return false;
     }
 
-    iDynTree::Transform leftToRightTransform;
-
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
@@ -892,7 +894,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         }
 
         // evaluate the left to right transformation, the inertial frame is on the left foot
-        leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
+        iDynTree::Transform leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
 
         // evaluate the first trajectory. The robot does not move!
         if(!generateFirstTrajectories(leftToRightTransform))
