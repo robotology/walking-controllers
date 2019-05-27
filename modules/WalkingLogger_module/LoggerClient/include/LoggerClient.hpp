@@ -1,13 +1,13 @@
 /**
- * @file WalkingLogger.hpp
+ * @file LoggerClient.hpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
- * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
+ * @copyright 2019 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
  * @date 2018
  */
 
-#ifndef WALKING_LOGGER_HPP
-#define WALKING_LOGGER_HPP
+#ifndef LOGGER_CLIENT_HPP
+#define LOGGER_CLIENT_HPP
 
 // YARP
 #include <yarp/os/Searchable.h>
@@ -15,7 +15,7 @@
 #include <yarp/os/RpcClient.h>
 #include <yarp/sig/Vector.h>
 
-class WalkingLogger
+class LoggerClient
 {
     yarp::os::BufferedPort<yarp::sig::Vector> m_dataPort; /**< Data logger port. */
     yarp::os::RpcClient m_rpcPort; /**< RPC data logger port. */
@@ -50,6 +50,6 @@ public:
     void sendData(const Args&... args);
 };
 
-#include "WalkingLogger.tpp"
+#include "LoggerClient.tpp"
 
 #endif

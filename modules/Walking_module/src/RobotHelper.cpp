@@ -43,7 +43,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 {
     if(!m_encodersInterface)
     {
-        yError() << "[RobotHelper::getFeedbacks] Encoders I/F is not ready";
+        yError() << "[RobotHelper::getFeedbacksRaw] Encoders I/F is not ready";
         return false;
     }
 
@@ -94,12 +94,12 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
             if(!iDynTree::toiDynTree(m_leftWrenchInput, m_leftWrench))
             {
-                yError() << "[getFeedbacks] Unable to convert left foot wrench.";
+                yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert left foot wrench.";
                 return false;
             }
             if(!iDynTree::toiDynTree(m_rightWrenchInput, m_rightWrench))
             {
-                yError() << "[getFeedbacks] Unable to convert right foot wrench.";
+                yError() << "[RobotHelper::getFeedbacksRaw] Unable to convert right foot wrench.";
                 return false;
             }
             return true;
@@ -108,7 +108,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
         attempt++;
     } while (attempt < maxAttempts);
 
-    yError() << "[getFeedbacks] The following readings failed:";
+    yError() << "[RobotHelper::getFeedbacksRaw] The following readings failed:";
     if(!okPosition)
         yError() << "\t - Position encoders";
 
@@ -234,7 +234,9 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_velocityFeedbackRad.resize(m_actuatedDOFs);
     m_desiredJointPositionRad.resize(m_actuatedDOFs);
     m_desiredJointValueDeg.resize(m_actuatedDOFs);
-    m_jointsVelocityLimit.resize(m_actuatedDOFs);
+    m_jointVelocitiesBounds.resize(m_actuatedDOFs);
+    m_jointPositionsUpperBounds.resize(m_actuatedDOFs);
+    m_jointPositionsLowerBounds.resize(m_actuatedDOFs);
 
     // m_positionFeedbackDegFiltered.resize(m_actuatedDOFs);
     // m_positionFeedbackDegFiltered.zero();
@@ -285,16 +287,29 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     }
 
     // get the limits
-    double max, min;
+    double maxVelocity, minAngle, maxAngle, dummy;
     for(unsigned int i = 0; i < m_actuatedDOFs; i++)
     {
-        if(!m_limitsInterface->getVelLimits(i, &min, &max))
+        if(!m_limitsInterface->getVelLimits(i, &dummy, &maxVelocity))
         {
-            yError() << "[configure] Unable get joints velocity limits.";
+            yError() << "[configure] Unable get the velocity limits of the joint: "
+                     << m_axesList[i];
             return false;
         }
 
-        m_jointsVelocityLimit(i) = iDynTree::deg2rad(max);
+        m_jointVelocitiesBounds(i) = iDynTree::deg2rad(maxVelocity);
+
+
+        if(!m_limitsInterface->getLimits(i, &minAngle, &maxAngle))
+        {
+            yError() << "[configure] Unable get the position limits of the joint: "
+                     << m_axesList[i];
+            return false;
+        }
+
+        m_jointPositionsUpperBounds(i) = iDynTree::deg2rad(maxAngle);
+        m_jointPositionsLowerBounds(i) = iDynTree::deg2rad(minAngle);
+
     }
     return true;
 }
@@ -336,7 +351,8 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
     // connect port
     if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
     {
-        yError() << "Unable to connect to port " << "/" + name + portInput;
+        yError() << "[RobotHelper::configureForceTorqueSensors] Unable to connect to port "
+                 << portOutput << " to " << "/" + name + portInput;
         return false;
     }
 
@@ -356,7 +372,8 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
     // connect port
     if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
     {
-        yError() << "Unable to connect to port " << "/" + name + portInput;
+        yError() << "[RobotHelper::configureForceTorqueSensors] Unable to connect to port "
+                 << portOutput << " to " << "/" + name + portInput;
         return false;
     }
 
@@ -366,7 +383,7 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
         double cutFrequency;
         if(!YarpHelper::getNumberFromSearchable(config, "wrench_cut_frequency", cutFrequency))
         {
-            yError() << "[configure] Unable get double from searchable.";
+            yError() << "[RobotHelper::configureForceTorqueSensors] Unable get double from searchable.";
             return false;
         }
 
@@ -389,7 +406,7 @@ bool RobotHelper::resetFilters()
 {
     if(!getFeedbacksRaw())
     {
-        yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
+        yError() << "[RobotHelper::resetFilters] Unable to get the feedback from the robot";
         return false;
     }
 
@@ -427,12 +444,12 @@ bool RobotHelper::getFeedbacks(unsigned int maxAttempts)
 
         if(!iDynTree::toiDynTree(m_leftWrenchInputFiltered, m_leftWrench))
         {
-            yError() << "[getFeedbacks] Unable to convert left foot wrench.";
+            yError() << "[RobotHelper::getFeedbacks] Unable to convert left foot wrench.";
             return false;
         }
         if(!iDynTree::toiDynTree(m_rightWrenchInputFiltered, m_rightWrench))
         {
-            yError() << "[getFeedbacks] Unable to convert right foot wrench.";
+            yError() << "[RobotHelper::getFeedbacks] Unable to convert right foot wrench.";
             return false;
         }
     }
@@ -444,7 +461,7 @@ bool RobotHelper::switchToControlMode(const int& controlMode)
     // check if the control interface is ready
     if(!m_controlModeInterface)
     {
-        yError() << "[switchToControlMode] ControlMode I/F not ready.";
+        yError() << "[RobotHelper::switchToControlMode] ControlMode I/F not ready.";
         return false;
     }
 
@@ -452,7 +469,7 @@ bool RobotHelper::switchToControlMode(const int& controlMode)
     std::vector<int> controlModes(m_actuatedDOFs, controlMode);
     if(!m_controlModeInterface->setControlModes(controlModes.data()))
     {
-        yError() << "[switchToControlMode] Error while setting the controlMode.";
+        yError() << "[RobotHelper::switchToControlMode] Error while setting the controlMode.";
         return false;
     }
     return true;
@@ -461,11 +478,21 @@ bool RobotHelper::switchToControlMode(const int& controlMode)
 bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                                         const double& positioningTimeSec)
 {
+    if(m_controlMode != VOCAB_CM_POSITION)
+    {
+        if(!switchToControlMode(VOCAB_CM_POSITION))
+        {
+            yError() << "[RobotHelper::setPositionReferences] Unable to switch in position control mode.";
+            return false;
+        }
+        m_controlMode = VOCAB_CM_POSITION;
+    }
+
     m_positioningTime = positioningTimeSec;
     m_positionMoveSkipped = false;
     if(m_positionInterface == nullptr)
     {
-        yError() << "[setPositionReferences] Position I/F is not ready.";
+        yError() << "[RobotHelper::setPositionReferences] Position I/F is not ready.";
         return false;
     }
 
@@ -475,7 +502,7 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
 
     if(!getWorstError(desiredJointPositionsRad, worstError))
     {
-        yError() << "[setPositionReferences] Unable to get the worst error.";
+        yError() << "[RobotHelper::setPositionReferences] Unable to get the worst error.";
         return false;
     }
 
@@ -487,13 +514,13 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
 
     if(positioningTimeSec < 0.01)
     {
-        yError() << "[setPositionReferences] The positioning time is too short.";
+        yError() << "[RobotHelper::setPositionReferences] The positioning time is too short.";
         return false;
     }
 
     if(!m_encodersInterface->getEncoders(m_positionFeedbackDeg.data()))
     {
-        yError() << "[setPositionReferences] Error while reading encoders.";
+        yError() << "[RobotHelper::setPositionReferences] Error while reading encoders.";
         return false;
     }
 
@@ -511,7 +538,7 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
 
     if(!m_positionInterface->setRefSpeeds(refSpeeds.data()))
     {
-        yError() << "[setPositionReferences] Error while setting the desired speed of joints.";
+        yError() << "[RobotHelper::setPositionReferences] Error while setting the desired speed of joints.";
         return false;
     }
 
@@ -521,7 +548,7 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
 
     if(!m_positionInterface->positionMove(m_desiredJointValueDeg.data()))
     {
-        yError() << "Error while setting the desired positions.";
+        yError() << "[RobotHelper::setPositionReferences] Error while setting the desired positions.";
         return false;
     }
 
@@ -544,7 +571,7 @@ bool RobotHelper::checkMotionDone(bool& motionDone)
     std::pair<std::string, double> worstError;
     if (!getWorstError(m_desiredJointPositionRad, worstError))
     {
-        yError() << "[checkMotionDone] Unable to get the worst error.";
+        yError() << "[RobotHelper::checkMotionDone] Unable to get the worst error.";
         return false;
     }
 
@@ -552,7 +579,7 @@ bool RobotHelper::checkMotionDone(bool& motionDone)
     double timeThreshold = 1;
     if (now - m_startingPositionControlTime > m_positioningTime + timeThreshold)
     {
-        yError() << "[checkMotionDone] The timer is expired but the joint "
+        yError() << "[RobotHelper::checkMotionDone] The timer is expired but the joint "
                  << worstError.first << " has an error of " << worstError.second
                  << " radians";
         return false;
@@ -566,19 +593,29 @@ bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& des
 {
     if(m_positionDirectInterface == nullptr)
     {
-        yError() << "[setDirectPositionReferences] PositionDirect I/F not ready.";
+        yError() << "[RobotHelper::setDirectPositionReferences] PositionDirect I/F not ready.";
         return false;
     }
 
     if(m_encodersInterface == nullptr)
     {
-        yError() << "[setDirectPositionReferences] Encoders I/F not ready.";
+        yError() << "[RobotHelper::setDirectPositionReferences] Encoders I/F not ready.";
         return false;
+    }
+
+    if(m_controlMode != VOCAB_CM_POSITION_DIRECT)
+    {
+        if(!switchToControlMode(VOCAB_CM_POSITION_DIRECT))
+        {
+            yError() << "[RobotHelper::setDirectPositionReferences] Unable to switch in position-direct control mode.";
+            return false;
+        }
+        m_controlMode = VOCAB_CM_POSITION_DIRECT;
     }
 
     if(desiredPositionRad.size() != m_actuatedDOFs)
     {
-        yError() << "[setDirectPositionReferences] Dimension mismatch between desired position "
+        yError() << "[RobotHelper::setDirectPositionReferences] Dimension mismatch between desired position "
                  << "vector and the number of controlled joints.";
         return false;
     }
@@ -587,13 +624,13 @@ bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& des
 
     if(!getWorstError(desiredPositionRad, worstError))
     {
-        yError() << "[setPositionReferences] Unable to get the worst error.";
+        yError() << "[RobotHelper::setDirectPositionReferences] Unable to get the worst error.";
         return false;
     }
 
     if(worstError.second > 0.5)
     {
-        yError() << "[setDirectPositionReferences] The worst error between the current and the "
+        yError() << "[RobotHelper::setDirectPositionReferences] The worst error between the current and the "
                  << "desired position of the " << worstError.first
                  << "-th joint is greater than 0.5 rad.";
         return false;
@@ -604,7 +641,7 @@ bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& des
 
     if(!m_positionDirectInterface->setPositions(m_desiredJointValueDeg.data()))
     {
-        yError() << "[setDirectPositionReferences] Error while setting the desired position.";
+        yError() << "[RobotHelper::setDirectPositionReferences] Error while setting the desired position.";
         return false;
     }
 
@@ -615,19 +652,29 @@ bool RobotHelper::setVelocityReferences(const iDynTree::VectorDynSize& desiredVe
 {
     if(m_velocityInterface == nullptr)
     {
-        yError() << "[setVelocityReferences] PositionDirect I/F not ready.";
+        yError() << "[RobotHelper::setVelocityReferences] PositionDirect I/F not ready.";
         return false;
     }
 
     if(m_encodersInterface == nullptr)
     {
-        yError() << "[setVelocityReferences] Encoders I/F not ready.";
+        yError() << "[RobotHelper::setVelocityReferences] Encoders I/F not ready.";
         return false;
+    }
+
+    if(m_controlMode != VOCAB_CM_VELOCITY)
+    {
+        if(!switchToControlMode(VOCAB_CM_VELOCITY))
+        {
+            yError() << "[RobotHelper::setVelocityReferences] Unable to switch in velocity control mode.";
+            return false;
+        }
+        m_controlMode = VOCAB_CM_VELOCITY;
     }
 
     if(desiredVelocityRad.size() != m_actuatedDOFs)
     {
-        yError() << "[setVelocityReferences] Dimension mismatch between desired velocity "
+        yError() << "[RobotHelper::setVelocityReferences] Dimension mismatch between desired velocity "
                  << "vector and the number of controlled joints.";
         return false;
     }
@@ -637,7 +684,7 @@ bool RobotHelper::setVelocityReferences(const iDynTree::VectorDynSize& desiredVe
 
     if(!m_velocityInterface->velocityMove(m_desiredJointValueDeg.data()))
     {
-        yError() << "[setVelocityReferences] Error while setting the desired position.";
+        yError() << "[RobotHelper::setVelocityReferences] Error while setting the desired position.";
         return false;
     }
 
@@ -649,9 +696,10 @@ bool RobotHelper::close()
     m_rightWrenchPort.close();
     m_leftWrenchPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
+    m_controlMode = VOCAB_CM_POSITION;
     if(!m_robotDevice.close())
     {
-        yError() << "[close] Unable to close the device.";
+        yError() << "[RobotHelper::close] Unable to close the device.";
         return false;
     }
 
@@ -671,6 +719,7 @@ const iDynTree::Wrench& RobotHelper::getLeftWrench() const
 {
     return m_leftWrench;
 }
+
 const iDynTree::Wrench& RobotHelper::getRightWrench() const
 {
     return m_rightWrench;
@@ -678,7 +727,17 @@ const iDynTree::Wrench& RobotHelper::getRightWrench() const
 
 const iDynTree::VectorDynSize& RobotHelper::getVelocityLimits() const
 {
-    return m_jointsVelocityLimit;
+    return m_jointVelocitiesBounds;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getPositionUpperLimits() const
+{
+    return m_jointPositionsUpperBounds;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getPositionLowerLimits() const
+{
+    return m_jointPositionsLowerBounds;
 }
 
 const std::vector<std::string>& RobotHelper::getAxesList() const

@@ -35,7 +35,8 @@
 #include <WalkingForwardKinematics.hpp>
 #include <StableDCMModel.hpp>
 #include <WalkingPIDHandler.hpp>
-#include <WalkingLogger.hpp>
+#include <RetargetingClient.hpp>
+#include <LoggerClient.hpp>
 #include <TimeProfiler.hpp>
 
 // iCub-ctrl
@@ -49,14 +50,13 @@
  */
 class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 {
-    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Stance, Paused, Stopped};
+    enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Paused, Stopped};
     WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
     double m_dT; /**< RFModule period. */
     double m_time; /**< Current time. */
     std::string m_robot; /**< Robot name. */
 
-    bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
@@ -68,12 +68,12 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
-    std::shared_ptr<WalkingQPIK_osqp> m_QPIKSolver_osqp; /**< Pointer to the inverse kinematics solver (osqp). */
-    std::shared_ptr<WalkingQPIK_qpOASES> m_QPIKSolver_qpOASES; /**< Pointer to the inverse kinematics solver (qpOASES). */
+    std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
-    std::unique_ptr<WalkingLogger> m_walkingLogger; /**< Pointer to the Walking Logger object. */
+    std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
+    std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
 
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
@@ -153,26 +153,11 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
      * @param output is the output of the solver (i.e. the desired joint velocity)
      * @return true in case of success and false otherwise.
      */
-    bool solveQPIK(const std::shared_ptr<WalkingQPIK> solver,
+    bool solveQPIK(const std::unique_ptr<WalkingQPIK>& solver,
                    const iDynTree::Position& desiredCoMPosition,
                    const iDynTree::Vector3& desiredCoMVelocity,
-                   const iDynTree::Position& actualCoMPosition,
                    const iDynTree::Rotation& desiredNeckOrientation,
                    iDynTree::VectorDynSize &output);
-    /**
-     * Evaluate the position of CoM.
-     * @param comPosition position of the center of mass;
-     * @param comVelocity velocity of the center of mass.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateCoM(iDynTree::Position& comPosition, iDynTree::Vector3& comVelocity);
-
-    /**
-     * Evaluate the position of 2D-Divergent component of motion.
-     * @param dcm 2d-Divergent component of motion.
-     * @return true in case of success and false otherwise.
-     */
-    bool evaluateDCM(iDynTree::Vector2& dcm);
 
     /**
      * Evaluate the position of Zero momentum point.

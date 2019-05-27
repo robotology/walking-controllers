@@ -32,6 +32,9 @@ class WalkingFK
     iDynTree::FrameIndex m_frameRightIndex; /**< Index of the frame attached to the right foot in which all the right foot transformations are expressed. */
     iDynTree::FrameIndex m_frameRootIndex; /**< Index of the frame attached to the root_link. */
     iDynTree::FrameIndex m_frameNeckIndex; /**< Index of the frame attached to the neck_2. */
+    iDynTree::FrameIndex m_frameLeftHandIndex; /**< Index of the frame attached to the left hand. */
+    iDynTree::FrameIndex m_frameRightHandIndex; /**< Index of the frame attached to the right hand. */
+    iDynTree::FrameIndex m_frameHeadIndex; /**< Index of the frame attached to the head. */
 
     std::string m_baseFrameLeft; /**< Name of the left base frame. */
     std::string m_baseFrameRight;  /**< Name of the right base frame. */
@@ -47,8 +50,8 @@ class WalkingFK
 
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comPositionFilter; /**< CoM position low pass filter. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_comVelocityFilter; /**< CoM velocity low pass filter. */
-    yarp::sig::Vector m_comPositionFiltered; /**< Filtered position of the CoM. */
-    yarp::sig::Vector m_comVelocityFiltered; /**< Filtered velocity of the CoM. */
+    iDynTree::Position m_comPositionFiltered; /**< Filtered position of the CoM. */
+    iDynTree::Vector3 m_comVelocityFiltered; /**< Filtered velocity of the CoM. */
     bool m_useFilters; /**< If it is true the filters will be used. */
 
     bool m_firstStep; /**< True only during the first step. */
@@ -69,6 +72,16 @@ class WalkingFK
      * @return true/false in case of success/failure.
      */
     bool setBaseFrames(const std::string& lFootFrame, const std::string& rFootFrame);
+
+    /**
+     * Evaluate the Divergent component of motion.
+     */
+     void evaluateDCM();
+
+    /**
+     * Evaluate the CoM position and velocity.
+     */
+    void evaluateCoM();
 
 public:
 
@@ -128,37 +141,22 @@ public:
                                const iDynTree::VectorDynSize& velocityFeedbackInRadians);
 
     /**
-     * Evaluate the 2D-Divergent component of motion.
-     * @return true/false in case of success/failure.
-     */
-    bool evaluateDCM();
-
-    /**
-     * Evaluate the CoM position.
-     * @return true/false in case of success/failure.
-     */
-    bool evaluateCoM();
-
-    /**
      * Get the CoM position.
-     * @param comPosition position of the center of mass.
-     * @return true/false in case of success/failure.
+     * @return CoM position
      */
-    bool getCoMPosition(iDynTree::Position& comPosition);
+    const iDynTree::Position& getCoMPosition();
 
     /**
      * Get the CoM velocity.
-     * @param comVelocity velocity of the center of mass.
-     * @return true/false in case of success/failure.
+     * @return CoM velocity
      */
-    bool getCoMVelocity(iDynTree::Vector3& comVelocity);
+    const iDynTree::Vector3& getCoMVelocity();
 
     /**
      * Get the 2d-Divergent component of motion.
-     * @param dcm 2d-Divergent component of motion.
-     * @return true/false in case of success/failure.
+     * @return the 2d-Divergent component of motion
      */
-    bool getDCM(iDynTree::Vector2& dcm);
+    const iDynTree::Vector2& getDCM();
 
     /**
      * Return the transformation between the left foot frame (l_sole) and the world reference frame.
@@ -171,6 +169,24 @@ public:
      * @return world_H_right_frame.
      */
     iDynTree::Transform getRightFootToWorldTransform();
+
+    /**
+     * Return the transformation between the left hand frame and the world reference frame.
+     * @return world_H_left_hand.
+     */
+    iDynTree::Transform getLeftHandToWorldTransform();
+
+    /**
+     * Return the transformation between the right hand frame and the world reference frame.
+     * @return world_H_right_hand.
+     */
+    iDynTree::Transform getRightHandToWorldTransform();
+
+    /**
+     * Return the transformation between the head frame and the world reference frame.
+     * @return world_H_head.
+     */
+    iDynTree::Transform getHeadToWorldTransform();
 
     /**
      * Return the transformation between the root frame and the world reference frame.
@@ -203,6 +219,20 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getRightFootJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the left hand jacobian.
+     * @oaram jacobian is the left hand jacobian matrix
+     * @return true/false in case of success/failure.
+     */
+    bool getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian);
+
+    /**
+     * Get the right hand jacobian.
+     * @oaram jacobian is the right hand jacobian matrix
+     * @return true/false in case of success/failure.
+     */
+    bool getRightHandJacobian(iDynTree::MatrixDynSize &jacobian);
 
     /**
      * Get the neck jacobian.

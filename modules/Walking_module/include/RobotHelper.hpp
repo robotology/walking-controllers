@@ -58,7 +58,9 @@ class RobotHelper
     iDynTree::VectorDynSize m_desiredJointPositionRad; /**< Desired Joint Position [rad]. */
     iDynTree::VectorDynSize m_desiredJointValueDeg; /**< Desired joint position or velocity [deg or deg/s]. */
 
-    iDynTree::VectorDynSize m_jointsVelocityLimit; /**< JointVeloc [rad/s]. */
+    iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
+    iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
+    iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
 
     // yarp::sig::Vector m_positionFeedbackDegFiltered;
     yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
@@ -81,6 +83,8 @@ class RobotHelper
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
 
+    int m_controlMode{-1}; /**< Current position control mode */
+
     /**
      * Get the higher position error among all joints.
      * @param desiredJointPositionsRad desired joint position in radiants;
@@ -90,6 +94,13 @@ class RobotHelper
      */
     bool getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                        std::pair<std::string, double>& worstError);
+
+    /**
+     * Switch the control mode.
+     * @param controlMode is the control mode.
+     * @return true in case of success and false otherwise.
+     */
+    bool switchToControlMode(const int& controlMode);
 public:
 
     /**
@@ -119,13 +130,6 @@ public:
     bool getFeedbacksRaw(unsigned int maxAttempts = 1);
 
     /**
-     * Switch the control mode.
-     * @param controlMode is the control mode.
-     * @return true in case of success and false otherwise.
-     */
-    bool switchToControlMode(const int& controlMode);
-
-    /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)
      * @param jointPositionsRadians desired final joint position;
      * @param positioningTimeSec minimum jerk trajectory duration.
@@ -151,13 +155,46 @@ public:
      */
     bool setVelocityReferences(const iDynTree::VectorDynSize& desiredVelocityRad);
 
+    /**
+     * Reset filters.
+     * @return true in case of success and false otherwise.
+     */
     bool resetFilters();
 
+    /**
+     * Close the polydrives.
+     * @return true in case of success and false otherwise.
+     */
     bool close();
 
+    /**
+     * Get the joint positions
+     * @return the joint positions in radiants
+     */
     const iDynTree::VectorDynSize& getJointPosition() const;
+
+    /**
+     * Get the joint velocities
+     * @return the joint velocities in radiants per second
+     */
     const iDynTree::VectorDynSize& getJointVelocity() const;
 
+    /**
+     * Get the joint upper limit
+     * @return the joint upper bound in radiants
+     */
+    const iDynTree::VectorDynSize& getPositionUpperLimits() const;
+
+    /**
+     * Get the joint lower limit
+     * @return the joint lower bound in radiants
+     */
+    const iDynTree::VectorDynSize& getPositionLowerLimits() const;
+
+    /**
+     * Get the joint velocity bounds
+     * @return the joint velocity bound in radiants per second
+     */
     const iDynTree::VectorDynSize& getVelocityLimits() const;
 
     const iDynTree::Wrench& getLeftWrench() const;

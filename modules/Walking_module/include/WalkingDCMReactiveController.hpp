@@ -65,10 +65,9 @@ public:
 
     /**
      * Get the controller output.
-     * @param controllerOutput is the output of the controller.
-     * @return true/false in case of success/failure
+     * @return the output of the controller.
      */
-    bool getControllerOutput(iDynTree::Vector2& controllerOutput);
+    const iDynTree::Vector2& getControllerOutput() const;
 };
 
 #endif

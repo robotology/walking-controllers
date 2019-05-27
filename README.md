@@ -49,10 +49,12 @@ Eprint = {arXiv:1809.02167},
 
 # :page_facing_up: Dependencies
 * [YARP](http://www.yarp.it/): to handle the comunication with the robot;
+* [iDynTree](http://wiki.icub.org/codyco/dox/html/idyntree/html/): to handle the robot kinematics;
+* [iCubContrib](https://github.com/robotology/icub-contrib-common): to configure the modules;
 * [osqp-eigen](https://github.com/robotology/osqp-eigen): to solve the MPC problem;
 * [qpOASES](https://github.com/robotology-dependencies/qpOASES): to solve the IK problem;
 * [Unicycle footstep planner](https://github.com/robotology/unicycle-footstep-planner/tree/dcmTrajectoryGenerator): to generate a trajectory for the DCM;
-* [Gazebo](http://gazebosim.org/): for the simulation (tested Gazebo 8 and 9).
+* [Gazebo](http://gazebosim.org/): for the simulation (tested Gazebo 8, 9 and 10).
 
 # :hammer: Build the suite
 ## Linux/macOs
