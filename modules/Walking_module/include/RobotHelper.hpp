@@ -28,6 +28,8 @@
 
 #include <iDynTree/Core/VectorDynSize.h>
 #include <iDynTree/Core/Wrench.h>
+#include <iDynTree/Core/Twist.h>
+#include <iDynTree/Core/Transform.h>
 
 #include <WalkingPIDHandler.hpp>
 
@@ -86,6 +88,13 @@ class RobotHelper
     double m_startingPositionControlTime;
     bool m_positionMoveSkipped;
 
+    bool m_useExternalRobotBase; /**< True if an the base is provided by the extern. */
+    iDynTree::Transform m_robotBaseTransform; /**< World_T_robot base. */
+    iDynTree::Twist m_robotBaseTwist; /**< Robot twist base expressed in mixed representation. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Robot base port. */
+    double m_heightOffset;
+
+
     int m_controlMode{-1}; /**< Current position control mode */
 
     /**
@@ -130,7 +139,7 @@ public:
      */
     bool getFeedbacks(unsigned int maxAttempts = 1);
 
-    bool getFeedbacksRaw(unsigned int maxAttempts = 1);
+    bool getFeedbacksRaw(unsigned int maxAttempts = 1, bool useBaseEst = false);
 
     /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)
@@ -221,6 +230,12 @@ public:
     int getActuatedDoFs();
 
     WalkingPIDHandler& getPIDHandler();
+
+    /**
+     * Set the height of the offset coming from the base estimation
+     * @param offset offset of the height of the base in meters
+     */
+    void setHeightOffset(const double& offset);
 };
 
 #endif
