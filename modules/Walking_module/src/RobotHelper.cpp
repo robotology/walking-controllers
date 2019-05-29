@@ -49,6 +49,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
     bool okPosition = false;
     bool okVelocity = false;
+    bool okTorque = false;
 
     bool okLeftWrench = false;
     bool okRightWrench = false;
@@ -61,6 +62,10 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
         if(!okVelocity)
             okVelocity = m_encodersInterface->getEncoderSpeeds(m_velocityFeedbackDeg.data());
+
+
+        if(!okTorque)
+            okTorque = m_torqueInterface->getTorques(m_torqueFeedback.data());
 
         if(!okLeftWrench)
         {
@@ -114,6 +119,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
     if(!okVelocity)
         yError() << "\t - Velocity encoders";
+
+    if(!okTorque)
+        yError() << "\t - Joint torque";
 
     if(!okLeftWrench)
         yError() << "\t - Left wrench";
@@ -215,6 +223,12 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    if(!m_robotDevice.view(m_torqueInterface) || !m_torqueInterface)
+    {
+        yError() << "[configureRobot] Cannot obtain ITorqueControl interface";
+        return false;
+    }
+
     if(!m_robotDevice.view(m_controlModeInterface) || !m_controlModeInterface)
     {
         yError() << "[configureRobot] Cannot obtain IControlMode interface";
@@ -232,6 +246,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_velocityFeedbackDeg.resize(m_actuatedDOFs, 0.0);
     m_positionFeedbackRad.resize(m_actuatedDOFs);
     m_velocityFeedbackRad.resize(m_actuatedDOFs);
+    m_torqueFeedback.resize(m_actuatedDOFs);
     m_desiredJointPositionRad.resize(m_actuatedDOFs);
     m_desiredJointValueDeg.resize(m_actuatedDOFs);
     m_jointVelocitiesBounds.resize(m_actuatedDOFs);
@@ -691,6 +706,37 @@ bool RobotHelper::setVelocityReferences(const iDynTree::VectorDynSize& desiredVe
     return true;
 }
 
+bool RobotHelper::setTorqueReferences(const iDynTree::VectorDynSize& desiredTorque)
+{
+    if (m_controlMode != VOCAB_CM_TORQUE)
+        if (!switchToControlMode(VOCAB_CM_TORQUE))
+        {
+            yError() << "[RobotHelper::setTorqueReferences] Unable to switch in torque control";
+            return false;
+        }
+
+    if(m_torqueInterface == nullptr)
+    {
+        yError() << "[RobotHelper::setTorqueReferences] Torque I/F not ready.";
+        return false;
+    }
+
+    if(desiredTorque.size() != m_actuatedDOFs)
+    {
+        yError() << "[RobotHelper::setTorqueReferences] Dimension mismatch between desired torque "
+                 << "vector and the number of controlled joints.";
+        return false;
+    }
+
+    if(!m_torqueInterface->setRefTorques(desiredTorque.data()))
+    {
+        yError() << "[RobotHelper::setTorqueReferences] Error while setting the desired torque.";
+        return false;
+    }
+    return true;
+}
+
+
 bool RobotHelper::close()
 {
     m_rightWrenchPort.close();
@@ -713,6 +759,11 @@ const iDynTree::VectorDynSize& RobotHelper::getJointPosition() const
 const iDynTree::VectorDynSize& RobotHelper::getJointVelocity() const
 {
     return m_velocityFeedbackRad;
+}
+
+const iDynTree::VectorDynSize& RobotHelper::getJointTorque() const
+{
+    return m_torqueFeedback;
 }
 
 const iDynTree::Wrench& RobotHelper::getLeftWrench() const
