@@ -357,7 +357,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
     }
 
-     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+    m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
     if(m_useExternalRobotBase)
     {
         m_robotBasePort.open("/" + name + "/robotBase:i");
