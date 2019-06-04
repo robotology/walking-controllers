@@ -90,12 +90,24 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
         return false;
     }
+    m_frameLeftIndex = m_kinDyn.model().getFrameIndex(lFootFrame);
+    if(m_frameLeftIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << lFootFrame;
+        return false;
+    }
 
     // set the right foot frame
     std::string rFootFrame;
     if(!YarpHelper::getStringFromSearchable(config, "right_foot_frame", rFootFrame))
     {
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameRightIndex = m_kinDyn.model().getFrameIndex(rFootFrame);
+    if(m_frameRightIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rFootFrame;
         return false;
     }
 
@@ -167,6 +179,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
 
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+
     if(!m_useExternalRobotBase)
     {
         if(!setBaseFrame(lFootFrame, "leftFoot"))
@@ -282,7 +295,6 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         if(!m_prevContactLeft || m_firstStep)
         {
             auto& base = m_baseFrames["leftFoot"];
-            yInfo() << base.first;
             m_worldToBaseTransform = leftFootTransform * base.second;
             if(!m_kinDyn.setFloatingBase(base.first))
             {
@@ -329,7 +341,7 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
     gravity(2) = -9.81;
 
     if(!m_kinDyn.setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
-                               iDynTree::Twist::Zero(), velocityFeedbackInRadians,
+                               m_baseTwist, velocityFeedbackInRadians,
                                gravity))
     {
         yError() << "[WalkingFK::setInternalRobotState] Error while updating the state.";
