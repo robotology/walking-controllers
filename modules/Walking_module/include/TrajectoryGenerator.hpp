@@ -205,6 +205,14 @@ public:
     bool getCoMHeightVelocity(std::vector<double>& CoMHeightVelocity);
 
     /**
+     * Get the weight on the left on the right foot is a number that goes from 0 to 1
+     * @param weightInLeft weight on the left foot
+     * @param weightInRight weight on the right foot
+     * @return true/false in case of success/failure.
+     */
+    bool getWeightPercentage(std::vector<double> &weightInLeft, std::vector<double> &weightInRight);
+
+    /**
      * Get the merge points along the trajectory
      * @param mergePoints vector containing all the merge points of the trajectory.
      * @return true/false in case of success/failure.

@@ -596,6 +596,19 @@ bool TrajectoryGenerator::getCoMHeightVelocity(std::vector<double>& CoMHeightVel
     return true;
 }
 
+bool TrajectoryGenerator::getWeightPercentage(std::vector<double> &weightInLeft,
+                                              std::vector<double> &weightInRight)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getWeightPercentage] No trajectories are available";
+        return false;
+    }
+
+    m_dcmGenerator->getWeightPercentage(weightInLeft, weightInRight);
+    return true;
+}
+
 bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
 {
     if(!isTrajectoryComputed())
