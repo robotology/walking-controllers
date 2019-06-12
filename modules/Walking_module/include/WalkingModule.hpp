@@ -38,6 +38,7 @@
 #include <RetargetingClient.hpp>
 #include <LoggerClient.hpp>
 #include <TimeProfiler.hpp>
+#include <ContactWrenchMapping.hpp>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -75,6 +76,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+    std::unique_ptr<ContactWrenchMapping> m_contactWrenchMapping; /**< Contact wrench mapping. */
 
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -92,6 +94,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::deque<bool> m_rightInContact; /**< Deque containing the right foot state. */
     std::deque<double> m_comHeightTrajectory; /**< Deque containing the CoM height trajectory. */
     std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
+    std::deque<double> m_weightInLeft; /**< Deque containing the left foot weight percentage. */
+    std::deque<double> m_weightInRight; /**< Deque containing the right foot weight percentage. */
     std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
 
     std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
@@ -158,6 +162,12 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Rotation& desiredNeckOrientation,
                    iDynTree::VectorDynSize &output);
+
+    /**
+     * Evaluate the desired contact wrench distribution.
+     * @return true in case of success and false otherwise.
+     */
+    bool evaluateContactWrenchDistribution();
 
     /**
      * Evaluate the position of Zero momentum point.

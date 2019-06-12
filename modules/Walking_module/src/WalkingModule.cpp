@@ -80,6 +80,12 @@ bool WalkingModule::advanceReferenceSignals()
     m_comHeightVelocity.pop_front();
     m_comHeightVelocity.push_back(m_comHeightVelocity.back());
 
+    m_weightInLeft.pop_front();
+    m_weightInLeft.push_back(m_weightInLeft.back());
+
+    m_weightInRight.pop_front();
+    m_weightInRight.push_back(m_weightInRight.back());
+
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
     // A new trajectory will be merged at the first merge point or if the deque is empty
@@ -286,6 +292,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    yarp::os::Bottle contactWrenchMappingOption = rf.findGroup("CONTACT_WRENCH_MAPPING");
+    m_contactWrenchMapping = std::make_unique<ContactWrenchMapping>();
+    if(!m_contactWrenchMapping->initialize(contactWrenchMappingOption))
+    {
+        yError() << "[WalkingModule::configure] Failed to configure the contact wrench mapping";
+        return false;
+    }
+    if(!m_contactWrenchMapping->setRobotMass(m_loader.model().getTotalMass()))
+        return false;
+
     // initialize the logger
     if(m_dumpData)
     {
@@ -305,6 +321,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_profiler->addTimer("MPC");
 
     m_profiler->addTimer("IK");
+    m_profiler->addTimer("CONTACT_WRENCH");
     m_profiler->addTimer("Total");
 
     // initialize some variables
@@ -366,6 +383,40 @@ bool WalkingModule::close()
     m_stableDCMModel.reset(nullptr);
 
     return true;
+}
+
+bool WalkingModule::evaluateContactWrenchDistribution()
+{
+    m_contactWrenchMapping->setFeetState(m_leftInContact.front(), m_rightInContact.front());
+
+    if(!m_contactWrenchMapping->setCentroidalMomentum(m_FKSolver->getCentroidalTotalMomentum()))
+    {
+        yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set the centroidal momentum";
+        return false;
+    }
+
+    m_contactWrenchMapping->setFeetState(m_FKSolver->getLeftFootToWorldTransform(), m_FKSolver->getRightFootToWorldTransform());
+
+    if(!m_contactWrenchMapping->setCoMState(m_FKSolver->getCoMPosition(), m_FKSolver->getCoMVelocity()))
+    {
+        yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set the center of mass position and velocity";
+        return false;
+    }
+
+    if(!m_contactWrenchMapping->setDesiredVRP(m_walkingDCMReactiveController->getControllerOutput()))
+    {
+        yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set the desired VRP";
+        return false;
+    }
+
+    if(!m_contactWrenchMapping->setFeetWeightPercentage(m_weightInLeft.front(), m_weightInRight.front()))
+    {
+        yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set the weight percentage.";
+        return false;
+    }
+
+
+    return m_contactWrenchMapping->solve();
 }
 
 bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const iDynTree::Position& desiredCoMPosition,
@@ -773,6 +824,16 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+        m_profiler->setInitTime("CONTACT_WRENCH");
+
+        if(!evaluateContactWrenchDistribution())
+        {
+            yError() << "[WalkingModule::updateModule] Unable to evaluate the contact wrench distribution.";
+            return false;
+        }
+
+        m_profiler->setEndTime("CONTACT_WRENCH");
+
         m_profiler->setEndTime("Total");
 
         // print timings
@@ -1085,6 +1146,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<bool> leftInContact;
     std::vector<double> comHeightTrajectory;
     std::vector<double> comHeightVelocity;
+    std::vector<double> weightInLeft;
+    std::vector<double> weightInRight;
     std::vector<size_t> mergePoints;
     std::vector<bool> isLeftFixedFrame;
 
@@ -1101,6 +1164,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get com height trajectory
     m_trajectoryGenerator->getCoMHeightTrajectory(comHeightTrajectory);
     m_trajectoryGenerator->getCoMHeightVelocity(comHeightVelocity);
+
+    // get the weight percentage
+    m_trajectoryGenerator->getWeightPercentage(weightInLeft, weightInRight);
 
     // get merge points
     m_trajectoryGenerator->getMergePoints(mergePoints);
@@ -1120,6 +1186,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
     StdHelper::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
+
+    StdHelper::appendVectorToDeque(weightInLeft, m_weightInLeft, mergePoint);
+    StdHelper::appendVectorToDeque(weightInRight, m_weightInRight, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 
