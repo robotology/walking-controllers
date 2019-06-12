@@ -23,6 +23,24 @@ find_package(Threads REQUIRED)
 
 include(FindPackageHandleStandardArgs)
 
+# Torque Control walking constraints
+# Parametrization library
+set(WALKING_CONSTRAINT walkingConstraintLibrary)
+
+set(${WALKING_CONSTRAINT}_SRC
+  src/CartesianPID.cpp
+  src/WalkingConstraint.cpp)
+
+set(${WALKING_CONSTRAINT}_HDR
+  include/CartesianPID.hpp
+  include/WalkingConstraint.hpp)
+
+add_library(${WALKING_CONSTRAINT} STATIC
+  ${${WALKING_CONSTRAINT}_SRC} ${${WALKING_CONSTRAINT}_HDR})
+
+target_include_directories(${WALKING_CONSTRAINT} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(${WALKING_CONSTRAINT} ${iDynTree_LIBRARIES} UtilityLibrary osqp::osqp ctrlLib)
+
 # set cpp files
 set(${EXE_TARGET_NAME}_SRC
   src/main.cpp
