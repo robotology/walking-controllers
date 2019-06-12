@@ -383,26 +383,20 @@ void WalkingFK::evaluateDCM()
 
     evaluateCoM();
 
-    iDynTree::Vector3 dcm3D;
-
     // evaluate the 3D-DCM
     if(m_useFilters)
-        iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPositionFiltered) +
+        iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPositionFiltered) +
             iDynTree::toEigen(m_comVelocityFiltered) / m_omega;
     else
-        iDynTree::toEigen(dcm3D) = iDynTree::toEigen(m_comPosition) +
+        iDynTree::toEigen(m_dcm) = iDynTree::toEigen(m_comPosition) +
             iDynTree::toEigen(m_comVelocity) / m_omega;
-
-    // take only the 2D projection
-    m_dcm(0) = dcm3D(0);
-    m_dcm(1) = dcm3D(1);
 
     m_dcmEvaluated = true;
 
     return;
 }
 
-const iDynTree::Vector2& WalkingFK::getDCM()
+const iDynTree::Vector3& WalkingFK::getDCM()
 {
     evaluateDCM();
     return m_dcm;

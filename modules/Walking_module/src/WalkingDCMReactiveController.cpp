@@ -48,13 +48,13 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
     return true;
 }
 
-void WalkingDCMReactiveController::setFeedback(const iDynTree::Vector2& dcmFeedback)
+void WalkingDCMReactiveController::setFeedback(const iDynTree::Vector3& dcmFeedback)
 {
     m_dcmFeedback = dcmFeedback;
 }
 
-void WalkingDCMReactiveController::setReferenceSignal(const iDynTree::Vector2& dcmPositionDesired,
-                                                      const iDynTree::Vector2& dcmVelocityDesired)
+void WalkingDCMReactiveController::setReferenceSignal(const iDynTree::Vector3& dcmPositionDesired,
+                                                      const iDynTree::Vector3& dcmVelocityDesired)
 {
     m_dcmPositionDesired = dcmPositionDesired;
     m_dcmVelocityDesired = dcmVelocityDesired;
@@ -78,7 +78,7 @@ bool WalkingDCMReactiveController::evaluateControl()
     return true;
 }
 
-const iDynTree::Vector2& WalkingDCMReactiveController::getControllerOutput() const
+const iDynTree::Vector3& WalkingDCMReactiveController::getControllerOutput() const
 {
     return m_controllerOutput;
 }

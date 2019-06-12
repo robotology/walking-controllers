@@ -28,11 +28,11 @@ class WalkingDCMReactiveController
     bool m_isInitialized{false}; /**< True if the control was initialized. */
     bool m_controlEvaluated{false}; /**< True if the control output was correctly evaluated. */
 
-    iDynTree::Vector2 m_dcmFeedback; /**< Feedback signal containing the position of the CoM. */
-    iDynTree::Vector2 m_dcmPositionDesired; /**< Desired CoM position. */
-    iDynTree::Vector2 m_dcmVelocityDesired; /**< Desired CoM velocity. */
+    iDynTree::Vector3 m_dcmFeedback; /**< Feedback signal containing the position of the CoM. */
+    iDynTree::Vector3 m_dcmPositionDesired; /**< Desired CoM position. */
+    iDynTree::Vector3 m_dcmVelocityDesired; /**< Desired CoM velocity. */
 
-    iDynTree::Vector2 m_controllerOutput; /**< Controller output. */
+    iDynTree::Vector3 m_controllerOutput; /**< Controller output. */
 
 public:
 
@@ -47,15 +47,15 @@ public:
      * Set the feedback.
      * @param dcmFeedback is position of the robot DCM;
      */
-    void setFeedback(const iDynTree::Vector2& dcmFeedback);
+    void setFeedback(const iDynTree::Vector3& dcmFeedback);
 
     /**
      * Set the desired reference signals.
      * @param dcmPositionDesired is the desired position of the DCM;
      * @param dcmVelocityDesired is the desired velocity of the DCM.
      */
-    void setReferenceSignal(const iDynTree::Vector2& dcmPositionDesired,
-                            const iDynTree::Vector2& dcmVelocityDesired);
+    void setReferenceSignal(const iDynTree::Vector3& dcmPositionDesired,
+                            const iDynTree::Vector3& dcmVelocityDesired);
 
     /**
      * Evaluate the control output.
@@ -67,7 +67,7 @@ public:
      * Get the controller output.
      * @return the output of the controller.
      */
-    const iDynTree::Vector2& getControllerOutput() const;
+    const iDynTree::Vector3& getControllerOutput() const;
 };
 
 #endif

@@ -604,7 +604,10 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(!m_walkingController->setFeedback(m_FKSolver->getDCM()))
+            iDynTree::Vector2 dcm2D;
+            dcm2D(0) = m_FKSolver->getDCM()(0);
+            dcm2D(1) = m_FKSolver->getDCM()(1);
+            if(!m_walkingController->setFeedback(dcm2D))
             {
                 yError() << "[WalkingModule::updateModule] unable to set the feedback.";
                 return false;
@@ -626,9 +629,19 @@ bool WalkingModule::updateModule()
         }
         else
         {
+            iDynTree::Vector3 DCMPositionDesired3D;
+            DCMPositionDesired3D(0) = m_DCMPositionDesired.front()(0);
+            DCMPositionDesired3D(1) = m_DCMPositionDesired.front()(1);
+            DCMPositionDesired3D(2) = m_comHeightTrajectory.front();
+
+            iDynTree::Vector3 DCMVelocityDesired3D;
+            DCMVelocityDesired3D(0) = m_DCMVelocityDesired.front()(0);
+            DCMVelocityDesired3D(1) = m_DCMVelocityDesired.front()(1);
+            DCMVelocityDesired3D(2) = m_comHeightVelocity.front();
+
             m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
-            m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(),
-                                                               m_DCMVelocityDesired.front());
+            m_walkingDCMReactiveController->setReferenceSignal(DCMPositionDesired3D,
+                                                               DCMVelocityDesired3D);
 
             if(!m_walkingDCMReactiveController->evaluateControl())
             {
@@ -648,7 +661,7 @@ bool WalkingModule::updateModule()
         if(m_useMPC)
             desiredZMP = m_walkingController->getControllerOutput();
         else
-            desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+            iDynTree::toEigen(desiredZMP) = iDynTree::toEigen(m_walkingDCMReactiveController->getControllerOutput()).segment(0, 2);
 
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
