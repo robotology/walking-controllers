@@ -59,6 +59,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/StableDCMModel.cpp
   src/WalkingPIDHandler.cpp
   src/RetargetingClient.cpp
+  src/ContactWrenchMapping.cpp
   )
 
 # set hpp files
@@ -77,6 +78,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/StableDCMModel.hpp
   include/WalkingPIDHandler.hpp
   include/RetargetingClient.hpp
+  include/ContactWrenchMapping.hpp
   )
 
 # add include directories to the build.
@@ -103,6 +105,7 @@ target_link_libraries(${EXE_TARGET_NAME}
   UnicyclePlanner
   UtilityLibrary
   LoggerClient
+  walkingConstraintLibrary
   OsqpEigen::OsqpEigen
   osqp::osqp
   Threads::Threads
