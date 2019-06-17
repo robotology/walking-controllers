@@ -107,3 +107,30 @@ void LinearPID::evaluateControl()
         + iDynTree::toEigen(m_kp).asDiagonal() * iDynTree::toEigen(m_error)
         + iDynTree::toEigen(m_kd).asDiagonal() * iDynTree::toEigen(m_dotError);
 }
+
+void ForcePID::setGains(const double& kp)
+{
+    for(int i =0; i < 3; i++)
+        m_kp(i) = kp;
+}
+
+void ForcePID::setGains(const iDynTree::Vector3& kp)
+{
+    m_kp = kp;
+}
+
+void ForcePID::setDesiredForce(const iDynTree::Vector3 &desiredForce)
+{
+    m_desiredForce = desiredForce;
+}
+
+void ForcePID::setFeedback(const iDynTree::Vector3 &force)
+{
+    m_force = force;
+}
+
+void ForcePID::evaluateControl()
+{
+    iDynTree::toEigen(m_controllerOutput) = iDynTree::toEigen(m_kp).asDiagonal()
+        * (iDynTree::toEigen(m_force) - iDynTree::toEigen(m_desiredForce));
+}

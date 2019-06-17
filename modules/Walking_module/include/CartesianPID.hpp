@@ -143,4 +143,45 @@ public:
     void evaluateControl() override;
 };
 
+class ForcePID : public CartesianPID
+{
+private:
+
+    iDynTree::Vector3 m_desiredForce; /**< Desired force. */
+    iDynTree::Vector3 m_force; /**< Actual force. */
+
+    iDynTree::Vector3 m_kp;
+
+public:
+
+    /**
+     * Set PID Gains
+     * @param kp proportional gain (scalar).
+     */
+    void setGains(const double& kp);
+
+    /**
+     * Set PID Gains
+     * @param kp proportional gain (vector).
+     */
+    void setGains(const iDynTree::Vector3& kp);
+
+    /**
+     * Set the desired trajectory.
+     * @param desiredForce desired force (N).
+     */
+    void setDesiredForce(const iDynTree::Vector3 &desiredForce);
+
+    /**
+     * Set feedback
+     * @param force force:
+     */
+    void setFeedback(const iDynTree::Vector3 &force);
+
+    /**
+     * Evaluate control
+     */
+    void evaluateControl() override;
+};
+
 #endif
