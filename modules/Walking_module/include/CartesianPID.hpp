@@ -18,7 +18,7 @@
  */
 class CartesianPID
 {
-public:
+protected:
     iDynTree::Vector3 m_desiredAcceleration; /**< Desired acceleration (feedforward). */
     iDynTree::Vector3 m_desiredVelocity;  /**< Desired velocity. */
 
@@ -26,11 +26,14 @@ public:
 
     iDynTree::Vector3 m_controllerOutput; /**< Controller output. */
 
-public:
+    bool m_controlEvaluated{false};
+
     /**
      * Evaluate the control output.
      */
     virtual void evaluateControl() = 0;
+
+public:
 
     /**
      * Get the controller output.
@@ -46,13 +49,18 @@ public:
  */
 class RotationalPID : public CartesianPID
 {
-public:
     double m_c0; /**< Rotational PID Gain. */
     double m_c1; /**< Rotational PID Gain. */
     double m_c2; /**< Rotational PID Gain. */
 
     iDynTree::Rotation m_desiredOrientation; /**< Desired orientation. */
     iDynTree::Rotation m_orientation; /**< Actual orientation. */
+
+protected:
+    /**
+     * Evaluate the control law.
+     */
+    void evaluateControl() override;
 
 public:
 
@@ -82,10 +90,6 @@ public:
     void setFeedback(const iDynTree::Vector3 &velocity,
                      const iDynTree::Rotation &orientation);
 
-    /**
-     * Evaluate the control law.
-     */
-    void evaluateControl() override;
 };
 
 /**
@@ -102,6 +106,13 @@ class LinearPID : public CartesianPID
 
     iDynTree::Vector3 m_error; /**< Position error */
     iDynTree::Vector3 m_dotError; /**< Velocity error */
+
+protected:
+    /**
+     * Evaluate the control law.
+     */
+    void evaluateControl() override;
+
 public:
 
     /**
@@ -137,20 +148,20 @@ public:
     void setFeedback(const iDynTree::Vector3 &velocity,
                      const iDynTree::Vector3 &position);
 
-    /**
-     * Evaluate control
-     */
-    void evaluateControl() override;
 };
 
 class ForcePID : public CartesianPID
 {
-private:
-
     iDynTree::Vector3 m_desiredForce; /**< Desired force. */
     iDynTree::Vector3 m_force; /**< Actual force. */
 
     iDynTree::Vector3 m_kp;
+
+protected:
+    /**
+     * Evaluate control
+     */
+    void evaluateControl() override;
 
 public:
 
@@ -177,11 +188,6 @@ public:
      * @param force force:
      */
     void setFeedback(const iDynTree::Vector3 &force);
-
-    /**
-     * Evaluate control
-     */
-    void evaluateControl() override;
 };
 
 #endif

@@ -31,6 +31,8 @@ void RotationalPID::setDesiredTrajectory(const iDynTree::Vector3 &desiredAcceler
     m_desiredAcceleration = desiredAcceleration;
     m_desiredVelocity = desiredVelocity;
     m_desiredOrientation = desiredOrientation;
+
+    m_controlEvaluated = false;
 }
 
 void RotationalPID::setFeedback(const iDynTree::Vector3 &velocity,
@@ -38,10 +40,15 @@ void RotationalPID::setFeedback(const iDynTree::Vector3 &velocity,
 {
     m_velocity = velocity;
     m_orientation = orientation;
+
+    m_controlEvaluated = false;
 }
 
 void RotationalPID::evaluateControl()
 {
+    if(m_controlEvaluated)
+        return;
+
     iDynTree::Matrix3x3 errorAttitude;
     Eigen::Vector3d error;
     errorAttitude = iDynTreeHelper::Rotation::skewSymmetric(m_orientation * m_desiredOrientation.inverse());
@@ -65,6 +72,8 @@ void RotationalPID::evaluateControl()
                 - m_c0 * dotError
         - m_c1 * (iDynTree::toEigen(m_velocity) - iDynTree::toEigen(m_desiredVelocity))
         - m_c2 * error;
+
+    m_controlEvaluated = true;
 }
 
 void LinearPID::setGains(const double& kp, const double& kd)
@@ -89,6 +98,8 @@ void LinearPID::setDesiredTrajectory(const iDynTree::Vector3 &desiredAcceleratio
     m_desiredAcceleration = desiredAcceleration;
     m_desiredVelocity = desiredVelocity;
     m_desiredPosition = desiredPosition;
+
+    m_controlEvaluated = false;
 }
 
 void LinearPID::setFeedback(const iDynTree::Vector3 &velocity,
@@ -96,16 +107,23 @@ void LinearPID::setFeedback(const iDynTree::Vector3 &velocity,
 {
     m_velocity = velocity;
     m_position = position;
+
+    m_controlEvaluated = false;
 }
 
 void LinearPID::evaluateControl()
 {
+    if(m_controlEvaluated)
+        return;
+
     iDynTree::toEigen(m_error) = iDynTree::toEigen(m_desiredPosition) - iDynTree::toEigen(m_position);
     iDynTree::toEigen(m_dotError) = iDynTree::toEigen(m_desiredVelocity) - iDynTree::toEigen(m_velocity);
 
     iDynTree::toEigen(m_controllerOutput) = iDynTree::toEigen(m_desiredAcceleration)
         + iDynTree::toEigen(m_kp).asDiagonal() * iDynTree::toEigen(m_error)
         + iDynTree::toEigen(m_kd).asDiagonal() * iDynTree::toEigen(m_dotError);
+
+    m_controlEvaluated = true;
 }
 
 void ForcePID::setGains(const double& kp)
@@ -122,15 +140,22 @@ void ForcePID::setGains(const iDynTree::Vector3& kp)
 void ForcePID::setDesiredForce(const iDynTree::Vector3 &desiredForce)
 {
     m_desiredForce = desiredForce;
+    m_controlEvaluated = false;
 }
 
 void ForcePID::setFeedback(const iDynTree::Vector3 &force)
 {
     m_force = force;
+    m_controlEvaluated = false;
 }
 
 void ForcePID::evaluateControl()
 {
+    if(m_controlEvaluated)
+        return;
+
     iDynTree::toEigen(m_controllerOutput) = iDynTree::toEigen(m_kp).asDiagonal()
         * (iDynTree::toEigen(m_force) - iDynTree::toEigen(m_desiredForce));
+
+    m_controlEvaluated = true;
 }
