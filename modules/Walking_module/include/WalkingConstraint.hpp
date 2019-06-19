@@ -18,6 +18,7 @@
 #include <iDynTree/Core/VectorDynSize.h>
 #include <iDynTree/Core/MatrixDynSize.h>
 #include <iDynTree/Core/Transform.h>
+#include <iDynTree/Core/Wrench.h>
 
 #include <Utils.hpp>
 #include <CartesianPID.hpp>
@@ -33,6 +34,10 @@ class CartesianElement
 public:
     /** Cartesian Element Type */
     enum class Type {POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT};
+
+    /** Control mode (Position or Force) */
+    enum class ControlMode {FORCE, POSITION};
+
 protected:
     iDynTree::VectorDynSize const * m_biasAcceleration; /**< Bias acceleration J \nu. */
     iDynTree::MatrixDynSize const * m_roboticJacobian; /**< Robotic Jacobian in mixed representation. */
@@ -42,6 +47,7 @@ protected:
                                                                                      controllers. */
 
     Type m_elementType; /**< Type of the Cartesian element */
+    ControlMode m_controlMode; /**< Type of the control mode */
 
     /**
      * Evaluate the desired acceleration. It depends on the type of constraint (Positional,
@@ -55,6 +61,11 @@ public:
      * @param elementType type of Cartesian element it can be POSE, POSITION, ORIENTATION, ONE_DIMENSION, CONTACT
      */
     CartesianElement(const Type& elementType);
+
+    /**
+     * Set the control mode
+     */
+    void setControlMode(const ControlMode& controlMode);
 
     /**
      * Set bias acceleration
@@ -80,6 +91,18 @@ public:
      * @return pointer to the controller.
      */
     std::shared_ptr<RotationalPID> orientationController();
+
+    /**
+     * Get the force controller associated to the constraint.
+     * @return pointer to the controller.
+     */
+    std::shared_ptr<ForcePID> forceController();
+
+    /**
+     * Get the couple (pure torque) controller associated to the constraint.
+     * @return pointer to the controller.
+     */
+    std::shared_ptr<ForcePID> coupleController();
 };
 
 
@@ -456,10 +479,14 @@ public:
 class SystemDynamicConstraint : public LinearConstraint
 {
     iDynTree::VectorDynSize const * m_generalizedBiasForces;
-
-protected:
     iDynTree::MatrixDynSize const * m_massMatrix;
+
+    std::vector<iDynTree::MatrixDynSize const *> m_contactWrenchesJacobian;
+    std::vector<iDynTree::Wrench const *> m_contactWrenches;
+
     int m_systemSize;
+
+
 
 public:
 
@@ -469,49 +496,17 @@ public:
 
     void setGeneralizedBiasForces(const iDynTree::VectorDynSize& generalizedBiasForces){m_generalizedBiasForces = &generalizedBiasForces;};
 
+    void setContactWrench(const iDynTree::Wrench& contactWrench){m_contactWrenches.push_back(&contactWrench);};
+
+    void setContactWrenchJacobian(const iDynTree::MatrixDynSize& contactWrenchJacobian){m_contactWrenchesJacobian.push_back(&contactWrenchJacobian);};
+
     /**
      * Evaluate lower and upper bounds.
      */
     void evaluateBounds(iDynTree::VectorDynSize &upperBounds, iDynTree::VectorDynSize &lowerBounds) override;
 
+    void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
     void setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian) override;
-};
-
-class SystemDynamicConstraintDoubleSupport : public SystemDynamicConstraint
-{
-    iDynTree::MatrixDynSize const * m_leftFootJacobian;
-    iDynTree::MatrixDynSize const * m_rightFootJacobian;
-
-public:
-
-    SystemDynamicConstraintDoubleSupport(const int& systemSize) : SystemDynamicConstraint(systemSize){};
-
-    void setLeftFootJacobian(const iDynTree::MatrixDynSize& leftFootJacobian){m_leftFootJacobian = &leftFootJacobian;};
-
-    void setRightFootJacobian(const iDynTree::MatrixDynSize& rightFootJacobian){m_rightFootJacobian = &rightFootJacobian;};
-
-    /**
-     * Evaluate the constraint jacobian
-     */
-    void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
-
-};
-
-class SystemDynamicConstraintSingleSupport : public SystemDynamicConstraint
-{
-    iDynTree::MatrixDynSize const * m_stanceFootJacobian;
-
-public:
-
-    SystemDynamicConstraintSingleSupport(const int& systemSize) : SystemDynamicConstraint(systemSize){};
-
-    void setStanceFootJacobian(const iDynTree::MatrixDynSize& stanceFootJacobian){m_stanceFootJacobian = &stanceFootJacobian;};
-
-    /**
-     * Evaluate the constraint jacobian
-     */
-    void evaluateJacobian(Eigen::SparseMatrix<double>& jacobian) override;
-
 };
 
 class RateOfChangeElement

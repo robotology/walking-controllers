@@ -47,24 +47,29 @@ CartesianElement::CartesianElement(const Type& elementType)
     case Type::POSE:
         m_controllers.insert({"position_pid", std::make_shared<LinearPID>()});
         m_controllers.insert({"orientation_pid", std::make_shared<RotationalPID>()});
+        m_controllers.insert({"force_pid", std::make_shared<ForcePID>()});
+        m_controllers.insert({"couple_pid", std::make_shared<ForcePID>()});
         m_desiredAcceleration.resize(6);
         m_desiredAcceleration.zero();
         break;
 
     case Type::POSITION:
         m_controllers.insert({"position_pid", std::make_shared<LinearPID>()});
+        m_controllers.insert({"force_pid", std::make_shared<ForcePID>()});
         m_desiredAcceleration.resize(3);
         m_desiredAcceleration.zero();
         break;
 
     case Type::ORIENTATION:
         m_controllers.insert({"orientation_pid", std::make_shared<RotationalPID>()});
+        m_controllers.insert({"couple_pid", std::make_shared<ForcePID>()});
         m_desiredAcceleration.resize(3);
         m_desiredAcceleration.zero();
         break;
 
     case Type::ONE_DIMENSION:
         m_controllers.insert({"position_pid", std::make_shared<LinearPID>()});
+        m_controllers.insert({"force_pid", std::make_shared<ForcePID>()});
         m_desiredAcceleration.resize(1);
         m_desiredAcceleration.zero();
         break;
@@ -76,6 +81,28 @@ CartesianElement::CartesianElement(const Type& elementType)
     }
 
     m_elementType = elementType;
+}
+
+std::shared_ptr<ForcePID> CartesianElement::forceController()
+{
+    std::unordered_map<std::string, std::shared_ptr<CartesianPID>>::const_iterator controller;
+    controller = m_controllers.find("force_pid");
+
+    if(controller == m_controllers.end())
+        return nullptr;
+
+    return std::static_pointer_cast<ForcePID>(controller->second);
+}
+
+std::shared_ptr<ForcePID> CartesianElement::coupleController()
+{
+    std::unordered_map<std::string, std::shared_ptr<CartesianPID>>::const_iterator controller;
+    controller = m_controllers.find("couple_pid");
+
+    if(controller == m_controllers.end())
+        return nullptr;
+
+    return std::static_pointer_cast<ForcePID>(controller->second);
 }
 
 std::shared_ptr<LinearPID> CartesianElement::positionController()
@@ -100,41 +127,57 @@ std::shared_ptr<RotationalPID> CartesianElement::orientationController()
     return std::static_pointer_cast<RotationalPID>(controller->second);
 }
 
+void CartesianElement::setControlMode(const ControlMode& controlMode)
+{
+    m_controlMode = controlMode;
+}
+
 void CartesianElement::evaluateDesiredAcceleration()
 {
+    auto desiredAcceleration(iDynTree::toEigen(m_desiredAcceleration));
+
     switch(m_elementType)
     {
     case Type::POSE:
-        m_controllers["position_pid"]->evaluateControl();
-        iDynTree::toEigen(m_desiredAcceleration).block(0, 0, 3, 1)
-            = iDynTree::toEigen(m_controllers["position_pid"]->getControllerOutput());
-
-        m_controllers["orientation_pid"]->evaluateControl();
-        iDynTree::toEigen(m_desiredAcceleration).block(3, 0, 3, 1)
-            = iDynTree::toEigen(m_controllers["orientation_pid"]->getControllerOutput());
+        if(m_controlMode ==  ControlMode::POSITION)
+        {
+            desiredAcceleration.segment(0, 3) = iDynTree::toEigen(m_controllers["position_pid"]->getControllerOutput());
+            desiredAcceleration.segment(3, 3) = iDynTree::toEigen(m_controllers["orientation_pid"]->getControllerOutput());
+        }
+        else
+        {
+            desiredAcceleration.segment(0, 3) = iDynTree::toEigen(m_controllers["force_pid"]->getControllerOutput());
+            desiredAcceleration.segment(3, 3) = iDynTree::toEigen(m_controllers["couple_pid"]->getControllerOutput());
+        }
         break;
 
     case Type::POSITION:
-        m_controllers["position_pid"]->evaluateControl();
-        iDynTree::toEigen(m_desiredAcceleration)
-            = iDynTree::toEigen(m_controllers["position_pid"]->getControllerOutput());
+        if(m_controlMode ==  ControlMode::POSITION)
+            desiredAcceleration = iDynTree::toEigen(m_controllers["position_pid"]->getControllerOutput());
+        else
+            desiredAcceleration = iDynTree::toEigen(m_controllers["force_pid"]->getControllerOutput());
         break;
 
     case Type::ORIENTATION:
-        m_controllers["orientation_pid"]->evaluateControl();
-        iDynTree::toEigen(m_desiredAcceleration)
-            = iDynTree::toEigen(m_controllers["orientation_pid"]->getControllerOutput());
+        if(m_controlMode ==  ControlMode::POSITION)
+            desiredAcceleration = iDynTree::toEigen(m_controllers["orientation_pid"]->getControllerOutput());
+        else
+            desiredAcceleration = iDynTree::toEigen(m_controllers["couple_pid"]->getControllerOutput());
         break;
 
     case Type::ONE_DIMENSION:
-        m_controllers["position_pid"]->evaluateControl();
-        m_desiredAcceleration(0) = m_controllers["position_pid"]->getControllerOutput()(2);
+        if(m_controlMode ==  ControlMode::POSITION)
+            m_desiredAcceleration(0) = m_controllers["position_pid"]->getControllerOutput()(2);
+        else
+            m_desiredAcceleration(0) = m_controllers["force_pid"]->getControllerOutput()(2);
         break;
 
     case Type::CONTACT:
         break;
     }
 }
+
+
 
 CartesianConstraint::CartesianConstraint(const Type& elementType)
     :CartesianElement(elementType)
@@ -373,7 +416,13 @@ void SystemDynamicConstraint::evaluateBounds(iDynTree::VectorDynSize &upperBound
 {
     iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, m_sizeOfElement)
         = iDynTree::toEigen(*m_generalizedBiasForces);
-    iDynTree::toEigen(lowerBounds).segment(m_jacobianStartingRow, m_sizeOfElement) = iDynTree::toEigen(*m_generalizedBiasForces);
+
+    for(int i = 0; i < m_contactWrenches.size(); i++)
+        iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, m_sizeOfElement) +=
+            iDynTree::toEigen(*m_contactWrenchesJacobian[i]).transpose() * iDynTree::toEigen(*m_contactWrenches[i]);
+
+    iDynTree::toEigen(lowerBounds).segment(m_jacobianStartingRow, m_sizeOfElement) =
+        iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, m_sizeOfElement);
 }
 
 void SystemDynamicConstraint::setJacobianConstantElements(Eigen::SparseMatrix<double>& jacobian)
@@ -386,34 +435,12 @@ void SystemDynamicConstraint::setJacobianConstantElements(Eigen::SparseMatrix<do
         jacobian.insert(startingRow + i, startingColumns + i) = 1;
 }
 
-void SystemDynamicConstraintDoubleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
+void SystemDynamicConstraint::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
 {
     // copy the sparse matrix
     copyDenseIntoSparse(-iDynTree::toEigen(*m_massMatrix),
                         m_jacobianStartingRow, m_jacobianStartingColumn, jacobian);
-
-    copyDenseIntoSparse(iDynTree::toEigen(*m_leftFootJacobian).transpose(),
-                        m_jacobianStartingRow,
-                        m_jacobianStartingColumn + m_systemSize + 6 + m_systemSize,
-                        jacobian);
-
-    copyDenseIntoSparse(iDynTree::toEigen(*m_rightFootJacobian).transpose(),
-                        m_jacobianStartingRow,
-                        m_jacobianStartingColumn + m_systemSize + 6 + m_systemSize + 6,
-                        jacobian);
 }
-
-void SystemDynamicConstraintSingleSupport::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
-{
-    copyDenseIntoSparse(-iDynTree::toEigen(*m_massMatrix),
-                        m_jacobianStartingRow, m_jacobianStartingColumn, jacobian);
-
-    copyDenseIntoSparse(iDynTree::toEigen(*m_stanceFootJacobian).transpose(),
-                        m_jacobianStartingRow,
-                        m_jacobianStartingColumn + m_systemSize + 6 + m_systemSize,
-                        jacobian);
-}
-
 
 LinearMomentumConstraint::LinearMomentumConstraint(const Type& elementType, bool controlCoM)
     :LinearMomentumElement(elementType, controlCoM)
@@ -446,7 +473,6 @@ void LinearMomentumConstraint::evaluateBounds(iDynTree::VectorDynSize &upperBoun
 
     if(m_controlCoM)
     {
-        m_controller->evaluateControl();
         iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, 3) =
             -iDynTree::toEigen(weightForce) +
             m_robotMass * iDynTree::toEigen(m_controller->getControllerOutput());
