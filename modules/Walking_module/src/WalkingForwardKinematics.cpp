@@ -32,6 +32,8 @@ bool WalkingFK::setRobotModel(const iDynTree::Model& model)
 
     m_kinDyn.setFrameVelocityRepresentation(iDynTree::MIXED_REPRESENTATION);
 
+    m_generalizedBiasForces.resize(model);
+
     // initialize some quantities needed for the first step
     m_prevContactLeft = false;
 
@@ -476,6 +478,16 @@ iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
 iDynTree::Twist WalkingFK::getRootLinkVelocity()
 {
     return m_kinDyn.getFrameVel(m_frameRootIndex);
+}
+
+iDynTree::Twist WalkingFK::getLeftFootVelocity()
+{
+    return m_kinDyn.getFrameVel(m_frameLeftIndex);
+}
+
+iDynTree::Twist WalkingFK::getRightFootVelocity()
+{
+    return m_kinDyn.getFrameVel(m_frameRightIndex);
 }
 
 iDynTree::Rotation WalkingFK::getNeckOrientation()

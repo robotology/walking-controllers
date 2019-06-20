@@ -198,6 +198,18 @@ public:
     iDynTree::Twist getRootLinkVelocity();
 
     /**
+     * Return the left foot velocity.
+     * @return the left foot velocity expressed with the mixed representation.
+     */
+    iDynTree::Twist getLeftFootVelocity();
+
+    /**
+     * Return the left foot velocity.
+     * @return the left foot velocity expressed with the mixed representation.
+     */
+    iDynTree::Twist getRightFootVelocity();
+
+    /**
      * Return the neck orientation.
      * @return the rotation matrix between the neck and the reference frame.
      */
