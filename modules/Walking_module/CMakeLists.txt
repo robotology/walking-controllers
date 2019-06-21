@@ -60,6 +60,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/WalkingPIDHandler.cpp
   src/RetargetingClient.cpp
   src/ContactWrenchMapping.cpp
+  src/WalkingAdmittanceController.cpp
   )
 
 # set hpp files
@@ -79,6 +80,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingPIDHandler.hpp
   include/RetargetingClient.hpp
   include/ContactWrenchMapping.hpp
+  include/WalkingAdmittanceController.hpp
   )
 
 # add include directories to the build.
