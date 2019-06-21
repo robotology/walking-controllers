@@ -418,7 +418,7 @@ void SystemDynamicConstraint::evaluateBounds(iDynTree::VectorDynSize &upperBound
         = iDynTree::toEigen(*m_generalizedBiasForces);
 
     for(int i = 0; i < m_contactWrenches.size(); i++)
-        iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, m_sizeOfElement) +=
+        iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, m_sizeOfElement) -=
             iDynTree::toEigen(*m_contactWrenchesJacobian[i]).transpose() * iDynTree::toEigen(*m_contactWrenches[i]);
 
     iDynTree::toEigen(lowerBounds).segment(m_jacobianStartingRow, m_sizeOfElement) =
@@ -632,7 +632,6 @@ void JointRegularizationCostFunction::evaluateGradient(iDynTree::VectorDynSize& 
 {
 
     evaluateControl();
-
     iDynTree::toEigen(gradient).segment(m_hessianStartingRow, m_sizeOfElement) =
         (-iDynTree::toEigen(m_weight)).asDiagonal()
         *iDynTree::toEigen(m_desiredJointAccelerationControlled);
