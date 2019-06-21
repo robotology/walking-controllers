@@ -53,8 +53,9 @@ public:
 
     bool solve();
 
-    const iDynTree::VectorDynSize& solution() const;
+    const iDynTree::Wrench& getDesiredLeftWrench() const;
 
+    const iDynTree::Wrench& getDesiredRightWrench() const;
 };
 
 #endif

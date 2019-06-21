@@ -19,7 +19,6 @@
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 
-
 class ContactWrenchMapping::Implementation
 {
     friend ContactWrenchMapping;
@@ -40,7 +39,8 @@ class ContactWrenchMapping::Implementation
     iDynTree::VectorDynSize m_lowerBound;
     int m_numberOfConstraints;
     int m_numberOfVariables;
-    iDynTree::VectorDynSize m_solution;
+    iDynTree::Wrench m_desiredLeftWrench;
+    iDynTree::Wrench m_desiredRightWrench;
 
     iDynTree::Transform m_leftFootToWorldTransform;
     iDynTree::Transform m_rightFootToWorldTransform;
@@ -420,7 +420,6 @@ class ContactWrenchMapping::Implementation
         for(const auto& element: m_costFunctions)
         {
             key = element.first;
-
             element.second->evaluateHessian(m_hessianMatrices.at(key));
             hessianEigen += m_hessianMatrices.at(key);
         }
@@ -480,7 +479,6 @@ class ContactWrenchMapping::Implementation
     {
         for(const auto& constraint: m_constraints)
             constraint.second->evaluateJacobian(m_constraintMatrix);
-
 
         if(m_optimizer->isInitialized())
         {
@@ -577,7 +575,8 @@ class ContactWrenchMapping::Implementation
             return false;
         }
 
-        iDynTree::toEigen(m_solution) = m_optimizer->getSolution();
+        iDynTree::fromEigen(m_desiredLeftWrench, m_optimizer->getSolution().segment<6>(0));
+        iDynTree::fromEigen(m_desiredRightWrench, m_optimizer->getSolution().segment<6>(6));
 
         return true;
     }
@@ -808,8 +807,6 @@ bool ContactWrenchMapping::initialize(yarp::os::Searchable& config)
     m_pimpl->m_upperBound.resize(m_pimpl->m_numberOfConstraints);
     m_pimpl->m_upperBound.zero();
 
-    m_pimpl->m_solution.resize(m_pimpl->m_numberOfVariables);
-
     // initialize the optimization problem
     m_pimpl->m_optimizer = std::make_unique<OsqpEigen::Solver>();
     m_pimpl->m_optimizer->data()->setNumberOfVariables(m_pimpl->m_numberOfVariables);
@@ -834,16 +831,19 @@ bool ContactWrenchMapping::initialize(yarp::os::Searchable& config)
     }
 
     // // print some usefull information
-    yInfo() << "Total number of constraints " << m_pimpl->m_numberOfConstraints;
+    yInfo() << "[ContactWrenchMapping::initialize] Total number of constraints "
+            << m_pimpl->m_numberOfConstraints;
     for(const auto& constraint: m_pimpl->m_constraints)
-        yInfo() << constraint.first << ": " << constraint.second->getNumberOfConstraints()
-                << constraint.second->getJacobianStartingRow()
-                << constraint.second->getJacobianStartingColumn();
+        yInfo() << "[ContactWrenchMapping::initialize] "
+                << constraint.first << ": " << constraint.second->getNumberOfConstraints()
+                << " " << constraint.second->getJacobianStartingRow()
+                << " " << constraint.second->getJacobianStartingColumn();
 
 
-    yInfo() << "Total number of cost function " << m_pimpl->m_hessianMatrices.size();
+    yInfo() << "[ContactWrenchMapping::initialize] Total number of cost function "
+            << m_pimpl->m_hessianMatrices.size();
     for(const auto& costFunction: m_pimpl->m_costFunctions)
-        yInfo() << costFunction.first;
+        yInfo() << "[ContactWrenchMapping::initialize] " << costFunction.first;
 
     return true;
 }
@@ -881,7 +881,7 @@ void ContactWrenchMapping::setFeetState(const iDynTree::Transform& leftFootToWor
 }
 
 bool ContactWrenchMapping::setCoMState(const iDynTree::Position& comPosition,
-                                      const iDynTree::Vector3& comVelocity)
+                                       const iDynTree::Vector3& comVelocity)
 {
     return m_pimpl->setCoMState(comPosition, comVelocity);
 }
@@ -908,7 +908,12 @@ bool ContactWrenchMapping::solve()
     return m_pimpl->solve();
 }
 
-const iDynTree::VectorDynSize& ContactWrenchMapping::solution() const
+const iDynTree::Wrench& ContactWrenchMapping::getDesiredLeftWrench() const
 {
-    return m_pimpl->m_solution;
+    return m_pimpl->m_desiredLeftWrench;
+}
+
+const iDynTree::Wrench& ContactWrenchMapping::getDesiredRightWrench() const
+{
+    return m_pimpl->m_desiredRightWrench;
 }
