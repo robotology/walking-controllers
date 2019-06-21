@@ -39,7 +39,7 @@ public:
      * Get the controller output.
      * @return controller output.
      */
-    const iDynTree::Vector3& getControllerOutput() const;
+    const iDynTree::Vector3& getControllerOutput();
 };
 
 /**

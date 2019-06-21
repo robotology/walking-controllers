@@ -12,8 +12,9 @@
 #include <CartesianPID.hpp>
 #include <Utils.hpp>
 
-const iDynTree::Vector3& CartesianPID::getControllerOutput() const
+const iDynTree::Vector3& CartesianPID::getControllerOutput()
 {
+    evaluateControl();
     return m_controllerOutput;
 }
 
