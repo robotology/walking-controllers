@@ -325,10 +325,10 @@ void ForceConstraint::enableConstraint()
 
 void ForceConstraint::evaluateJacobian(Eigen::SparseMatrix<double>& jacobian)
 {
-    auto tmp1 = iDynTree::toEigen(m_jacobianLeftTrivialized).block(0, 0, m_sizeOfElement, 3)
+    Eigen::MatrixXd tmp1 = iDynTree::toEigen(m_jacobianLeftTrivialized).block(0, 0, m_sizeOfElement, 3)
         * iDynTree::toEigen(m_footToWorldTransform->getRotation().inverse());
 
-    auto tmp2 = iDynTree::toEigen(m_jacobianLeftTrivialized).block(0, 3, m_sizeOfElement, 3)
+    Eigen::MatrixXd tmp2 = iDynTree::toEigen(m_jacobianLeftTrivialized).block(0, 3, m_sizeOfElement, 3)
         * iDynTree::toEigen(m_footToWorldTransform->getRotation().inverse());
 
     for(int i = 0; i < m_jacobianLeftTrivialized.rows(); i++)
@@ -745,12 +745,14 @@ void AngularMomentumCostFunction::evaluateGradient(iDynTree::VectorDynSize &grad
                 = iDynTree::skew(iDynTree::toEigen(m_feetToWorldTransform[i]->getPosition())
                                  - iDynTree::toEigen(m_comPosition));
 
-            iDynTree::toEigen(temp).block(0, i * 6 + 3, 3, 3) = Eigen::MatrixXd::Identity(3, 3);
-
+        iDynTree::toEigen(temp).block(0, i * 6 + 3, 3, 3) = Eigen::MatrixXd::Identity(3, 3);
     }
-    iDynTree::toEigen(gradient).segment(m_hessianStartingRow, m_sizeOfElement) =
-        -iDynTree::toEigen(temp) * iDynTree::toEigen(m_weight).asDiagonal() *
-        iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+
+    iDynTree::Vector3 desiredAngularMomentumRateOfChange = this->desiredAngularMomentumRateOfChange();
+
+    iDynTree::toEigen(gradient).segment(m_hessianStartingRow, 12) =
+        -iDynTree::toEigen(temp).transpose() * iDynTree::toEigen(m_weight).asDiagonal() *
+        iDynTree::toEigen(desiredAngularMomentumRateOfChange);
 }
 
 AngularMomentumCostFunction::AngularMomentumCostFunction()
