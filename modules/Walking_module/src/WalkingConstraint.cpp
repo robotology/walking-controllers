@@ -9,6 +9,8 @@
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/EigenSparseHelpers.h>
+#include <iDynTree/yarp/YARPConversions.h>
+#include <iDynTree/yarp/YARPEigenConversions.h>
 #include <OsqpEigen/OsqpEigen.h>
 #include <WalkingConstraint.hpp>
 
@@ -495,8 +497,13 @@ void LinearMomentumConstraint::evaluateBounds(iDynTree::VectorDynSize &upperBoun
 iDynTree::Vector3 AngularMomentumElement::desiredAngularMomentumRateOfChange()
 {
     iDynTree::Vector3 angularMomentumRateOfChange;
-    iDynTree::toEigen(angularMomentumRateOfChange) = - m_kp * iDynTree::toEigen(m_angularMomentum);
-    return  angularMomentumRateOfChange;
+    yarp::sig::Vector buff(3);
+
+    iDynTree::toYarp(m_angularMomentum, buff);
+    iDynTree::toEigen(angularMomentumRateOfChange) = - m_kp * iDynTree::toEigen(m_angularMomentum)
+        - m_ki * iDynTree::toEigen(m_angularMomentumIntegrator->integrate(buff));
+
+    return angularMomentumRateOfChange;
 }
 
 AngularMomentumConstraint::AngularMomentumConstraint()
@@ -531,10 +538,12 @@ void AngularMomentumConstraint::evaluateJacobian(Eigen::SparseMatrix<double>& ja
 void AngularMomentumConstraint::evaluateBounds(iDynTree::VectorDynSize &upperBounds,
                                                iDynTree::VectorDynSize &lowerBounds)
 {
+    iDynTree::Vector3 desiredAngularMomentumRateOfChange = this->desiredAngularMomentumRateOfChange();
+
     iDynTree::toEigen(upperBounds).segment(m_jacobianStartingRow, 3)
-        = iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+        = iDynTree::toEigen(desiredAngularMomentumRateOfChange);
     iDynTree::toEigen(lowerBounds).segment(m_jacobianStartingRow, 3)
-        = iDynTree::toEigen(desiredAngularMomentumRateOfChange());
+        = iDynTree::toEigen(desiredAngularMomentumRateOfChange);
 }
 
 RateOfChangeConstraint::RateOfChangeConstraint(const int& sizeOfTheConstraintVector)
