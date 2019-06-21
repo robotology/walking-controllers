@@ -22,6 +22,7 @@
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
+#include <iDynTree/Core/Wrench.h>
 
 #include <WalkingModule.hpp>
 #include <Utils.hpp>
@@ -302,6 +303,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(!m_contactWrenchMapping->setRobotMass(m_loader.model().getTotalMass()))
         return false;
 
+    yarp::os::Bottle walkingAdmittanceControllerOption = rf.findGroup("ADMITTANCE_CONTROLLER");
+    m_walkingAdmittanceController = std::make_unique<WalkingAdmittanceController>();
+    if(!m_walkingAdmittanceController->initialize(walkingAdmittanceControllerOption, m_robotControlHelper->getActuatedDoFs()))
+    {
+        yError() << "[WalkingModule::configure] Failed to configure the walking admittance controller";
+        return false;
+    }
+
     // initialize the logger
     if(m_dumpData)
     {
@@ -322,6 +331,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     m_profiler->addTimer("IK");
     m_profiler->addTimer("CONTACT_WRENCH");
+    m_profiler->addTimer("ADMITTANCE_CONTROLLER");
     m_profiler->addTimer("Total");
 
     // initialize some variables
@@ -419,6 +429,65 @@ bool WalkingModule::evaluateContactWrenchDistribution()
     return m_contactWrenchMapping->solve();
 }
 
+bool WalkingModule::evaluateAdmittanceControl()
+{
+    m_walkingAdmittanceController->setJointState(m_robotControlHelper->getJointPosition(),
+                                                 m_robotControlHelper->getJointVelocity());
+
+    iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
+                                       m_robotControlHelper->getActuatedDoFs() + 6);
+
+    iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
+
+    bool ok = true;
+    ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
+    m_walkingAdmittanceController->setMassMatrix(massMatrix);
+
+    ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
+    m_walkingAdmittanceController->setGeneralizedBiasForces(generalizedBiasForces);
+
+    iDynTree::MatrixDynSize leftFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+    iDynTree::MatrixDynSize rightFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+
+    ok &= m_FKSolver->getLeftFootJacobian(leftFootJacobian);
+    ok &= m_FKSolver->getRightFootJacobian(rightFootJacobian);
+
+    m_walkingAdmittanceController->setFeetJacobian(leftFootJacobian, rightFootJacobian);
+
+    m_walkingAdmittanceController->setFeetBiasAcceleration(m_FKSolver->getLeftFootBiasAcceleration(),
+                                                           m_FKSolver->getRightFootBiasAcceleration());
+
+    ok &= m_walkingAdmittanceController->setFeetState(m_FKSolver->getLeftFootToWorldTransform(),
+                                                      m_FKSolver->getLeftFootVelocity(),
+                                                      m_robotControlHelper->getLeftWrench(),
+                                                      m_leftInContact.front(),
+                                                      m_FKSolver->getRightFootToWorldTransform(),
+                                                      m_FKSolver->getRightFootVelocity(),
+                                                      m_robotControlHelper->getRightWrench(),
+                                                      m_rightInContact.front());
+
+    // TODO add acceleration
+    iDynTree::Vector6 dummy;
+    dummy.zero();
+
+    ok &= m_walkingAdmittanceController->setDesiredFeetTrajectory(m_leftTrajectory.front(),
+                                                                  m_leftTwistTrajectory.front(),
+                                                                  dummy,
+                                                                  m_contactWrenchMapping->getDesiredLeftWrench(),
+                                                                  m_rightTrajectory.front(),
+                                                                  m_rightTwistTrajectory.front(),
+                                                                  dummy,
+                                                                  m_contactWrenchMapping->getDesiredRightWrench());
+
+    if(!ok)
+    {
+        yError() << "[WalkingModule::evaluateAdmittanceControl] Unable to update parameters in the admittance controller.";
+        return false;
+    }
+
+    return m_walkingAdmittanceController->solve();
+}
+
 bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const iDynTree::Position& desiredCoMPosition,
                               const iDynTree::Vector3& desiredCoMVelocity,
                               const iDynTree::Rotation& desiredNeckOrientation,
@@ -509,16 +578,16 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            // send the reference again in order to reduce error
-            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            {
-                yError() << "[prepareRobot] Error while setting the initial position using "
-                         << "POSITION DIRECT mode.";
-                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
-                reset();
-                m_robotState = WalkingFSM::Stopped;
-                return true;
-            }
+            // // send the reference again in order to reduce error
+            // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            // {
+            //     yError() << "[prepareRobot] Error while setting the initial position using "
+            //              << "POSITION DIRECT mode.";
+            //     yInfo() << "[WalkingModule::updateModule] Try to prepare again";
+            //     reset();
+            //     m_robotState = WalkingFSM::Stopped;
+            //     return true;
+            // }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
@@ -542,6 +611,10 @@ bool WalkingModule::updateModule()
                                        m_FKSolver->getHeadToWorldTransform().inverse()
                                        * m_FKSolver->getRightHandToWorldTransform());
 
+
+            iDynTree::VectorDynSize dummy(m_robotControlHelper->getActuatedDoFs());
+            dummy.zero();
+            m_walkingAdmittanceController->setDesiredJointTrajectory( m_qDesired, dummy, dummy);
 
             m_robotState = WalkingFSM::Prepared;
 
@@ -818,11 +891,11 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-        {
-            yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            return false;
-        }
+        // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+        // {
+        //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+        //     return false;
+        // }
 
         m_profiler->setInitTime("CONTACT_WRENCH");
 
@@ -833,6 +906,23 @@ bool WalkingModule::updateModule()
         }
 
         m_profiler->setEndTime("CONTACT_WRENCH");
+
+        m_profiler->setInitTime("ADMITTANCE_CONTROLLER");
+
+        if(!evaluateAdmittanceControl())
+        {
+            yError() << "[WalkingModule::updateModule] Unable to evaluate the evaluate admittance control.";
+            return false;
+        }
+
+        m_profiler->setEndTime("ADMITTANCE_CONTROLLER");
+
+        if(!m_robotControlHelper->setTorqueReferences(m_walkingAdmittanceController->desiredJointTorque()))
+        {
+            yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
+            return false;
+        }
+
 
         m_profiler->setEndTime("Total");
 
@@ -857,15 +947,9 @@ bool WalkingModule::updateModule()
 
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-                                      m_stableDCMModel->getCoMPosition(),
-                                      m_stableDCMModel->getCoMVelocity(),
-                                      leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-                                      rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-                                      m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
-                                      m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),
+                                      m_contactWrenchMapping->getDesiredLeftWrench(), m_contactWrenchMapping->getDesiredRightWrench(),
+                                      m_robotControlHelper->getLeftWrench(), m_robotControlHelper->getRightWrench());
         }
 
         propagateTime();
@@ -1230,26 +1314,12 @@ bool WalkingModule::startWalking()
 
     if(m_dumpData)
     {
-        m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
+        m_walkingLogger->startRecord({"record","dcm_x", "dcm_y", "dcm_z",
                     "dcm_des_x", "dcm_des_y",
-                    "dcm_des_dx", "dcm_des_dy",
-                    "zmp_x", "zmp_y",
-                    "zmp_des_x", "zmp_des_y",
-                    "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y",
-                    "com_des_dx", "com_des_dy",
-                    "lf_x", "lf_y", "lf_z",
-                    "lf_roll", "lf_pitch", "lf_yaw",
-                    "rf_x", "rf_y", "rf_z",
-                    "rf_roll", "rf_pitch", "rf_yaw",
-                    "lf_des_x", "lf_des_y", "lf_des_z",
-                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    "rf_des_x", "rf_des_y", "rf_des_z",
-                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_err_x", "lf_err_y", "lf_err_z",
-                    "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
-                    "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                    "lf_force_des_x", "lf_force_des_y", "lf_force_des_z", "lf_torque_des_x", "lf_torque_des_y", "lf_torque_des_z",
+                    "rf_force_des_x", "rf_force_des_y", "rf_force_des_z", "rf_torque_des_x", "rf_torque_des_y", "rf_torque_des_z",
+                    "lf_force_x", "lf_force_y", "lf_force_z", "lf_torque_x", "lf_torque_y", "lf_torque_z",
+                    "rf_force_x", "rf_force_y", "rf_force_z", "rf_torque_x", "rf_torque_y", "rf_torque_z"});
     }
 
     // if the robot was only prepared the filters has to be reseted
