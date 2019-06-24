@@ -546,6 +546,20 @@ bool TrajectoryGenerator::getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
     return true;
 }
 
+bool TrajectoryGenerator::getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAcceleration,
+                                              std::vector<iDynTree::SpatialAcc>& rFootAcceleration)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getFeetAcceleration] No trajectories are available";
+        return false;
+    }
+
+    m_feetGenerator->getFeetAccelerationInMixedRepresentation(lFootAcceleration, rFootAcceleration);
+
+    return true;
+}
+
 bool TrajectoryGenerator::getWhenUseLeftAsFixed(std::vector<bool>& isLeftFixedFrame)
 {
     if(!isTrajectoryComputed())
