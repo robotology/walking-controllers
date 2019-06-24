@@ -60,6 +60,12 @@ bool WalkingModule::advanceReferenceSignals()
     m_leftTwistTrajectory.pop_front();
     m_leftTwistTrajectory.push_back(m_leftTwistTrajectory.back());
 
+    m_rightAccelerationTrajectory.pop_front();
+    m_rightAccelerationTrajectory.push_back(m_rightAccelerationTrajectory.back());
+
+    m_leftAccelerationTrajectory.pop_front();
+    m_leftAccelerationTrajectory.push_back(m_leftAccelerationTrajectory.back());
+
     m_rightInContact.pop_front();
     m_rightInContact.push_back(m_rightInContact.back());
 
@@ -429,11 +435,10 @@ bool WalkingModule::evaluateContactWrenchDistribution()
     return m_contactWrenchMapping->solve();
 }
 
-bool WalkingModule::evaluateAdmittanceControl()
+bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredNeckOrientation)
 {
     m_walkingAdmittanceController->setJointState(m_robotControlHelper->getJointPosition(),
                                                  m_robotControlHelper->getJointVelocity());
-
     iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
                                        m_robotControlHelper->getActuatedDoFs() + 6);
 
@@ -472,12 +477,23 @@ bool WalkingModule::evaluateAdmittanceControl()
 
     ok &= m_walkingAdmittanceController->setDesiredFeetTrajectory(m_leftTrajectory.front(),
                                                                   m_leftTwistTrajectory.front(),
-                                                                  dummy,
+                                                                  m_leftAccelerationTrajectory.front(),
                                                                   m_contactWrenchMapping->getDesiredLeftWrench(),
                                                                   m_rightTrajectory.front(),
                                                                   m_rightTwistTrajectory.front(),
-                                                                  dummy,
+                                                                  m_rightAccelerationTrajectory.front(),
                                                                   m_contactWrenchMapping->getDesiredRightWrench());
+
+
+    // set neck quantities
+    ok &= m_walkingAdmittanceController->setDesiredNeckTrajectory(desiredNeckOrientation.inverse());
+    ok &= m_walkingAdmittanceController->setNeckState(m_FKSolver->getNeckOrientation(),
+                                                      m_FKSolver->getNeckVelocity());
+
+    iDynTree::MatrixDynSize neckJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+    ok &= m_FKSolver->getNeckJacobian(neckJacobian);
+    m_walkingAdmittanceController->setNeckJacobian(neckJacobian);
+    m_walkingAdmittanceController->setNeckBiasAcceleration(m_FKSolver->getNeckBiasAcceleration());
 
     if(!ok)
     {
@@ -909,7 +925,7 @@ bool WalkingModule::updateModule()
 
         m_profiler->setInitTime("ADMITTANCE_CONTROLLER");
 
-        if(!evaluateAdmittanceControl())
+        if(!evaluateAdmittanceControl(yawRotation))
         {
             yError() << "[WalkingModule::updateModule] Unable to evaluate the evaluate admittance control.";
             return false;
@@ -939,11 +955,11 @@ bool WalkingModule::updateModule()
         // send data to the WalkingLogger
         if(m_dumpData)
         {
-            iDynTree::Vector2 desiredZMP;
-            if(m_useMPC)
-                desiredZMP = m_walkingController->getControllerOutput();
-            else
-                desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+            // iDynTree::Vector2 desiredZMP;
+            // if(m_useMPC)
+            //     desiredZMP = m_walkingController->getControllerOutput();
+            // else
+            //     desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
@@ -1030,7 +1046,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(10))
+    bool getExternalRobotBase = true;
+    if(!m_robotControlHelper->getFeedbacksRaw(10, getExternalRobotBase))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1168,10 +1185,21 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    if(!m_trajectoryGenerator->generateFirstTrajectories())
+    if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-        return false;
+        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
+    }
+    else
+    {
+        if(!m_trajectoryGenerator->generateFirstTrajectories())
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
     }
 
     if(!updateTrajectories(0))
@@ -1224,6 +1252,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::Transform> rightTrajectory;
     std::vector<iDynTree::Twist> leftTwistTrajectory;
     std::vector<iDynTree::Twist> rightTwistTrajectory;
+    std::vector<iDynTree::SpatialAcc> leftAccelerationTrajectory;
+    std::vector<iDynTree::SpatialAcc> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
     std::vector<bool> rightInContact;
@@ -1242,6 +1272,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
     m_trajectoryGenerator->getFeetTwist(leftTwistTrajectory, rightTwistTrajectory);
+    m_trajectoryGenerator->getFeetAcceleration(leftAccelerationTrajectory, rightAccelerationTrajectory);
     m_trajectoryGenerator->getFeetStandingPeriods(leftInContact, rightInContact);
     m_trajectoryGenerator->getWhenUseLeftAsFixed(isLeftFixedFrame);
 
@@ -1260,6 +1291,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdHelper::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(leftTwistTrajectory, m_leftTwistTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(rightTwistTrajectory, m_rightTwistTrajectory, mergePoint);
+    StdHelper::appendVectorToDeque(leftAccelerationTrajectory, m_leftAccelerationTrajectory, mergePoint);
+    StdHelper::appendVectorToDeque(rightAccelerationTrajectory, m_rightAccelerationTrajectory, mergePoint);
     StdHelper::appendVectorToDeque(isLeftFixedFrame, m_isLeftFixedFrame, mergePoint);
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
@@ -1284,12 +1317,21 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
-                                                      m_rightTrajectory.front(),
-                                                      m_isLeftFixedFrame.front()))
+    if(!m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
-        return false;
+        if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                          m_rightTrajectory.front(),
+                                                          m_isLeftFixedFrame.front()))
+        {
+            yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
+    }
+    else
+    {
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+                                                      m_robotControlHelper->getBaseTwist());
+
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
@@ -1324,7 +1366,18 @@ bool WalkingModule::startWalking()
 
     // if the robot was only prepared the filters has to be reseted
     if(m_robotState == WalkingFSM::Prepared)
+    {
         m_robotControlHelper->resetFilters();
+        updateFKSolver();
+
+        // TODO this is useful for the simulation
+        double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+                               + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+
+        yInfo() << heightOffset;
+
+        m_robotControlHelper->setHeightOffset(heightOffset);
+    }
 
     m_robotState = WalkingFSM::Walking;
 
