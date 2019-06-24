@@ -93,9 +93,10 @@ public:
     /**
      * Generate the first trajectory.
      * This method has to be called before updateTrajectories() method
+     * @param initialRobotPosition initial position of the robot (if an external robot base is used it may be different from zero )
      * @return true/false in case of success/failure.
      */
-    bool generateFirstTrajectories();
+    bool generateFirstTrajectories(const iDynTree::Position& initialPosition = iDynTree::Position::Zero());
 
     /**
      * Generate the first trajectory.
