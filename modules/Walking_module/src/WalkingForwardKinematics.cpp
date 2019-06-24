@@ -202,7 +202,6 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     }
     else
     {
-
         if(!setBaseFrame(rootFrame, "root"))
         {
             yError() << "[initialize] Unable to set the rightFootFrame.";
@@ -493,6 +492,11 @@ iDynTree::Twist WalkingFK::getRightFootVelocity()
 iDynTree::Rotation WalkingFK::getNeckOrientation()
 {
     return m_kinDyn.getWorldTransform(m_frameNeckIndex).getRotation();
+}
+
+iDynTree::Twist WalkingFK::getNeckVelocity()
+{
+    return m_kinDyn.getFrameVel(m_frameNeckIndex);
 }
 
 bool WalkingFK::getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)

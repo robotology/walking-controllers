@@ -216,6 +216,12 @@ public:
     iDynTree::Rotation getNeckOrientation();
 
     /**
+     * Return the neck velocity.
+     * @return the neck velocity expressed with the mixed representation.
+     */
+    iDynTree::Twist getNeckVelocity();
+
+    /**
      * Get the left foot jacobian.
      * @oaram jacobian is the left foot jacobian matrix
      * @return true/false in case of success/failure.
