@@ -10,6 +10,7 @@
 #include <iDynTree/Core/VectorDynSize.h>
 #include <iDynTree/Core/Wrench.h>
 #include <iDynTree/Core/Twist.h>
+#include <iDynTree/Core/SpatialAcc.h>
 #include <iDynTree/Core/EigenHelpers.h>
 
 #include <WalkingConstraint.hpp>
@@ -213,21 +214,12 @@ class WalkingAdmittanceController::Implementation
         return true;
     }
 
-    void setDesiredFootTrajectory(const iDynTree::Transform& footToWorldTransform, const iDynTree::Twist& footTwist, const iDynTree::Vector6& footAcceleration,
+    void setDesiredFootTrajectory(const iDynTree::Transform& footToWorldTransform, const iDynTree::Twist& footTwist, const iDynTree::SpatialAcc& footAcceleration,
                                   const iDynTree::Wrench& footWrench, std::shared_ptr<CartesianConstraint>& foot)
     {
         // Kinematcs
-        iDynTree::Vector3 footLinearAcceleration;
-        footLinearAcceleration(0) = footAcceleration(0);
-        footLinearAcceleration(1) = footAcceleration(1);
-        footLinearAcceleration(2) = footAcceleration(2);
-        foot->positionController()->setDesiredTrajectory(footLinearAcceleration, footTwist.getLinearVec3(), footToWorldTransform.getPosition());
-
-        iDynTree::Vector3 footAngularAcceleration;
-        footAngularAcceleration(0) = footAcceleration(3);
-        footAngularAcceleration(1) = footAcceleration(4);
-        footAngularAcceleration(2) = footAcceleration(5);
-        foot->orientationController()->setDesiredTrajectory(footAngularAcceleration, footTwist.getAngularVec3(), footToWorldTransform.getRotation());
+        foot->positionController()->setDesiredTrajectory(footAcceleration.getLinearVec3(), footTwist.getLinearVec3(), footToWorldTransform.getPosition());
+        foot->orientationController()->setDesiredTrajectory(footAcceleration.getAngularVec3(), footTwist.getAngularVec3(), footToWorldTransform.getRotation());
 
         // static
         foot->forceController()->setDesiredForce(footWrench.getLinearVec3());
@@ -236,9 +228,9 @@ class WalkingAdmittanceController::Implementation
         return;
     }
 
-    bool setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::Vector6& leftFootAcceleration,
+    bool setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::SpatialAcc& leftFootAcceleration,
                                   const iDynTree::Wrench& leftFootWrench,
-                                  const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::Vector6& rightFootAcceleration,
+                                  const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::SpatialAcc& rightFootAcceleration,
                                   const iDynTree::Wrench& rightFootWrench)
     {
 
@@ -710,9 +702,9 @@ bool WalkingAdmittanceController::setFeetState(const iDynTree::Transform& leftFo
                                  rightFootToWorldTransform, rightFootTwist, rightFootWrench, rightInContact);
 }
 
-bool WalkingAdmittanceController::setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::Vector6& leftFootAcceleration,
+bool WalkingAdmittanceController::setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::SpatialAcc& leftFootAcceleration,
                                                            const iDynTree::Wrench& leftFootWrench,
-                                                           const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::Vector6& rightFootAcceleration,
+                                                           const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::SpatialAcc& rightFootAcceleration,
                                                            const iDynTree::Wrench& rightFootWrench)
 {
     return m_pimpl->setDesiredFeetTrajectory(leftFootToWorldTransform, leftFootTwist,

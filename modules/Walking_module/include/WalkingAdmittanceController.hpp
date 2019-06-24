@@ -53,9 +53,9 @@ public:
     bool setFeetState(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::Wrench& leftFootWrench, bool leftInContact,
                       const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::Wrench& rightFootWrench, bool rightInContact);
 
-    bool setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::Vector6& leftFootAcceleration,
+    bool setDesiredFeetTrajectory(const iDynTree::Transform& leftFootToWorldTransform, const iDynTree::Twist& leftFootTwist, const iDynTree::SpatialAcc& leftFootAcceleration,
                                   const iDynTree::Wrench& leftFootWrench,
-                                  const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::Vector6& rightFootAcceleration,
+                                  const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::SpatialAcc& rightFootAcceleration,
                                   const iDynTree::Wrench& rightFootWrench);
 
     bool solve();
