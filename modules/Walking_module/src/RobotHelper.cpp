@@ -860,7 +860,22 @@ WalkingPIDHandler& RobotHelper::getPIDHandler()
     return *m_PIDHandler;
 }
 
+const iDynTree::Transform& RobotHelper::getBaseTransform() const
+{
+    return m_robotBaseTransform;
+}
+
+const iDynTree::Twist& RobotHelper::getBaseTwist() const
+{
+    return m_robotBaseTwist;
+}
+
 void RobotHelper::setHeightOffset(const double& offset)
 {
     m_heightOffset = offset;
+}
+
+bool RobotHelper::isExternalRobotBaseUsed()
+{
+    return m_useExternalRobotBase;
 }

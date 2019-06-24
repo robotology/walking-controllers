@@ -231,11 +231,20 @@ public:
 
     WalkingPIDHandler& getPIDHandler();
 
+    const iDynTree::Transform& getBaseTransform() const;
+
+    const iDynTree::Twist& getBaseTwist() const;
+
     /**
      * Set the height of the offset coming from the base estimation
      * @param offset offset of the height of the base in meters
      */
     void setHeightOffset(const double& offset);
+
+    /**
+     * Return true if the base of the robot is provided by an external source
+     */
+    bool isExternalRobotBaseUsed();
 };
 
 #endif
