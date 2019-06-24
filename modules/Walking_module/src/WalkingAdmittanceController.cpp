@@ -7,11 +7,13 @@
  */
 
 #include <OsqpEigen/OsqpEigen.h>
+
 #include <iDynTree/Core/VectorDynSize.h>
 #include <iDynTree/Core/Wrench.h>
 #include <iDynTree/Core/Twist.h>
 #include <iDynTree/Core/SpatialAcc.h>
 #include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
 #include <WalkingConstraint.hpp>
 #include <WalkingAdmittanceController.hpp>
@@ -28,9 +30,13 @@ class WalkingAdmittanceController::Implementation
 
     iDynTree::MatrixDynSize m_leftFootJacobian;
     iDynTree::MatrixDynSize m_rightFootJacobian;
+    iDynTree::MatrixDynSize m_neckJacobian;
 
     iDynTree::VectorDynSize m_leftFootBiasAcceleration;
     iDynTree::VectorDynSize m_rightFootBiasAcceleration;
+    iDynTree::VectorDynSize m_neckBiasAcceleration;
+
+    iDynTree::Rotation m_additionalRotation;
 
     iDynTree::MatrixDynSize m_massMatrix;
     iDynTree::VectorDynSize m_generalizedBiasForces;
@@ -96,6 +102,24 @@ class WalkingAdmittanceController::Implementation
         m_gradientVectors["joint_regularization_costFunction"].zero();
 
         return;
+    }
+
+    void instantiateNeckCostFunction(const double& c0, const double& kpAngular, const double& kdAngular, const iDynTree::VectorDynSize weight)
+    {
+        std::shared_ptr<CartesianCostFunction> ptr;
+        ptr = std::make_shared<CartesianCostFunction>(CartesianElement::Type::ORIENTATION);
+        ptr->setControlMode(CartesianElement::ControlMode::POSITION);
+        ptr->setSubMatricesStartingPosition(0, 0);
+
+        ptr->setWeight(weight);
+        ptr->setBiasAcceleration(m_neckBiasAcceleration);
+        ptr->setRoboticJacobian(m_neckJacobian);
+        ptr->orientationController()->setGains(c0, kdAngular, kpAngular);
+
+        m_costFunctions.insert({"neck", ptr});
+        m_hessianMatrices["neck"].resize(m_numberOfVariables, m_numberOfVariables);
+        m_gradientVectors["neck"].resize(m_numberOfVariables);
+        m_gradientVectors["neck"].zero();
     }
 
     void instantiateSystemDynamicsConstraint(const int& numberOfDofs)
@@ -258,6 +282,40 @@ class WalkingAdmittanceController::Implementation
 
         ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
         this->setDesiredFootTrajectory(rightFootToWorldTransform, rightFootTwist, rightFootAcceleration, rightFootWrench, ptr);
+
+        return true;
+    }
+
+    bool setDesiredNeckTrajectory(const iDynTree::Rotation& desiredNeckOrientation)
+    {
+        iDynTree::Vector3 dummy;
+        dummy.zero();
+        auto cost = m_costFunctions.find("neck");
+        if(cost == m_costFunctions.end())
+        {
+            yError() << "[setDesiredNeckTrajectory] unable to find the neck trajectory element. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianCostFunction>(cost->second);
+        ptr->orientationController()->setDesiredTrajectory(dummy, dummy,
+                                                           desiredNeckOrientation * m_additionalRotation);
+        return true;
+    }
+
+    bool setNeckState(const iDynTree::Rotation& neckOrientation, const iDynTree::Twist& neckVelocity)
+    {
+        auto cost = m_costFunctions.find("neck");
+        if(cost == m_costFunctions.end())
+        {
+            yError() << "[setNeckState] unable to find the neck trajectory element. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianCostFunction>(cost->second);
+        ptr->orientationController()->setFeedback(neckVelocity.getAngularVec3(), neckOrientation);
 
         return true;
     }
@@ -589,6 +647,59 @@ bool WalkingAdmittanceController::initialize(yarp::os::Searchable &config, const
                                            kpForce, kpCouple);
     }
 
+    {
+        yarp::os::Bottle& option = config.findGroup("NECK");
+        bool useDefaultKd = option.check("use_default_kd", yarp::os::Value("False")).asBool();
+        double c0, kpAngular, kdAngular;
+        if(!YarpHelper::getNumberFromSearchable(option, "c0", c0))
+        {
+            yError() << "[WalkingAdmittanceController::initialize] Unable to get number.";
+            return false;
+        }
+
+        if(!YarpHelper::getNumberFromSearchable(option, "kpAngular", kpAngular))
+        {
+            yError() << "[WalkingAdmittanceController::initialize] Unable to get number.";
+            return false;
+        }
+
+        if(useDefaultKd)
+        {
+            double scaling;
+            if(!YarpHelper::getNumberFromSearchable(option, "scaling", scaling))
+            {
+                yError() << "[WalkingAdmittanceController::initialize] Unable to get number.";
+                return false;
+            }
+
+            kdAngular = 2 / scaling * std::sqrt(kpAngular);
+        }
+        else
+        {
+            if(!YarpHelper::getNumberFromSearchable(option, "kdAngular", kdAngular))
+            {
+                yError() << "[WalkingAdmittanceController::initialize] Unable to get number.";
+                return false;
+            }
+        }
+
+        iDynTree::VectorDynSize weight(3);
+        if(!YarpHelper::getVectorFromSearchable(option, "weight", weight))
+        {
+            yError() << "[WalkingAdmittanceController::initialize] Unable to find a vector";
+            return false;
+        }
+
+        if(!iDynTree::parseRotationMatrix(option, "additional_rotation", m_pimpl->m_additionalRotation))
+        {
+            yError() << "[WalkingAdmittanceController::initialize] Unable to set the additional rotation.";
+            return false;
+        }
+
+
+        m_pimpl->instantiateNeckCostFunction(c0, kpAngular, kdAngular, weight);
+    }
+
     // resize variables
     m_pimpl->m_hessianEigen.resize(m_pimpl->m_numberOfVariables, m_pimpl->m_numberOfVariables);
     m_pimpl->m_constraintMatrix.resize(m_pimpl->m_numberOfConstraints, m_pimpl->m_numberOfVariables);
@@ -607,6 +718,8 @@ bool WalkingAdmittanceController::initialize(yarp::os::Searchable &config, const
     m_pimpl->m_rightFootJacobian.resize(6, actuatedDoFs + 6);
     m_pimpl->m_leftFootBiasAcceleration.resize(6);
     m_pimpl->m_rightFootBiasAcceleration.resize(6);
+    m_pimpl->m_neckJacobian.resize(3, actuatedDoFs + 6);
+    m_pimpl->m_neckBiasAcceleration.resize(3);
 
     // TODO move me
     m_pimpl->m_desiredJointPosition.resize(actuatedDoFs);
@@ -711,6 +824,29 @@ bool WalkingAdmittanceController::setDesiredFeetTrajectory(const iDynTree::Trans
                                              leftFootAcceleration, leftFootWrench,
                                              rightFootToWorldTransform, rightFootTwist,
                                              rightFootAcceleration, rightFootWrench);
+}
+
+bool WalkingAdmittanceController::setNeckState(const iDynTree::Rotation& neckOrientation,
+                                               const iDynTree::Twist& neckVelocity)
+{
+    return m_pimpl->setNeckState(neckOrientation, neckVelocity);
+}
+
+bool WalkingAdmittanceController::setDesiredNeckTrajectory(const iDynTree::Rotation& neckOrientation)
+{
+    return m_pimpl->setDesiredNeckTrajectory(neckOrientation);
+}
+
+void WalkingAdmittanceController::setNeckJacobian(const iDynTree::MatrixDynSize& jacobian)
+{
+    iDynTree::toEigen(m_pimpl->m_neckJacobian) = iDynTree::toEigen(jacobian).block(3, 0,
+                                                                                   3, m_pimpl->m_actuatedDoFs + 6);
+}
+
+void WalkingAdmittanceController::setNeckBiasAcceleration(const iDynTree::Vector6 &biasAcceleration)
+{
+    // get only the angular part
+    iDynTree::toEigen(m_pimpl->m_neckBiasAcceleration) = iDynTree::toEigen(biasAcceleration).block(3, 0, 3, 1);
 }
 
 bool WalkingAdmittanceController::solve()

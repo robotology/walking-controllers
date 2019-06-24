@@ -58,6 +58,14 @@ public:
                                   const iDynTree::Transform& rightFootToWorldTransform, const iDynTree::Twist& rightFootTwist, const iDynTree::SpatialAcc& rightFootAcceleration,
                                   const iDynTree::Wrench& rightFootWrench);
 
+    bool setNeckState(const iDynTree::Rotation& neckOrientation, const iDynTree::Twist& neckVelocity);
+
+    bool setDesiredNeckTrajectory(const iDynTree::Rotation& neckOrientation);
+
+    void setNeckJacobian(const iDynTree::MatrixDynSize& jacobian);
+
+    void setNeckBiasAcceleration(const iDynTree::Vector6 &biasAcceleration);
+
     bool solve();
 
     const iDynTree::VectorDynSize& desiredJointTorque() const;
