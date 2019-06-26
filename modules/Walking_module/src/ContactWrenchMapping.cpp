@@ -18,7 +18,6 @@
 #include <Utils.hpp>
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
-
 class ContactWrenchMapping::Implementation
 {
     friend ContactWrenchMapping;
@@ -278,6 +277,38 @@ class ContactWrenchMapping::Implementation
         //     ptr->setDesiredCoMVelocity(comVelocity);
         //     ptr->setDesiredCoMAcceleration(comAcceleration);
         // }
+        return true;
+    }
+
+    bool setDesiredAngularMomentumRateOfChange(const iDynTree::Vector3& desiredAngularMomentumRateOfChange)
+    {
+        if(m_useAngularMomentumConstraint)
+        {
+            auto constraint = m_constraints.find("angular_momentum_constraint");
+            if(constraint == m_constraints.end())
+            {
+                yError() << "[setLinearAngularMomentum] unable to find the angular momentum constraint. "
+                         << "Please call 'initialize()' method";
+                return false;
+            }
+
+            auto ptr = std::dynamic_pointer_cast<AngularMomentumElement>(constraint->second);
+            ptr->setAngularMomentumRateOfChange(desiredAngularMomentumRateOfChange);
+        }
+
+        if(m_useAngularMomentumCostFunction)
+        {
+            auto costFunction = m_costFunctions.find("angular_momentum_costFunction");
+            if(costFunction == m_costFunctions.end())
+            {
+                yError() << "[setCoMState] unable to find the angular momentum costFunction. "
+                         << "Please call 'initialize()' method";
+                return false;
+            }
+
+            auto ptr = std::dynamic_pointer_cast<AngularMomentumElement>(costFunction->second);
+            ptr->setAngularMomentumRateOfChange(desiredAngularMomentumRateOfChange);
+        }
         return true;
     }
 
@@ -689,7 +720,7 @@ bool ContactWrenchMapping::initialize(yarp::os::Searchable& config)
     }
 
     {
-        yarp::os::Bottle& contactForcesOption = config.findGroup("CONTACT_FORCES");
+        yarp::os::Bottle contactForcesOption = config.findGroup("CONTACT_FORCES");
 
         double staticFrictionCoefficient;
         if(!YarpHelper::getNumberFromSearchable(contactForcesOption, "staticFrictionCoefficient", staticFrictionCoefficient))
@@ -872,6 +903,12 @@ bool ContactWrenchMapping::setCentroidalMomentum(const iDynTree::SpatialMomentum
 {
     return m_pimpl->setCentroidalMomentum(centroidalMomentum);
 }
+
+bool ContactWrenchMapping::setDesiredAngularMomentumRateOfChange(const iDynTree::Vector3& angularMomentumrateOfChange)
+{
+    return m_pimpl->setDesiredAngularMomentumRateOfChange(angularMomentumrateOfChange);
+}
+
 
 void ContactWrenchMapping::setFeetState(const iDynTree::Transform& leftFootToWorldTransform,
                                        const iDynTree::Transform& rightFootToWorldTransform)

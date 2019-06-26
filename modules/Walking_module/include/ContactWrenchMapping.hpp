@@ -51,6 +51,8 @@ public:
 
     bool setFeetWeightPercentage(const double &weightInLeft, const double &weightInRight);
 
+    bool setDesiredAngularMomentumRateOfChange(const iDynTree::Vector3& angularMomentumrateOfChange);
+
     bool solve();
 
     const iDynTree::Wrench& getDesiredLeftWrench() const;
