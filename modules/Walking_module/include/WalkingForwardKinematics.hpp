@@ -306,6 +306,10 @@ public:
      * @return the linear and angular momentum of the robot.
      */
     iDynTree::SpatialMomentum getCentroidalTotalMomentum();
+
+    bool getLinearAngularMomentumJacobian(iDynTree::MatrixDynSize& linAngMomentumJacobian);
+
+
 };
 
 #endif

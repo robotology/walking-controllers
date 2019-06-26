@@ -571,3 +571,8 @@ iDynTree::SpatialMomentum WalkingFK::getCentroidalTotalMomentum()
 {
     return m_kinDyn.getCentroidalTotalMomentum();
 }
+
+bool WalkingFK::getLinearAngularMomentumJacobian(iDynTree::MatrixDynSize& linAngMomentumJacobian)
+{
+    return m_kinDyn.getLinearAngularMomentumJacobian(linAngMomentumJacobian);
+}
