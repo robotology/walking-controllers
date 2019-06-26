@@ -498,10 +498,12 @@ iDynTree::Vector3 AngularMomentumElement::desiredAngularMomentumRateOfChange()
 {
     iDynTree::Vector3 angularMomentumRateOfChange;
     yarp::sig::Vector buff(3);
-
     iDynTree::toYarp(m_angularMomentum, buff);
-    iDynTree::toEigen(angularMomentumRateOfChange) = - m_kp * iDynTree::toEigen(m_angularMomentum)
-        - m_ki * iDynTree::toEigen(m_angularMomentumIntegrator->integrate(buff));
+
+    yarp::sig::Vector angularMomentumIntegral = m_angularMomentumIntegrator->integrate(buff);
+    iDynTree::toEigen(angularMomentumRateOfChange) = iDynTree::toEigen(m_angularMomentumRateOfChange)
+        - m_kp * iDynTree::toEigen(m_angularMomentum)
+        - m_ki * iDynTree::toEigen(angularMomentumIntegral);
 
     return angularMomentumRateOfChange;
 }

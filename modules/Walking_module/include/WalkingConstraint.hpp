@@ -423,6 +423,7 @@ protected:
     double m_kp;
     double m_ki;
     iDynTree::Vector3 m_angularMomentum;
+    iDynTree::Vector3 m_angularMomentumRateOfChange;
     iDynTree::Vector3 m_angularMomentumIntegral;
 
     std::unique_ptr<iCub::ctrl::Integrator> m_angularMomentumIntegrator;
@@ -448,6 +449,8 @@ public:
     void setCoMPosition(const iDynTree::Position& comPosition){m_comPosition = comPosition;};
 
     void setAngularMomentum(const iDynTree::Vector3& angularMomentum){m_angularMomentum = angularMomentum;};
+
+    void setAngularMomentumRateOfChange(const iDynTree::Vector3& angularMomentumRateOfChange){m_angularMomentumRateOfChange = angularMomentumRateOfChange;};
 
     void setFootToWorldTransform(const iDynTree::Transform& footToWorldTransform){m_feetToWorldTransform.push_back(&footToWorldTransform);};
 };
