@@ -411,6 +411,17 @@ bool WalkingModule::evaluateContactWrenchDistribution()
         return false;
     }
 
+    iDynTree::Vector3 angularMomentumrateOfChange;
+    iDynTree::MatrixDynSize linearAngularMomentumJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+    m_FKSolver->getLinearAngularMomentumJacobian(linearAngularMomentumJacobian);
+    iDynTree::toEigen(angularMomentumrateOfChange) = (iDynTree::toEigen(linearAngularMomentumJacobian) * iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())).tail(3);
+
+    if(!m_contactWrenchMapping->setDesiredAngularMomentumRateOfChange(angularMomentumrateOfChange))
+    {
+        yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set the angular momentum";
+        return false;
+    }
+
     m_contactWrenchMapping->setFeetState(m_FKSolver->getLeftFootToWorldTransform(), m_FKSolver->getRightFootToWorldTransform());
 
     if(!m_contactWrenchMapping->setCoMState(m_FKSolver->getCoMPosition(), m_FKSolver->getCoMVelocity()))
@@ -494,6 +505,12 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
     ok &= m_FKSolver->getNeckJacobian(neckJacobian);
     m_walkingAdmittanceController->setNeckJacobian(neckJacobian);
     m_walkingAdmittanceController->setNeckBiasAcceleration(m_FKSolver->getNeckBiasAcceleration());
+
+    iDynTree::MatrixDynSize comJacobian(3, m_robotControlHelper->getActuatedDoFs() + 6);
+    ok &= m_walkingAdmittanceController->setDesiredCoMTrajectory(m_FKSolver->getCoMPosition(), m_walkingDCMReactiveController->getControllerOutput());
+    ok &= m_FKSolver->getCoMJacobian(comJacobian);
+    m_walkingAdmittanceController->setCoMJacobian(comJacobian);
+    m_walkingAdmittanceController->setCoMBiasAcceleration(m_FKSolver->getCoMBiasAcceleration());
 
     if(!ok)
     {
@@ -913,16 +930,6 @@ bool WalkingModule::updateModule()
         //     return false;
         // }
 
-        m_profiler->setInitTime("CONTACT_WRENCH");
-
-        if(!evaluateContactWrenchDistribution())
-        {
-            yError() << "[WalkingModule::updateModule] Unable to evaluate the contact wrench distribution.";
-            return false;
-        }
-
-        m_profiler->setEndTime("CONTACT_WRENCH");
-
         m_profiler->setInitTime("ADMITTANCE_CONTROLLER");
 
         if(!evaluateAdmittanceControl(yawRotation))
@@ -933,7 +940,61 @@ bool WalkingModule::updateModule()
 
         m_profiler->setEndTime("ADMITTANCE_CONTROLLER");
 
-        if(!m_robotControlHelper->setTorqueReferences(m_walkingAdmittanceController->desiredJointTorque()))
+        m_profiler->setInitTime("CONTACT_WRENCH");
+
+        if(!evaluateContactWrenchDistribution())
+        {
+            yError() << "[WalkingModule::updateModule] Unable to evaluate the contact wrench distribution.";
+            return false;
+        }
+
+        m_profiler->setEndTime("CONTACT_WRENCH");
+
+
+        // yarp::sig::Vector bufferAcceleration(m_robotControlHelper->getActuatedDoFs());
+        // yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
+        // yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+        // iDynTree::toYarp(m_walkingAdmittanceController->desiredJointAcceleration(), bufferAcceleration);
+        // bufferAcceleration = m_accelerationIntegral->integrate(bufferAcceleration);
+        // bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+        // iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+        // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+        // {
+        //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+        //     return false;
+        // }
+
+        iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
+                                           m_robotControlHelper->getActuatedDoFs() + 6);
+
+        iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
+
+        bool ok = true;
+        ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
+
+
+        ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
+
+
+        iDynTree::MatrixDynSize leftFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+        iDynTree::MatrixDynSize rightFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+
+        ok &= m_FKSolver->getLeftFootJacobian(leftFootJacobian);
+        ok &= m_FKSolver->getRightFootJacobian(rightFootJacobian);
+
+
+        iDynTree::VectorDynSize desiredJointTorque(m_robotControlHelper->getActuatedDoFs());
+        iDynTree::toEigen(desiredJointTorque) = (iDynTree::toEigen(massMatrix) *
+                                                 iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())
+                                                 + iDynTree::toEigen(generalizedBiasForces)
+                                                 - iDynTree::toEigen(leftFootJacobian).transpose()
+                                                 * iDynTree::toEigen(m_contactWrenchMapping->getDesiredLeftWrench())
+                                                 - iDynTree::toEigen(rightFootJacobian).transpose()
+                                                 * iDynTree::toEigen(m_contactWrenchMapping->getDesiredRightWrench())).tail(m_robotControlHelper->getActuatedDoFs());
+
+
+        if(!m_robotControlHelper->setTorqueReferences(desiredJointTorque))
         {
             yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
             return false;
@@ -1373,8 +1434,6 @@ bool WalkingModule::startWalking()
         // TODO this is useful for the simulation
         double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
                                + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
-
-        yInfo() << heightOffset;
 
         m_robotControlHelper->setHeightOffset(heightOffset);
     }
