@@ -66,9 +66,19 @@ public:
 
     void setNeckBiasAcceleration(const iDynTree::Vector6 &biasAcceleration);
 
+    void setCoMJacobian(const iDynTree::MatrixDynSize& jacobian);
+
+    void setCoMBiasAcceleration(const iDynTree::Vector3 &biasAcceleration);
+
+    bool setDesiredCoMTrajectory(const iDynTree::Position& comPosition, const iDynTree::Vector3& vrpPosition);
+
     bool solve();
 
     const iDynTree::VectorDynSize& desiredJointTorque() const;
+
+    const iDynTree::VectorDynSize& desiredRobotAcceleration() const;
+
+    const iDynTree::VectorDynSize& desiredJointAcceleration() const;
 
 };
 #endif
