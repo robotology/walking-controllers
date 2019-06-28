@@ -572,7 +572,18 @@ iDynTree::SpatialMomentum WalkingFK::getCentroidalTotalMomentum()
     return m_kinDyn.getCentroidalTotalMomentum();
 }
 
-bool WalkingFK::getLinearAngularMomentumJacobian(iDynTree::MatrixDynSize& linAngMomentumJacobian)
+bool WalkingFK::getCentroidalMomentumJacobian(iDynTree::MatrixDynSize& centroidalMomentumJacobian)
 {
-    return m_kinDyn.getLinearAngularMomentumJacobian(linAngMomentumJacobian);
+    iDynTree::MatrixDynSize linAngMomentumJacobian;
+
+    m_kinDyn.getLinearAngularMomentumJacobian(linAngMomentumJacobian);
+
+    iDynTree::Position com = getCoMPosition();
+    iDynTree::Position basePosition = m_kinDyn.getWorldTransform(m_kinDyn.getFloatingBase()).getPosition();
+
+    iDynTree::Transform com_T_base_in_inertial(iDynTree::Rotation::Identity(), basePosition - com);
+
+    iDynTree::toEigen(centroidalMomentumJacobian) = iDynTree::toEigen(com_T_base_in_inertial.asAdjointTransformWrench()) * iDynTree::toEigen(linAngMomentumJacobian);
+
+    return true;
 }

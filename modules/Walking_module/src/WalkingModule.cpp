@@ -412,9 +412,9 @@ bool WalkingModule::evaluateContactWrenchDistribution()
     }
 
     iDynTree::Vector3 angularMomentumrateOfChange;
-    iDynTree::MatrixDynSize linearAngularMomentumJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
-    m_FKSolver->getLinearAngularMomentumJacobian(linearAngularMomentumJacobian);
-    iDynTree::toEigen(angularMomentumrateOfChange) = (iDynTree::toEigen(linearAngularMomentumJacobian) * iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())).tail(3);
+    iDynTree::MatrixDynSize centroidalMomentumJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+    m_FKSolver->getCentroidalMomentumJacobian(centroidalMomentumJacobian);
+    iDynTree::toEigen(angularMomentumrateOfChange) = (iDynTree::toEigen(centroidalMomentumJacobian) * iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())).tail(3);
 
     if(!m_contactWrenchMapping->setDesiredAngularMomentumRateOfChange(angularMomentumrateOfChange))
     {

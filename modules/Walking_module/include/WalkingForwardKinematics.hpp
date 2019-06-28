@@ -307,7 +307,7 @@ public:
      */
     iDynTree::SpatialMomentum getCentroidalTotalMomentum();
 
-    bool getLinearAngularMomentumJacobian(iDynTree::MatrixDynSize& linAngMomentumJacobian);
+    bool getCentroidalMomentumJacobian(iDynTree::MatrixDynSize& centroidalMomentumJacobian);
 
 
 };
