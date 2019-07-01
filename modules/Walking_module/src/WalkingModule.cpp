@@ -81,6 +81,9 @@ bool WalkingModule::advanceReferenceSignals()
     m_DCMVelocityDesired.pop_front();
     m_DCMVelocityDesired.push_back(m_DCMVelocityDesired.back());
 
+    m_ZMPPositionDesired.pop_front();
+    m_ZMPPositionDesired.push_back(m_ZMPPositionDesired.back());
+
     m_comHeightTrajectory.pop_front();
     m_comHeightTrajectory.push_back(m_comHeightTrajectory.back());
 
@@ -439,8 +442,7 @@ bool WalkingModule::evaluateContactWrenchDistribution()
     m_contactWrenchMapping->setFeetState(m_FKSolver->getLeftFootToWorldTransform(), m_FKSolver->getRightFootToWorldTransform());
 
 
-    iDynTree::Vector3 desiredCoMVelocity, dummy3;
-    dummy3.zero();
+    iDynTree::Vector3 desiredCoMVelocity, desiredCoMAcceleration;
     iDynTree::Position desiredCoMPosition;
     desiredCoMPosition(0) = m_stableDCMModel->getCoMPosition()(0);
     desiredCoMPosition(1) = m_stableDCMModel->getCoMPosition()(1);
@@ -450,7 +452,12 @@ bool WalkingModule::evaluateContactWrenchDistribution()
     desiredCoMVelocity(1) = m_stableDCMModel->getCoMVelocity()(1);
     desiredCoMVelocity(2) = m_comHeightVelocity.front();
 
-    if(!m_contactWrenchMapping->setDesiredCoMTrajectory(desiredCoMPosition,desiredCoMVelocity, dummy3))
+    desiredCoMAcceleration(0) = m_stableDCMModel->getCoMAcceleration()(0);
+    desiredCoMAcceleration(1) = m_stableDCMModel->getCoMAcceleration()(1);
+    desiredCoMAcceleration(2) = 0;
+
+
+    if(!m_contactWrenchMapping->setDesiredCoMTrajectory(desiredCoMPosition,desiredCoMVelocity, desiredCoMAcceleration))
     {
         yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set CoM trajectory";
         return false;
@@ -542,12 +549,11 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
 
     iDynTree::Vector3 dummy3;
     iDynTree::Position dummyPos;
+    iDynTree::Vector3 desiredCoMAcceleration;
     dummy3.zero();
     dummyPos.zero();
     if(!m_walkingAdmittanceController->isCoMTrajectoryControlled())
     {
-        iDynTree::Vector3 desiredCoMAcceleration;
-
         iDynTree::toEigen(desiredCoMAcceleration) = 9.81 / 0.53 *
             (iDynTree::toEigen(m_FKSolver->getCoMPosition()) -
              iDynTree::toEigen(m_walkingDCMReactiveController->getControllerOutput()));
@@ -566,7 +572,12 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
         desiredCoMVelocity(1) = m_stableDCMModel->getCoMVelocity()(1);
         desiredCoMVelocity(2) = m_comHeightVelocity.front();
 
-        ok &= m_walkingAdmittanceController->setDesiredCoMTrajectory(dummy3,desiredCoMVelocity,
+        desiredCoMAcceleration(0) = m_stableDCMModel->getCoMAcceleration()(0);
+        desiredCoMAcceleration(1) = m_stableDCMModel->getCoMAcceleration()(1);
+        desiredCoMAcceleration(2) = 0;
+
+        ok &= m_walkingAdmittanceController->setDesiredCoMTrajectory(desiredCoMAcceleration,
+                                                                     desiredCoMVelocity,
                                                                      desiredCoMPosition);
     }
 
@@ -702,6 +713,7 @@ bool WalkingModule::updateModule()
 
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
+            m_stableDCMModel->setZMPPosition(m_ZMPPositionDesired.front());
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
@@ -749,9 +761,14 @@ bool WalkingModule::updateModule()
                 double initTimeTrajectory;
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
+                // iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
+                //     m_rightTrajectory[m_newTrajectoryMergeCounter] :
+                //     m_leftTrajectory[m_newTrajectoryMergeCounter];
+
                 iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
-                    m_rightTrajectory[m_newTrajectoryMergeCounter] :
-                    m_leftTrajectory[m_newTrajectoryMergeCounter];
+                    m_FKSolver->getRightFootToWorldTransform() :
+                    m_FKSolver->getLeftFootToWorldTransform();
+
 
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
@@ -808,7 +825,8 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate 3D-LIPM reference signal
-        m_stableDCMModel->setInput(m_DCMPositionDesired.front());
+        m_stableDCMModel->setDCMPosition(m_DCMPositionDesired.front());
+        m_stableDCMModel->setZMPPosition(m_ZMPPositionDesired.front());
         if(!m_stableDCMModel->integrateModel())
         {
             yError() << "[WalkingModule::updateModule] Unable to propagate the 3D-LIPM.";
@@ -1397,6 +1415,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::SpatialAcc> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
+    std::vector<iDynTree::Vector2> ZMPPositionDesired;
     std::vector<bool> rightInContact;
     std::vector<bool> leftInContact;
     std::vector<double> comHeightTrajectory;
@@ -1409,6 +1428,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
     m_trajectoryGenerator->getDCMVelocityTrajectory(DCMVelocityDesired);
+    m_trajectoryGenerator->getZMPPositionTrajectory(ZMPPositionDesired);
 
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
@@ -1438,6 +1458,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
+    StdHelper::appendVectorToDeque(ZMPPositionDesired, m_ZMPPositionDesired, mergePoint);
+
 
     StdHelper::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
     StdHelper::appendVectorToDeque(rightInContact, m_rightInContact, mergePoint);
@@ -1591,7 +1613,10 @@ bool WalkingModule::setPlannerInput(double x, double y)
             if(m_newTrajectoryRequired)
                 return true;
 
-            m_newTrajectoryMergeCounter = m_mergePoints[1];
+            // this is because we use the real foot position for initializing the planner
+            yInfo() << "[WalkingModule::setPlannerInput] Too late the trajectory will be merged at the next merge point.";
+            return true;
+            // m_newTrajectoryMergeCounter = m_mergePoints[1];
         }
         else
         {

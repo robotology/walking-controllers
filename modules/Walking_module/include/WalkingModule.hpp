@@ -94,6 +94,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
     std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
+    std::deque<iDynTree::Vector2> m_ZMPPositionDesired; /**< Deque containing the desired ZMP position. */
     std::deque<bool> m_leftInContact; /**< Deque containing the left foot state. */
     std::deque<bool> m_rightInContact; /**< Deque containing the right foot state. */
     std::deque<double> m_comHeightTrajectory; /**< Deque containing the CoM height trajectory. */
