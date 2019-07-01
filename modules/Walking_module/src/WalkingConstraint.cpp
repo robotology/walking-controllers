@@ -715,7 +715,6 @@ void LinearMomentumCostFunction::evaluateGradient(iDynTree::VectorDynSize& gradi
     }
     else
     {
-        yInfo() << m_controller->getControllerOutput().toString();
         iDynTree::toEigen(gradient).segment(m_hessianStartingRow, m_sizeOfElement) =
             (-iDynTree::toEigen(m_weight)).asDiagonal() *
             (m_robotMass * iDynTree::toEigen(m_controller->getControllerOutput())

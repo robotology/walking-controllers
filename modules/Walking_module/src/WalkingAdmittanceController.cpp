@@ -335,9 +335,6 @@ class WalkingAdmittanceController::Implementation
         else
         {
             ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
-            yInfo() << "1 " << comAcceleration.toString();
-            yInfo() << "2 " << comVelocity.toString();
-            yInfo() << "3 " << comPosition.toString();
         }
 
         return true;

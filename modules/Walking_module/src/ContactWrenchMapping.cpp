@@ -298,12 +298,6 @@ class ContactWrenchMapping::Implementation
 
             auto ptr = std::static_pointer_cast<LinearMomentumCostFunction>(costFunction->second);
             ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
-
-            yInfo() << "mapping";
-            yInfo() << "1 " << comAcceleration.toString();
-            yInfo() << "2 " << comVelocity.toString();
-            yInfo() << "3 " << comPosition.toString();
-
         }
 
         return true;
