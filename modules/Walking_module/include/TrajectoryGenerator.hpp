@@ -157,6 +157,13 @@ public:
     bool getDCMVelocityTrajectory(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory);
 
     /**
+     * Get the desired ZMP position trajectory
+     * @param ZMPPositionTrajectory desired trajectory of the ZMP.
+     * @return true/false in case of success/failure.
+     */
+    bool getZMPPositionTrajectory(std::vector<iDynTree::Vector2>& ZMPPositionTrajectory);
+
+    /**
      * Get the feet trajectory
      * @param lFootTrajectory vector containing the left foot trajectory;
      * @param rFootTrajectory vector containing the right foot trajectory.
