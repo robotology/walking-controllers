@@ -55,9 +55,14 @@ bool StableDCMModel::initialize(const yarp::os::Searchable& config)
     return true;
 }
 
-void StableDCMModel::setInput(const iDynTree::Vector2& input)
+void StableDCMModel::setDCMPosition(const iDynTree::Vector2& input)
 {
     m_dcmPosition = input;
+}
+
+void StableDCMModel::setZMPPosition(const iDynTree::Vector2& input)
+{
+    m_zmpPosition = input;
 }
 
 bool StableDCMModel::integrateModel()
@@ -68,6 +73,9 @@ bool StableDCMModel::integrateModel()
                  << "Please call initialize method.";
         return false;
     }
+
+    iDynTree::toEigen(m_comAcceleration) = std::pow(m_omega,2) * (iDynTree::toEigen(m_comPosition) -
+                                                                  iDynTree::toEigen(m_zmpPosition));
 
     // evaluate the velocity of the CoM
     yarp::sig::Vector comVelocityYarp(2);
@@ -93,6 +101,11 @@ const iDynTree::Vector2& StableDCMModel::getCoMPosition() const
 const iDynTree::Vector2& StableDCMModel::getCoMVelocity() const
 {
     return m_comVelocity;
+}
+
+const iDynTree::Vector2& StableDCMModel::getCoMAcceleration() const
+{
+    return m_comAcceleration;
 }
 
 bool StableDCMModel::reset(const iDynTree::Vector2& initialValue)

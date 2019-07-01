@@ -34,6 +34,8 @@ class StableDCMModel
     iDynTree::Vector2 m_dcmPosition; /**< Position of the DCM. */
     iDynTree::Vector2 m_comPosition; /**< Position of the CoM. */
     iDynTree::Vector2 m_comVelocity; /**< Velocity of the CoM. */
+    iDynTree::Vector2 m_comAcceleration; /**< Acceleration of the CoM. */
+    iDynTree::Vector2 m_zmpPosition; /**< Position of the CoM. */
 
 public:
 
@@ -43,11 +45,18 @@ public:
      * @return true on success, false otherwise.
      */
     bool initialize(const yarp::os::Searchable& config);
+
     /**
      * Set the controlled input.
      * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
      */
-    void setInput(const iDynTree::Vector2& input);
+    void setDCMPosition(const iDynTree::Vector2& input);
+
+    /**
+     * Set the controlled input.
+     * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
+     */
+    void setZMPPosition(const iDynTree::Vector2& input);
 
     /**
      * Integrate the model.
@@ -66,6 +75,12 @@ public:
      * @return velocity of the CoM.
      */
     const iDynTree::Vector2& getCoMVelocity() const;
+
+    /**
+     * Get the acceleration of the CoM.
+     * @return acceleration of the CoM.
+     */
+    const iDynTree::Vector2& getCoMAcceleration() const;
 
     /**
      * Reset the Model
