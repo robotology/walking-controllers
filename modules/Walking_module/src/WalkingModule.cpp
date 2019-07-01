@@ -310,7 +310,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
 
     yarp::os::Bottle walkingAdmittanceControllerOption = rf.findGroup("ADMITTANCE_CONTROLLER");
-    m_walkingAdmittanceController = std::make_unique<WalkingAdmittanceController>();
+    m_walkingAdmittanceController = std::make_unique<WalkingTaskPriority>();
     if(!m_walkingAdmittanceController->initialize(walkingAdmittanceControllerOption, m_robotControlHelper->getActuatedDoFs()))
     {
         yError() << "[WalkingModule::configure] Failed to configure the walking admittance controller";
@@ -450,17 +450,17 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
 {
     m_walkingAdmittanceController->setJointState(m_robotControlHelper->getJointPosition(),
                                                  m_robotControlHelper->getJointVelocity());
-    iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
-                                       m_robotControlHelper->getActuatedDoFs() + 6);
+    // iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
+    //                                    m_robotControlHelper->getActuatedDoFs() + 6);
 
-    iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
+    // iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
 
     bool ok = true;
-    ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
-    m_walkingAdmittanceController->setMassMatrix(massMatrix);
+    // ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
+    // m_walkingAdmittanceController->setMassMatrix(massMatrix);
 
-    ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
-    m_walkingAdmittanceController->setGeneralizedBiasForces(generalizedBiasForces);
+    // ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
+    // m_walkingAdmittanceController->setGeneralizedBiasForces(generalizedBiasForces);
 
     iDynTree::MatrixDynSize leftFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
     iDynTree::MatrixDynSize rightFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
@@ -495,7 +495,6 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
                                                                   m_rightAccelerationTrajectory.front(),
                                                                   m_contactWrenchMapping->getDesiredRightWrench());
 
-
     // set neck quantities
     ok &= m_walkingAdmittanceController->setDesiredNeckTrajectory(desiredNeckOrientation.inverse());
     ok &= m_walkingAdmittanceController->setNeckState(m_FKSolver->getNeckOrientation(),
@@ -511,6 +510,11 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
     ok &= m_FKSolver->getCoMJacobian(comJacobian);
     m_walkingAdmittanceController->setCoMJacobian(comJacobian);
     m_walkingAdmittanceController->setCoMBiasAcceleration(m_FKSolver->getCoMBiasAcceleration());
+    m_walkingAdmittanceController->setAngularMomentum(m_FKSolver->getCentroidalTotalMomentum().getAngularVec3());
+
+    iDynTree::MatrixDynSize centroidalMomentumJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+    m_FKSolver->getCentroidalMomentumJacobian(centroidalMomentumJacobian);
+    m_walkingAdmittanceController->setAngularMomentumJacobian(centroidalMomentumJacobian);
 
     if(!ok)
     {
@@ -1026,7 +1030,12 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),
                                       m_contactWrenchMapping->getDesiredLeftWrench(), m_contactWrenchMapping->getDesiredRightWrench(),
-                                      m_robotControlHelper->getLeftWrench(), m_robotControlHelper->getRightWrench());
+                                      m_robotControlHelper->getLeftWrench(), m_robotControlHelper->getRightWrench(),
+                                      m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
+                                      m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
+                                      m_FKSolver->getLeftFootToWorldTransform().getPosition(), m_FKSolver->getLeftFootToWorldTransform().getRotation().asRPY(),
+                                      m_FKSolver->getRightFootToWorldTransform().getPosition(), m_FKSolver->getRightFootToWorldTransform().getRotation().asRPY(),
+                                      m_FKSolver->getCentroidalTotalMomentum());
         }
 
         propagateTime();
@@ -1422,7 +1431,12 @@ bool WalkingModule::startWalking()
                     "lf_force_des_x", "lf_force_des_y", "lf_force_des_z", "lf_torque_des_x", "lf_torque_des_y", "lf_torque_des_z",
                     "rf_force_des_x", "rf_force_des_y", "rf_force_des_z", "rf_torque_des_x", "rf_torque_des_y", "rf_torque_des_z",
                     "lf_force_x", "lf_force_y", "lf_force_z", "lf_torque_x", "lf_torque_y", "lf_torque_z",
-                    "rf_force_x", "rf_force_y", "rf_force_z", "rf_torque_x", "rf_torque_y", "rf_torque_z"});
+                    "rf_force_x", "rf_force_y", "rf_force_z", "rf_torque_x", "rf_torque_y", "rf_torque_z",
+                    "lf_position_des_x", "lf_position_des_y", "lf_position_des_z", "lf_orientation_des_x", "lf_orientation_des_y", "lf_orientation_des_z",
+                    "rf_position_des_x", "rf_position_des_y", "rf_position_des_z", "rf_orientation_des_x", "rf_orientation_des_y", "rf_orientation_des_z",
+                    "lf_position_x", "lf_position_y", "lf_position_z", "lf_orientation_x", "lf_orientation_y", "lf_orientation_z",
+                    "rf_position_x", "rf_position_y", "rf_position_z", "rf_orientation_x", "rf_orientation_y", "rf_orientation_z",
+                    "centroidal_linear_x", "centroidal_linear_y", "centroidal_linear_z", "centroidal_angular_x", "centroidal_angular_y", "centroidal_angular_z"});
     }
 
     // if the robot was only prepared the filters has to be reseted

@@ -39,7 +39,7 @@
 #include <LoggerClient.hpp>
 #include <TimeProfiler.hpp>
 #include <ContactWrenchMapping.hpp>
-#include <WalkingAdmittanceController.hpp>
+#include <WalkingTaskPriority.hpp>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -78,7 +78,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
     std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
     std::unique_ptr<ContactWrenchMapping> m_contactWrenchMapping; /**< Contact wrench mapping. */
-    std::unique_ptr<WalkingAdmittanceController> m_walkingAdmittanceController; /**< Contact wrench mapping. */
+    std::unique_ptr<WalkingTaskPriority> m_walkingAdmittanceController; /**< Contact wrench mapping. */
 
     double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
     double m_desiredJointsWeight; /**< Desired joint weight matrix. */
