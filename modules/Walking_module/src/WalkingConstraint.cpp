@@ -666,8 +666,8 @@ void JointRegularizationConstraint::evaluateBounds(iDynTree::VectorDynSize &uppe
     }
 }
 
-LinearMomentumCostFunction::LinearMomentumCostFunction(const Type &elemetType)
-    : LinearMomentumElement(elemetType)
+LinearMomentumCostFunction::LinearMomentumCostFunction(const Type &elemetType, bool controlCoM)
+    : LinearMomentumElement(elemetType, controlCoM)
 {
     m_sizeOfElement = 3;
 }
@@ -705,11 +705,22 @@ void LinearMomentumCostFunction::evaluateGradient(iDynTree::VectorDynSize& gradi
     // TODO remove magic number
     double omegaSquare = 9.81 / 0.53;
 
-    iDynTree::toEigen(gradient).segment(m_hessianStartingRow, m_sizeOfElement) =
-        (-iDynTree::toEigen(m_weight)).asDiagonal() *
-        (m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
-                                      iDynTree::toEigen(m_desiredVRPPosition))
-         -iDynTree::toEigen(weightForce));
+    if(!m_controlCoM)
+    {
+        iDynTree::toEigen(gradient).segment(m_hessianStartingRow, m_sizeOfElement) =
+            (-iDynTree::toEigen(m_weight)).asDiagonal() *
+            (m_robotMass * omegaSquare * (iDynTree::toEigen(m_comPosition) -
+                                          iDynTree::toEigen(m_desiredVRPPosition))
+             -iDynTree::toEigen(weightForce));
+    }
+    else
+    {
+        yInfo() << m_controller->getControllerOutput().toString();
+        iDynTree::toEigen(gradient).segment(m_hessianStartingRow, m_sizeOfElement) =
+            (-iDynTree::toEigen(m_weight)).asDiagonal() *
+            (m_robotMass * iDynTree::toEigen(m_controller->getControllerOutput())
+             -iDynTree::toEigen(weightForce));
+    }
 
     if(m_elementType == Type::DOUBLE_SUPPORT)
     {

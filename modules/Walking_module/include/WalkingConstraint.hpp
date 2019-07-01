@@ -666,7 +666,7 @@ class LinearMomentumCostFunction : public QuadraticCostFunction,
 {
 public:
 
-    LinearMomentumCostFunction(const Type &elemetType);
+    LinearMomentumCostFunction(const Type &elemetType, bool controlCoM = false);
 
     void setHessianConstantElements(Eigen::SparseMatrix<double>& hessian) final;
 
