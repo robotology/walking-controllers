@@ -438,6 +438,24 @@ bool WalkingModule::evaluateContactWrenchDistribution()
 
     m_contactWrenchMapping->setFeetState(m_FKSolver->getLeftFootToWorldTransform(), m_FKSolver->getRightFootToWorldTransform());
 
+
+    iDynTree::Vector3 desiredCoMVelocity, dummy3;
+    dummy3.zero();
+    iDynTree::Position desiredCoMPosition;
+    desiredCoMPosition(0) = m_stableDCMModel->getCoMPosition()(0);
+    desiredCoMPosition(1) = m_stableDCMModel->getCoMPosition()(1);
+    desiredCoMPosition(2) = m_comHeightTrajectory.front();
+
+    desiredCoMVelocity(0) = m_stableDCMModel->getCoMVelocity()(0);
+    desiredCoMVelocity(1) = m_stableDCMModel->getCoMVelocity()(1);
+    desiredCoMVelocity(2) = m_comHeightVelocity.front();
+
+    if(!m_contactWrenchMapping->setDesiredCoMTrajectory(desiredCoMPosition,desiredCoMVelocity, dummy3))
+    {
+        yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set CoM trajectory";
+        return false;
+    }
+
     if(!m_contactWrenchMapping->setCoMState(m_FKSolver->getCoMPosition(), m_FKSolver->getCoMVelocity()))
     {
         yError() << "[WalkingModule::evaluateContactWrenchDistribution] Unable to set the center of mass position and velocity";
@@ -521,7 +539,41 @@ bool WalkingModule::evaluateAdmittanceControl(const iDynTree::Rotation& desiredN
     m_walkingAdmittanceController->setNeckBiasAcceleration(m_FKSolver->getNeckBiasAcceleration());
 
     iDynTree::MatrixDynSize comJacobian(3, m_robotControlHelper->getActuatedDoFs() + 6);
-    ok &= m_walkingAdmittanceController->setDesiredCoMTrajectory(m_FKSolver->getCoMPosition(), m_walkingDCMReactiveController->getControllerOutput());
+
+    iDynTree::Vector3 dummy3;
+    iDynTree::Position dummyPos;
+    dummy3.zero();
+    dummyPos.zero();
+    if(!m_walkingAdmittanceController->isCoMTrajectoryControlled())
+    {
+        iDynTree::Vector3 desiredCoMAcceleration;
+
+        iDynTree::toEigen(desiredCoMAcceleration) = 9.81 / 0.53 *
+            (iDynTree::toEigen(m_FKSolver->getCoMPosition()) -
+             iDynTree::toEigen(m_walkingDCMReactiveController->getControllerOutput()));
+
+        ok &= m_walkingAdmittanceController->setDesiredCoMTrajectory(desiredCoMAcceleration, dummy3, dummyPos);
+    }
+    else
+    {
+        iDynTree::Vector3 desiredCoMVelocity;
+        iDynTree::Position desiredCoMPosition;
+        desiredCoMPosition(0) = m_stableDCMModel->getCoMPosition()(0);
+        desiredCoMPosition(1) = m_stableDCMModel->getCoMPosition()(1);
+        desiredCoMPosition(2) = m_comHeightTrajectory.front();
+
+        desiredCoMVelocity(0) = m_stableDCMModel->getCoMVelocity()(0);
+        desiredCoMVelocity(1) = m_stableDCMModel->getCoMVelocity()(1);
+        desiredCoMVelocity(2) = m_comHeightVelocity.front();
+
+        ok &= m_walkingAdmittanceController->setDesiredCoMTrajectory(dummy3,desiredCoMVelocity,
+                                                                     desiredCoMPosition);
+    }
+
+
+    ok &= m_walkingAdmittanceController->setCoMState(m_FKSolver->getCoMVelocity(),
+                                                     m_FKSolver->getCoMPosition());
+
     ok &= m_FKSolver->getCoMJacobian(comJacobian);
     m_walkingAdmittanceController->setCoMJacobian(comJacobian);
     m_walkingAdmittanceController->setCoMBiasAcceleration(m_FKSolver->getCoMBiasAcceleration());
