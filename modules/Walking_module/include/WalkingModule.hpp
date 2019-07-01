@@ -131,6 +131,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::MatrixDynSize m_reflectedInertia;
     bool m_useMotorReflectedInertia{false};
     bool instantiateMotorReflectedInertia(const yarp::os::Searchable& config);
+    yarp::os::RpcClient m_rpcBaseEstPort; /**< Remote Procedure Call port. */
+
 
     /**
      * Get the robot model from the resource finder and set it.

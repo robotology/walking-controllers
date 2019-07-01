@@ -359,6 +359,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
+    // TODO move in the config
+    std::string portNameBaseEst;
+    portNameBaseEst = "/" + name + "/base-est/rpc";
+    m_rpcBaseEstPort.open(portNameBaseEst);
+    yarp::os::Network::connect(portNameBaseEst, "/base-estimator/rpc");
+
     yInfo() << "[WalkingModule::configure] Ready to play!";
 
     return true;
@@ -1122,7 +1128,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    bool getExternalRobotBase = true;
+    bool getExternalRobotBase = false;
     if(!m_robotControlHelper->getFeedbacksRaw(10, getExternalRobotBase))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
@@ -1261,21 +1267,28 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    if(m_robotControlHelper->isExternalRobotBaseUsed())
+    // if(m_robotControlHelper->isExternalRobotBaseUsed())
+    // {
+    //     if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+    //     {
+    //         yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+    //         return false;
+    //     }
+    // }
+    // else
+    // {
+    //     if(!m_trajectoryGenerator->generateFirstTrajectories())
+    //     {
+    //         yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+    //         return false;
+    //     }
+    // }
+
+    // TODO handle the exception in a better way
+    if(!m_trajectoryGenerator->generateFirstTrajectories())
     {
-        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
-        {
-            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-            return false;
-        }
-    }
-    else
-    {
-        if(!m_trajectoryGenerator->generateFirstTrajectories())
-        {
-            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-            return false;
-        }
+        yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+        return false;
     }
 
     if(!updateTrajectories(0))
@@ -1444,15 +1457,55 @@ bool WalkingModule::startWalking()
     if(m_robotState == WalkingFSM::Prepared)
     {
         m_robotControlHelper->resetFilters();
-        updateFKSolver();
+        // updateFKSolver();
+
+        // if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+        //                                                   m_rightTrajectory.front(),
+        //                                                   m_isLeftFixedFrame.front()))
+        // {
+        //     yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+        //     return false;
+        // }
+
+        // if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+        //                                       m_robotControlHelper->getJointVelocity()))
+        // {
+        //     yError() << "[WalkingModule::updateFKSolver] Unable to set the robot state.";
+        //     return false;
+        // }
+
 
         // TODO this is useful for the simulation
-        double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
-                               + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+        // double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+        //                        + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
 
-        m_robotControlHelper->setHeightOffset(heightOffset);
+        // double heightOffset = 0;
+
+        // m_robotControlHelper->setHeightOffset(heightOffset);
+
+        iDynTree::Transform stanceFoot_T_world = m_trajectoryGenerator->isLeftSwingFoot() ?
+        m_rightTrajectory.front().inverse() : m_leftTrajectory.front().inverse();
+
+        yInfo() << stanceFoot_T_world.toString();
+
+         std::string frameName = m_trajectoryGenerator->isLeftSwingFoot() ? "r_sole" : "l_sole";
+         yarp::os::Bottle cmd, outcome;
+         cmd.addString("resetLeggedOdometryWithRefFrame");
+         cmd.addString(frameName);
+         cmd.addDouble(stanceFoot_T_world.getPosition()(0));
+         cmd.addDouble(stanceFoot_T_world.getPosition()(1));
+         cmd.addDouble(stanceFoot_T_world.getPosition()(2));
+         cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
+         cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
+         cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
+         m_rpcBaseEstPort.write(cmd,outcome);
+
+         if(!outcome.get(0).asBool())
+         {
+             yError() << "[startWalking] Unable reset the base estimation.";
+             return false;
+         }
     }
-
     m_robotState = WalkingFSM::Walking;
 
     return true;
