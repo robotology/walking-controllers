@@ -32,6 +32,7 @@ class WalkingAdmittanceController::Implementation
     iDynTree::MatrixDynSize m_rightFootJacobian;
     iDynTree::MatrixDynSize m_neckJacobian;
     iDynTree::MatrixDynSize m_comJacobian;
+    bool m_controlCoMTrajectory;
 
     iDynTree::VectorDynSize m_leftFootBiasAcceleration;
     iDynTree::VectorDynSize m_rightFootBiasAcceleration;
@@ -147,7 +148,7 @@ class WalkingAdmittanceController::Implementation
         return;
     }
 
-    void instantiateCoMConstraint()
+    void instantiateCoMConstraint(const iDynTree::Vector3& kp, const iDynTree::Vector3& kd)
     {
         std::shared_ptr<CartesianConstraint> ptr;
 
@@ -155,7 +156,7 @@ class WalkingAdmittanceController::Implementation
         ptr = std::make_shared<CartesianConstraint>(CartesianElement::Type::POSITION);
         ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
 
-        ptr->positionController()->setGains(0, 0);
+        ptr->positionController()->setGains(kp, kd);
 
         ptr->setRoboticJacobian(m_comJacobian);
         ptr->setBiasAcceleration(m_comBiasAcceleration);
@@ -309,15 +310,10 @@ class WalkingAdmittanceController::Implementation
         return true;
     }
 
-    bool setDesiredCoMTrajectory(const iDynTree::Position& comPosition, const iDynTree::Vector3 &vrp)
+    bool setDesiredCoMTrajectory(const iDynTree::Vector3& comAcceleration,
+                                 const iDynTree::Vector3& comVelocity,
+                                 const iDynTree::Position& comPosition)
     {
-        iDynTree::Vector3 desiredCoMAcceleration;
-        // TODO remove magic numbers
-        iDynTree::toEigen(desiredCoMAcceleration) = 9.81/0.53 * (iDynTree::toEigen(comPosition) - iDynTree::toEigen(vrp));
-
-        iDynTree::Vector3 dummy;
-        dummy.zero();
-
         auto constraint = m_constraints.find("com");
         if(constraint == m_constraints.end())
         {
@@ -328,8 +324,41 @@ class WalkingAdmittanceController::Implementation
 
         auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
 
-        ptr->positionController()->setDesiredTrajectory(desiredCoMAcceleration, dummy, dummy);
-        ptr->positionController()->setFeedback(dummy, dummy);
+        if(!m_controlCoMTrajectory)
+        {
+            iDynTree::Vector3 dummy;
+            dummy.zero();
+
+            ptr->positionController()->setDesiredTrajectory(comAcceleration, dummy, dummy);
+            ptr->positionController()->setFeedback(dummy, dummy);
+        }
+        else
+        {
+            ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
+            yInfo() << "1 " << comAcceleration.toString();
+            yInfo() << "2 " << comVelocity.toString();
+            yInfo() << "3 " << comPosition.toString();
+        }
+
+        return true;
+    }
+
+    bool setCoMState(const iDynTree::Vector3& comVelocity, const iDynTree::Position& comPosition)
+    {
+        auto constraint = m_constraints.find("com");
+        if(constraint == m_constraints.end())
+        {
+            yError() << "[setCoMState] unable to find the com constraint. "
+                     << "Please call 'initialize()' method";
+            return false;
+        }
+
+        auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
+
+        yInfo() << comPosition.toString() << " " <<comVelocity.toString();
+
+        if(m_controlCoMTrajectory)
+            ptr->positionController()->setFeedback(comVelocity, comPosition);
 
         return true;
     }
@@ -709,7 +738,44 @@ bool WalkingAdmittanceController::initialize(yarp::os::Searchable &config, const
     }
 
     {
-        m_pimpl->instantiateCoMConstraint();
+        yarp::os::Bottle& option = config.findGroup("COM");
+
+        iDynTree::Vector3 kp;
+        iDynTree::Vector3 kd;
+        kp.zero();
+        kd.zero();
+
+        m_pimpl->m_controlCoMTrajectory = option.check("control_com_trajectory", yarp::os::Value("False")).asBool();
+
+        if(m_pimpl->m_controlCoMTrajectory)
+        {
+            if(!YarpHelper::getVectorFromSearchable(option, "kp", kp))
+            {
+                yError() << "[ContactWrenchMapping::initialize] Unable to find a vector";
+                return false;
+            }
+
+            if(option.check("use_default_kd", yarp::os::Value("False")).asBool())
+            {
+                double scaling;
+                if(!YarpHelper::getNumberFromSearchable(option, "scaling", scaling))
+                {
+                    yError() << "[WalkingAdmittanceController::initialize] Unable to get number.";
+                    return false;
+                }
+                iDynTree::toEigen(kd) = 2 / scaling * iDynTree::toEigen(kp).array().sqrt();
+            }
+            else
+            {
+                if(!YarpHelper::getVectorFromSearchable(option, "kd", kd))
+                {
+                    yError() << "[WalkingAdmittanceController::initialize] Unable to find a vector";
+                    return false;
+                }
+            }
+        }
+
+        m_pimpl->instantiateCoMConstraint(kp, kd);
     }
 
     {
@@ -927,9 +993,14 @@ void WalkingAdmittanceController::setCoMBiasAcceleration(const iDynTree::Vector3
     m_pimpl->m_neckBiasAcceleration = biasAcceleration;
 }
 
-bool WalkingAdmittanceController::setDesiredCoMTrajectory(const iDynTree::Position& comPosition, const iDynTree::Vector3& vrpPosition)
+bool WalkingAdmittanceController::setDesiredCoMTrajectory(const iDynTree::Vector3& comAcceleration, const iDynTree::Vector3& comVelocity, const iDynTree::Position& comPosition)
 {
-    return m_pimpl->setDesiredCoMTrajectory(comPosition, vrpPosition);
+    return m_pimpl->setDesiredCoMTrajectory(comAcceleration, comVelocity, comPosition);
+}
+
+bool WalkingAdmittanceController::setCoMState(const iDynTree::Vector3& comVelocity, const iDynTree::Position& comPosition)
+{
+    return m_pimpl->setCoMState(comVelocity, comPosition);
 }
 
 bool WalkingAdmittanceController::solve()
@@ -950,4 +1021,9 @@ const iDynTree::VectorDynSize& WalkingAdmittanceController::desiredJointAccelera
 const iDynTree::VectorDynSize& WalkingAdmittanceController::desiredRobotAcceleration() const
 {
     return m_pimpl->m_desiredRobotAccelerationOutput;
+}
+
+bool WalkingAdmittanceController::isCoMTrajectoryControlled()
+{
+    return m_pimpl->m_controlCoMTrajectory;
 }

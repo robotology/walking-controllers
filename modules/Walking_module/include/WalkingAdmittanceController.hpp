@@ -70,7 +70,8 @@ public:
 
     void setCoMBiasAcceleration(const iDynTree::Vector3 &biasAcceleration);
 
-    bool setDesiredCoMTrajectory(const iDynTree::Position& comPosition, const iDynTree::Vector3& vrpPosition);
+    bool setDesiredCoMTrajectory(const iDynTree::Vector3& comAcceleration, const iDynTree::Vector3& comVelocity, const iDynTree::Position& comPosition);
+    bool setCoMState(const iDynTree::Vector3& comVelocity, const iDynTree::Position& comPosition);
 
     bool solve();
 
@@ -80,5 +81,6 @@ public:
 
     const iDynTree::VectorDynSize& desiredJointAcceleration() const;
 
+    bool isCoMTrajectoryControlled();
 };
 #endif
