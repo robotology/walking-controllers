@@ -329,6 +329,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         }
     }
 
+    // TODO MOVE ME
+    yarp::os::Bottle motorReflectedInertiaOption = rf.findGroup("REFLECTED_INERTIA");
+    if(!instantiateMotorReflectedInertia(motorReflectedInertiaOption))
+    {
+        yError() << "[WalkingModule::configure] Unable to configure the motor reflected inertia.";
+        return false;
+    }
+
     // time profiler
     m_profiler = std::make_unique<TimeProfiler>();
     m_profiler->setPeriod(round(0.1 / m_dT));
@@ -968,10 +976,17 @@ bool WalkingModule::updateModule()
         iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
                                            m_robotControlHelper->getActuatedDoFs() + 6);
 
+        iDynTree::MatrixDynSize massMatrixReflected(m_robotControlHelper->getActuatedDoFs() + 6,
+                                                    m_robotControlHelper->getActuatedDoFs() + 6);
         iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
 
         bool ok = true;
         ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
+
+        if(m_useMotorReflectedInertia)
+            iDynTree::toEigen(massMatrixReflected) = iDynTree::toEigen(massMatrix) + iDynTree::toEigen(m_reflectedInertia);
+        else
+            iDynTree::toEigen(massMatrixReflected) = iDynTree::toEigen(massMatrix);
 
 
         ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
@@ -985,7 +1000,7 @@ bool WalkingModule::updateModule()
 
 
         iDynTree::VectorDynSize desiredJointTorque(m_robotControlHelper->getActuatedDoFs());
-        iDynTree::toEigen(desiredJointTorque) = (iDynTree::toEigen(massMatrix) *
+        iDynTree::toEigen(desiredJointTorque) = (iDynTree::toEigen(massMatrixReflected) *
                                                  iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())
                                                  + iDynTree::toEigen(generalizedBiasForces)
                                                  - iDynTree::toEigen(leftFootJacobian).transpose()
@@ -1525,5 +1540,103 @@ bool WalkingModule::stopWalking()
     reset();
 
     m_robotState = WalkingFSM::Stopped;
+    return true;
+}
+
+bool WalkingModule::instantiateMotorReflectedInertia(const yarp::os::Searchable& config)
+{
+    yarp::os::Value tempValue;
+
+    if(config.isNull())
+    {
+        yWarning() << "[instantiateMotorReflectedInertia] Motor reflected inertia will not be used.";
+        m_useMotorReflectedInertia = false;
+        return true;
+    }
+
+    m_useMotorReflectedInertia = true;
+
+    iDynTree::VectorDynSize gamma(m_robotControlHelper->getActuatedDoFs());
+    if(!YarpHelper::getVectorFromSearchable(config, "gamma", gamma))
+    {
+        yError() << "Initialization failed while reading gamma vector.";
+        return false;
+    }
+
+    iDynTree::VectorDynSize motorsInertia(m_robotControlHelper->getActuatedDoFs());
+    if(!YarpHelper::getVectorFromSearchable(config, "motors_inertia", motorsInertia))
+    {
+        yError() << "Initialization failed while reading motors_inertia vector.";
+        return false;
+    }
+
+    bool useHarmonicDriveInertia = config.check("use_harmonic_drive", yarp::os::Value("False")).asBool();
+    if (useHarmonicDriveInertia)
+    {
+        iDynTree::VectorDynSize harmonicDriveInertia(m_robotControlHelper->getActuatedDoFs());
+        if(!YarpHelper::getVectorFromSearchable(config, "harmonic_drive_inertia", harmonicDriveInertia))
+        {
+            yError() << "Initialization failed while reading motors_inertia vector.";
+            return false;
+        }
+
+        iDynTree::toEigen(motorsInertia) += iDynTree::toEigen(harmonicDriveInertia);
+    }
+    else
+        yWarning() << "[instantiateMotorReflectedInertia] Harmonic drive inertia is not used.";
+
+    // parameters for coupling matrices. Updated according to the wiki:
+    // http://wiki.icub.org/wiki/ICub_coupled_joints
+    // and corrected according to https://github.com/robotology/robots-configuration/issues/39
+    double t, r, R;
+    if(!YarpHelper::getNumberFromSearchable(config, "t", t ))
+    {
+        yError() << "[instantiateMotorReflectedInertia] Unable to find the 't' parameters";
+        return false;
+    }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "r", r ))
+    {
+        yError() << "[instantiateMotorReflectedInertia] Unable to find the 'r' parameters";
+        return false;
+    }
+
+    if(!YarpHelper::getNumberFromSearchable(config, "R", R ))
+    {
+        yError() << "[instantiateMotorReflectedInertia] Unable to find the 'R' parameters";
+        return false;
+    }
+
+    iDynTree::MatrixDynSize couplingMatrix(m_robotControlHelper->getActuatedDoFs(), m_robotControlHelper->getActuatedDoFs());
+    for(int i = 0; i < m_robotControlHelper->getActuatedDoFs(); i++)
+        couplingMatrix(i, i) = 1;
+
+    // TODO do in a better way (HARD CODED JOINTS)
+    iDynTree::toEigen(couplingMatrix).block(0, 0, 3, 3) <<   0.5,    -0.5,     0,
+                                                             0.5,     0.5,     0,
+                                                             r/(2*R), r/(2*R), r/R;
+
+    iDynTree::toEigen(couplingMatrix).block(3, 3, 3, 3) << -1, 0, 0,
+                                                           -1, -t, 0,
+                                                            0, t, -t;
+
+
+    iDynTree::toEigen(couplingMatrix).block(7, 7, 3, 3) << 1, 0, 0,
+                                                           1, t, 0,
+                                                           0, -t, t;
+
+    // TODO
+    // if(!YarpHelper::getNumberFromSearchable(config, "k_ff", m_kFF))
+    // {
+    //     yError() << "[instantiateMotorReflectedInertia] Unable to find the k_ff parameter";
+    //     return false;
+    // }
+
+    m_reflectedInertia.resize(6 + m_robotControlHelper->getActuatedDoFs(), 6 + m_robotControlHelper->getActuatedDoFs());
+    iDynTree::toEigen(m_reflectedInertia).block(6, 6, m_robotControlHelper->getActuatedDoFs(), m_robotControlHelper->getActuatedDoFs())  =
+        (iDynTree::toEigen(couplingMatrix) * iDynTree::toEigen(gamma).asDiagonal()).inverse().transpose() *
+        iDynTree::toEigen(motorsInertia).asDiagonal() *
+        (iDynTree::toEigen(couplingMatrix) * iDynTree::toEigen(gamma).asDiagonal()).inverse();
+
     return true;
 }

@@ -127,6 +127,11 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
+    // TODO MOVE FROM HERE
+    iDynTree::MatrixDynSize m_reflectedInertia;
+    bool m_useMotorReflectedInertia{false};
+    bool instantiateMotorReflectedInertia(const yarp::os::Searchable& config);
+
     /**
      * Get the robot model from the resource finder and set it.
      * @param rf is the reference to a resource finder object.
