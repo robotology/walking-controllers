@@ -55,8 +55,9 @@ class ContactWrenchMapping::Implementation
 
 
 
-    void instantiateLinearMomentumConstraint(const iDynTree::VectorDynSize& kp,
-                                             const iDynTree::VectorDynSize& kd)
+    void instantiateLinearMomentumConstraint(const iDynTree::Vector3& kp,
+                                             const iDynTree::Vector3& kd,
+                                             bool controlCoM)
     {
         m_useLinearMomentumConstraint = true;
 
@@ -64,10 +65,12 @@ class ContactWrenchMapping::Implementation
         // Notice here we re using DoubleSupport even if the robot is in single support because in case of SS the wrench
         // acting on the swing foot is equal to zero
 
-        auto ptr = std::make_shared<LinearMomentumConstraint>(LinearMomentumConstraint::Type::DOUBLE_SUPPORT);
+        auto ptr = std::make_shared<LinearMomentumConstraint>(LinearMomentumConstraint::Type::DOUBLE_SUPPORT, controlCoM);
 
         // only the forces are used to control the linear momentum
         ptr->setSubMatricesStartingPosition(m_numberOfConstraints, 0);
+
+        ptr->positionController()->setGains(kp, kd);
 
         m_constraints.insert(std::make_pair("linear_momentum_constraint", ptr));
         m_numberOfConstraints += ptr->getNumberOfConstraints();
@@ -75,7 +78,10 @@ class ContactWrenchMapping::Implementation
         return;
     }
 
-    void instantiateLinearMomentumCostFunction(const iDynTree::VectorDynSize weight)
+    void instantiateLinearMomentumCostFunction(const iDynTree::VectorDynSize& weight,
+                                               const iDynTree::Vector3& kp,
+                                               const iDynTree::Vector3& kd,
+                                               bool controlCoM)
     {
         m_useLinearMomentumCostFunction = true;
 
@@ -83,10 +89,12 @@ class ContactWrenchMapping::Implementation
 
         // Notice here we re using DoubleSupport even if the robot is in single support because in case of SS the wrench
         // acting on the swing foot is equal to zero
-        auto ptr = std::make_shared<LinearMomentumCostFunction>(LinearMomentumCostFunction::Type::DOUBLE_SUPPORT);
+        auto ptr = std::make_shared<LinearMomentumCostFunction>(LinearMomentumCostFunction::Type::DOUBLE_SUPPORT, controlCoM);
         // only the forces are used to control the linear momentum
         ptr->setSubMatricesStartingPosition(0, 0);
         ptr->setWeight(weight);
+
+        ptr->positionController()->setGains(kp, kd);
 
         m_costFunctions.insert({"linear_momentum_costFunction", ptr});
         m_hessianMatrices["linear_momentum_costFunction"].resize(m_numberOfVariables, m_numberOfVariables);
@@ -209,7 +217,7 @@ class ContactWrenchMapping::Implementation
 
             auto ptr = std::static_pointer_cast<LinearMomentumConstraint>(constraint->second);
             ptr->setCoMPosition(comPosition);
-            // ptr->setCoMVelocity(comVelocity);
+            ptr->positionController()->setFeedback(comVelocity, comPosition);
         }
 
         if(m_useLinearMomentumCostFunction)
@@ -225,6 +233,7 @@ class ContactWrenchMapping::Implementation
 
             auto ptr = std::static_pointer_cast<LinearMomentumCostFunction>(costFunction->second);
             ptr->setCoMPosition(comPosition);
+            ptr->positionController()->setFeedback(comVelocity, comPosition);
         }
 
         if(m_useAngularMomentumConstraint)
@@ -261,22 +270,42 @@ class ContactWrenchMapping::Implementation
     bool setDesiredCoMTrajectory(const iDynTree::Position& comPosition, const iDynTree::Vector3& comVelocity,
                                  const iDynTree::Vector3& comAcceleration)
     {
-        // if(m_useLinearMomentumConstraint)
-        // {
-        //     // save com desired trajectory
-        //     auto constraint = m_constraints.find("linear_momentum_constraint");
-        //     if(constraint == m_constraints.end())
-        //     {
-        //         yError() << "[setCoMState] unable to find the linear momentum constraint. "
-        //                  << "Please call 'initialize()' method";
-        //         return false;
-        //     }
+        if(m_useLinearMomentumConstraint)
+        {
+            // save com desired trajectory
+            auto constraint = m_constraints.find("linear_momentum_constraint");
+            if(constraint == m_constraints.end())
+            {
+                yError() << "[setCoMState] unable to find the linear momentum constraint. "
+                         << "Please call 'initialize()' method";
+                return false;
+            }
 
-        //     auto ptr = std::static_pointer_cast<LinearMomentumConstraint>(constraint->second);
-        //     ptr->setDesiredCoMPosition(comPosition);
-        //     ptr->setDesiredCoMVelocity(comVelocity);
-        //     ptr->setDesiredCoMAcceleration(comAcceleration);
-        // }
+            auto ptr = std::static_pointer_cast<LinearMomentumConstraint>(constraint->second);
+            ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
+        }
+
+        if(m_useLinearMomentumCostFunction)
+        {
+            // save com desired trajectory
+            auto costFunction = m_costFunctions.find("linear_momentum_costFunction");
+            if(costFunction == m_costFunctions.end())
+            {
+                yError() << "[setCoMState] unable to find the linear momentum costFunction. "
+                         << "Please call 'initialize()' method";
+                return false;
+            }
+
+            auto ptr = std::static_pointer_cast<LinearMomentumCostFunction>(costFunction->second);
+            ptr->positionController()->setDesiredTrajectory(comAcceleration, comVelocity, comPosition);
+
+            yInfo() << "mapping";
+            yInfo() << "1 " << comAcceleration.toString();
+            yInfo() << "2 " << comVelocity.toString();
+            yInfo() << "3 " << comPosition.toString();
+
+        }
+
         return true;
     }
 
@@ -632,6 +661,37 @@ bool ContactWrenchMapping::initialize(yarp::os::Searchable& config)
     {
         yarp::os::Bottle& linearMomentumOptions = config.findGroup("LINEAR_MOMENTUM");
 
+        iDynTree::Vector3 kp;
+        iDynTree::Vector3 kd;
+
+
+        if(!YarpHelper::getVectorFromSearchable(linearMomentumOptions, "kp", kp))
+        {
+            yError() << "[ContactWrenchMapping::initialize] Unable to find a vector";
+            return false;
+        }
+
+        if(linearMomentumOptions.check("use_default_kd", yarp::os::Value("False")).asBool())
+        {
+            double scaling;
+            if(!YarpHelper::getNumberFromSearchable(linearMomentumOptions, "scaling", scaling))
+            {
+                yError() << "[WalkingAdmittanceController::initialize] Unable to get number.";
+                return false;
+            }
+            iDynTree::toEigen(kd) = 2 / scaling * iDynTree::toEigen(kp).array().sqrt();
+        }
+        else
+        {
+            if(!YarpHelper::getVectorFromSearchable(linearMomentumOptions, "kd", kd))
+            {
+                yError() << "[WalkingAdmittanceController::initialize] Unable to find a vector";
+                return false;
+            }
+        }
+
+        bool controlCoM = linearMomentumOptions.check("control_com_trajectory", yarp::os::Value("False")).asBool();
+
         if(linearMomentumOptions.check("use_as_cost_function", yarp::os::Value("False")).asBool())
         {
             iDynTree::VectorDynSize weight(3);
@@ -642,27 +702,12 @@ bool ContactWrenchMapping::initialize(yarp::os::Searchable& config)
                 return false;
             }
 
-            m_pimpl->instantiateLinearMomentumCostFunction(weight);
+            m_pimpl->instantiateLinearMomentumCostFunction(weight, kp, kd, controlCoM);
         }
 
         if(linearMomentumOptions.check("use_as_constraint", yarp::os::Value("False")).asBool())
         {
-            iDynTree::VectorDynSize kp(3);
-            iDynTree::VectorDynSize kd(3);
-
-            if(!YarpHelper::getVectorFromSearchable(linearMomentumOptions, "kp", kp))
-            {
-                yError() << "[ContactWrenchMapping::initialize] Unable to find a vector";
-                return false;
-            }
-
-            if(!YarpHelper::getVectorFromSearchable(linearMomentumOptions, "kd", kd))
-            {
-                yError() << "[ContactWrenchMapping::initialize] Unable to find a vector";
-                return false;
-            }
-
-            m_pimpl->instantiateLinearMomentumConstraint(kp, kd);
+            m_pimpl->instantiateLinearMomentumConstraint(kp, kd, controlCoM);
         }
     }
 
