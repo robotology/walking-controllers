@@ -129,7 +129,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
-    ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
+    // ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
 
     if (m_useMinimumJerk) {
         m_feetGenerator = m_trajectoryGenerator.addFeetMinimumJerkGenerator();
@@ -642,4 +642,9 @@ void TrajectoryGenerator::reset()
 
     // change the state of the generator
     m_generatorState = GeneratorState::FirstStep;
+}
+
+bool TrajectoryGenerator::isLeftSwingFoot()
+{
+    return m_swingLeft;
 }

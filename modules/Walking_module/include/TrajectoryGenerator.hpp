@@ -235,6 +235,8 @@ public:
      * Reset the planner
      */
     void reset();
+
+    bool isLeftSwingFoot();
 };
 
 #endif
