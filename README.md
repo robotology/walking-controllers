@@ -1,5 +1,5 @@
 # walking-controllers
-The **walking-controllers** project is a _suite_ of modules for bipedal locomotion for the humanoid robot platform iCub.
+The **walking-controllers** project is a _suite_ of modules for achieving bipedal locomotion of the humanoid robot iCub.
 
 The suite includes:
 

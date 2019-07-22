@@ -156,8 +156,8 @@ bool WalkingLoggerModule::updateModule()
 
         if(data->size() != m_numberOfValues)
         {
-            yError() << "[updateModule] The size of the vector is different from "
-                     << m_numberOfValues;
+            yError() << "[updateModule] The size of the vector is not the one expected. Expected: "
+                     << m_numberOfValues << " received: " << data->size();
             return false;
         }
 
