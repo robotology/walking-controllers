@@ -110,7 +110,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     bool ok = true;
     ok = ok && unicyclePlanner->setDesiredPersonDistance(m_referencePointDistance(0),
-                                                              m_referencePointDistance(1));
+                                                         m_referencePointDistance(1));
     ok = ok && unicyclePlanner->setControllerGain(unicycleGain);
     ok = ok && unicyclePlanner->setMaximumIntegratorStepSize(m_dT);
     ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength);
@@ -270,7 +270,8 @@ void TrajectoryGenerator::computeThread()
     }
 }
 
-bool TrajectoryGenerator::generateFirstTrajectories()
+//bool TrajectoryGenerator::generateFirstTrajectories()
+bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& initialPosition)
 {
     // check if this step is the first one
     {
@@ -295,11 +296,15 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     double endTime = initTime + m_plannerHorizon;
 
     // at the beginning iCub has to stop
-    m_desiredPoint(0) = m_referencePointDistance(0);
-    m_desiredPoint(1) = m_referencePointDistance(1);
+    //    m_desiredPoint(0) = m_referencePointDistance(0);
+    //    m_desiredPoint(1) = m_referencePointDistance(1);
+    m_desiredPoint(0) = m_referencePointDistance(0) + initialPosition(0);
+    m_desiredPoint(1) = m_referencePointDistance(1) + initialPosition(1);
 
     // add the initial point
-    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
+    //if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
+
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
@@ -324,7 +329,7 @@ bool TrajectoryGenerator::generateFirstTrajectories()
 }
 
 bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &leftToRightTransform)
-                                                    // const iDynTree::Position &initialCOMPosition)
+// const iDynTree::Position &initialCOMPosition)
 {
     // check if this step is the first one
     {
@@ -444,7 +449,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
 
     iDynTree::Vector2 desredPositionFromStanceFoot;
     iDynTree::toEigen(desredPositionFromStanceFoot) = iDynTree::toEigen(unicyclePositionFromStanceFoot)
-        + iDynTree::toEigen(m_referencePointDistance) + iDynTree::toEigen(desiredPosition);
+            + iDynTree::toEigen(m_referencePointDistance) + iDynTree::toEigen(desiredPosition);
 
     // prepare the rotation matrix w_R_{unicycle}
     double theta = measured.getRotation().asRPY()(2);
@@ -457,9 +462,9 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
 
         // apply the homogeneous transformation w_H_{unicycle}
         m_desiredPoint(0) = c_theta * desredPositionFromStanceFoot(0)
-            - s_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(0);
+                - s_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(0);
         m_desiredPoint(1) = s_theta * desredPositionFromStanceFoot(0)
-            + c_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(1);
+                + c_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(1);
 
         m_initTime = initTime;
 

@@ -38,11 +38,12 @@ bool WalkingFK::setRobotModel(const iDynTree::Model& model)
     return true;
 }
 
-bool WalkingFK::setBaseFrames(const std::string& lFootFrame, const std::string& rFootFrame)
+bool WalkingFK::setBaseFrame(const std::string& baseFrame, const std::string& name)
 {
     if(!m_kinDyn.isValid())
     {
-        yError() << "[WalkingFK::setBaseFrames] Please set the Robot model before calling this method.";
+       // yError() << "[WalkingFK::setBaseFrames] Please set the Robot model before calling this method.";
+       yError() << "[setBaseFrame] Please set the Robot model before calling this method.";
         return false;
     }
 
@@ -50,25 +51,25 @@ bool WalkingFK::setBaseFrames(const std::string& lFootFrame, const std::string& 
     // note: in the following the base frames will be:
     // - left_foot when the left foot is the stance foot;
     // - right_foot when the right foot is the stance foot.
-    m_frameLeftIndex = m_kinDyn.model().getFrameIndex(lFootFrame);
-    if(m_frameLeftIndex == iDynTree::FRAME_INVALID_INDEX)
+//    m_frameLeftIndex = m_kinDyn.model().getFrameIndex(lFootFrame);
+//    if(m_frameLeftIndex == iDynTree::FRAME_INVALID_INDEX)
+    iDynTree::FrameIndex frameBaseIndex = m_kinDyn.model().getFrameIndex(baseFrame);
+       if(frameBaseIndex == iDynTree::FRAME_INVALID_INDEX)
     {
-        yError() << "[WalkingFK::setBaseFrames] Unable to find the frame named: " << lFootFrame;
-        return false;
+     //   yError() << "[WalkingFK::setBaseFrames] Unable to find the frame named: " << lFootFrame;
+      yError() << "[setBaseFrames] Unable to find the frame named: " << baseFrame;
+           return false;
     }
-    iDynTree::LinkIndex linkLeftIndex = m_kinDyn.model().getFrameLink(m_frameLeftIndex);
-    m_baseFrameLeft = m_kinDyn.model().getLinkName(linkLeftIndex);
-    m_frameHlinkLeft = m_kinDyn.getRelativeTransform(m_frameLeftIndex, linkLeftIndex);
+       // get the link where the desired baseFrame is attached
+       iDynTree::LinkIndex linkBaseIndex = m_kinDyn.model().getFrameLink(frameBaseIndex);
 
-    m_frameRightIndex = m_kinDyn.model().getFrameIndex(rFootFrame);
-    if(m_frameRightIndex == iDynTree::FRAME_INVALID_INDEX)
-    {
-        yError() << "[WalkingFK::setBaseFrames] Unable to find the frame named: " << rFootFrame;
-        return false;
-    }
-    iDynTree::LinkIndex linkRightIndex = m_kinDyn.model().getFrameLink(m_frameRightIndex);
-    m_baseFrameRight = m_kinDyn.model().getLinkName(linkRightIndex);
-    m_frameHlinkRight = m_kinDyn.getRelativeTransform(m_frameRightIndex, linkRightIndex);
+       // get the main frame of the link. In iDynTree the base frame has to be the main frame
+          // of the link
+          std::string baseFrameName = m_kinDyn.model().getLinkName(linkBaseIndex);
+
+          m_baseFrames.insert({name, std::make_pair(baseFrameName,
+                                                     m_kinDyn.getRelativeTransform(frameBaseIndex,
+                                                                                   linkBaseIndex))});
 
     return true;
 }
@@ -105,10 +106,18 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    // set base frames
-    if(!setBaseFrames(lFootFrame, rFootFrame))
+    m_frameLeftIndex = m_kinDyn.model().getFrameIndex(lFootFrame);
+    if(m_frameLeftIndex == iDynTree::FRAME_INVALID_INDEX)
     {
-        yError() << "[WalkingFK::initialize] Unable to set the base frames.";
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << lFootFrame;
+        return false;
+    }
+
+    // set base frames
+    m_frameRightIndex = m_kinDyn.model().getFrameIndex(rFootFrame);
+       if(m_frameRightIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+      yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rFootFrame;
         return false;
     }
 
@@ -179,6 +188,43 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+
+    if(!m_useExternalRobotBase)
+    {
+        if(!setBaseFrame(lFootFrame, "leftFoot"))
+        {
+            yError() << "[initialize] Unable to set the leftFootFrame.";
+            return false;
+        }
+
+        if(!setBaseFrame(rFootFrame, "rightFoot"))
+        {
+            yError() << "[initialize] Unable to set the rightFootFrame.";
+            return false;
+        }
+
+        // Since the base is attached to the stance foot its velocity is always equal to zero
+        // (stable contact hypothesis)
+        m_baseTwist.zero();
+    }
+    else
+    {
+        if(!setBaseFrame(rootFrame, "root"))
+        {
+            yError() << "[initialize] Unable to set the rightFootFrame.";
+            return false;
+        }
+
+        // in this specific case the base is always the root link
+        if(!m_kinDyn.setFloatingBase(m_baseFrames["root"].first))
+        {
+            yError() << "[initialize] Unable to set the floating base";
+            return false;
+        }
+    }
+
+
     double comHeight;
     if(!YarpHelper::getNumberFromSearchable(config, "com_height", comHeight))
     {
@@ -224,71 +270,54 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
     return true;
 }
 
-bool WalkingFK::evaluateFirstWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform)
+//bool WalkingFK::evaluateFirstWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform)
+void WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& rootTransform,
+                                                  const iDynTree::Twist& rootTwist)
 {
-    m_worldToBaseTransform = leftFootTransform * m_frameHlinkLeft;
-    if(!m_kinDyn.setFloatingBase(m_baseFrameLeft))
+    if(!m_useExternalRobotBase)
     {
-        yError() << "[WalkingFK::evaluateFirstWorldToBaseTransformation] Error while setting the floating "
-                 << "base on link " << m_baseFrameLeft;
-        return false;
-    }
-    m_prevContactLeft = true;
-    return true;
-}
 
-bool WalkingFK::evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame)
-{
-    if(isLeftFixedFrame)
-    {
-        // evaluate the new world to base transformation only if the previous fixed frame was
-        // the right foot
-        if(!m_prevContactLeft)
-        {
-            m_worldToBaseTransform =  this->getLeftFootToWorldTransform() * m_frameHlinkLeft;
-            if(!m_kinDyn.setFloatingBase(m_baseFrameLeft))
-            {
-                yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
-                         << "base on link " << m_baseFrameLeft;
-                return false;
-            }
-            m_prevContactLeft = true;
-        }
+        yWarning() << "[evaluateWorldToBaseTransformation] The base position is not retrieved from external. There is no reason to call this function.";
+               return;
+
     }
-    else
-    {
-        // evaluate the new world to base transformation only if the previous if the previous fixed frame was
-        // the left foot
-        if(m_prevContactLeft)
-        {
-            m_worldToBaseTransform = this->getRightFootToWorldTransform() * m_frameHlinkRight;
-            if(!m_kinDyn.setFloatingBase(m_baseFrameRight))
-            {
-                yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
-                         << "base on link " << m_baseFrameRight;
-                return false;
-            }
-            m_prevContactLeft = false;
-        }
-    }
-    return true;
+
+
+//    return true;
+    auto& base = m_baseFrames["root"];
+    m_worldToBaseTransform = rootTransform * base.second;
+    m_baseTwist = rootTwist;
+
+    m_comEvaluated = false;
+    m_dcmEvaluated = false;
+    return;
 }
 
 bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform,
                                                   const iDynTree::Transform& rightFootTransform,
                                                   const bool& isLeftFixedFrame)
 {
+
+    if(m_useExternalRobotBase)
+    {
+        yWarning() << "[evaluateWorldToBaseTransformation] The base position is retrieved from external. There is no reason on using odometry.";
+        return true;
+    }
+
+
     if(isLeftFixedFrame)
     {
         // evaluate the new world to base transformation only if the previous fixed frame was
         // the right foot
         if(!m_prevContactLeft || m_firstStep)
         {
-            m_worldToBaseTransform = leftFootTransform * m_frameHlinkLeft;
-            if(!m_kinDyn.setFloatingBase(m_baseFrameLeft))
+
+            auto& base = m_baseFrames["leftFoot"];
+                        m_worldToBaseTransform = leftFootTransform * base.second;
+                        if(!m_kinDyn.setFloatingBase(base.first))
             {
-                yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
-                         << "base on link " << m_baseFrameLeft;
+                           yError() << "[evaluateWorldToBaseTransformation] Error while setting the floating "
+                                                     << "base on link " << base.first;
                 return false;
             }
             m_prevContactLeft = true;
@@ -300,18 +329,23 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         // the left foot
         if(m_prevContactLeft || m_firstStep)
         {
-            m_worldToBaseTransform = rightFootTransform * m_frameHlinkRight;
-            if(!m_kinDyn.setFloatingBase(m_baseFrameRight))
+            auto base = m_baseFrames["rightFoot"];
+                     m_worldToBaseTransform = rightFootTransform * base.second;
+                     if(!m_kinDyn.setFloatingBase(base.first))
             {
-                yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
-                         << "base on link " << m_baseFrameRight;
+                         yError() << "[evaluateWorldToBaseTransformation] Error while setting the floating "
+                                                  << "base on link " << base.first;
                 return false;
             }
             m_prevContactLeft = false;
         }
     }
 
-    m_firstStep = false;
+    if(m_firstStep)
+        m_firstStep = false;
+
+    m_comEvaluated = false;
+    m_dcmEvaluated = false;
     return true;
 }
 
@@ -323,7 +357,7 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
     gravity(2) = -9.81;
 
     if(!m_kinDyn.setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
-                               iDynTree::Twist::Zero(), velocityFeedbackInRadians,
+                                 m_baseTwist, velocityFeedbackInRadians,
                                gravity))
     {
         yError() << "[WalkingFK::setInternalRobotState] Error while updating the state.";
@@ -412,11 +446,19 @@ const iDynTree::Vector3& WalkingFK::getCoMVelocity()
 
 bool WalkingFK::setBaseOnTheFly()
 {
-    m_worldToBaseTransform = m_frameHlinkLeft;
-    if(!m_kinDyn.setFloatingBase(m_baseFrameLeft))
+    // TODO understand how to change this function when the base is provided by an external module
+        if(m_useExternalRobotBase)
+        {
+            yError() << "[setBaseOnTheFly] If the base comes from the external you cannot use the onthefly. (This feature will be implemented in a second moment)";
+            return false;
+        }
+
+        auto base = m_baseFrames["leftFoot"];
+        m_worldToBaseTransform = base.second;
+        if(!m_kinDyn.setFloatingBase(base.first))
     {
-        yError() << "[WalkingFK::setBaseOnTheFly] Error while setting the floating base on link "
-                 << m_baseFrameLeft;
+           yError() << "[setBaseOnTheFly] Error while setting the floating base on link "
+                            << base.first;
         return false;
     }
 

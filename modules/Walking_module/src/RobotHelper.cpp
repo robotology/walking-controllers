@@ -14,12 +14,6 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
         return false;
     }
 
-    if(!m_encodersInterface->getEncoders(m_positionFeedbackDeg.data()))
-    {
-        yError() << "[RobotHelper::getWorstError] Error reading encoders.";
-        return false;
-    }
-
     // clear the std::pair
     worstError.first = "";
     worstError.second = 0.0;
@@ -39,7 +33,7 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
     return true;
 }
 
-bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
+bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 {
     if(!m_encodersInterface)
     {
@@ -49,9 +43,14 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
     bool okPosition = false;
     bool okVelocity = false;
-
+    bool okTorque = false;
     bool okLeftWrench = false;
     bool okRightWrench = false;
+
+    bool okBaseEstimation = true;
+    if(getBaseEst)
+        okBaseEstimation = !m_useExternalRobotBase;
+
 
     unsigned int attempt = 0;
     do
@@ -84,7 +83,31 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
             }
         }
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench)
+        if(m_useExternalRobotBase)
+              {
+                  if(!okBaseEstimation)
+                  {
+                      yarp::sig::Vector *base = NULL;
+                      base = m_robotBasePort.read(false);
+                      if(base != NULL)
+                      {
+                          m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
+                                                                              (*base)(1),
+                                                                              (*base)(2) - m_heightOffset));
+
+                          m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
+                                                                                   (*base)(4),
+                                                                                   (*base)(5)));
+
+                          m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
+                          m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
+                          okBaseEstimation = true;
+                      }
+                  }
+              }
+
+              if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation )
+
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -120,6 +143,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts)
 
     if(!okRightWrench)
         yError() << "\t - Right wrench";
+
+    if(!okBaseEstimation)
+          yError() << "\t - Base estimation";
 
     return false;
 }
@@ -238,9 +264,6 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_jointPositionsUpperBounds.resize(m_actuatedDOFs);
     m_jointPositionsLowerBounds.resize(m_actuatedDOFs);
 
-    // m_positionFeedbackDegFiltered.resize(m_actuatedDOFs);
-    // m_positionFeedbackDegFiltered.zero();
-
     m_velocityFeedbackDegFiltered.resize(m_actuatedDOFs);
     m_velocityFeedbackDegFiltered.zero();
 
@@ -278,11 +301,10 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         }
 
         // set filters
-        // m_positionFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(10, m_dT);
         m_velocityFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
                                                                                  sampligTime);
 
-        // m_positionFilter->init(m_positionFeedbackDeg);
+
         m_velocityFilter->init(m_velocityFeedbackDeg);
     }
 
@@ -311,6 +333,30 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         m_jointPositionsLowerBounds(i) = iDynTree::deg2rad(minAngle);
 
     }
+
+
+    m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+    if(m_useExternalRobotBase)
+    {
+        m_robotBasePort.open("/" + name + "/robotBase:i");
+        // connect port
+
+        std::string floatingBasePortName;
+        if(!YarpHelper::getStringFromSearchable(config, "floating_base_port_name", floatingBasePortName))
+        {
+            yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
+            return false;
+        }
+
+        if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/robotBase:i";
+            return false;
+        }
+    }
+    m_heightOffset = 0;
+
+
     return true;
 }
 
@@ -337,9 +383,9 @@ bool RobotHelper::configureForceTorqueSensors(const yarp::os::Searchable& config
     // open and connect left foot wrench
     if(!YarpHelper::getStringFromSearchable(config, "leftFootWrenchInputPort_name", portInput))
     {
-      yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get "
-                  "the string from searchable.";
-      return false;
+        yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get "
+                    "the string from searchable.";
+        return false;
     }
     if(!YarpHelper::getStringFromSearchable(config, "leftFootWrenchOutputPort_name", portOutput))
     {
@@ -404,7 +450,8 @@ bool RobotHelper::configurePIDHandler(const yarp::os::Bottle& config)
 
 bool RobotHelper::resetFilters()
 {
-    if(!getFeedbacksRaw())
+    //if(!getFeedbacksRaw())
+    if(!getFeedbacksRaw(100, true))
     {
         yError() << "[RobotHelper::resetFilters] Unable to get the feedback from the robot";
         return false;
@@ -424,7 +471,9 @@ bool RobotHelper::resetFilters()
 
 bool RobotHelper::getFeedbacks(unsigned int maxAttempts)
 {
-    if(!getFeedbacksRaw(maxAttempts))
+    // by default we consider the presence of a base estimation block
+    bool useBaseEst = true;
+    if(!getFeedbacksRaw(maxAttempts, useBaseEst))
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;
@@ -753,4 +802,25 @@ int RobotHelper::getActuatedDoFs()
 WalkingPIDHandler& RobotHelper::getPIDHandler()
 {
     return *m_PIDHandler;
+}
+
+
+const iDynTree::Transform& RobotHelper::getBaseTransform() const
+{
+    return m_robotBaseTransform;
+}
+
+const iDynTree::Twist& RobotHelper::getBaseTwist() const
+{
+    return m_robotBaseTwist;
+}
+
+void RobotHelper::setHeightOffset(const double& offset)
+{
+    m_heightOffset = offset;
+}
+
+bool RobotHelper::isExternalRobotBaseUsed()
+{
+    return m_useExternalRobotBase;
 }

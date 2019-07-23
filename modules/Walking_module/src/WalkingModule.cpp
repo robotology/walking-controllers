@@ -36,12 +36,12 @@ bool WalkingModule::advanceReferenceSignals()
 {
     // check if vector is not initialized
     if(m_leftTrajectory.empty()
-       || m_rightTrajectory.empty()
-       || m_leftInContact.empty()
-       || m_rightInContact.empty()
-       || m_DCMPositionDesired.empty()
-       || m_DCMVelocityDesired.empty()
-       || m_comHeightTrajectory.empty())
+            || m_rightTrajectory.empty()
+            || m_leftInContact.empty()
+            || m_rightInContact.empty()
+            || m_DCMPositionDesired.empty()
+            || m_DCMVelocityDesired.empty()
+            || m_comHeightTrajectory.empty())
     {
         yError() << "[WalkingModule::advanceReferenceSignals] Cannot advance empty reference signals.";
         return false;
@@ -447,6 +447,13 @@ bool WalkingModule::updateModule()
 
     if(m_robotState == WalkingFSM::Preparing)
     {
+
+        if(!m_robotControlHelper->getFeedbacksRaw(10))
+        {
+            yError() << "[updateModule] Unable to get the feedback.";
+            return false;
+        }
+
         bool motionDone = false;
         if(!m_robotControlHelper->checkMotionDone(motionDone))
         {
@@ -458,16 +465,16 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            // send the reference again in order to reduce error
-            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            {
-                yError() << "[prepareRobot] Error while setting the initial position using "
-                         << "POSITION DIRECT mode.";
-                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
-                reset();
-                m_robotState = WalkingFSM::Stopped;
-                return true;
-            }
+            //            // send the reference again in order to reduce error
+            //            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            //            {
+            //                yError() << "[prepareRobot] Error while setting the initial position using "
+            //                         << "POSITION DIRECT mode.";
+            //                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
+            //                reset();
+            //                m_robotState = WalkingFSM::Stopped;
+            //                return true;
+            //            }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
@@ -504,8 +511,13 @@ bool WalkingModule::updateModule()
                                        * m_FKSolver->getRightHandToWorldTransform());
 
 
-            m_robotState = WalkingFSM::Prepared;
+            //   m_robotState = WalkingFSM::Prepared;
 
+            iDynTree::VectorDynSize dummy(m_robotControlHelper->getActuatedDoFs());
+            dummy.zero();
+            //  m_walkingAdmittanceController->setDesiredJointTrajectory( m_qDesired, dummy, dummy);
+
+            m_robotState = WalkingFSM::Prepared;
             yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
         }
     }
@@ -539,8 +551,8 @@ bool WalkingModule::updateModule()
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
                 iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
-                    m_rightTrajectory[m_newTrajectoryMergeCounter] :
-                    m_leftTrajectory[m_newTrajectoryMergeCounter];
+                            m_rightTrajectory[m_newTrajectoryMergeCounter] :
+                            m_leftTrajectory[m_newTrajectoryMergeCounter];
 
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
@@ -863,8 +875,8 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 
     // the global zmp is given by a weighted average
     iDynTree::toEigen(zmpWorld) = ((leftWrench.getLinearVec3()(2) * zmpLeftDefined) / totalZ)
-        * iDynTree::toEigen(zmpLeft) +
-        ((rightWrench.getLinearVec3()(2) * zmpRightDefined)/totalZ) * iDynTree::toEigen(zmpRight);
+            * iDynTree::toEigen(zmpLeft) +
+            ((rightWrench.getLinearVec3()(2) * zmpRightDefined)/totalZ) * iDynTree::toEigen(zmpRight);
 
     zmp(0) = zmpWorld(0);
     zmp(1) = zmpWorld(1);
@@ -884,7 +896,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(10))
+    bool getExternalRobotBase = true;
+    if(!m_robotControlHelper->getFeedbacksRaw(10, getExternalRobotBase))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1022,10 +1035,21 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    if(!m_trajectoryGenerator->generateFirstTrajectories())
+    if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-        return false;
+        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
+    }
+    else
+    {
+        if(!m_trajectoryGenerator->generateFirstTrajectories())
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
     }
 
     if(!updateTrajectories(0))
@@ -1130,12 +1154,22 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
-                                                      m_rightTrajectory.front(),
-                                                      m_isLeftFixedFrame.front()))
+    if(!m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
-        return false;
+        if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                          m_rightTrajectory.front(),
+                                                          m_isLeftFixedFrame.front()))
+        {
+            yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
+    }
+    else
+    {
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+                                                      m_robotControlHelper->getBaseTwist());
+
+
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
@@ -1161,30 +1195,39 @@ bool WalkingModule::startWalking()
     if(m_dumpData)
     {
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                    "dcm_des_x", "dcm_des_y",
-                    "dcm_des_dx", "dcm_des_dy",
-                    "zmp_x", "zmp_y",
-                    "zmp_des_x", "zmp_des_y",
-                    "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y",
-                    "com_des_dx", "com_des_dy",
-                    "lf_x", "lf_y", "lf_z",
-                    "lf_roll", "lf_pitch", "lf_yaw",
-                    "rf_x", "rf_y", "rf_z",
-                    "rf_roll", "rf_pitch", "rf_yaw",
-                    "lf_des_x", "lf_des_y", "lf_des_z",
-                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    "rf_des_x", "rf_des_y", "rf_des_z",
-                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_err_x", "lf_err_y", "lf_err_z",
-                    "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
-                    "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                                      "dcm_des_x", "dcm_des_y",
+                                      "dcm_des_dx", "dcm_des_dy",
+                                      "zmp_x", "zmp_y",
+                                      "zmp_des_x", "zmp_des_y",
+                                      "com_x", "com_y", "com_z",
+                                      "com_des_x", "com_des_y",
+                                      "com_des_dx", "com_des_dy",
+                                      "lf_x", "lf_y", "lf_z",
+                                      "lf_roll", "lf_pitch", "lf_yaw",
+                                      "rf_x", "rf_y", "rf_z",
+                                      "rf_roll", "rf_pitch", "rf_yaw",
+                                      "lf_des_x", "lf_des_y", "lf_des_z",
+                                      "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
+                                      "rf_des_x", "rf_des_y", "rf_des_z",
+                                      "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
+                                      "lf_err_x", "lf_err_y", "lf_err_z",
+                                      "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
+                                      "rf_err_x", "rf_err_y", "rf_err_z",
+                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
     }
 
-    // if the robot was only prepared the filters has to be reseted
     if(m_robotState == WalkingFSM::Prepared)
+    {
         m_robotControlHelper->resetFilters();
+
+    updateFKSolver();
+
+     // TODO this is useful for the simulation
+     double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+                            + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+
+     m_robotControlHelper->setHeightOffset(heightOffset);
+ }
 
     m_robotState = WalkingFSM::Walking;
 
