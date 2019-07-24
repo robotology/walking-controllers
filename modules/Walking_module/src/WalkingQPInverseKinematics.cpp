@@ -38,7 +38,7 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
     }
 
     m_useCoMAsConstraint = config.check("use_com_as_constraint", yarp::os::Value(false)).asBool();
-    m_enableHandRetargeting = config.check("enable_hand_retargeting", yarp::os::Value(false)).asBool();
+    m_enableHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
     m_useJointsLimitsConstraint = config.check("use_joint_limits_constraint", yarp::os::Value(false)).asBool();
 
     // TODO in the future the number of constraints should be added inside
