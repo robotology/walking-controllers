@@ -486,6 +486,18 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
+            if(!m_robotControlHelper->getFeedbacks(10))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
+                return false;
+            }
+
+            if(!updateFKSolver())
+            {
+                yError() << "[WalkingModule::updateModule] Unable to update the FK solver.";
+                return false;
+            }
+
             m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
                                        * m_FKSolver->getLeftHandToWorldTransform(),
                                        m_FKSolver->getHeadToWorldTransform().inverse()
