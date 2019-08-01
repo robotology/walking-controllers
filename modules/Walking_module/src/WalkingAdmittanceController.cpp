@@ -352,8 +352,6 @@ class WalkingAdmittanceController::Implementation
 
         auto ptr = std::static_pointer_cast<CartesianConstraint>(constraint->second);
 
-        yInfo() << comPosition.toString() << " " <<comVelocity.toString();
-
         if(m_controlCoMTrajectory)
             ptr->positionController()->setFeedback(comVelocity, comPosition);
 
