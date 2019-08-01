@@ -140,6 +140,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
+    m_useTorque = rf.check("use_torque", yarp::os::Value(false)).asBool();
+
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
@@ -346,9 +348,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_useMPC)
         m_profiler->addTimer("MPC");
 
-    m_profiler->addTimer("IK");
-    m_profiler->addTimer("CONTACT_WRENCH");
-    m_profiler->addTimer("ADMITTANCE_CONTROLLER");
+    if(m_useTorque)
+    {
+        m_profiler->addTimer("CONTACT_WRENCH");
+        m_profiler->addTimer("ADMITTANCE_CONTROLLER");
+    }
+    else
+        m_profiler->addTimer("IK");
+
     m_profiler->addTimer("Total");
 
     // initialize some variables
@@ -688,16 +695,16 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            // // send the reference again in order to reduce error
-            // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            // {
-            //     yError() << "[prepareRobot] Error while setting the initial position using "
-            //              << "POSITION DIRECT mode.";
-            //     yInfo() << "[WalkingModule::updateModule] Try to prepare again";
-            //     reset();
-            //     m_robotState = WalkingFSM::Stopped;
-            //     return true;
-            // }
+            // send the reference again in order to reduce error
+            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            {
+                yError() << "[prepareRobot] Error while setting the initial position using "
+                         << "POSITION DIRECT mode.";
+                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
+                reset();
+                m_robotState = WalkingFSM::Stopped;
+                return true;
+            }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
@@ -923,9 +930,6 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        // inverse kinematics
-        m_profiler->setInitTime("IK");
-
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
@@ -949,148 +953,155 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
-        if(m_useQPIK)
+        if(!m_useTorque)
         {
-            // integrate dq because velocity control mode seems not available
-            yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
-            yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+            // inverse kinematics
+            m_profiler->setInitTime("IK");
 
-            if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+            if(m_useQPIK)
             {
-                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
-                return false;
-            }
+                // integrate dq because velocity control mode seems not available
+                yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
+                yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
 
-            if(!solveQPIK(m_QPIKSolver, desiredCoMPosition,
-                          desiredCoMVelocity,
-                          yawRotation, m_dqDesired))
-            {
-                yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with osqp.";
-                return false;
-            }
-
-            iDynTree::toYarp(m_dqDesired, bufferVelocity);
-
-            bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-            iDynTree::toiDynTree(bufferPosition, m_qDesired);
-
-            if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-                                                  m_robotControlHelper->getJointVelocity()))
-            {
-                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
-                return false;
-            }
-
-        }
-        else
-        {
-            if(m_IKSolver->usingAdditionalRotationTarget())
-            {
-                if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                if(!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
                 {
-                    yError() << "[WalkingModule::updateModule] Error updating the inertia to world frame rotation.";
+                    yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                     return false;
                 }
 
-                if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
+                if(!solveQPIK(m_QPIKSolver, desiredCoMPosition,
+                              desiredCoMVelocity,
+                              yawRotation, m_dqDesired))
                 {
-                    yError() << "[WalkingModule::updateModule] Error while setting the feedback to the inverse Kinematics.";
+                    yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with osqp.";
                     return false;
                 }
 
-                if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                                          desiredCoMPosition, m_qDesired))
+                iDynTree::toYarp(m_dqDesired, bufferVelocity);
+
+                bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+                iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+                if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                      m_robotControlHelper->getJointVelocity()))
                 {
-                    yError() << "[WalkingModule::updateModule] Error during the inverse Kinematics iteration.";
+                    yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                     return false;
+                }
+
+            }
+            else
+            {
+                if(m_IKSolver->usingAdditionalRotationTarget())
+                {
+                    if(!m_IKSolver->updateIntertiaToWorldFrameRotation(modifiedInertial))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error updating the inertia to world frame rotation.";
+                        return false;
+                    }
+
+                    if(!m_IKSolver->setFullModelFeedBack(m_robotControlHelper->getJointPosition()))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error while setting the feedback to the inverse Kinematics.";
+                        return false;
+                    }
+
+                    if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+                                              desiredCoMPosition, m_qDesired))
+                    {
+                        yError() << "[WalkingModule::updateModule] Error during the inverse Kinematics iteration.";
+                        return false;
+                    }
                 }
             }
+            m_profiler->setEndTime("IK");
+
+            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
         }
-        m_profiler->setEndTime("IK");
-
-        // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-        // {
-        //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-        //     return false;
-        // }
-
-        m_profiler->setInitTime("ADMITTANCE_CONTROLLER");
-
-        if(!evaluateAdmittanceControl(yawRotation))
+        if(m_useTorque)
         {
-            yError() << "[WalkingModule::updateModule] Unable to evaluate the evaluate admittance control.";
-            return false;
+            m_profiler->setInitTime("ADMITTANCE_CONTROLLER");
+
+            if(!evaluateAdmittanceControl(yawRotation))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to evaluate the evaluate admittance control.";
+                return false;
+            }
+
+            m_profiler->setEndTime("ADMITTANCE_CONTROLLER");
+
+            m_profiler->setInitTime("CONTACT_WRENCH");
+
+            if(!evaluateContactWrenchDistribution())
+            {
+                yError() << "[WalkingModule::updateModule] Unable to evaluate the contact wrench distribution.";
+                return false;
+            }
+
+            m_profiler->setEndTime("CONTACT_WRENCH");
+
+
+            // yarp::sig::Vector bufferAcceleration(m_robotControlHelper->getActuatedDoFs());
+            // yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
+            // yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
+            // iDynTree::toYarp(m_walkingAdmittanceController->desiredJointAcceleration(), bufferAcceleration);
+            // bufferAcceleration = m_accelerationIntegral->integrate(bufferAcceleration);
+            // bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+            // iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+            // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            // {
+            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+            //     return false;
+            // }
+
+            iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
+                                               m_robotControlHelper->getActuatedDoFs() + 6);
+
+            iDynTree::MatrixDynSize massMatrixReflected(m_robotControlHelper->getActuatedDoFs() + 6,
+                                                        m_robotControlHelper->getActuatedDoFs() + 6);
+            iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
+
+            bool ok = true;
+            ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
+
+            if(m_useMotorReflectedInertia)
+                iDynTree::toEigen(massMatrixReflected) = iDynTree::toEigen(massMatrix) + iDynTree::toEigen(m_reflectedInertia);
+            else
+                iDynTree::toEigen(massMatrixReflected) = iDynTree::toEigen(massMatrix);
+
+
+            ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
+
+
+            iDynTree::MatrixDynSize leftFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+            iDynTree::MatrixDynSize rightFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
+
+            ok &= m_FKSolver->getLeftFootJacobian(leftFootJacobian);
+            ok &= m_FKSolver->getRightFootJacobian(rightFootJacobian);
+
+
+            iDynTree::VectorDynSize desiredJointTorque(m_robotControlHelper->getActuatedDoFs());
+            iDynTree::toEigen(desiredJointTorque) = (iDynTree::toEigen(massMatrixReflected) *
+                                                     iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())
+                                                     + iDynTree::toEigen(generalizedBiasForces)
+                                                     - iDynTree::toEigen(leftFootJacobian).transpose()
+                                                     * iDynTree::toEigen(m_contactWrenchMapping->getDesiredLeftWrench())
+                                                     - iDynTree::toEigen(rightFootJacobian).transpose()
+                                                     * iDynTree::toEigen(m_contactWrenchMapping->getDesiredRightWrench())).tail(m_robotControlHelper->getActuatedDoFs());
+
+
+            if(!m_robotControlHelper->setTorqueReferences(desiredJointTorque))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
+                return false;
+            }
         }
-
-        m_profiler->setEndTime("ADMITTANCE_CONTROLLER");
-
-        m_profiler->setInitTime("CONTACT_WRENCH");
-
-        if(!evaluateContactWrenchDistribution())
-        {
-            yError() << "[WalkingModule::updateModule] Unable to evaluate the contact wrench distribution.";
-            return false;
-        }
-
-        m_profiler->setEndTime("CONTACT_WRENCH");
-
-
-        // yarp::sig::Vector bufferAcceleration(m_robotControlHelper->getActuatedDoFs());
-        // yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
-        // yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
-        // iDynTree::toYarp(m_walkingAdmittanceController->desiredJointAcceleration(), bufferAcceleration);
-        // bufferAcceleration = m_accelerationIntegral->integrate(bufferAcceleration);
-        // bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-        // iDynTree::toiDynTree(bufferPosition, m_qDesired);
-
-        // if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-        // {
-        //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-        //     return false;
-        // }
-
-        iDynTree::MatrixDynSize massMatrix(m_robotControlHelper->getActuatedDoFs() + 6,
-                                           m_robotControlHelper->getActuatedDoFs() + 6);
-
-        iDynTree::MatrixDynSize massMatrixReflected(m_robotControlHelper->getActuatedDoFs() + 6,
-                                                    m_robotControlHelper->getActuatedDoFs() + 6);
-        iDynTree::VectorDynSize generalizedBiasForces(m_robotControlHelper->getActuatedDoFs() + 6);
-
-        bool ok = true;
-        ok &= m_FKSolver->getFreeFloatingMassMatrix(massMatrix);
-
-        if(m_useMotorReflectedInertia)
-            iDynTree::toEigen(massMatrixReflected) = iDynTree::toEigen(massMatrix) + iDynTree::toEigen(m_reflectedInertia);
-        else
-            iDynTree::toEigen(massMatrixReflected) = iDynTree::toEigen(massMatrix);
-
-
-        ok &= m_FKSolver->getGeneralizedBiasForces(generalizedBiasForces);
-
-
-        iDynTree::MatrixDynSize leftFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
-        iDynTree::MatrixDynSize rightFootJacobian(6, m_robotControlHelper->getActuatedDoFs() + 6);
-
-        ok &= m_FKSolver->getLeftFootJacobian(leftFootJacobian);
-        ok &= m_FKSolver->getRightFootJacobian(rightFootJacobian);
-
-
-        iDynTree::VectorDynSize desiredJointTorque(m_robotControlHelper->getActuatedDoFs());
-        iDynTree::toEigen(desiredJointTorque) = (iDynTree::toEigen(massMatrixReflected) *
-                                                 iDynTree::toEigen(m_walkingAdmittanceController->desiredRobotAcceleration())
-                                                 + iDynTree::toEigen(generalizedBiasForces)
-                                                 - iDynTree::toEigen(leftFootJacobian).transpose()
-                                                 * iDynTree::toEigen(m_contactWrenchMapping->getDesiredLeftWrench())
-                                                 - iDynTree::toEigen(rightFootJacobian).transpose()
-                                                 * iDynTree::toEigen(m_contactWrenchMapping->getDesiredRightWrench())).tail(m_robotControlHelper->getActuatedDoFs());
-
-
-        if(!m_robotControlHelper->setTorqueReferences(desiredJointTorque))
-        {
-            yError() << "[WalkingModule::updateModule] Error while setting the reference torque to iCub.";
-            return false;
-        }
-
 
         m_profiler->setEndTime("Total");
 
@@ -1675,8 +1686,6 @@ bool WalkingModule::stopWalking()
 
 bool WalkingModule::instantiateMotorReflectedInertia(const yarp::os::Searchable& config)
 {
-    yarp::os::Value tempValue;
-
     if(config.isNull())
     {
         yWarning() << "[instantiateMotorReflectedInertia] Motor reflected inertia will not be used.";
