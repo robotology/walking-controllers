@@ -230,6 +230,10 @@ namespace StdHelper
      */
     template<typename T>
     bool appendVectorToDeque(const std::vector<T>& input, std::deque<T>& output, const size_t& initPoint);
+    // TODO
+    template<typename T>
+    bool appendSubVectorToDeque(const std::vector<T>& input, const size_t& startIndexOfInput, std::deque<T>& output, const size_t& initPoint);
+
 }
 #include "Utils.tpp"
 

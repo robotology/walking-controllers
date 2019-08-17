@@ -36,7 +36,14 @@ class TrajectoryGenerator
     std::shared_ptr<DCMTrajectoryGenerator> m_dcmGenerator;
     std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGenerator;
     std::shared_ptr<FeetGenerator> m_feetGenerator;
+    UnicycleGenerator m_trajectoryGeneratorStepAdj; /**< UnicycleTrajectoryGenerator object. */
+        std::shared_ptr<DCMTrajectoryGenerator> m_dcmGeneratorStepAdj;
+        std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGeneratorStepAdj;
+        std::shared_ptr<FeetGenerator> m_feetGeneratorStepAdj;
     bool m_useMinimumJerk;
+    double m_nominalCoMHeight;
+     double m_switchOverSwingRatio;
+
 
     bool m_swingLeft; /**< True if the first swing foot is the left. */
 
@@ -107,6 +114,7 @@ public:
     bool generateFirstTrajectories(const iDynTree::Transform &leftToRightTransform);
                                    // const iDynTree::Position &initialCOMPosition);
 
+
     /**
      * Update the trajectory.
      * The old trajectory will be deleted and a new one is evaluated. The boundary condition of the new trajectory is given by
@@ -150,11 +158,45 @@ public:
     bool getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory);
 
     /**
+     * Get the desired 2D-DCM position trajectory
+     * @param DCMPositionTrajectory desired trajectory of the DCM.
+     * @return true/false in case of success/failure.
+     */
+    bool getDCMPositionTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMPositionTrajectory);
+
+
+    bool getDCMVelocityTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory);
+
+
+    // /**
+    //  * Get the desired 2D-DCM position trajectory
+    //  * @param DCMPositionTrajectory desired trajectory of the DCM.
+    //  * @return true/false in case of success/failure.
+    //  */
+    // bool getDCMPositionTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMPositionTrajectory);
+
+
+    /**
+     * Get the desired 2D-ZMP position trajectory
+     * @param ZMPPositionTrajectory desired trajectory of the DCM.
+     * @return true/false in case of success/failure.
+     */
+    bool getZMPPositionTrajectory(std::vector<iDynTree::Vector2>& ZMPPositionTrajectory);
+
+    /**
      * Get the desired 2D-DCM velocity trajectory
      * @param DCMVelocityTrajectory desired trajectory of the DCM.
      * @return true/false in case of success/failure.
      */
     bool getDCMVelocityTrajectory(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory);
+
+    /**
+        * Get the desired trajectories
+        * @param dcmSubTrajectories desired trajectories.
+        * @return true/false in case of success/failure.
+        */
+       bool getDCMSubTrajectory(std::vector<std::shared_ptr<GeneralSupportTrajectory>>& dcmSubTrajectories);
+
 
     /**
      * Get the feet trajectory
@@ -206,16 +248,78 @@ public:
     bool getCoMHeightVelocity(std::vector<double>& CoMHeightVelocity);
 
     /**
+        * Get the weight on the left on the right foot is a number that goes from 0 to 1
+        * @param weightInLeft weight on the left foot
+        * @param weightInRight weight on the right foot
+        * @return true/false in case of success/failure.
+        */
+       bool getWeightPercentage(std::vector<double> &weightInLeft, std::vector<double> &weightInRight);
+
+    /**
+     * Get the feet acceleration
+     * @param lFootAcceleration vector containing the left foot acceleration;
+     * @param rFootAcceleration vector containing the right foot acceleration.
+     * @return true/false in case of success/failure.
+     */
+    bool getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAcceleration,
+                             std::vector<iDynTree::SpatialAcc>& rFootAcceleration);
+
+
+    /**
      * Get the merge points along the trajectory
      * @param mergePoints vector containing all the merge points of the trajectory.
      * @return true/false in case of success/failure.
      */
     bool getMergePoints(std::vector<size_t>& mergePoints);
 
+    bool generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime);
+
     /**
      * Reset the planner
      */
     void reset();
+
+
+    /**
+     * Get the phases of each foot during walking from unicycle
+     * @param leftPhases vector containing all the phases that left foot experience.
+     * @param rightPhases vector containing all the phases that right foot experience.
+     * @return true/false in case of success/failure.
+     */
+    bool getStepPhases(std::vector<StepPhase> &leftPhases, std::vector<StepPhase> &rightPhases);
+
+    /**
+     * Get the phases of each foot during walking from unicycle
+     * @param leftFootPrint vector containing .........
+     * @param rightFootPrint vector containing  .........
+     * @return true/false in case of success/failure.
+     */
+     bool getLeftFootprint(std::shared_ptr<FootPrint>& leftFootPrint);
+
+     /**
+      * Get the phases of each foot during walking from unicycle
+      * @param leftFootPrint vector containing .........
+      * @param rightFootPrint vector containing  .........
+      * @return true/false in case of success/failure.
+      */
+
+     bool getRightFootprint(std::shared_ptr<FootPrint>& rightFootPrint);
+
+      /**
+       * Get the Nominal CoM height trajectory for omega calculation
+       * @param nominalCoMHeight returning nominal CoM height .........
+       * @return true/false in case of success/failure.
+       */
+      bool getNominalCoMHeight(double & nominalCoMHeight);
+
+      /**
+       * Get the ratio of double support to single support
+       * @param switchOverSwingRatio returning ratio of double support to single support .........
+       * @return true/false in case of success/failure.
+       */
+      bool getSwitchOverSwingRatio(double &switchOverSwingRatio);
+
+
 };
 
 #endif

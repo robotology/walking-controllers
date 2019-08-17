@@ -26,6 +26,7 @@
 #include <RobotHelper.hpp>
 #include <TrajectoryGenerator.hpp>
 #include <WalkingDCMModelPredictiveController.hpp>
+#include <StepAdaptator.hpp>
 #include <WalkingDCMReactiveController.hpp>
 #include <WalkingZMPController.hpp>
 #include <WalkingInverseKinematics.hpp>
@@ -56,8 +57,50 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_dT; /**< RFModule period. */
     double m_time; /**< Current time. */
     std::string m_robot; /**< Robot name. */
+    double m_stepHeight;
+    double m_startOfWalkingTime;
 
+    double m_tempCoP;
+    double m_tempDCM;
+    iDynTree::VectorFixSize<5> m_nominalValuesLeft;
+    iDynTree::VectorFixSize<5> m_nominalValuesRight;
+    iDynTree::Vector3 m_currentValues;
+    iDynTree::Vector3 leftAdaptedStepParameters;
+    std::vector<std::shared_ptr<GeneralSupportTrajectory>> m_DCMSubTrajectories;
+    iDynTree::Transform m_adaptatedFootLeftTransform;
+    iDynTree::Twist m_adaptatedFootLeftTwist;
+    iDynTree::SpatialAcc m_adaptatedFootLeftAcceleration;
+    iDynTree::Transform m_currentFootLeftTransform;
+    iDynTree::Twist m_currentFootLeftTwist;
+    iDynTree::SpatialAcc m_currentFootLeftAcceleration;
+    iDynTree::Transform m_currentFootRightTransform;
+    iDynTree::Twist m_currentFootRightTwist;
+    iDynTree::SpatialAcc m_currentFootRightAcceleration;
+    std::shared_ptr<FootPrint> m_jleftFootprints;
+    StepList m_jLeftstepList;
+
+    int m_removeMe;
+
+    iDynTree::Vector3 rightAdaptedStepParameters;
+    iDynTree::Transform m_adaptatedFootRightTransform;
+    iDynTree::Twist m_adaptatedFootRightTwist;
+    iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;
+    std::shared_ptr<FootPrint> m_jRightFootprints;
+    StepList m_jRightstepList;
+
+    //following three lines  added for filtering the global zmp to decrease the vibration during walking
+    yarp::sig::Vector m_zmpFiltered; /**< Vector containing the filtered evaluated ZMP. */
+    std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_ZMPFilter; /**< ZMP low pass filter .*/
+    bool m_useZMPFilter; /**< True if the zmp filter is used. */
+
+    //reading dada from configure file for zmp saturation function
+    double thresholdFz;
+    double epsilonZMP;
+    bool m_useZMPSaturation;
+
+    bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
+        bool m_useStepAdaptation; /**< True if the step adaptation is used. */
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
@@ -65,6 +108,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<RobotHelper> m_robotControlHelper; /**< Robot control helper. */
     std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
     std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
+    std::unique_ptr<StepAdaptator> m_stepAdaptator; /**< Pointer to the step adaptation object. */
     std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
     std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
     std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
@@ -85,14 +129,23 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
     std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
+    std::deque<iDynTree::SpatialAcc> m_leftAccelerationTrajectory; /**< Deque containing the acceleration trajectory of the left foot. */
+    std::deque<iDynTree::SpatialAcc> m_rightAccelerationTrajectory; /**< Deque containing the acceleration trajectory of the right foot. */
 
     std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
+    std::deque<iDynTree::Vector2> m_ZMPPositionDesired; /**< Deque containing the desired DCM position. */
+
     std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
     std::deque<bool> m_leftInContact; /**< Deque containing the left foot state. */
     std::deque<bool> m_rightInContact; /**< Deque containing the right foot state. */
     std::deque<double> m_comHeightTrajectory; /**< Deque containing the CoM height trajectory. */
     std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
+    std::deque<double> m_weightInLeft; /**< Deque containing the left foot weight percentage. */
+    std::deque<double> m_weightInRight; /**< Deque containing the right foot weight percentage. */
+
     std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
+    std::deque<iDynTree::Vector2> m_DCMPositionAdjusted; /**< Deque containing the desired DCM position. */
+    std::deque<iDynTree::Vector2> m_DCMVelocityAdjusted; /**< Deque containing the desired DCM position. */
 
     std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                             In general a main frame of a foot is the fix frame only during the
@@ -158,6 +211,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
                    const iDynTree::Vector3& desiredCoMVelocity,
                    const iDynTree::Rotation& desiredNeckOrientation,
                    iDynTree::VectorDynSize &output);
+
 
     /**
      * Evaluate the position of Zero momentum point.
