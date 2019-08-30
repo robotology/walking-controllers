@@ -48,9 +48,16 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
     bool okRightWrench = false;
 
     bool okBaseEstimation = true;
-    if(getBaseEst)
+    bool okFloatingBaseEstimation = true;
+    if(getBaseEst){
+
+        if(m_useExternalRobotBase)
         okBaseEstimation = !m_useExternalRobotBase;
 
+        if(m_useFloatingBaseEstimator)
+        okFloatingBaseEstimation = !m_useFloatingBaseEstimator;
+
+}
 
     unsigned int attempt = 0;
     do
@@ -83,6 +90,31 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
             }
         }
 
+
+        if(m_useFloatingBaseEstimator)
+              {
+                  if(!okFloatingBaseEstimation)
+                  {
+                      yarp::sig::Vector *baseEstimated = NULL;
+                      baseEstimated = m_robotBaseEstimatorPort.read(false);
+                      if(baseEstimated != NULL)
+                      {
+                          m_robotEstimatedBaseTransform.setPosition(iDynTree::Position((*baseEstimated)(0),
+                                                                              (*baseEstimated)(1),
+                                                                              (*baseEstimated)(2) - m_heightOffset));
+
+                          m_robotEstimatedBaseTransform.setRotation(iDynTree::Rotation::RPY((*baseEstimated)(3),
+                                                                                   (*baseEstimated)(4),
+                                                                                   (*baseEstimated)(5)));
+
+                          m_robotEstimatedBaseTwist.setLinearVec3(iDynTree::Vector3(baseEstimated->data() + 6, 3));
+                          m_robotEstimatedBaseTwist.setAngularVec3(iDynTree::Vector3(baseEstimated->data() + 6 + 3, 3));
+                          okFloatingBaseEstimation = true;
+                      }
+                  }
+              }
+
+
         if(m_useExternalRobotBase)
               {
                   if(!okBaseEstimation)
@@ -106,7 +138,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                   }
               }
 
-              if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation )
+              if(okPosition && okVelocity && okLeftWrench && okRightWrench && (okBaseEstimation || okFloatingBaseEstimation))
 
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
@@ -334,6 +366,28 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
     }
 
+    m_useFloatingBaseEstimator=config.check("use_floating_base_estimator", yarp::os::Value("False")).asBool();
+    if(m_useFloatingBaseEstimator)
+    {
+        m_robotBaseEstimatorPort.open("/" + name + "/robotBaseEstimator:i");
+        // connect port
+
+        std::string floatingBaseEstimatorPortName;
+        if(!YarpHelper::getStringFromSearchable(config, "floating_base_estimator_port_name", floatingBaseEstimatorPortName))
+        {
+            yError() << "[RobotHelper::useFloatingBaseEstimator] Unable to get the string from searchable.";
+            return false;
+        }
+
+        if(!yarp::os::Network::connect(floatingBaseEstimatorPortName, "/" + name + "/robotBaseEstimator:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/robotBaseEstimator:i";
+            return false;
+        }
+    }
+
+
+
 
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
     if(m_useExternalRobotBase)
@@ -354,6 +408,8 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
     }
+
+
     m_heightOffset = 0;
 
 
@@ -815,6 +871,16 @@ const iDynTree::Twist& RobotHelper::getBaseTwist() const
     return m_robotBaseTwist;
 }
 
+const iDynTree::Transform& RobotHelper::getEstimatedBaseTransform() const
+{
+    return m_robotEstimatedBaseTransform;
+}
+
+const iDynTree::Twist& RobotHelper::getEstimatedBaseTwist() const
+{
+    return m_robotEstimatedBaseTwist;
+}
+
 void RobotHelper::setHeightOffset(const double& offset)
 {
     m_heightOffset = offset;
@@ -823,4 +889,9 @@ void RobotHelper::setHeightOffset(const double& offset)
 bool RobotHelper::isExternalRobotBaseUsed()
 {
     return m_useExternalRobotBase;
+}
+
+bool RobotHelper::isFloatingBaseEstimatorUsed()
+{
+    return m_useFloatingBaseEstimator;
 }

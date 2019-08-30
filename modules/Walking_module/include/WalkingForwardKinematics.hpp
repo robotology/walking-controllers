@@ -27,6 +27,7 @@ class WalkingFK
     iDynTree::KinDynComputations m_kinDyn; /**< KinDynComputations solver. */
 
     bool m_useExternalRobotBase;
+    bool m_useFloatingBaseEstimator;
        iDynTree::FreeFloatingGeneralizedTorques m_generalizedBiasForces;
 
     bool m_prevContactLeft; /**< Boolean is the previous contact foot the left one? */

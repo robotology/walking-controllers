@@ -792,3 +792,8 @@ bool TrajectoryGenerator::getSwitchOverSwingRatio(double& switchOverSwingRatio)
     switchOverSwingRatio=m_switchOverSwingRatio;
     return true;
 }
+
+bool TrajectoryGenerator::swingLeft()
+{
+    return m_swingLeft;
+}

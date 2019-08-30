@@ -101,6 +101,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useStepAdaptation; /**< True if the step adaptation is used. */
+     bool m_useExternalRobotBase;
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
@@ -162,6 +163,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
+    yarp::os::RpcClient m_rpcBaseEstPort; /**< Remote Procedure Call port. */
     bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
     size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 

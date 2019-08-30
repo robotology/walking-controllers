@@ -188,9 +188,10 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
-
-    if(!m_useExternalRobotBase)
+     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+     m_useFloatingBaseEstimator=config.check("use_floating_base_estimator", yarp::os::Value("False")).asBool();
+ //    m_useFloatingBaseEstimator=false;
+    if(!m_useExternalRobotBase && !m_useFloatingBaseEstimator)
     {
         if(!setBaseFrame(lFootFrame, "leftFoot"))
         {
@@ -274,7 +275,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 void WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& rootTransform,
                                                   const iDynTree::Twist& rootTwist)
 {
-    if(!m_useExternalRobotBase)
+    if(!m_useExternalRobotBase  && !m_useFloatingBaseEstimator)
     {
 
         yWarning() << "[evaluateWorldToBaseTransformation] The base position is not retrieved from external. There is no reason to call this function.";
@@ -298,11 +299,13 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
                                                   const bool& isLeftFixedFrame)
 {
 
-    if(m_useExternalRobotBase)
+    if(m_useExternalRobotBase || m_useFloatingBaseEstimator)
     {
         yWarning() << "[evaluateWorldToBaseTransformation] The base position is retrieved from external. There is no reason on using odometry.";
         return true;
     }
+
+
 
 
     if(isLeftFixedFrame)
@@ -447,7 +450,7 @@ const iDynTree::Vector3& WalkingFK::getCoMVelocity()
 bool WalkingFK::setBaseOnTheFly()
 {
     // TODO understand how to change this function when the base is provided by an external module
-        if(m_useExternalRobotBase)
+        if(m_useExternalRobotBase || m_useFloatingBaseEstimator)
         {
             yError() << "[setBaseOnTheFly] If the base comes from the external you cannot use the onthefly. (This feature will be implemented in a second moment)";
             return false;

@@ -319,6 +319,10 @@ public:
        */
       bool getSwitchOverSwingRatio(double &switchOverSwingRatio);
 
+      /**
+       * Check if the swing foot is the left
+       */
+      bool swingLeft();
 
 };
 

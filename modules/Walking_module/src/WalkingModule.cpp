@@ -138,6 +138,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
 bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 {
     m_removeMe=1;
+       // m_useExternalRobotBase = rf.check("use_external_robot_base", yarp::os::Value("False")).asBool();
           m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
     // TODO REMOVE ME
        impactTimeNominal = 0;
@@ -385,6 +386,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_robotState = WalkingFSM::Configured;
 
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
+    // TODO move in the config
+       std::string portNameBaseEst;
+       portNameBaseEst = "/" + name + "/base-est/rpc";
+       m_rpcBaseEstPort.open(portNameBaseEst);
+       yarp::os::Network::connect(portNameBaseEst, "/base-estimator/rpc");
 
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
@@ -759,7 +765,7 @@ yInfo()<<m_removeMe<<m_removeMe;
             dcmMeasured2D(1) = m_FKSolver->getDCM()(1);
 
 
-            if((iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() > 0.20)
+            if((m_DCMPositionAdjusted.front()(0) - dcmMeasured2D(0)) > 0.05 ||(m_DCMPositionAdjusted.front()(1) - dcmMeasured2D(1))> 0.03 )
             {
 
                 yInfo()<<"you should not be here";
@@ -876,7 +882,7 @@ yInfo()<<currentZmpPosition(0);
             // generate the DCM trajectory
             if(!m_trajectoryGenerator->generateTrajectoriesFromFootprints(leftTemp, rightTemp, timeOffset))
             {
-                yError() << "[WalkingModule::updateModule] Generate new trajectorie after step adjustment.";
+                yError() << "[WalkingModule::updateModule] unable to generate new trajectorie after step adjustment.";
                 return false;
             }
 
@@ -1138,7 +1144,15 @@ yInfo()<<currentZmpPosition(0);
 
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
+            iDynTree::Vector2 DCMError;
+            iDynTree::toEigen( DCMError)=iDynTree::toEigen(m_FKSolver->getDCM())- iDynTree::toEigen( m_DCMPositionDesired.front());
+
+            iDynTree::Vector2 LfootAdaptedX;
+            LfootAdaptedX(0)=m_adaptatedFootLeftTransform.getPosition()(0);
+            LfootAdaptedX(1)=m_adaptatedFootLeftTransform.getPosition()(1);
+            //iDynTree::Lfoot_adaptedX=
+iDynTree::Vector3 estimatedBasePose =m_robotControlHelper->getEstimatedBaseTransform().getPosition();
+            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),DCMError, m_DCMVelocityDesired.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
                                       m_stableDCMModel->getCoMPosition(),
                                       m_stableDCMModel->getCoMVelocity(),
@@ -1146,7 +1160,7 @@ yInfo()<<currentZmpPosition(0);
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+                                      errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),estimatedBasePose);
         }
 
         propagateTime();
@@ -1374,6 +1388,13 @@ bool WalkingModule::generateFirstTrajectories()
             return false;
         }
     }
+    else if (m_robotControlHelper->isFloatingBaseEstimatorUsed()) {
+        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getEstimatedBaseTransform().getPosition()))
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
+    }
     else
     {
         if(!m_trajectoryGenerator->generateFirstTrajectories())
@@ -1560,8 +1581,17 @@ m_trajectoryGenerator->getZMPPositionTrajectory(ZMPPositionDesired);
 
 bool WalkingModule::updateFKSolver()
 {
-    if(!m_robotControlHelper->isExternalRobotBaseUsed())
+    if(m_robotControlHelper->isFloatingBaseEstimatorUsed())
     {
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getEstimatedBaseTransform(),
+                                                      m_robotControlHelper->getEstimatedBaseTwist());
+    }
+    else if (m_robotControlHelper->isExternalRobotBaseUsed())
+    {
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+                                                      m_robotControlHelper->getBaseTwist());
+    }
+    else {
         if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
                                                           m_rightTrajectory.front(),
                                                           m_isLeftFixedFrame.front()))
@@ -1569,13 +1599,6 @@ bool WalkingModule::updateFKSolver()
             yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
             return false;
         }
-    }
-    else
-    {
-        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
-                                                      m_robotControlHelper->getBaseTwist());
-
-
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
@@ -1601,7 +1624,7 @@ bool WalkingModule::startWalking()
     if(m_dumpData)
     {
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                                      "dcm_des_x", "dcm_des_y",
+                                      "dcm_des_x", "dcm_des_y","errorx","errory",
                                       "dcm_des_dx", "dcm_des_dy",
                                       "zmp_x", "zmp_y",
                                       "zmp_des_x", "zmp_des_y",
@@ -1619,7 +1642,7 @@ bool WalkingModule::startWalking()
                                       "lf_err_x", "lf_err_y", "lf_err_z",
                                       "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
                                       "rf_err_x", "rf_err_y", "rf_err_z",
-                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
@@ -1634,6 +1657,29 @@ bool WalkingModule::startWalking()
 
      m_robotControlHelper->setHeightOffset(heightOffset);
  }
+
+    iDynTree::Transform stanceFoot_T_world = m_trajectoryGenerator->swingLeft() ?
+        m_rightTrajectory.front().inverse() : m_leftTrajectory.front().inverse();
+
+    std::string frameName = m_trajectoryGenerator->swingLeft() ? "r_sole" : "l_sole";
+
+
+    yarp::os::Bottle cmd, outcome;
+    cmd.addString("resetLeggedOdometryWithRefFrame");
+    cmd.addString(frameName);
+    cmd.addDouble(stanceFoot_T_world.getPosition()(0));
+    cmd.addDouble(stanceFoot_T_world.getPosition()(1));
+    cmd.addDouble(stanceFoot_T_world.getPosition()(2));
+    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
+    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
+    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
+    m_rpcBaseEstPort.write(cmd,outcome);
+
+    if(!outcome.get(0).asBool())
+    {
+        yError() << "[startWalking] Unable reset the odometry.";
+        return false;
+    }
 
     m_robotState = WalkingFSM::Walking;
 
