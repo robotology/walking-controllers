@@ -39,7 +39,7 @@
 #include <RetargetingClient.hpp>
 #include <LoggerClient.hpp>
 #include <TimeProfiler.hpp>
-
+#include <DCMEstimator.hpp>
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
 #include <iCub/ctrl/minJerkCtrl.h>
@@ -80,7 +80,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     StepList m_jLeftstepList;
 
     int m_removeMe;
-
+    iDynTree::Vector2 m_dcmEstimatedI;
     iDynTree::Vector3 rightAdaptedStepParameters;
     iDynTree::Transform m_adaptatedFootRightTransform;
     iDynTree::Twist m_adaptatedFootRightTwist;
@@ -117,6 +117,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
     std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
     std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
+    std::unique_ptr<DCMEstimator> m_DCMEstimator; /**< Pointer to the DCM state estimation for push recovery. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
     std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
     std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */

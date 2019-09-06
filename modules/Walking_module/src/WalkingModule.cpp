@@ -334,6 +334,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    //initialize the DCM estimator
+    m_DCMEstimator=std::make_unique<DCMEstimator>();
+    if(!m_DCMEstimator->initialize(generalOptions))
+    {
+        yError() << "[WalkingModule::configure] Failed to configure the DCM estimator.";
+        return false;
+    }
     // initialize the linear inverted pendulum model
     m_stableDCMModel = std::make_unique<StableDCMModel>();
     if(!m_stableDCMModel->initialize(generalOptions))
@@ -444,6 +451,7 @@ bool WalkingModule::close()
     m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
+     m_DCMEstimator.reset(nullptr);
 
     return true;
 }
@@ -571,7 +579,7 @@ bool WalkingModule::updateModule()
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
-
+            m_DCMEstimator->reset(m_DCMPositionDesired.front());
             // reset the retargeting
             if(!m_robotControlHelper->getFeedbacks(20))
             {
@@ -712,7 +720,14 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+        m_DCMEstimator->reset(m_DCMPositionDesired.front());
+        if(!m_DCMEstimator->integrateDCMVelocity(measuredZMP,m_DCMPositionDesired.front()))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to integrate DCM Velocity.";
+            return false;
+        }
 
+iDynTree::Vector2 m_dcmEstimatedI= m_DCMEstimator->getDCMPosition();
 
 if(m_useStepAdaptation){
 
@@ -1183,7 +1198,7 @@ iDynTree::Vector3 estimatedBasePose =m_robotControlHelper->getEstimatedBaseTrans
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),estimatedBasePose);
+                                      errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),estimatedBasePose,m_dcmEstimatedI);
         }
 
         propagateTime();
@@ -1665,7 +1680,9 @@ bool WalkingModule::startWalking()
                                       "lf_err_x", "lf_err_y", "lf_err_z",
                                       "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
                                       "rf_err_x", "rf_err_y", "rf_err_z",
-                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z"});
+                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY",
+                                      "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
+                                      "dcm_estimated_x","dcm_estimated_y"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
