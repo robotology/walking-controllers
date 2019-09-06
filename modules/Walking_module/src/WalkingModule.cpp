@@ -140,6 +140,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_removeMe=1;
        // m_useExternalRobotBase = rf.check("use_external_robot_base", yarp::os::Value("False")).asBool();
           m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
+          m_useFloatingBaseEstimator=rf.check("use_floating_base_estimator", yarp::os::Value("False")).asBool();
     // TODO REMOVE ME
        impactTimeNominal = 0;
        impactTimeAdjusted = 0;
@@ -611,12 +612,13 @@ bool WalkingModule::updateModule()
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
-        if(desiredUnicyclePosition != nullptr)
+        if(desiredUnicyclePosition != nullptr){
             if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
             }
+        }
 
         if (m_mergePoints.front() == 11 && desiredUnicyclePosition == nullptr) {
 
@@ -713,6 +715,27 @@ bool WalkingModule::updateModule()
 
 
 if(m_useStepAdaptation){
+
+    // integration of DCM velocity for push recovery
+//               yarp::sig::Vector bufferDCMVelocity;
+//               bufferDCMVelocity.resize(2, 0.0);
+
+//               // instantiate Integrator object
+//               m_DCMIntegrator = std::make_unique<iCub::ctrl::Integrator>(m_dT, bufferDCMVelocity);
+
+
+
+//               // evaluate the velocity of the CoM
+//               yarp::sig::Vector DCMVelocityYarp(2);
+//               iDynTree::toEigen(DCMVelocityYarp) ;// -m_omega * (iDynTree::toEigen(m_DCMPosition) -
+//                                                                //iDynTree::toEigen(m_DCMPosition));
+//               yarp::sig::Vector DCMPositionYarp(2);
+//                   DCMPositionYarp = m_DCMIntegrator->integrate(DCMVelocityYarp);
+
+//                   // convert YARP vector into iDynTree vector
+//                   iDynTree::toiDynTree(DCMVelocityYarp, m_dcmVelocityPush);
+//                   iDynTree::toiDynTree(DCMPositionYarp, m_dcmPositionPush);
+
        //  step adjustment
         double comHeight;
         double omega;
@@ -767,13 +790,13 @@ yInfo()<<m_removeMe<<m_removeMe;
 
             if((m_DCMPositionAdjusted.front()(0) - dcmMeasured2D(0)) > 0.05 ||(m_DCMPositionAdjusted.front()(1) - dcmMeasured2D(1))> 0.03 )
             {
-
-                yInfo()<<"you should not be here";
+                yInfo()<<"triggering the push recovery";
                 std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
                 m_stepAdaptator->setCurrentDcmPosition(dcmMeasured2D);
             }
-            else
+            else{
                 m_stepAdaptator->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
+            }
 
             iDynTree::Vector2 dcmAtTimeAlpha;
             double timeAlpha = (secondDS->getTrajectoryDomain().second + secondDS->getTrajectoryDomain().first) / 2;
@@ -785,11 +808,11 @@ yInfo()<<m_removeMe<<m_removeMe;
 
             m_stepAdaptator->setTimings(omega, m_time - timeOffset, firstSS->getTrajectoryDomain().second,
                                         secondDS->getTrajectoryDomain().second - secondDS->getTrajectoryDomain().first);
-            yInfo()<<"m_DCMPositionAdjusted"<<m_DCMPositionAdjusted.front()(0);
-            yInfo()<<"dcmMeasured2D"<< dcmMeasured2D(0);
-            yInfo()<<m_DCMPositionDesired.front()(0);
-yInfo()<<nextZmpPosition(0);
-yInfo()<<currentZmpPosition(0);
+//            yInfo()<<"m_DCMPositionAdjusted"<<m_DCMPositionAdjusted.front()(0);
+//            yInfo()<<"dcmMeasured2D"<< dcmMeasured2D(0);
+//            yInfo()<<m_DCMPositionDesired.front()(0);
+//yInfo()<<nextZmpPosition(0);
+//yInfo()<<currentZmpPosition(0);
             if(!m_stepAdaptator->solve(!m_leftInContact.front()))
             {
                 yError() << "unable to solve the problem step adjustment";
@@ -1663,23 +1686,25 @@ bool WalkingModule::startWalking()
 
     std::string frameName = m_trajectoryGenerator->swingLeft() ? "r_sole" : "l_sole";
 
+    if (m_useFloatingBaseEstimator) {
+        yarp::os::Bottle cmd, outcome;
+        cmd.addString("resetLeggedOdometryWithRefFrame");
+        cmd.addString(frameName);
+        cmd.addDouble(stanceFoot_T_world.getPosition()(0));
+        cmd.addDouble(stanceFoot_T_world.getPosition()(1));
+        cmd.addDouble(stanceFoot_T_world.getPosition()(2));
+        cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
+        cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
+        cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
+        m_rpcBaseEstPort.write(cmd,outcome);
 
-    yarp::os::Bottle cmd, outcome;
-    cmd.addString("resetLeggedOdometryWithRefFrame");
-    cmd.addString(frameName);
-    cmd.addDouble(stanceFoot_T_world.getPosition()(0));
-    cmd.addDouble(stanceFoot_T_world.getPosition()(1));
-    cmd.addDouble(stanceFoot_T_world.getPosition()(2));
-    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(0));
-    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(1));
-    cmd.addDouble(stanceFoot_T_world.getRotation().asRPY()(2));
-    m_rpcBaseEstPort.write(cmd,outcome);
-
-    if(!outcome.get(0).asBool())
-    {
-        yError() << "[startWalking] Unable reset the odometry.";
-        return false;
+        if(!outcome.get(0).asBool())
+        {
+            yError() << "[startWalking] Unable reset the odometry.";
+            return false;
+        }
     }
+
 
     m_robotState = WalkingFSM::Walking;
 

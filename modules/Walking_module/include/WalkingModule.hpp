@@ -100,8 +100,9 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     bool m_firstStep; /**< True if this is the first step. */
     bool m_useMPC; /**< True if the MPC controller is used. */
-        bool m_useStepAdaptation; /**< True if the step adaptation is used. */
-     bool m_useExternalRobotBase;
+    bool m_useStepAdaptation; /**< True if the step adaptation is used. */
+    bool m_useExternalRobotBase;
+    bool m_useFloatingBaseEstimator;
     bool m_useQPIK; /**< True if the QP-IK is used. */
     bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
     bool m_dumpData; /**< True if data are saved. */
@@ -173,7 +174,10 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     // debug
     std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
+    std::unique_ptr<iCub::ctrl::Integrator> m_DCMIntegrator{nullptr}; /**< CoM integrator object. */
 
+    iDynTree::Vector2 m_dcmVelocityPush;
+    iDynTree::Vector2 m_dcmPositionPush;
     /**
      * Get the robot model from the resource finder and set it.
      * @param rf is the reference to a resource finder object.

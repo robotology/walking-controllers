@@ -43,6 +43,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/RetargetingClient.cpp
   src/QPSolver.cpp
   src/StepAdaptator.cpp
+  src/DCMEstimator.cpp
   )
 
 # set hpp files
@@ -63,6 +64,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/RetargetingClient.hpp
   include/QPSolver.hpp
   include/StepAdaptator.hpp
+  include/DCMEstimator.hpp
   )
 
 # add include directories to the build.
