@@ -800,10 +800,11 @@ if(m_useStepAdaptation){
             iDynTree::Vector2 dcmMeasured2D;
             dcmMeasured2D(0) = m_FKSolver->getDCM()(0);
             dcmMeasured2D(1) = m_FKSolver->getDCM()(1);
+             m_isPushActive=0;
 
-
-            if((m_DCMPositionAdjusted.front()(0) - dcmMeasured2D(0)) > 0.03 ||(m_DCMPositionAdjusted.front()(1) - dcmMeasured2D(1))> 0.03 )
+            if((m_DCMPositionAdjusted.front()(0) - m_DCMEstimator->getDCMPosition()(0)) > 0.04 ||(m_DCMPositionAdjusted.front()(1) - m_DCMEstimator->getDCMPosition()(1))> 0.03 )
             {
+                m_isPushActive=10;
                 yInfo()<<"triggering the push recovery";
                 std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
                 m_stepAdaptator->setCurrentDcmPosition(m_DCMEstimator->getDCMPosition());
@@ -1197,7 +1198,7 @@ iDynTree::Vector3 estimatedBasePose =m_robotControlHelper->getEstimatedBaseTrans
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),estimatedBasePose,m_dcmEstimatedI);
+                                      errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),estimatedBasePose,m_dcmEstimatedI,m_isPushActive);
         }
 
         propagateTime();
@@ -1681,7 +1682,7 @@ bool WalkingModule::startWalking()
                                       "rf_err_x", "rf_err_y", "rf_err_z",
                                       "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
-                                      "dcm_estimated_x","dcm_estimated_y"});
+                                      "dcm_estimated_x","dcm_estimated_y","IsPushActive"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)

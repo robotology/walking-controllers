@@ -62,6 +62,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     double m_tempCoP;
     double m_tempDCM;
+    double m_isPushActive;
     iDynTree::VectorFixSize<5> m_nominalValuesLeft;
     iDynTree::VectorFixSize<5> m_nominalValuesRight;
     iDynTree::Vector3 m_currentValues;
