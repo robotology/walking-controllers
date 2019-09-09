@@ -95,6 +95,13 @@ void YarpHelper::sendVariadicVector(yarp::os::BufferedPort<yarp::sig::Vector>& p
 template<typename T>
 bool StdHelper::appendVectorToDeque(const std::vector<T>& input, std::deque<T>& output, const size_t& initPoint)
 {
+    return appendSubVectorToDeque(input, 0, output, initPoint);
+}
+
+
+template<typename T>
+bool StdHelper::appendSubVectorToDeque(const std::vector<T>& input, const size_t& startIndexOfInput, std::deque<T>& output, const size_t& initPoint)
+{
     if(initPoint > output.size())
     {
         std::cerr << "[appendVectorToDeque] The init point has to be less or equal to the size of the output deque."
@@ -103,13 +110,14 @@ bool StdHelper::appendVectorToDeque(const std::vector<T>& input, std::deque<T>& 
     }
 
     // resize the deque
-    output.resize(input.size() + initPoint);
+     output.resize(input.size() + initPoint - startIndexOfInput);
 
     // Advances the iterator it by initPoint positions
     typename std::deque<T>::iterator it = output.begin();
     std::advance(it, initPoint);
 
-    // copy the vector into the deque from the initPoint position
+   // // copy the vector into the deque from the initPoint position
+ // copy the vector into the deque from the initPoint positionzzzzzzzzzzzzzzzzzzzzzz
     std::copy(input.begin(), input.end(), it);
 
     return true;

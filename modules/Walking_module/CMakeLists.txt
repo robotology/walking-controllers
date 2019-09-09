@@ -41,6 +41,9 @@ set(${EXE_TARGET_NAME}_SRC
   src/StableDCMModel.cpp
   src/WalkingPIDHandler.cpp
   src/RetargetingClient.cpp
+  src/QPSolver.cpp
+  src/StepAdaptator.cpp
+  src/DCMEstimator.cpp
   )
 
 # set hpp files
@@ -59,6 +62,9 @@ set(${EXE_TARGET_NAME}_HDR
   include/StableDCMModel.hpp
   include/WalkingPIDHandler.hpp
   include/RetargetingClient.hpp
+  include/QPSolver.hpp
+  include/StepAdaptator.hpp
+  include/DCMEstimator.hpp
   )
 
 # add include directories to the build.
