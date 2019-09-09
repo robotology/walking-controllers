@@ -14,13 +14,17 @@
 
 //iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
+
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 
 #include <DCMEstimator.hpp>
 #include <Utils.hpp>
+#include <iDynTree/yarp/YARPEigenConversions.h>
+#include <iDynTree/Model/Model.h>
 
-bool DCMEstimator::initialize(const yarp::os::Searchable& config)
+
+bool DCMEstimator::initialize(const yarp::os::Searchable& config,const iDynTree::Model modelLoader)
 {
     if(config.isNull())
     {
@@ -37,6 +41,7 @@ bool DCMEstimator::initialize(const yarp::os::Searchable& config)
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
 
     m_omega = sqrt(gravityAcceleration / comHeight);
+    m_mass=modelLoader.getTotalMass();
 
     // set the sampling time
     double samplingTime;
@@ -123,7 +128,6 @@ bool DCMEstimator::integrateDCMVelocity(iDynTree::LinearForceVector3 contactForc
                  << "Please call initialize method.";
         return false;
     }
-    double mass=30;
     iDynTree::Vector2 contactForce2d;
     contactForce2d(0)=contactForce3d(0);
     contactForce2d(1)=contactForce3d(1);
@@ -133,7 +137,7 @@ bool DCMEstimator::integrateDCMVelocity(iDynTree::LinearForceVector3 contactForc
     CoMVelocity(1)=CoMVelocity3d(1);
 
     iDynTree::Vector2 comAcceleration;
-    iDynTree::toEigen(comAcceleration)=iDynTree::toEigen (contactForce2d)/mass;
+    iDynTree::toEigen(comAcceleration)=iDynTree::toEigen (contactForce2d)/m_mass;
     yarp::sig::Vector dcmVelocityYarp(2);
 
     iDynTree::toEigen(dcmVelocityYarp) =(iDynTree::toEigen(CoMVelocity)+(iDynTree::toEigen(comAcceleration)/m_omega));

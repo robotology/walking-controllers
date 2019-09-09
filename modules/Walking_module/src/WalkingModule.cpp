@@ -336,7 +336,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     //initialize the DCM estimator
     m_DCMEstimator=std::make_unique<DCMEstimator>();
-    if(!m_DCMEstimator->initialize(generalOptions))
+    if(!m_DCMEstimator->initialize(generalOptions,m_loader.model()))
     {
         yError() << "[WalkingModule::configure] Failed to configure the DCM estimator.";
         return false;
@@ -764,8 +764,7 @@ if(m_useStepAdaptation){
 
         if (!m_leftInContact.front() || !m_rightInContact.front())
         {
-m_removeMe=m_removeMe+1;
-yInfo()<<m_removeMe<<m_removeMe;
+
             indexPush++;
 
             int numberOfSubTrajectories = m_DCMSubTrajectories.size();
@@ -803,11 +802,11 @@ yInfo()<<m_removeMe<<m_removeMe;
             dcmMeasured2D(1) = m_FKSolver->getDCM()(1);
 
 
-            if((m_DCMPositionAdjusted.front()(0) - dcmMeasured2D(0)) > 0.05 ||(m_DCMPositionAdjusted.front()(1) - dcmMeasured2D(1))> 0.03 )
+            if((m_DCMPositionAdjusted.front()(0) - dcmMeasured2D(0)) > 0.03 ||(m_DCMPositionAdjusted.front()(1) - dcmMeasured2D(1))> 0.03 )
             {
                 yInfo()<<"triggering the push recovery";
                 std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-                m_stepAdaptator->setCurrentDcmPosition(dcmMeasured2D);
+                m_stepAdaptator->setCurrentDcmPosition(m_DCMEstimator->getDCMPosition());
             }
             else{
                 m_stepAdaptator->setCurrentDcmPosition(m_DCMPositionAdjusted.front());

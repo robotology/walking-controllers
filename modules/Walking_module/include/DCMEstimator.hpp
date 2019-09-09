@@ -23,6 +23,7 @@
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/Core/Twist.h>
 #include <iDynTree/Core/Transform.h>
+#include <iDynTree/Model/Model.h>
 
 /**
  * StableDCMModel linear inverted pendulum model.
@@ -30,7 +31,7 @@
 class DCMEstimator
 {
     double m_omega; /**< Inverted time constant of the 3D-LIPM. */
-
+    double m_mass;
     std::unique_ptr<iCub::ctrl::Integrator> m_dcmVelocityIntegrator{nullptr}; /**< CoM integrator object. */
     iDynTree::Vector2 m_dcmEstimatedPosition; /**< Position of the DCM. */
     iDynTree::Vector2 m_dcmPosition; /**< Position of the DCM. */
@@ -39,11 +40,11 @@ class DCMEstimator
 
 public:
 
-bool integrateDCMVelocity(iDynTree::Vector2 zmp,iDynTree::Vector2 dcm);
+    bool integrateDCMVelocity(iDynTree::Vector2 zmp,iDynTree::Vector2 dcm);
 
-bool integrateDCMVelocity(iDynTree::AngVelocity omegaIMU, iDynTree::LinAcceleration accelerationIMU, iDynTree::Position baseToCoMPosition, iDynTree::LinVelocity CoMVelocity3d);
+    bool integrateDCMVelocity(iDynTree::AngVelocity omegaIMU, iDynTree::LinAcceleration accelerationIMU, iDynTree::Position baseToCoMPosition, iDynTree::LinVelocity CoMVelocity3d);
 
-bool integrateDCMVelocity(iDynTree::LinearForceVector3 contactForce3d, iDynTree::LinVelocity CoMVelocity3d);
+    bool integrateDCMVelocity(iDynTree::LinearForceVector3 contactForce3d, iDynTree::LinVelocity CoMVelocity3d);
 
 
     /**
@@ -51,7 +52,7 @@ bool integrateDCMVelocity(iDynTree::LinearForceVector3 contactForce3d, iDynTree:
      * @param config config of the 3D-LIPM;
      * @return true on success, false otherwise.
      */
-    bool initialize(const yarp::os::Searchable& config);
+    bool initialize(const yarp::os::Searchable& config, const iDynTree::Model modelLoader);
     /**
      * Set the controlled input.
      * @param controlledInput of the 3D-LIPM (i.e. Position of the ZMP).
