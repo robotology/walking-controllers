@@ -48,16 +48,17 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
     bool okRightWrench = false;
 
     bool okBaseEstimation = true;
+     bool okPelvisIMU = true;
     bool okFloatingBaseEstimation = true;
     if(getBaseEst){
 
         if(m_useExternalRobotBase)
-        okBaseEstimation = !m_useExternalRobotBase;
+            okBaseEstimation = !m_useExternalRobotBase;
 
         if(m_useFloatingBaseEstimator)
-        okFloatingBaseEstimation = !m_useFloatingBaseEstimator;
+            okFloatingBaseEstimation = !m_useFloatingBaseEstimator;
 
-}
+    }
 
     unsigned int attempt = 0;
     do
@@ -92,53 +93,72 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 
 
         if(m_useFloatingBaseEstimator)
-              {
-                  if(!okFloatingBaseEstimation)
-                  {
-                      yarp::sig::Vector *baseEstimated = NULL;
-                      baseEstimated = m_robotBaseEstimatorPort.read(false);
-                      if(baseEstimated != NULL)
-                      {
-                          m_robotEstimatedBaseTransform.setPosition(iDynTree::Position((*baseEstimated)(0),
-                                                                              (*baseEstimated)(1),
-                                                                              (*baseEstimated)(2) - m_heightOffset));
+        {
+            if(!okFloatingBaseEstimation)
+            {
+                yarp::sig::Vector *baseEstimated = NULL;
+                baseEstimated = m_robotBaseEstimatorPort.read(false);
+                if(baseEstimated != NULL)
+                {
+                    m_robotEstimatedBaseTransform.setPosition(iDynTree::Position((*baseEstimated)(0),
+                                                                                 (*baseEstimated)(1),
+                                                                                 (*baseEstimated)(2) - m_heightOffset));
 
-                          m_robotEstimatedBaseTransform.setRotation(iDynTree::Rotation::RPY((*baseEstimated)(3),
-                                                                                   (*baseEstimated)(4),
-                                                                                   (*baseEstimated)(5)));
+                    m_robotEstimatedBaseTransform.setRotation(iDynTree::Rotation::RPY((*baseEstimated)(3),
+                                                                                      (*baseEstimated)(4),
+                                                                                      (*baseEstimated)(5)));
 
-                          m_robotEstimatedBaseTwist.setLinearVec3(iDynTree::Vector3(baseEstimated->data() + 6, 3));
-                          m_robotEstimatedBaseTwist.setAngularVec3(iDynTree::Vector3(baseEstimated->data() + 6 + 3, 3));
-                          okFloatingBaseEstimation = true;
-                      }
-                  }
-              }
+                    m_robotEstimatedBaseTwist.setLinearVec3(iDynTree::Vector3(baseEstimated->data() + 6, 3));
+                    m_robotEstimatedBaseTwist.setAngularVec3(iDynTree::Vector3(baseEstimated->data() + 6 + 3, 3));
+                    okFloatingBaseEstimation = true;
+                }
+            }
+        }
+
+        // if(m_use)
 
 
         if(m_useExternalRobotBase)
-              {
-                  if(!okBaseEstimation)
-                  {
-                      yarp::sig::Vector *base = NULL;
-                      base = m_robotBasePort.read(false);
-                      if(base != NULL)
-                      {
-                          m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
-                                                                              (*base)(1),
-                                                                              (*base)(2) - m_heightOffset));
+        {
+            if(!okBaseEstimation)
+            {
+                yarp::sig::Vector *base = NULL;
+                base = m_robotBasePort.read(false);
+                if(base != NULL)
+                {
+                    m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
+                                                                        (*base)(1),
+                                                                        (*base)(2) - m_heightOffset));
 
-                          m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
-                                                                                   (*base)(4),
-                                                                                   (*base)(5)));
+                    m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
+                                                                             (*base)(4),
+                                                                             (*base)(5)));
 
-                          m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
-                          m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
-                          okBaseEstimation = true;
-                      }
-                  }
-              }
+                    m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
+                    m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
+                    okBaseEstimation = true;
+                }
+            }
+        }
 
-              if(okPosition && okVelocity && okLeftWrench && okRightWrench && (okBaseEstimation || okFloatingBaseEstimation))
+        if (m_usePelvisIMU) {
+            yarp::sig::Vector *pelvisIMU = NULL;
+            pelvisIMU=m_pelvisIMUPort.read(false);
+            if (pelvisIMU!=NULL) {
+                //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
+                m_imuOrientation=m_imuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
+                //m_imuOrientation
+                m_imuAcceleration(0)=(*pelvisIMU)(3) ;
+                m_imuAcceleration(1)=(*pelvisIMU)(4) ;
+                m_imuAcceleration(2)=(*pelvisIMU)(5) ;
+
+                m_imuAngularVelocity(0)=(*pelvisIMU)(6) ;
+                m_imuAngularVelocity(0)=(*pelvisIMU)(7) ;
+                m_imuAngularVelocity(0)=(*pelvisIMU)(8) ;
+            }
+        }
+
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench &&  (okBaseEstimation || okFloatingBaseEstimation))
 
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
@@ -177,7 +197,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
         yError() << "\t - Right wrench";
 
     if(!okBaseEstimation)
-          yError() << "\t - Base estimation";
+        yError() << "\t - Base estimation";
 
     return false;
 }
@@ -387,6 +407,24 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     }
 
 
+    m_usePelvisIMU=config.check("m_use_pelvis_imu", yarp::os::Value("False")).asBool();
+    if (m_usePelvisIMU) {
+        m_pelvisIMUPort.open("/" + name + "/pelvisIMU:i");
+        // connect port
+
+        std::string pelvisIMUPortName;
+        if(!YarpHelper::getStringFromSearchable(config, "imu_pelvis_port_name", pelvisIMUPortName))
+        {
+            yError() << "[RobotHelper::pelvisIMUPort] Unable to get the string from searchable.";
+            return false;
+        }
+
+        if(!yarp::os::Network::connect(pelvisIMUPortName,"/" + name + "/pelvisIMU:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/pelvisIMU::i";
+            return false;
+        }
+    }
 
 
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
@@ -879,6 +917,21 @@ const iDynTree::Transform& RobotHelper::getEstimatedBaseTransform() const
 const iDynTree::Twist& RobotHelper::getEstimatedBaseTwist() const
 {
     return m_robotEstimatedBaseTwist;
+}
+
+const iDynTree::LinAcceleration& RobotHelper::getIMUAcceleration() const
+{
+    return m_imuAcceleration;
+}
+
+const iDynTree::AngVelocity& RobotHelper::getIMUAngularVelocity() const
+{
+    return m_imuAngularVelocity;
+}
+
+const iDynTree::Rotation& RobotHelper::getIMUOreintation() const
+{
+    return m_imuOrientation;
 }
 
 void RobotHelper::setHeightOffset(const double& offset)

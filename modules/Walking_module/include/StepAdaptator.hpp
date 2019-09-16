@@ -42,6 +42,7 @@ class StepAdaptator
 
     iDynTree::Vector2 m_zmpPositionWeight;
     iDynTree::Vector2 m_dcmOffsetWeight;
+    iDynTree::Vector2 m_dcm_ErrorThreshold;
     double m_sigmaWeight;
 
     iDynTree::Vector2 m_currentZmpPosition;
@@ -128,6 +129,8 @@ public:
     void setCurrentZmpPosition(const iDynTree::Vector2& currentZmpPosition);
 
     void setCurrentDcmPosition(const iDynTree::Vector2& currentDcmPosition);
+
+    iDynTree::Vector2 getDCMErrorThreshold();
 
     /**
      * Get the output of the controller.

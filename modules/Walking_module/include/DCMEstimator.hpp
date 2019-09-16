@@ -83,6 +83,7 @@ public:
      * @return true/false in case of success/failure
      */
     bool reset(const iDynTree::Vector2& initialValue);
+    bool pendulumEstimator(iDynTree::Rotation pelvisOrientation, iDynTree::Vector3 zmp, iDynTree::Vector3 com, iDynTree::LinVelocity CoMVelocity3d);
 };
 
 #endif

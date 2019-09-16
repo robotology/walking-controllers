@@ -67,6 +67,13 @@ bool StepAdaptator::initialize(const yarp::os::Searchable &config)
         return false;
     }
 
+
+    if(!YarpHelper::getVectorFromSearchable(config, "threshold_dcm_error",  m_dcm_ErrorThreshold))
+    {
+        yError() << "[StepAdaptator::initialize] Unable to get the vector of DCM error threshold";
+        return false;
+    }
+
     foot = iDynTree::Polygon::XYRectangleFromOffsets(zmpOffsetLeftFoot(0), zmpOffsetLeftFoot(1),
                                                      zmpOffsetLeftFoot(2), zmpOffsetLeftFoot(3));
     m_feetExtendedPolygon[0] = foot;
@@ -249,9 +256,9 @@ bool StepAdaptator::getAdaptatedFootTrajectory(double maxFootHeight, double dt, 
     {
         adaptedFootTwist.zero();
         iDynTree::Position newPosition;
-        newPosition(0) = getDesiredZmp()(0) - (cos(yawAngleAtImpact) * zmpOffset(0) - sin(yawAngleAtImpact) * zmpOffset(1));
-        newPosition(1)= getDesiredZmp()(1) - (cos(yawAngleAtImpact) * zmpOffset(1) + sin(yawAngleAtImpact) * zmpOffset(0));
-        newPosition(2) = 0;
+        newPosition(0)=getDesiredZmp()(0) - (cos(yawAngleAtImpact) * zmpOffset(0) - sin(yawAngleAtImpact) * zmpOffset(1));
+        newPosition(1)=getDesiredZmp()(1) - (cos(yawAngleAtImpact) * zmpOffset(1) + sin(yawAngleAtImpact) * zmpOffset(0));
+        newPosition(2)= 0;
         adaptatedFootTransform.setPosition(newPosition);
 
         adaptatedFootTransform.setRotation(iDynTree::Rotation::RPY(0.0, 0.0, yawAngleAtImpact));
@@ -368,6 +375,10 @@ bool StepAdaptator::getAdaptatedFootTrajectory(double maxFootHeight, double dt, 
     return true;
 }
 
+iDynTree::Vector2 StepAdaptator::getDCMErrorThreshold(){
+    return m_dcm_ErrorThreshold;
+            ;
+}
 
 void StepAdaptator::reset(){
     m_isSolutionEvaluated = false;

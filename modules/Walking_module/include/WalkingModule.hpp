@@ -79,6 +79,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::SpatialAcc m_currentFootRightAcceleration;
     std::shared_ptr<FootPrint> m_jleftFootprints;
     StepList m_jLeftstepList;
+    iDynTree::Rotation m_pelvisRotationOffset;
 
     int m_removeMe;
     iDynTree::Vector2 m_dcmEstimatedI;

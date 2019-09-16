@@ -42,7 +42,7 @@ bool DCMEstimator::initialize(const yarp::os::Searchable& config,const iDynTree:
 
     m_omega = sqrt(gravityAcceleration / comHeight);
     m_mass=modelLoader.getTotalMass();
-
+yInfo()<<"massssssssssss"<<m_mass<<m_mass<<m_mass;
     // set the sampling time
     double samplingTime;
     if(!YarpHelper::getNumberFromSearchable(config, "sampling_time", samplingTime))
@@ -151,6 +151,18 @@ bool DCMEstimator::integrateDCMVelocity(iDynTree::LinearForceVector3 contactForc
     iDynTree::toiDynTree(dcmPositionYarp, m_dcmEstimatedPosition);
 
     return true;
+}
+
+
+
+bool DCMEstimator::pendulumEstimator(iDynTree::Rotation pelvisOrientation,iDynTree::Vector3 zmp,iDynTree::Vector3 com,iDynTree::LinVelocity CoMVelocity3d){
+iDynTree::Vector3 CoMPositionEstimated;
+iDynTree::toEigen(CoMPositionEstimated)=iDynTree::toEigen(zmp)+iDynTree::toEigen(pelvisOrientation)*(iDynTree::toEigen(com)-iDynTree::toEigen(zmp));
+
+m_dcmEstimatedPosition(0)=CoMPositionEstimated(0)+CoMVelocity3d(0)/m_omega;
+m_dcmEstimatedPosition(1)=CoMPositionEstimated(1)+CoMVelocity3d(1)/m_omega;
+
+return true;
 }
 
 

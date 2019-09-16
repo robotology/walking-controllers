@@ -86,18 +86,27 @@ class RobotHelper
     bool m_positionMoveSkipped;
 
     bool m_useExternalRobotBase; /**< True if an the base is provided by the extern. */
-    bool m_useFloatingBaseEstimator; /**< True if an the base is provided by the extern. */
+    bool m_useFloatingBaseEstimator; /**< True if an the base is provided by the base estimator. */
+    bool m_usePelvisIMU; /**< True if an the base is provided by the extern. */
 
     iDynTree::Transform m_robotBaseTransform; /**< World_T_robot base. */
     iDynTree::Twist m_robotBaseTwist; /**< Robot twist base expressed in mixed representation. */
 
+    iDynTree::Rotation m_imuOrientation; /**< imu orientation data */
+    iDynTree::LinAcceleration m_imuAcceleration;/**< imu acceleration data */
+    iDynTree::AngVelocity m_imuAngularVelocity;/**< /**< imu angular velocity data */
+
     iDynTree::Transform m_robotEstimatedBaseTransform; /**< World_T_robot base that come from estimator. */
     iDynTree::Twist m_robotEstimatedBaseTwist; /**< Robot twist base expressed in mixed representation that come from estimator. */
+
+//    iDynTree::Transform m_robotEstimatedBaseTransform; /**< World_T_robot base that come from estimator. */
+//    iDynTree::Twist m_robotEstimatedBaseTwist; /**< Robot twist base expressed in mixed representation that come from estimator.
 
 
 
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Robot base port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBaseEstimatorPort; /**< Robot base port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_pelvisIMUPort; /**< IMU base port. */
     double m_heightOffset;
 
 
@@ -247,6 +256,9 @@ public:
     bool isExternalRobotBaseUsed();
 
     bool isFloatingBaseEstimatorUsed();
+    const iDynTree::LinAcceleration &getIMUAcceleration() const;
+    const iDynTree::Rotation &getIMUOreintation() const;
+    const iDynTree::AngVelocity &getIMUAngularVelocity() const;
 };
 
 #endif
