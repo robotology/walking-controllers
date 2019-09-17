@@ -1,0 +1,2 @@
+/usr/bin/ar qc libStepAdaptation.a  CMakeFiles/StepAdaptation.dir/src/StepAdaptator.cpp.o CMakeFiles/StepAdaptation.dir/src/QPSolver.cpp.o CMakeFiles/StepAdaptation.dir/src/WalkingLogger.cpp.o
+/usr/bin/ranlib libStepAdaptation.a
