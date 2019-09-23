@@ -101,7 +101,7 @@ bool QPSolver::setGradientVector(const iDynTree::Vector2& zmpWeight, const iDynT
 }
 
 bool QPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition, const iDynTree::Vector2& currentZmpPosition,
-                                    const iDynTree::MatrixDynSize& convexHullMatrix,const iDynTree::Vector2& delta)
+                                    const iDynTree::MatrixDynSize& convexHullMatrix,const iDynTree::Vector2& delta2,const iDynTree::Vector2& finalZMPPosition)
 {
     if(convexHullMatrix.rows() != 4 || convexHullMatrix.cols() != 2)
     {
@@ -110,7 +110,7 @@ bool QPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition,
     }
 
     iDynTree::Vector2 temp;
-    iDynTree::toEigen(temp) = iDynTree::toEigen(currentZmpPosition) - iDynTree::toEigen(currentDcmPosition)-iDynTree::toEigen(delta)/2;
+    iDynTree::toEigen(temp) = iDynTree::toEigen(finalZMPPosition)-iDynTree::toEigen(delta2)/2 - iDynTree::toEigen(currentDcmPosition);
 
     m_constraintsMatrix(0, 2) = temp(0);
     m_constraintsMatrix(1, 2) = temp(1);
@@ -122,6 +122,17 @@ bool QPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition,
     m_constraintsMatrix(4, 1) = convexHullMatrix(2, 1);
     m_constraintsMatrix(5, 0) = convexHullMatrix(3, 0);
     m_constraintsMatrix(5, 1) = convexHullMatrix(3, 1);
+
+    m_constraintsMatrix(1, 1) = 1;
+
+    m_constraintsMatrix(0, 3) = 1;
+    m_constraintsMatrix(1, 4) = 1;
+
+    m_constraintsMatrix(6, 2) = 1;
+
+    m_constraintsMatrix(7, 3) = 1;
+
+
 
     // if(m_QPSolver->isInitialized())
     // {
@@ -143,7 +154,8 @@ bool QPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition,
 }
 
 bool QPSolver::setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
-                                            const double& stepDuration, const double& stepDurationTollerance, const double& remainingSingleSupportDuration, const double& omega, const iDynTree::Vector2 & delta){
+                                            const double& stepDuration, const double& stepDurationTollerance, const double& remainingSingleSupportDuration, const double& omega,const iDynTree::Vector2 &Delta1)
+{
     if(convexHullVector.size() != 4)
     {
         yError() << "QPSolver::setConstraintsMatrix the convex hull matrix it is strange " << convexHullVector.toString();
@@ -154,8 +166,8 @@ bool QPSolver::setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition
 // Two equality constraints and three inequality constraint
 
     // equality constraint
-    iDynTree::toEigen(m_upperBound).segment(0, 2) = iDynTree::toEigen(zmpPosition)+iDynTree::toEigen(delta)/2;
-    iDynTree::toEigen(m_lowerBound).segment(0, 2) = iDynTree::toEigen(zmpPosition)+iDynTree::toEigen(delta)/2;
+    iDynTree::toEigen(m_upperBound).segment(0, 2) = (iDynTree::toEigen(zmpPosition)+iDynTree::toEigen(Delta1)/2);
+    iDynTree::toEigen(m_lowerBound).segment(0, 2) = (iDynTree::toEigen(zmpPosition)+iDynTree::toEigen(Delta1)/2);
     iDynTree::toEigen(m_upperBound).segment(2, 4) = iDynTree::toEigen(convexHullVector);
 //    m_upperBound(0) = qpOASES::INFTY;
 //    m_upperBound(1) = qpOASES::INFTY;
@@ -177,6 +189,10 @@ bool QPSolver::setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition
 
     m_upperBound(6) = std::exp((stepDuration + stepDurationTollerance) * omega);
     m_lowerBound(6) = std::exp((stepDuration - std::min(stepDurationTollerance, remainingSingleSupportDuration)) * omega);
+m_upperBound(7)=qpOASES::INFTY;
+
+
+m_lowerBound(7)=0;
 
     // std::cerr << "u = [" << m_upperBound << "];";
     // std::cerr << "l = [" << m_lowerBound << "];";

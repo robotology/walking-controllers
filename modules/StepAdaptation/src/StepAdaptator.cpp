@@ -1,3 +1,4 @@
+
 // std
 #define NOMINMAX
 #include <algorithm>
@@ -30,13 +31,12 @@ StepAdaptator::StepAdaptator()
 
 bool StepAdaptator::initialize(const yarp::os::Searchable &config)
 {
-
     // inputs are zmp position, sigma dcm offset
-
     m_inputSize = 5;
 
     // constraints are dynamics (2) zmp position (2) impact time(1)
-    m_numberOfConstraint = 7;
+    m_numberOfConstraint = 8;
+
     m_currentQPSolver = std::make_shared<QPSolver>(m_inputSize, m_numberOfConstraint);
 
 
@@ -45,6 +45,15 @@ bool StepAdaptator::initialize(const yarp::os::Searchable &config)
         yError() << "[StepAdaptator::initialize] Unable to get the vector";
         return false;
     }
+
+
+    if(!YarpHelper::getVectorFromSearchable(config, "delta",  m_Delta))
+    {
+        yError() << "[StepAdaptator::initialize] Unable to get the vector delta";
+        return false;
+    }
+
+    yInfo()<<m_Delta.toString();
 
     if(!YarpHelper::getVectorFromSearchable(config, "next_dcm_offset_weight",  m_dcmOffsetWeight))
     {
@@ -55,12 +64,6 @@ bool StepAdaptator::initialize(const yarp::os::Searchable &config)
     if(!YarpHelper::getNumberFromSearchable(config, "sigma_weight", m_sigmaWeight))
     {
         yError() << "[StepAdaptator::initialize] Unable to get the number";
-        return false;
-    }
-
-    if(!YarpHelper::getVectorFromSearchable(config, "delta",  m_delta))
-    {
-        yError() << "[StepAdaptator::initialize] Unable to get the vector delta";
         return false;
     }
 
@@ -135,19 +138,17 @@ void StepAdaptator::setTimings(const double & omega, const double & currentTime,
     m_sigmaNominal = std::exp(omega * m_stepTiming);
     m_omega = omega;
 }
-
 void StepAdaptator::setTimings(const double & omega, const double & currentTime, const double& nextImpactTime)
 {
-
+   // m_nextDoubleSupportDuration = nextDoubleSupportDuration;
     m_currentTime = currentTime;
 
-    m_stepTiming = nextImpactTime-currentTime;
+    m_stepTiming = nextImpactTime  - currentTime;
     m_remainingSingleSupportDuration = nextImpactTime - currentTime;
 
     m_sigmaNominal = std::exp(omega * m_stepTiming);
     m_omega = omega;
 }
-
 
 void StepAdaptator::setNominalDcmOffset(const iDynTree::Vector2& nominalDcmOffset)
 {
@@ -163,6 +164,13 @@ void StepAdaptator::setCurrentDcmPosition(const iDynTree::Vector2& currentDcmPos
 {
     m_currentDcmPosition = currentDcmPosition;
 }
+
+
+void StepAdaptator::setFinalZMPPosition(const iDynTree::Vector2& finalZmpPosition)
+{
+    m_finalZmpPosition= finalZmpPosition;
+}
+
 
 bool StepAdaptator::solve(bool isLeft)
 {
@@ -202,7 +210,6 @@ bool StepAdaptator::solve(bool isLeft)
             yInfo() << "unable to build the convex hull (right)";
             return false;
         }
-        yInfo() << "left22222";
     }
 
     if (!m_currentQPSolver->setGradientVector(m_zmpPositionWeight, m_dcmOffsetWeight, m_sigmaWeight,
@@ -212,7 +219,7 @@ bool StepAdaptator::solve(bool isLeft)
         return false;
     }
 
-    if(!m_currentQPSolver->setConstraintsMatrix(m_currentDcmPosition, m_currentZmpPosition, m_convexHullComputer.A,m_delta))
+    if(!m_currentQPSolver->setConstraintsMatrix(m_currentDcmPosition, m_currentZmpPosition, m_convexHullComputer.A,m_Delta,m_finalZmpPosition))
     {
         yError() << "[StepAdaptator::RunStepAdaptator] Unable to set the constraint matrix";
         return false;
@@ -220,7 +227,7 @@ bool StepAdaptator::solve(bool isLeft)
 
     if(!m_currentQPSolver->setBoundsVectorOfConstraints(m_currentZmpPosition, m_convexHullComputer.b,
                                                         m_stepTiming, m_stepDurationTolerance, m_remainingSingleSupportDuration,
-                                                        m_omega,m_delta))
+                                                        m_omega,m_Delta))
     {
         yError() << "[StepAdaptator::RunStepAdaptator] Unable to set the bounds";
         return false;
@@ -251,7 +258,7 @@ double StepAdaptator::getDesiredImpactTime()
 {
     double optimalStepDuration = std::log(m_currentQPSolver->getSolution()(2)) / m_omega;
 
-    return m_currentTime + optimalStepDuration - m_nextDoubleSupportDuration / 2;
+    return m_currentTime + optimalStepDuration ;
 }
 
 iDynTree::Vector2 StepAdaptator::getDesiredZmp()
@@ -262,16 +269,6 @@ iDynTree::Vector2 StepAdaptator::getDesiredZmp()
     desiredZmp(1) = m_currentQPSolver->getSolution()(1);
 
     return desiredZmp;
-}
-
-iDynTree::Vector2 StepAdaptator::getDesiredNextDCMOffset()
-{
-    iDynTree::Vector2 desiredNextDCMOffset;
-
-    desiredNextDCMOffset(0) = m_currentQPSolver->getSolution()(3);
-    desiredNextDCMOffset(1) = m_currentQPSolver->getSolution()(4);
-
-    return desiredNextDCMOffset;
 }
 
 bool StepAdaptator::getAdaptatedFootTrajectory(double maxFootHeight, double dt, double takeOffTime, double yawAngleAtImpact, iDynTree::Vector2 zmpOffset,
@@ -408,6 +405,16 @@ bool StepAdaptator::getAdaptatedFootTrajectory(double maxFootHeight, double dt, 
 iDynTree::Vector2 StepAdaptator::getDCMErrorThreshold(){
     return m_dcm_ErrorThreshold;
             ;
+}
+
+
+
+iDynTree::Vector2  StepAdaptator::getDesiredNextDCMOffset()
+{
+    //double optimalStepDuration = m_currentQPSolver->getSolution()(2);
+    m_DCMOffset(0) = m_currentQPSolver->getSolution()(3);
+    m_DCMOffset(1) = m_currentQPSolver->getSolution()(4);
+    return m_DCMOffset ;
 }
 
 void StepAdaptator::reset(){

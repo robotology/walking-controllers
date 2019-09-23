@@ -1,3 +1,4 @@
+
 #ifndef STEP_ADAPTATOR_HPP
 #define STEP_ADAPTATOR_HPP
 
@@ -42,6 +43,8 @@ class StepAdaptator
     iDynTree::Vector2 m_zmpPositionWeight;
     iDynTree::Vector2 m_dcmOffsetWeight;
     iDynTree::Vector2 m_dcm_ErrorThreshold;
+    iDynTree::Vector2 m_Delta;
+        iDynTree::Vector2 m_finalZmpPosition;
     double m_sigmaWeight;
 
     iDynTree::Vector2 m_currentZmpPosition;
@@ -50,19 +53,20 @@ class StepAdaptator
     iDynTree::Vector2 m_zmpPositionTollerance_x;
     iDynTree::Vector2 m_zmpPositionTollerance_yLeft;
     iDynTree::Vector2 m_zmpPositionTollerance_yRight;
-    iDynTree::Vector2 m_delta;
+
 
     iDynTree::Vector2 m_desiredZmp;
+
+        iDynTree::Vector2 m_DCMOffset;
 
     double m_stepTiming;
     double m_stepDurationTolerance;
     double m_remainingSingleSupportDuration;
     double m_omega;
 
-
     double m_currentTime;
     double m_nextDoubleSupportDuration;
- int m_testSize;
+
     int m_inputSize;  /**< Size of the input vector. It is equal to 3 now!!!!. */
     int m_numberOfConstraint;  /**< Size of the input vector. It is equal to 5 now!!!!. */
 
@@ -144,6 +148,7 @@ public:
     double getDesiredImpactTime();
 
     iDynTree::Vector2 getDesiredZmp();
+    void setFinalZMPPosition(const iDynTree::Vector2 &finalZmpPosition);
     iDynTree::Vector2 getDesiredNextDCMOffset();
 };
 

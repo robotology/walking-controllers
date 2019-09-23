@@ -47,8 +47,8 @@ int main(int argc, char **argv) {
     yarp::os::ResourceFinder& rf = yarp::os::ResourceFinder::getResourceFinderSingleton();
     rf.setDefaultConfigFile("dcm_walking_with_joypad.ini");
     rf.configure(argc, argv);
-
-
+    bool m_dumpData;
+    m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     double  m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     double omega;
@@ -57,27 +57,35 @@ int main(int argc, char **argv) {
     omega = sqrt(9.81 / 0.53);
     yarp::os::Bottle& stepAdaptatorOptions = rf.findGroup("STEP_ADAPTATOR");
     stepAdaptatorOptions.append(generalOptions);
- m_DCMPlanner = std::make_unique<DCMPlanning>(omega);
-m_stepAdaptator = std::make_unique<StepAdaptator>();
-m_stepAdaptator->initialize(stepAdaptatorOptions);
-//    if(!)
-//    {
-//        yError() << "[configure] Unable to initialize the step adaptator!";
-//    }
-
-
-
-    m_walkingLogger = std::make_unique<WalkingLogger>();
-    yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
-    if(!m_walkingLogger->configure(loggerOptions, "stepAdaptation"))
+    m_DCMPlanner = std::make_unique<DCMPlanning>(omega);
+    m_stepAdaptator = std::make_unique<StepAdaptator>();
+    m_stepAdaptator->initialize(stepAdaptatorOptions);
+    //    if(!)
+    //    {
+    //        yError() << "[configure] Unable to initialize the step adaptator!";
+    //    }
+    iDynTree::Vector2 delta;
+    if(!YarpHelper::getVectorFromSearchable(stepAdaptatorOptions, "delta",  delta))
     {
-        yError() << "[configure] Unable to configure the logger.";
+        yError() << "[StepAdaptator::initialize] Unable to get the vector delta";
         return false;
     }
+    if(m_dumpData)
+    {
 
-    m_walkingLogger->startRecord({"record","foot_adapted_x","foot_adapted_y","timeX","timeY"});
+        m_walkingLogger = std::make_unique<WalkingLogger>();
+        yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
+        if(!m_walkingLogger->configure(loggerOptions, "stepAdaptation"))
+        {
+            yError() << "[configure] Unable to configure the logger.";
+            return false;
+        }
+        m_walkingLogger->startRecord({"record","foot_adapted_x","foot_adapted_y","currentDCMx","currentDCMy","currentZMPx","currentZMPy","currentCoMx","currentCoMy","dcm_offset_x","dcm_offset_y","timeX","timeY","itimeX","itimeY"});
 
-//    m_stepAdaptator = std::make_unique<StepAdaptator>();
+    }
+
+
+    //    m_stepAdaptator = std::make_unique<StepAdaptator>();
 
 
     iDynTree::VectorFixSize<5> nominalValues;
@@ -97,6 +105,11 @@ m_stepAdaptator->initialize(stepAdaptatorOptions);
     double nominalDCMOffset;
     iDynTree::Vector2 timed;
     timed(0)=0;
+
+
+    double nomStepWidth=0;
+    double lengthOfPelvis=0.1;
+
     //iDynTree::Vector3 leftAdaptedStepParameters;
     double alpha=0;
     double initDCM=0;
@@ -105,52 +118,71 @@ m_stepAdaptator->initialize(stepAdaptatorOptions);
     double initStepPosition1=0;
     double a;
     double b;
-    double comHeight=0.53;
+    double comHeight=0.8;
 
 
 
     iDynTree::Vector4 tempp;
-    double dt=0.01;
+    double dt=0.0100000000;
     double Pt=0;
     iDynTree::Vector2 CoeffA;
     iDynTree::Vector2 CoeffB;
     iDynTree::Vector2 finalZMP;
     iDynTree::Vector2 initialZMP;
     iDynTree::Vector2 currentZMP;
+        iDynTree::Vector2 currentDCMOffset;
     iDynTree::Vector2 currentDCM;
     iDynTree::Vector2 currentCoM;
     iDynTree::Vector2 middleZMP;
     iDynTree::Vector2 stepLW;
     bool isleft;
+
     iDynTree::Vector2 nextZMP;
     iDynTree::Vector2 adaptedNextZMP;
     iDynTree::Vector2 adaptedNextDCMOffset;
     adaptedNextDCMOffset.zero();
-
-
+    initialZMP.zero();
+    finalZMP.zero();
+    iDynTree::Vector2 m_nominalDCMOffset;
 
     // iDynTree::Vector2 adaptedNextZMP;
     double landa;
     iDynTree::toEigen( middleZMP)=(iDynTree::toEigen(finalZMP)/2+iDynTree::toEigen(initialZMP))/(2);
-    currentDCM.zero();
+    m_nominalDCMOffset(0)=nomStepLength/(exp(omega*stepTiming1)-1);
+    currentDCM(0)=nomStepLength/(exp(omega*stepTiming1)-1);
+    currentDCM(1)=0;//nom/(exp(omega*nomStepLength)-1);
     currentZMP.zero();
+    m_nominalDCMOffset(1)=pow(-1,1)*(lengthOfPelvis/(1+exp(omega*stepTiming1)));
+    iDynTree::toEigen(currentDCM)=iDynTree::toEigen(currentZMP)+iDynTree::toEigen(m_nominalDCMOffset);
 
+    currentCoM=currentDCM;
+    iDynTree::toEigen(finalZMP)=iDynTree::toEigen(initialZMP)+iDynTree::toEigen(delta);
     for (int i=1;i<=numberOfStep;i++) {
-
+        adaptedStepTiming=nomStepTiming;
         int adaptedStepTimingIndex=adaptedStepTiming/dt;
         stepLW(0)=nomStepLength;
         stepLW(1)=pow(-1,i)*stepWidth;
-        yInfo()<<i<<i<<i<<i<<i<<"iii";
+//        yInfo()<<i<<i<<i<<i<<i<<"iii";
 
-        if ((pow(-1,i)==1)) {
+        if (int(pow(-1,i))==1) {
             isleft=true;
+//            yInfo()<<"injaaahshhggdggdggsggsgggs"<<2;
+//            yInfo()<<"injaaahshhggdggdggsggsgggs"<<5544;
+//            yInfo()<<"injaaahshhggdggdggsggsgggs"<<245544;
+//            yInfo()<<"injaaahshhggdggdggsggsgggs"<<5444455;
+            m_nominalDCMOffset(1)=pow(-1,i)*(lengthOfPelvis/(1+exp(omega*adaptedStepTiming)));
         }
         else {
             isleft=false;
+            m_nominalDCMOffset(1)=pow(-1,i)*(lengthOfPelvis/(1+exp(omega*adaptedStepTiming)));
         }
-
-        for(int index=1;index<adaptedStepTimingIndex;index++){
-            yInfo()<<index<<index<<index<<index<<index<<"index";
+        if (i!=1) {
+            iDynTree::toEigen(currentDCM)=iDynTree::toEigen(currentZMP)+iDynTree::toEigen(m_nominalDCMOffset);
+        }
+        for(int index=0;index<adaptedStepTimingIndex;index++){
+            adaptedStepTiming=adaptedStepTiming-dt;
+            timed(0)=timed(0)+dt;
+//            yInfo()<<index<<index<<index<<index<<index<<"index";
             //time=0;
 
             m_stepAdaptator->setTimings(omega,0,adaptedStepTiming);
@@ -158,13 +190,14 @@ m_stepAdaptator->initialize(stepAdaptatorOptions);
 
 
             m_stepAdaptator->setCurrentZmpPosition(currentZMP);
-            iDynTree::toEigen( CoeffA)=(iDynTree::toEigen(finalZMP)-iDynTree::toEigen(initialZMP))/(landa-1);
-            iDynTree::toEigen( CoeffB)=(landa*iDynTree::toEigen(initialZMP)-iDynTree::toEigen(finalZMP))/(landa-1);
-            iDynTree::toEigen( nextZMP)=(iDynTree::toEigen(middleZMP)+iDynTree::toEigen(stepLW));
-            m_stepAdaptator-> setCurrentDcmPosition(currentDCM);
-            m_stepAdaptator->setNominalNextStepPosition(nextZMP,0.0);
+            iDynTree::toEigen( CoeffA)=(iDynTree::toEigen(finalZMP)-iDynTree::toEigen(currentZMP))/(landa-1);
+            iDynTree::toEigen( CoeffB)=(landa*iDynTree::toEigen(currentZMP)-iDynTree::toEigen(finalZMP))/(landa-1);
+            iDynTree::toEigen( nextZMP)=(iDynTree::toEigen(currentZMP)+iDynTree::toEigen(stepLW));
+            m_stepAdaptator->setCurrentDcmPosition(currentDCM);
+            m_stepAdaptator->setNominalNextStepPosition(nextZMP,0.0000);
             m_stepAdaptator->setCurrentZmpPosition(currentZMP);
-            m_stepAdaptator->setNominalDcmOffset(adaptedNextDCMOffset);
+            m_stepAdaptator->setNominalDcmOffset(m_nominalDCMOffset);
+            m_stepAdaptator->setFinalZMPPosition(finalZMP);
 
 
             m_stepAdaptator->solve(isleft);
@@ -172,21 +205,34 @@ m_stepAdaptator->initialize(stepAdaptatorOptions);
             adaptedNextZMP=m_stepAdaptator->getDesiredZmp();
             adaptedStepTiming=m_stepAdaptator->getDesiredImpactTime();
             adaptedNextDCMOffset=m_stepAdaptator->getDesiredNextDCMOffset();
+//            yInfo()<<currentZMP(0)<<finalZMP(0)<<nextZMP(0)<<currentZMP(1)<<finalZMP(1)<<nextZMP(1);
             m_DCMPlanner->setBoundryZMPPosition(currentZMP,finalZMP);
             m_DCMPlanner->setInitialDCMPosition(currentDCM);
-            m_DCMPlanner->solveDCMDynamics(dt*index);
+            m_DCMPlanner->solveDCMDynamics(dt);
             m_DCMPlanner->getDCMPosition(currentDCM);
 
-            m_DCMPlanner->solveCoMDynamics(dt*index,currentCoM,currentDCM);
+            m_DCMPlanner->solveCoMDynamics(dt,currentCoM,currentDCM);
             m_DCMPlanner->getCoMPosition(currentCoM);
-           yarp::os::Time::delay(0.01);
-            iDynTree::toEigen(currentZMP)=(iDynTree::toEigen(CoeffA))*exp(-omega*dt*index)+iDynTree::toEigen(CoeffB);
+
+
+            yarp::os::Time::delay(0.017);
+           // iDynTree::toEigen(currentZMP)=(iDynTree::toEigen(CoeffA))*exp(-omega*dt)+iDynTree::toEigen(CoeffB);
             iDynTree::Vector2 timingTemp;
             timingTemp(0)=adaptedStepTiming;
-            m_walkingLogger->sendData(adaptedNextZMP,timingTemp);
-          //adaptedStepTiming=adaptedStepTiming-0.01;
+            if(m_dumpData)
+            {
+            m_walkingLogger->sendData(adaptedNextZMP,currentDCM,currentZMP,currentCoM,adaptedNextDCMOffset,timingTemp,timed);
+            }
+            //adaptedStepTiming=adaptedStepTiming-0.01;
+            iDynTree::toEigen(currentZMP)=(iDynTree::toEigen(CoeffA))*exp(-omega*dt)+iDynTree::toEigen(CoeffB);
+
+            //adaptedStepTiming=adaptedStepTiming-0.01;
 
         }
+        initialZMP=adaptedNextZMP;
+        iDynTree::toEigen(finalZMP)=iDynTree::toEigen(adaptedNextZMP)+iDynTree::toEigen(delta);
+        iDynTree::toEigen(currentZMP)=iDynTree::toEigen(adaptedNextZMP)-iDynTree::toEigen(delta)/2;
+
     }
     //for (int k=1;k<12;k++){
     //    alpha=alpha+0.011;
@@ -303,7 +349,8 @@ m_stepAdaptator->initialize(stepAdaptatorOptions);
     //    }
     //       m_walkingLogger->sendData(tempp);
     //}
+    if(m_dumpData)
+        m_walkingLogger->quit();
 
-    m_walkingLogger->quit();
     return EXIT_SUCCESS;
 }

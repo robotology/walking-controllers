@@ -65,7 +65,7 @@ public:
      * @return true/false in case of success/failure.
      */
     bool setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition, const iDynTree::Vector2& currentZmpPosition,
-                              const iDynTree::MatrixDynSize& convexHullMatrix, const iDynTree::Vector2 & delta);
+                              const iDynTree::MatrixDynSize& convexHullMatrix, const iDynTree::Vector2 &delta2, const iDynTree::Vector2 &finalZMPPosition);
 
     /**
      * Set or update the gradient
@@ -84,7 +84,7 @@ public:
      * @return true/false in case of success/failure.
      */
     bool setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
-                                      const double& stepDuration, const double& stepDurationTollerance, const double& remainingSingleSupportDuration, const double& omega,const iDynTree::Vector2& delta);
+                                      const double& stepDuration, const double& stepDurationTollerance, const double& remainingSingleSupportDuration, const double& omega,const iDynTree::Vector2 &Delta1);
 
     /**
      * Get the state of the solver.

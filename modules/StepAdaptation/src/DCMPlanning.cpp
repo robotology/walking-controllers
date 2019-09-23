@@ -28,7 +28,7 @@ bool DCMPlanning::solveDCMDynamics(const double& time){
     iDynTree::Vector2 CoeffB;
     double landa=exp(-m_omega*m_nominalStepTiming);
     iDynTree::toEigen( CoeffA)=(iDynTree::toEigen(m_finalZMPPosition)-iDynTree::toEigen(m_initialZMPPosition))/(landa-1);
-    iDynTree::toEigen( CoeffB)=(landa*iDynTree::toEigen(m_initialZMPPosition)-iDynTree::toEigen(m_finalZMPPosition))/(landa-1);
+    iDynTree::toEigen( CoeffB)=(landa*iDynTree::toEigen(m_initialZMPPosition)-iDynTree::toEigen(m_finalZMPPosition)) /(landa-1);
 
     iDynTree::Vector2 CoeffC;
 
