@@ -762,12 +762,48 @@ bool WalkingModule::updateModule()
         //yInfo() <<"imuuu"<<imurolpitchyaw(0)<<imurolpitchyaw(1)<<imurolpitchyaw(2);
         m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
         iDynTree::Rotation pelvisOrientation;
-       pelvisOrientation.RPY(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0),
-                             0/*m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)*/,
-                             0);//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
+        pelvisOrientation=iDynTree::Rotation::Identity();
+        double miladTempP;
+         double miladTempR;
+        if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>0.005  ) {
+            miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
+
+            //miladTemp=0;
+        }
+        else {
+            miladTempP=0;
+        }
+
+        if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>0.015) {
+
+            miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
+            //miladTemp=0;
+        }
+        else {
+            miladTempR=0;
+        }
+
+
+       pelvisOrientation=iDynTree::Rotation::RPY (miladTempR,miladTempP,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
+ //      yInfo()<<pelvisOrientation.toString();
+//yInfo()<<pelvisOrientation.toString();
+/*m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)*/
+
+
+//       int numberOfSubTrajectoriesTemp = m_DCMSubTrajectories.size();
+//       yInfo()<<"MMIIL001222222"<<numberOfSubTrajectoriesTemp;
+//       auto firstSSTemp = m_DCMSubTrajectories[numberOfSubTrajectoriesTemp-2];
+//       auto secondSSTemp = m_DCMSubTrajectories[numberOfSubTrajectoriesTemp-4];
+//       yInfo()<<"MMIIL00444444222"<<numberOfSubTrajectoriesTemp;
+//       iDynTree::Vector2  currentZmpPositionTemp;
+//       bool checkFeasibility = false;
+//yInfo()<<"MMIIL1";
+
+//       firstSSTemp->getZMPPosition(0, currentZmpPositionTemp, checkFeasibility);
         //pelvisOrientation
-        iDynTree::Vector3 ZMP3d;
         //iDynTree::Vector3 ZMP3d;
+
+        iDynTree::Vector3 ZMP3d;
         ZMP3d(0)=measuredZMP(0);
         ZMP3d(1)=measuredZMP(1);
         ZMP3d(2)=0;
@@ -1607,10 +1643,10 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
 
-    if (m_useStepAdaptation) {
-        StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
-        StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
-    }
+//    if (m_useStepAdaptation) {
+//        StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
+//        StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
+//    }
 
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);

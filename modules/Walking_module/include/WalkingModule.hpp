@@ -152,6 +152,9 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::deque<iDynTree::Vector2> m_DCMPositionAdjusted; /**< Deque containing the desired DCM position. */
     std::deque<iDynTree::Vector2> m_DCMVelocityAdjusted; /**< Deque containing the desired DCM position. */
 
+    std::deque<iDynTree::Vector2> m_CurrentDCMPositionAdjusted; /**< Deque containing the desired DCM position. */
+    std::deque<iDynTree::Vector2> m_CurrentDCMVelocityAdjusted; /**< Deque containing the desired DCM position. */
+
     std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                             In general a main frame of a foot is the fix frame only during the
                                             stance and the switch out phases. */

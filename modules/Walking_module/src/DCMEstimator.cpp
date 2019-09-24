@@ -157,6 +157,7 @@ bool DCMEstimator::integrateDCMVelocity(iDynTree::LinearForceVector3 contactForc
 
 bool DCMEstimator::pendulumEstimator(iDynTree::Rotation pelvisOrientation,iDynTree::Vector3 zmp,iDynTree::Vector3 com,iDynTree::LinVelocity CoMVelocity3d){
 iDynTree::Vector3 CoMPositionEstimated;
+//yInfo()<<pelvisOrientation.toString();
 iDynTree::toEigen(CoMPositionEstimated)=iDynTree::toEigen(zmp)+iDynTree::toEigen(pelvisOrientation)*(iDynTree::toEigen(com)-iDynTree::toEigen(zmp));
 
 m_dcmEstimatedPosition(0)=CoMPositionEstimated(0)+CoMVelocity3d(0)/m_omega;
