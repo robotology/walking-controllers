@@ -43,6 +43,7 @@ class StepAdaptator
     iDynTree::Vector2 m_zmpPositionWeight;
     iDynTree::Vector2 m_dcmOffsetWeight;
     iDynTree::Vector2 m_dcm_ErrorThreshold;
+   iDynTree::Vector2 m_roll_pitch_ErrorThreshold;
     double m_sigmaWeight;
 
     iDynTree::Vector2 m_currentZmpPosition;
@@ -142,6 +143,7 @@ public:
     double getDesiredImpactTime();
 
     iDynTree::Vector2 getDesiredZmp();
+    iDynTree::Vector2 getRollPitchErrorThreshold();
 };
 
 #endif

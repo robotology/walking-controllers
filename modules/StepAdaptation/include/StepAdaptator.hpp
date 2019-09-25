@@ -43,6 +43,7 @@ class StepAdaptator
     iDynTree::Vector2 m_zmpPositionWeight;
     iDynTree::Vector2 m_dcmOffsetWeight;
     iDynTree::Vector2 m_dcm_ErrorThreshold;
+    iDynTree::Vector2 m_roll_pitch_ErrorThreshold;
     iDynTree::Vector2 m_Delta;
         iDynTree::Vector2 m_finalZmpPosition;
     double m_sigmaWeight;

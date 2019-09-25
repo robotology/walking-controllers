@@ -83,6 +83,12 @@ bool StepAdaptator::initialize(const yarp::os::Searchable &config)
         return false;
     }
 
+    if(!YarpHelper::getVectorFromSearchable(config, "threshold_roll_pitch_error",  m_roll_pitch_ErrorThreshold))
+    {
+        yError() << "[StepAdaptator::initialize] Unable to get the vector of roll pitch imu error threshold";
+        return false;
+    }
+
     foot = iDynTree::Polygon::XYRectangleFromOffsets(zmpOffsetLeftFoot(0), zmpOffsetLeftFoot(1),
                                                      zmpOffsetLeftFoot(2), zmpOffsetLeftFoot(3));
     m_feetExtendedPolygon[0] = foot;

@@ -551,9 +551,9 @@ bool WalkingModule::updateModule()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
-//    iDynTree::Rotation imuRotation=m_robotControlHelper->getIMUOreintation();
-//    iDynTree::Vector3 imurolpitchyaw= imuRotation.asRPY();
-//    yInfo() <<"imuuu"<<imurolpitchyaw(0)<<imurolpitchyaw(1)<<imurolpitchyaw(2);
+    //    iDynTree::Rotation imuRotation=m_robotControlHelper->getIMUOreintation();
+    //    iDynTree::Vector3 imurolpitchyaw= imuRotation.asRPY();
+    //    yInfo() <<"imuuu"<<imurolpitchyaw(0)<<imurolpitchyaw(1)<<imurolpitchyaw(2);
     if(m_robotState == WalkingFSM::Preparing)
     {
 
@@ -626,9 +626,9 @@ bool WalkingModule::updateModule()
             dummy.zero();
             //  m_walkingAdmittanceController->setDesiredJointTrajectory( m_qDesired, dummy, dummy);
 
-                   // iDynTree::toEigen(m_pelvisRotationOffset.);
-          //  iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
-                            m_robotState = WalkingFSM::Prepared;
+            // iDynTree::toEigen(m_pelvisRotationOffset.);
+            //  iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
+            m_robotState = WalkingFSM::Prepared;
             yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
         }
     }
@@ -689,8 +689,8 @@ bool WalkingModule::updateModule()
 
 
                 // ask for a new trajectory
-                if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
-                                       measuredTransform, m_newTrajectoryMergeCounter,
+                if(!askNewTrajectories(initTimeTrajectory,!m_isLeftFixedFrame.front(),
+                                       measuredTransform,m_newTrajectoryMergeCounter,
                                        m_desiredPosition))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to ask for a new trajectory.";
@@ -743,20 +743,21 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate 3D-LIPM reference signal
-        m_stableDCMModel->setInput(m_DCMPositionDesired.front());
+        m_stableDCMModel->setInput(m_DCMPositionAdjusted.front());
         if(!m_stableDCMModel->integrateModel())
         {
             yError() << "[WalkingModule::updateModule] Unable to propagate the 3D-LIPM.";
             return false;
         }
 
-//        m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
-//        if(!m_DCMEstimator->integrateDCMVelocity(measuredZMP,m_DCMPositionAdjusted.front()))
-//        {
-//            yError() << "[WalkingModule::updateModule] Unable to integrate DCM Velocity.";
-//            return false;
-//        }
-
+        //        m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
+        //        if(!m_DCMEstimator->integrateDCMVelocity(measuredZMP,m_DCMPositionAdjusted.front()))
+        //        {
+        //            yError() << "[WalkingModule::updateModule] Unable to integrate DCM Velocity.";
+        //            return false;
+        //        }
+        m_isPitchActive=0;
+        m_isRollActive=0;
         iDynTree::Rotation imuRotation=m_robotControlHelper->getIMUOreintation();
         iDynTree::Vector3 imuRPY= imuRotation.asRPY();
         //yInfo() <<"imuuu"<<imurolpitchyaw(0)<<imurolpitchyaw(1)<<imurolpitchyaw(2);
@@ -764,9 +765,10 @@ bool WalkingModule::updateModule()
         iDynTree::Rotation pelvisOrientation;
         pelvisOrientation=iDynTree::Rotation::Identity();
         double miladTempP;
-         double miladTempR;
-        if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>0.005  ) {
+        double miladTempR;
+        if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
             miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
+            m_isPitchActive=1;
 
             //miladTemp=0;
         }
@@ -774,9 +776,11 @@ bool WalkingModule::updateModule()
             miladTempP=0;
         }
 
-        if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>0.015) {
+        if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
 
             miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
+            m_isRollActive=1;
+
             //miladTemp=0;
         }
         else {
@@ -784,22 +788,22 @@ bool WalkingModule::updateModule()
         }
 
 
-       pelvisOrientation=iDynTree::Rotation::RPY (miladTempR,miladTempP,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
- //      yInfo()<<pelvisOrientation.toString();
-//yInfo()<<pelvisOrientation.toString();
-/*m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)*/
+        pelvisOrientation=iDynTree::Rotation::RPY (miladTempR,miladTempP,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
+        //      yInfo()<<pelvisOrientation.toString();
+        //yInfo()<<pelvisOrientation.toString();
+        /*m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)*/
 
 
-//       int numberOfSubTrajectoriesTemp = m_DCMSubTrajectories.size();
-//       yInfo()<<"MMIIL001222222"<<numberOfSubTrajectoriesTemp;
-//       auto firstSSTemp = m_DCMSubTrajectories[numberOfSubTrajectoriesTemp-2];
-//       auto secondSSTemp = m_DCMSubTrajectories[numberOfSubTrajectoriesTemp-4];
-//       yInfo()<<"MMIIL00444444222"<<numberOfSubTrajectoriesTemp;
-//       iDynTree::Vector2  currentZmpPositionTemp;
-//       bool checkFeasibility = false;
-//yInfo()<<"MMIIL1";
+        //       int numberOfSubTrajectoriesTemp = m_DCMSubTrajectories.size();
+        //       yInfo()<<"MMIIL001222222"<<numberOfSubTrajectoriesTemp;
+        //       auto firstSSTemp = m_DCMSubTrajectories[numberOfSubTrajectoriesTemp-2];
+        //       auto secondSSTemp = m_DCMSubTrajectories[numberOfSubTrajectoriesTemp-4];
+        //       yInfo()<<"MMIIL00444444222"<<numberOfSubTrajectoriesTemp;
+        //       iDynTree::Vector2  currentZmpPositionTemp;
+        //       bool checkFeasibility = false;
+        //yInfo()<<"MMIIL1";
 
-//       firstSSTemp->getZMPPosition(0, currentZmpPositionTemp, checkFeasibility);
+        //       firstSSTemp->getZMPPosition(0, currentZmpPositionTemp, checkFeasibility);
         //pelvisOrientation
         //iDynTree::Vector3 ZMP3d;
 
@@ -900,6 +904,7 @@ bool WalkingModule::updateModule()
                 dcmMeasured2D(0) = m_FKSolver->getDCM()(0);
                 dcmMeasured2D(1) = m_FKSolver->getDCM()(1);
                 m_isPushActive=0;
+
 
                 if((m_DCMPositionAdjusted.front()(0) - m_DCMEstimator->getDCMPosition()(0)) > m_stepAdaptator->getDCMErrorThreshold()(0) ||(m_DCMPositionAdjusted.front()(1) - m_DCMEstimator->getDCMPosition()(1))> m_stepAdaptator->getDCMErrorThreshold()(1) )
                 {
@@ -1204,6 +1209,16 @@ bool WalkingModule::updateModule()
                 yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
             }
+            iDynTree::Position ComWithoutController;
+            ComWithoutController(0)=CoM3d(0);
+            ComWithoutController(1)=CoM3d(1);
+            ComWithoutController(2)=CoM3d(2);
+
+            iDynTree::Vector3 ComVelocityWithoutController;
+            ComVelocityWithoutController(0)=CoMVelocity3d(0);
+            ComVelocityWithoutController(1)=CoMVelocity3d(1);
+            ComVelocityWithoutController(2)=CoMVelocity3d(2);
+
 
             if(!solveQPIK(m_QPIKSolver, desiredCoMPosition,
                           desiredCoMVelocity,
@@ -1291,7 +1306,12 @@ bool WalkingModule::updateModule()
             iDynTree::Vector3 estimatedBasePose =m_robotControlHelper->getEstimatedBaseTransform().getPosition();
             iDynTree::Vector2 m_isPushActiveVec;
             m_isPushActiveVec(0)=m_isPushActive;
-            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),DCMError, m_DCMVelocityDesired.front(),
+
+            iDynTree::Vector2 m_isRollPitchActiveVec;
+            m_isRollPitchActiveVec(0)=m_isRollActive;
+            m_isRollPitchActiveVec(1)=m_isPitchActive;
+
+            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),DCMError, m_DCMVelocityDesired.front(),m_DCMPositionAdjusted.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
                                       m_stableDCMModel->getCoMPosition(),
                                       m_stableDCMModel->getCoMVelocity(),
@@ -1300,7 +1320,7 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
+                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),m_isRollPitchActiveVec);
         }
 
         propagateTime();
@@ -1643,10 +1663,10 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
 
-//    if (m_useStepAdaptation) {
-//        StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
-//        StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
-//    }
+//        if (m_useStepAdaptation) {
+//            StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
+//            StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
+//        }
 
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
@@ -1765,7 +1785,7 @@ bool WalkingModule::startWalking()
     {
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
                                       "dcm_des_x", "dcm_des_y","errorx","errory",
-                                      "dcm_des_dx", "dcm_des_dy",
+                                      "dcm_des_dx", "dcm_des_dy","dcm_adj_dx", "dcm_adj_dy",
                                       "zmp_x", "zmp_y",
                                       "zmp_des_x", "zmp_des_y",
                                       "com_x", "com_y", "com_z",
@@ -1784,7 +1804,7 @@ bool WalkingModule::startWalking()
                                       "rf_err_x", "rf_err_y", "rf_err_z",
                                       "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
-                                      "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","imu_roll","imu_pitch","imu_yaw","roll_des","pitch_des","yaw_des"});
+                                      "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","imu_roll","imu_pitch","imu_yaw","roll_des","pitch_des","yaw_des","IsRollActive","IsPitchActive"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
