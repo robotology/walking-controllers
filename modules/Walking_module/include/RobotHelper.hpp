@@ -31,6 +31,7 @@
 #include <iDynTree/Core/Wrench.h>
 
 #include <WalkingPIDHandler.hpp>
+#include <iDynTree/Model/Model.h>
 
 class RobotHelper
 {
@@ -153,10 +154,10 @@ public:
      * Get all the feedback signal from the interfaces
      * @return true in case of success and false otherwise.
      */
-    bool getFeedbacks(unsigned int maxAttempts = 1);
+    bool getFeedbacks(const iDynTree::Model modelLoader,unsigned int maxAttempts = 1);
 
     //bool getFeedbacksRaw(unsigned int maxAttempts = 1);
-    bool getFeedbacksRaw(unsigned int maxAttempts = 1, bool useBaseEst = false);
+    bool getFeedbacksRaw( const iDynTree::Model modelLoader,unsigned int maxAttempts = 1, bool useBaseEst = false);
 
     /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)
@@ -188,7 +189,7 @@ public:
      * Reset filters.
      * @return true in case of success and false otherwise.
      */
-    bool resetFilters();
+    bool resetFilters(const iDynTree::Model modelLoader);
 
     /**
      * Close the polydrives.

@@ -557,7 +557,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
 
-        if(!m_robotControlHelper->getFeedbacksRaw(10))
+        if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),10))
         {
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
@@ -602,7 +602,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionAdjusted.front());
             m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(20))
+            if(!m_robotControlHelper->getFeedbacks(m_loader.model(),20))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -722,7 +722,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(20))
+        if(!m_robotControlHelper->getFeedbacks(m_loader.model(),20))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -1407,7 +1407,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
     bool getExternalRobotBase = true;
-    if(!m_robotControlHelper->getFeedbacksRaw(10, getExternalRobotBase))
+    if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),10, getExternalRobotBase))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1814,7 +1814,7 @@ bool WalkingModule::startWalking()
 
     if(m_robotState == WalkingFSM::Prepared)
     {
-        m_robotControlHelper->resetFilters();
+        m_robotControlHelper->resetFilters(m_loader.model());
 
         updateFKSolver();
 

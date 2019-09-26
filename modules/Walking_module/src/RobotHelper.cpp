@@ -4,6 +4,7 @@
 
 #include <RobotHelper.hpp>
 #include <Utils.hpp>
+#include <iDynTree/Model/Model.h>
 
 bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                                 std::pair<std::string, double>& worstError)
@@ -33,7 +34,7 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
     return true;
 }
 
-bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
+bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,unsigned int maxAttempts, bool getBaseEst)
 {
     if(!m_encodersInterface)
     {
@@ -146,7 +147,21 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
             pelvisIMU=m_pelvisIMUPort.read(false);
             if (pelvisIMU!=NULL) {
                 //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
+                auto root_imu_idx = modelLoader.getFrameIndex("root_link_imu_acc");
+                auto root_R_imu = modelLoader.getFrameTransform(root_imu_idx).getRotation();
+
+                yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
+                //yInfo()<<"m_imuOrientation"<<m_imuOrientation.asRPY().toString();
+               // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
+;
+
+
                 m_imuOrientation=m_imuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
+                yInfo()<<"imubefore"<<m_imuOrientation.asRPY().toString();
+                m_imuOrientation=root_R_imu.inverse()*m_imuOrientation;
+
+                                //yInfo()<<"imu"<<root_R_imu.asRPY().toString();
+                                yInfo()<<"imuafter"<<m_imuOrientation.asRPY().toString();
                 //m_imuOrientation
                 m_imuAcceleration(0)=(*pelvisIMU)(3) ;
                 m_imuAcceleration(1)=(*pelvisIMU)(4) ;
@@ -542,14 +557,15 @@ bool RobotHelper::configurePIDHandler(const yarp::os::Bottle& config)
 }
 
 
-bool RobotHelper::resetFilters()
+bool RobotHelper::resetFilters(const iDynTree::Model modelLoader)
 {
     //if(!getFeedbacksRaw())
-    if(!getFeedbacksRaw(100, true))
+    if(!getFeedbacksRaw(modelLoader,100, true))
     {
         yError() << "[RobotHelper::resetFilters] Unable to get the feedback from the robot";
         return false;
     }
+
 
     if(m_useVelocityFilter)
         m_velocityFilter->init(m_velocityFeedbackDeg);
@@ -563,11 +579,11 @@ bool RobotHelper::resetFilters()
     return true;
 }
 
-bool RobotHelper::getFeedbacks(unsigned int maxAttempts)
+bool RobotHelper::getFeedbacks(const iDynTree::Model modelLoader, unsigned int maxAttempts)
 {
     // by default we consider the presence of a base estimation block
     bool useBaseEst = true;
-    if(!getFeedbacksRaw(maxAttempts, useBaseEst))
+    if(!getFeedbacksRaw(modelLoader,maxAttempts, useBaseEst))
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;
