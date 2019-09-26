@@ -101,6 +101,8 @@ namespace WalkingControllers
         double m_kAttHand; /**< Gain related to the desired hand attitude. */
         double m_kNeck; /**< Gain related to the desired neck attitude. */
         double m_kCom; /**< Gain related to the desired CoM position. */
+
+        iDynTree::VectorDynSize m_jointRegularizationWeights; /**< Weight related to the the regularization term */
         iDynTree::Vector3 m_comWeight; /**< CoM weight. */
         double m_neckWeight; /**< Neck weight matrix. */
         iDynSparseMatrix m_jointRegularizationHessian; /**< Contains a constant matrix that can be useful

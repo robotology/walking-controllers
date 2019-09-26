@@ -150,22 +150,13 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     }
 
     // set the matrix related to the joint regularization
-    iDynTree::VectorDynSize jointRegularizationWeights(m_actuatedDOFs);
-    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_weights", jointRegularizationWeights))
+
+    m_jointRegularizationWeights.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_weights", m_jointRegularizationWeights))
     {
         yError() << "Initialization failed while reading jointRegularizationWeights vector.";
         return false;
     }
-
-    //  m_jointRegulatizationHessian = H' \lamda H
-    m_jointRegularizationHessian.resize(m_numberOfVariables, m_numberOfVariables);
-    for(int i = 0; i < m_actuatedDOFs; i++)
-        m_jointRegularizationHessian(i + 6, i + 6) = jointRegularizationWeights(i);
-
-    // evaluate constant sub-matrix of the gradient matrix
-    m_jointRegularizationGradient.resize(m_numberOfVariables, m_actuatedDOFs);
-    for(int i = 0; i < m_actuatedDOFs; i++)
-        m_jointRegularizationGradient(i + 6, i) = jointRegularizationWeights(i);
 
     m_jointRegularizationGains.resize(m_actuatedDOFs);
     if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_gains",
@@ -506,13 +497,12 @@ void WalkingQPIK::evaluateHessianMatrix()
         m_neckWeight *
         iDynTree::toEigen(m_neckJacobian);
 
-    if(!m_enableHandRetargeting)
-        hessianDense += iDynTree::toEigen(m_jointRegularizationHessian);
-    else
+    hessianDense.bottomRightCorner(m_actuatedDOFs, m_actuatedDOFs) += iDynTree::toEigen(m_jointRegularizationWeights).asDiagonal();
+
+    if(m_enableHandRetargeting)
     {
         // think about the possibility to project in the null space the joint regularization
-        hessianDense += iDynTree::toEigen(m_jointRegularizationHessian)
-            + iDynTree::toEigen(m_leftHandJacobian).transpose()
+        hessianDense +=  iDynTree::toEigen(m_leftHandJacobian).transpose()
             * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal()
             * iDynTree::toEigen(m_leftHandJacobian)
             + iDynTree::toEigen(m_rightHandJacobian).transpose()
@@ -533,7 +523,7 @@ void WalkingQPIK::evaluateGradientVector()
 
     auto neckJacobian(iDynTree::toEigen(m_neckJacobian));
 
-    auto jointRegularizationGradient(iDynTree::toEigen(m_jointRegularizationGradient));
+    auto jointRegularizationWeights(iDynTree::toEigen(m_jointRegularizationWeights));
     auto jointRegularizationGains(iDynTree::toEigen(m_jointRegularizationGains));
     auto jointPosition(iDynTree::toEigen(m_jointPosition));
     auto regularizationTerm(iDynTree::toEigen(m_regularizationTerm));
@@ -549,11 +539,13 @@ void WalkingQPIK::evaluateGradientVector()
     gradient = -neckJacobian.transpose() * m_neckWeight * (-m_kNeck
                                                            * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)));
 
-    // if the hand retargeting is not enable the regularization term should be used as usual
-    if(!m_enableHandRetargeting)
-       gradient += -jointRegularizationGradient * jointRegularizationGains.asDiagonal()
-           * (regularizationTerm - jointPosition);
-    else
+    // g = Weight * K_p * (regularizationTerm - jointPosition)
+    // Weight  and K_p are two diagonal matrices so their product can be also evaluated multiplying component-wise
+    // the elements of the vectors and then generating the diagonal matrix
+    gradient.tail(m_actuatedDOFs) += (-jointRegularizationWeights.cwiseProduct(jointRegularizationGains)).asDiagonal()
+        * (regularizationTerm - jointPosition);
+
+    if(m_enableHandRetargeting)
     {
         auto leftHandCorrectionLinear(iDynTree::toEigen(m_leftHandCorrection.getLinearVec3()));
         auto leftHandCorrectionAngular(iDynTree::toEigen(m_leftHandCorrection.getAngularVec3()));
@@ -579,10 +571,7 @@ void WalkingQPIK::evaluateGradientVector()
         rightHandCorrectionAngular = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
 
 
-        gradient +=
-            -jointRegularizationGradient * jointRegularizationGains.asDiagonal()
-            * (regularizationTerm - jointPosition)
-            - iDynTree::toEigen(m_leftHandJacobian).transpose()
+        gradient += - iDynTree::toEigen(m_leftHandJacobian).transpose()
             * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-iDynTree::toEigen(m_leftHandCorrection))
             - iDynTree::toEigen(m_rightHandJacobian).transpose()
             * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal() * (-iDynTree::toEigen(m_rightHandCorrection));
