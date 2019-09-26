@@ -36,6 +36,7 @@ namespace WalkingControllers
 
         bool m_useHandRetargeting; /**< True if the hand retargeting is used */
         bool m_useVirtualizer; /**< True if the virtualizer is used */
+        bool m_useJointRetargeting; /**< True if the joint retargeting is used */
 
         iDynTree::Transform m_leftHandTransform; /**< Left hand transform head_T_leftHand */
         iDynTree::Transform m_rightHandTransform; /**< Right hand transform head_T_rightHand*/
@@ -54,6 +55,11 @@ namespace WalkingControllers
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
+        std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_jointRetargetingPort; /**< joint retargeting port. */
+        iDynTree::VectorDynSize m_retargetJoints; /**< Values of the retarget Joints. */
+
+
         /**
          * Convert a yarp vector containing position + rpy into an iDynTree homogeneous transform
          * @param vector a 6d yarp vector
@@ -69,19 +75,23 @@ namespace WalkingControllers
          * @param config configuration parameters
          * @param name name of the module
          * @param period period of the module
+         * @param controlledJointsName name of the controlled joints
          * @return true/false in case of success/failure
          */
         bool initialize(const yarp::os::Searchable &config,
                         const std::string &name,
-                        const double &period);
+                        const double &period,
+                        const std::vector<std::string>& controlledJointsName);
 
         /**
          * Reset the client
          * @param leftHandTransform head_T_leftHand transform
          * @param rightHandTransform head_T_rightHand transform
+         * @param jointValues joint values [rad]
          */
         void reset(const iDynTree::Transform& leftHandTransform,
-                   const iDynTree::Transform& rightHandTransform);
+                   const iDynTree::Transform& rightHandTransform,
+                   const iDynTree::VectorDynSize& jointValues);
 
         /**
          * Close the client
@@ -102,6 +112,11 @@ namespace WalkingControllers
          * Get the homogeneous transform of the right hand w.r.t. the head frame head_T_rightHand
          */
         const iDynTree::Transform& rightHandTransform() const;
+
+        /**
+         * Get the value of the retarget joints
+         */
+        const iDynTree::VectorDynSize& jointValues() const;
 
         /**
          * Get the homogeneous transform of the right hand w.r.t. the head frame head_T_rightHand

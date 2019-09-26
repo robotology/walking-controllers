@@ -284,7 +284,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle retargetingOptions = rf.findGroup("RETARGETING");
     retargetingOptions.append(generalOptions);
     m_retargetingClient = std::make_unique<RetargetingClient>();
-    if (!m_retargetingClient->initialize(retargetingOptions, getName(), m_dT))
+    if (!m_retargetingClient->initialize(retargetingOptions, getName(), m_dT, m_robotControlHelper->getAxesList()))
     {
         yError() << "[WalkingModule::configure] Failed to configure the retargeting";
         return false;
@@ -405,6 +405,8 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     solver->setDesiredHandsTransformation(m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->leftHandTransform(),
                                           m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->rightHandTransform());
 
+    ok &= solver->setDesiredRetargetingJoint(m_retargetingClient->jointValues());
+
     // set jacobians
     iDynTree::MatrixDynSize jacobian, comJacobian;
     jacobian.resize(6, m_robotControlHelper->getActuatedDoFs() + 6);
@@ -505,7 +507,8 @@ bool WalkingModule::updateModule()
             m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
                                        * m_FKSolver->getLeftHandToWorldTransform(),
                                        m_FKSolver->getHeadToWorldTransform().inverse()
-                                       * m_FKSolver->getRightHandToWorldTransform());
+                                       * m_FKSolver->getRightHandToWorldTransform(),
+                                       m_robotControlHelper->getJointPosition());
 
 
             m_robotState = WalkingFSM::Prepared;

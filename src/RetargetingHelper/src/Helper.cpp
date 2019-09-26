@@ -26,18 +26,29 @@ void RetargetingClient::convertYarpVectorPoseIntoTransform(const yarp::sig::Vect
 
 bool RetargetingClient::initialize(const yarp::os::Searchable &config,
                                    const std::string &name,
-                                   const double &period)
+                                   const double &period,
+                                   const std::vector<std::string>& controlledJointsName)
 {
     if(config.isNull())
     {
         yInfo() << "[RetargetingClient::initialize] the hand retargeting is disable";
         m_useHandRetargeting = false;
         m_useVirtualizer = false;
+        m_useJointRetargeting = false;
         return true;
     }
 
     m_useHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
+    m_useJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
+
+    if(m_useJointRetargeting && m_useHandRetargeting)
+    {
+        yError() << "[RetargetingClient::initialize] You cannot enable the joint retargeting along with the hand retargeting.";
+        return false;
+    }
+
+    m_retargetJoints.resize(controlledJointsName.size());
 
     std::string portName;
 
@@ -75,6 +86,41 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_rightHandSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
     }
 
+    if(m_useJointRetargeting)
+    {
+        std::vector<std::string> retargetJointNames;
+
+        yarp::os::Value *retargetJointNamesYarp;
+        if(!config.check("retargeting_joint_list", retargetJointNamesYarp))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to find joints_list into config file.";
+            return false;
+        }
+        if(!YarpUtilities::yarpListToStringVector(retargetJointNamesYarp, retargetJointNames))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to convert yarp list into a vector of strings.";
+            return false;
+        }
+
+        // find the indices
+        for(const std::string& joint : retargetJointNames)
+        {
+            int index = std::distance(controlledJointsName.begin(), std::find(controlledJointsName.begin(),
+                                                                              controlledJointsName.end(),
+                                                                              joint));
+
+            m_retargetJointsIndex.push_back(index);
+        }
+
+        if(!YarpUtilities::getStringFromSearchable(config, "joint_retargeting_port_name",
+                                                portName))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+            return false;
+        }
+        m_jointRetargetingPort.open("/" + name + portName);
+    }
+
     if(m_useVirtualizer)
     {
         if(!YarpUtilities::getStringFromSearchable(config, "robot_orientation_port_name",
@@ -90,48 +136,63 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
 }
 
 void RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
-                              const iDynTree::Transform& rightHandTransform)
+                              const iDynTree::Transform& rightHandTransform,
+                              const iDynTree::VectorDynSize& jointValues)
 {
-    if(!m_useHandRetargeting)
-        return;
+    if(m_useHandRetargeting)
+    {
+        m_leftHandTransform = leftHandTransform;
+        m_rightHandTransform = rightHandTransform;
 
-    m_leftHandTransform = leftHandTransform;
-    m_rightHandTransform = rightHandTransform;
+        iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(0) =
+            iDynTree::toEigen(m_leftHandTransform.getPosition());
 
-    iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(0) =
-        iDynTree::toEigen(m_leftHandTransform.getPosition());
+        iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(3) =
+            iDynTree::toEigen(m_leftHandTransform.getRotation().asRPY());
 
-    iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(3) =
-        iDynTree::toEigen(m_leftHandTransform.getRotation().asRPY());
+        iDynTree::toEigen(m_rightHandTransformYarp).segment<3>(0) =
+            iDynTree::toEigen(m_rightHandTransform.getPosition());
 
-    iDynTree::toEigen(m_rightHandTransformYarp).segment<3>(0) =
-        iDynTree::toEigen(m_rightHandTransform.getPosition());
+        iDynTree::toEigen(m_rightHandTransformYarp).segment<3>(3) =
+            iDynTree::toEigen(m_rightHandTransform.getRotation().asRPY());
 
-    iDynTree::toEigen(m_rightHandTransformYarp).segment<3>(3) =
-        iDynTree::toEigen(m_rightHandTransform.getRotation().asRPY());
+        m_leftHandSmoother->init(m_leftHandTransformYarp);
+        m_rightHandSmoother->init(m_rightHandTransformYarp);
+    }
 
-    m_leftHandSmoother->init(m_leftHandTransformYarp);
-    m_rightHandSmoother->init(m_rightHandTransformYarp);
+    m_retargetJoints = jointValues;
 }
 
 void RetargetingClient::getFeedback()
 {
-    if(!m_useHandRetargeting)
-        return;
+    if(m_useHandRetargeting)
+    {
+        auto desiredLeftHandPose = m_leftHandTransformPort.read(false);
+        if(desiredLeftHandPose != nullptr)
+            m_leftHandTransformYarp = *desiredLeftHandPose;
 
-    auto desiredLeftHandPose = m_leftHandTransformPort.read(false);
-    if(desiredLeftHandPose != nullptr)
-        m_leftHandTransformYarp = *desiredLeftHandPose;
+        m_leftHandSmoother->computeNextValues(m_leftHandTransformYarp);
+        convertYarpVectorPoseIntoTransform(m_leftHandSmoother->getPos(), m_leftHandTransform);
 
-    m_leftHandSmoother->computeNextValues(m_leftHandTransformYarp);
-    convertYarpVectorPoseIntoTransform(m_leftHandSmoother->getPos(), m_leftHandTransform);
+        auto desiredRightHandPose = m_rightHandTransformPort.read(false);
+        if(desiredRightHandPose != nullptr)
+            m_rightHandTransformYarp = *desiredRightHandPose;
 
-    auto desiredRightHandPose = m_rightHandTransformPort.read(false);
-    if(desiredRightHandPose != nullptr)
-        m_rightHandTransformYarp = *desiredRightHandPose;
+        m_rightHandSmoother->computeNextValues(m_rightHandTransformYarp);
+        convertYarpVectorPoseIntoTransform(m_rightHandSmoother->getPos(), m_rightHandTransform);
+    }
 
-    m_rightHandSmoother->computeNextValues(m_rightHandTransformYarp);
-    convertYarpVectorPoseIntoTransform(m_rightHandSmoother->getPos(), m_rightHandTransform);
+    if(m_useJointRetargeting)
+    {
+        auto desiredJoint = m_jointRetargetingPort.read(false);
+        if(desiredJoint != nullptr)
+        {
+            for(int i =0; i < desiredJoint->size(); i++)
+                m_retargetJoints(m_retargetJointsIndex[i]) = (*desiredJoint)(i);
+        }
+    }
+
+    return;
 }
 
 const iDynTree::Transform& RetargetingClient::leftHandTransform() const
@@ -144,19 +205,28 @@ const iDynTree::Transform& RetargetingClient::rightHandTransform() const
     return m_rightHandTransform;
 }
 
+const iDynTree::VectorDynSize& RetargetingClient::jointValues() const
+{
+    return m_retargetJoints;
+}
+
 void RetargetingClient::close()
 {
-    if(!m_useHandRetargeting)
-        return;
+    if(m_useHandRetargeting)
+    {
+        m_leftHandTransformPort.close();
+        m_rightHandTransformPort.close();
+    }
 
-    m_leftHandTransformPort.close();
-    m_rightHandTransformPort.close();
+    if(m_useJointRetargeting)
+        m_jointRetargetingPort.close();
 }
 
 void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotation)
 {
     if(!m_useVirtualizer)
         return;
+
     yarp::sig::Vector& output = m_robotOrientationPort.prepare();
     output.clear();
     output.push_back(rotation.asRPY()(2));
