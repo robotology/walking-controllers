@@ -43,6 +43,14 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
 
     m_useCoMAsConstraint = config.check("use_com_as_constraint", yarp::os::Value(false)).asBool();
     m_enableHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
+    m_enableJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
+
+    if(m_enableHandRetargeting && m_enableJointRetargeting)
+    {
+        yError() << "[initialize] You cannot enable both hand and joint retargeting.";
+        return false;
+    }
+
     m_useJointsLimitsConstraint = config.check("use_joint_limits_constraint", yarp::os::Value(false)).asBool();
 
     // TODO in the future the number of constraints should be added inside
@@ -79,6 +87,7 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
     m_rightHandJacobian.resize(6, m_numberOfVariables);
 
     m_regularizationTerm.resize(m_actuatedDOFs);
+    m_retargetingJointValue.resize(m_actuatedDOFs);
     m_jointPosition.resize(m_actuatedDOFs);
 
     // preprare constant matrix necessary for the QP problem
@@ -94,6 +103,13 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
         if(!initializeHandRetargeting(config))
         {
             yError() << "[initialize] Unable to Initialize the hand retargeting.";
+            return false;
+        }
+
+    if(m_enableJointRetargeting)
+        if(!initializeJointRetargeting(config))
+        {
+            yError() << "[initialize] Unable to Initialize the joint retargeting.";
             return false;
         }
 
@@ -143,19 +159,22 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
         }
     }
 
-    if(!YarpUtilities::getNumberFromSearchable(config, "neck_weight", m_neckWeight))
+     // if the joint retargeting is enabled the weights of the cost function are time-variant.
+    if(!m_enableJointRetargeting)
     {
-        yError() << "Initialization failed while reading neck_weight vector.";
-        return false;
-    }
+        if(!YarpUtilities::getNumberFromSearchable(config, "neck_weight", m_neckWeight))
+        {
+            yError() << "Initialization failed while reading neck_weight vector.";
+            return false;
+        }
 
-    // set the matrix related to the joint regularization
-
-    m_jointRegularizationWeights.resize(m_actuatedDOFs);
-    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_weights", m_jointRegularizationWeights))
-    {
-        yError() << "Initialization failed while reading jointRegularizationWeights vector.";
-        return false;
+        // set the matrix related to the joint regularization
+        m_jointRegularizationWeights.resize(m_actuatedDOFs);
+        if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_weights", m_jointRegularizationWeights))
+        {
+            yError() << "Initialization failed while reading jointRegularizationWeights vector.";
+            return false;
+        }
     }
 
     m_jointRegularizationGains.resize(m_actuatedDOFs);
@@ -242,7 +261,6 @@ bool WalkingQPIK::initializeHandRetargeting(const yarp::os::Searchable& config)
         return false;
     }
 
-
     m_handWeightStanceVector.resize(6);
     if(!YarpUtilities::getVectorFromSearchable(config, "hand_weight_stance", m_handWeightStanceVector))
     {
@@ -267,6 +285,85 @@ bool WalkingQPIK::initializeHandRetargeting(const yarp::os::Searchable& config)
 
     m_handWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, dT, smoothingTime);
     m_handWeightSmoother->init(m_handWeightStanceVector);
+
+    return true;
+}
+
+bool WalkingQPIK::initializeJointRetargeting(const yarp::os::Searchable& config)
+{
+    double smoothingTime;
+    if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading smoothingTime.";
+        return false;
+    }
+
+    double dT;
+    if(!YarpUtilities::getNumberFromSearchable(config, "sampling_time", dT))
+    {
+        yError() << "Initialization failed while a double.";
+        return false;
+    }
+
+    // joint retargeting
+    m_jointRetargetingGains.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_retargeting_gains", m_jointRetargetingGains))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading jointRetargetingGains vector.";
+        return false;
+    }
+
+    // if the joint retargeting is enable the weights of the cost function are time variant
+    m_jointRetargetingWeightWalking.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_retargeting_weight_walking", m_jointRetargetingWeightWalking))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading the yarp vector.";
+        return false;
+    }
+
+    m_jointRetargetingWeightStance.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_retargeting_weight_stance", m_jointRetargetingWeightStance))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading the yarp vector.";
+        return false;
+    }
+
+    m_jointRetargetingWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(m_actuatedDOFs, dT, smoothingTime);
+    m_jointRetargetingWeightSmoother->init(m_jointRetargetingWeightStance);
+
+    // joint regularization
+    m_jointRegularizationWeightWalking.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_weight_walking", m_jointRegularizationWeightWalking))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading the yarp vector.";
+        return false;
+    }
+
+    m_jointRegularizationWeightStance.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_weight_stance", m_jointRegularizationWeightStance))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading the yarp vector.";
+        return false;
+    }
+
+    m_jointRegularizationWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(m_actuatedDOFs, dT, smoothingTime);
+    m_jointRegularizationWeightSmoother->init(m_jointRegularizationWeightStance);
+
+    // torso
+    if(!YarpUtilities::getNumberFromSearchable(config, "torso_weight_walking", m_torsoWeightWalking))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading the double.";
+        return false;
+    }
+
+    if(!YarpUtilities::getNumberFromSearchable(config, "torso_weight_stance", m_torsoWeightStance))
+    {
+        yError() << "[initializeJointRetargeting] Initialization failed while reading the double.";
+        return false;
+    }
+
+    m_torsoWeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, dT, smoothingTime);
+    m_torsoWeightSmoother->init(yarp::sig::Vector(1, m_torsoWeightStance));
 
     return true;
 }
@@ -304,13 +401,30 @@ bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
 
 void WalkingQPIK::setPhase(const bool& isStancePhase)
 {
-    if(!m_enableHandRetargeting)
-        return;
-
     if(isStancePhase)
-        m_handWeightSmoother->computeNextValues(m_handWeightStanceVector);
+    {
+        if(m_enableHandRetargeting)
+            m_handWeightSmoother->computeNextValues(m_handWeightStanceVector);
+
+        if(m_enableJointRetargeting)
+        {
+            m_torsoWeightSmoother->computeNextValues(yarp::sig::Vector(1, m_torsoWeightStance));
+            m_jointRetargetingWeightSmoother->computeNextValues(m_jointRetargetingWeightStance);
+            m_jointRegularizationWeightSmoother->computeNextValues(m_jointRegularizationWeightStance);
+        }
+    }
     else
-        m_handWeightSmoother->computeNextValues(m_handWeightWalkingVector);
+    {
+        if(m_enableHandRetargeting)
+            m_handWeightSmoother->computeNextValues(m_handWeightWalkingVector);
+
+        if(m_enableJointRetargeting)
+        {
+            m_torsoWeightSmoother->computeNextValues(yarp::sig::Vector(1, m_torsoWeightWalking));
+            m_jointRetargetingWeightSmoother->computeNextValues(m_jointRetargetingWeightWalking);
+            m_jointRegularizationWeightSmoother->computeNextValues(m_jointRegularizationWeightWalking);
+        }
+    }
 }
 
 void WalkingQPIK::setDesiredNeckOrientation(const iDynTree::Rotation& desiredNeckOrientation)
@@ -470,6 +584,24 @@ void WalkingQPIK::setDesiredHandsTransformation(const iDynTree::Transform& desir
     m_desiredRightHandToWorldTransform = desiredRightHandToWorldTransform;
 }
 
+bool WalkingQPIK::setDesiredRetargetingJoint(const iDynTree::VectorDynSize& jointPosition)
+{
+    // if the joint retargeting is not used return
+    if(!m_enableJointRetargeting)
+        return true;
+
+    if(jointPosition.size() != m_actuatedDOFs)
+    {
+        yError() << "[WalkingQPIK::setDesiredRetargetingJoint] The size of the jointPosition vector is not coherent with the "
+                 << "number of the actuated Joint";
+        return false;
+    }
+
+    m_retargetingJointValue = jointPosition;
+
+    return true;
+}
+
 void WalkingQPIK::setDesiredHandsTwist(const iDynTree::Twist& leftHandTwist,
                                        const iDynTree::Twist& rightHandTwist)
 {
@@ -493,11 +625,21 @@ void WalkingQPIK::evaluateHessianMatrix()
     // the joint angle
     auto hessianDense(iDynTree::toEigen(m_hessianDense));
 
-    hessianDense = iDynTree::toEigen(m_neckJacobian).transpose() *
-        m_neckWeight *
-        iDynTree::toEigen(m_neckJacobian);
-
-    hessianDense.bottomRightCorner(m_actuatedDOFs, m_actuatedDOFs) += iDynTree::toEigen(m_jointRegularizationWeights).asDiagonal();
+    // if the joint retargeting is enable the weights of the cost function are time variant
+    if(!m_enableJointRetargeting)
+    {
+        hessianDense = iDynTree::toEigen(m_neckJacobian).transpose() * m_neckWeight * iDynTree::toEigen(m_neckJacobian);
+        hessianDense.bottomRightCorner(m_actuatedDOFs, m_actuatedDOFs) += iDynTree::toEigen(m_jointRegularizationWeights).asDiagonal();
+    }
+    else
+    {
+        hessianDense = iDynTree::toEigen(m_neckJacobian).transpose() *
+            m_torsoWeightSmoother->getPos()(0) *
+            iDynTree::toEigen(m_neckJacobian);
+        hessianDense.bottomRightCorner(m_actuatedDOFs, m_actuatedDOFs) +=
+            (iDynTree::toEigen(m_jointRegularizationWeightSmoother->getPos()) +
+             iDynTree::toEigen(m_jointRetargetingWeightSmoother->getPos())).asDiagonal();
+    }
 
     if(m_enableHandRetargeting)
     {
@@ -523,7 +665,6 @@ void WalkingQPIK::evaluateGradientVector()
 
     auto neckJacobian(iDynTree::toEigen(m_neckJacobian));
 
-    auto jointRegularizationWeights(iDynTree::toEigen(m_jointRegularizationWeights));
     auto jointRegularizationGains(iDynTree::toEigen(m_jointRegularizationGains));
     auto jointPosition(iDynTree::toEigen(m_jointPosition));
     auto regularizationTerm(iDynTree::toEigen(m_regularizationTerm));
@@ -536,14 +677,36 @@ void WalkingQPIK::evaluateGradientVector()
 
     // Neck orientation
     iDynTree::Matrix3x3 errorNeckAttitude = iDynTreeUtilities::Rotation::skewSymmetric(m_neckOrientation * m_desiredNeckOrientation.inverse());
-    gradient = -neckJacobian.transpose() * m_neckWeight * (-m_kNeck
-                                                           * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)));
 
-    // g = Weight * K_p * (regularizationTerm - jointPosition)
-    // Weight  and K_p are two diagonal matrices so their product can be also evaluated multiplying component-wise
-    // the elements of the vectors and then generating the diagonal matrix
-    gradient.tail(m_actuatedDOFs) += (-jointRegularizationWeights.cwiseProduct(jointRegularizationGains)).asDiagonal()
-        * (regularizationTerm - jointPosition);
+    if(!m_enableJointRetargeting)
+    {
+        auto jointRegularizationWeights(iDynTree::toEigen(m_jointRegularizationWeights));
+
+        gradient = -neckJacobian.transpose() * m_neckWeight * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)));
+
+        // g = Weight * K_p * (regularizationTerm - jointPosition)
+        // Weight  and K_p are two diagonal matrices so their product can be also evaluated multiplying component-wise
+        // the elements of the vectors and then generating the diagonal matrix
+        gradient.tail(m_actuatedDOFs) += (-jointRegularizationWeights.cwiseProduct(jointRegularizationGains)).asDiagonal()
+            * (regularizationTerm - jointPosition);
+    }
+    else
+    {
+        auto jointRetargetingGains(iDynTree::toEigen(m_jointRetargetingGains));
+        auto jointRetargetingValues(iDynTree::toEigen(m_retargetingJointValue));
+
+        gradient = -neckJacobian.transpose() * m_torsoWeightSmoother->getPos()(0)
+            * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)));
+
+        // g = Weight * K_p * (regularizationTerm - jointPosition)
+        // Weight  and K_p are two diagonal matrices so their product can be also evaluated multiplying component-wise
+        // the elements of the vectors and then generating the diagonal matrix
+        gradient.tail(m_actuatedDOFs) += (-jointRegularizationGains.cwiseProduct(
+                                              iDynTree::toEigen(m_jointRegularizationWeightSmoother->getPos()))).asDiagonal()
+            * (regularizationTerm - jointPosition)
+            + (-jointRetargetingGains.cwiseProduct(iDynTree::toEigen(m_jointRetargetingWeightSmoother->getPos()))).asDiagonal()
+            * (jointRetargetingValues - jointPosition);
+    }
 
     if(m_enableHandRetargeting)
     {
