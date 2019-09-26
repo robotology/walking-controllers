@@ -598,8 +598,8 @@ bool WalkingModule::updateModule()
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
 
             // reset the models
-            m_walkingZMPController->reset(m_DCMPositionDesired.front());
-            m_stableDCMModel->reset(m_DCMPositionDesired.front());
+            m_walkingZMPController->reset(m_DCMPositionAdjusted.front());
+            m_stableDCMModel->reset(m_DCMPositionAdjusted.front());
             m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
             // reset the retargeting
             if(!m_robotControlHelper->getFeedbacks(20))
@@ -1302,6 +1302,11 @@ bool WalkingModule::updateModule()
             iDynTree::Vector2 LfootAdaptedX;
             LfootAdaptedX(0)=m_adaptatedFootLeftTransform.getPosition()(0);
             LfootAdaptedX(1)=m_adaptatedFootLeftTransform.getPosition()(1);
+
+
+            iDynTree::Vector2 RfootAdaptedX;
+            RfootAdaptedX(0)=m_adaptatedFootRightTransform.getPosition()(0);
+            RfootAdaptedX(1)=m_adaptatedFootRightTransform.getPosition()(1);
             //iDynTree::Lfoot_adaptedX=
             iDynTree::Vector3 estimatedBasePose =m_robotControlHelper->getEstimatedBaseTransform().getPosition();
             iDynTree::Vector2 m_isPushActiveVec;
@@ -1319,7 +1324,7 @@ bool WalkingModule::updateModule()
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR,LfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                      errorL, errorR,LfootAdaptedX,RfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),m_isRollPitchActiveVec);
         }
 
@@ -1802,7 +1807,7 @@ bool WalkingModule::startWalking()
                                       "lf_err_x", "lf_err_y", "lf_err_z",
                                       "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
                                       "rf_err_x", "rf_err_y", "rf_err_z",
-                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY",
+                                      "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","Rfoot_adaptedX","Rfoot_adaptedY",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
                                       "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","imu_roll","imu_pitch","imu_yaw","roll_des","pitch_des","yaw_des","IsRollActive","IsPitchActive"});
     }
