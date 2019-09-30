@@ -742,6 +742,7 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+yInfo()<<"FK_Pelvis Orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         // evaluate 3D-LIPM reference signal
         if (!DCMSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed)) {
          yError()<<"the DCM smoother can not evaluate the smoothed DCM!";

@@ -101,6 +101,9 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
 
     }
 
+if(!m_usePelvisIMU)
+            okPelvisIMU = !m_usePelvisIMU;
+
     unsigned int attempt = 0;
     do
     {
@@ -183,6 +186,7 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
         }
 
         if (m_usePelvisIMU) {
+if(!okPelvisIMU){
             yarp::sig::Vector *pelvisIMU = NULL;
             pelvisIMU=m_pelvisIMUPort.read(false);
             if (pelvisIMU!=NULL) {
@@ -212,10 +216,12 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
                 m_imuAngularVelocity(0)=(*pelvisIMU)(6) ;
                 m_imuAngularVelocity(0)=(*pelvisIMU)(7) ;
                 m_imuAngularVelocity(0)=(*pelvisIMU)(8) ;
+okPelvisIMU=true;
+}
             }
         }
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench &&  (okBaseEstimation || okFloatingBaseEstimation))
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okPelvisIMU &&  (okBaseEstimation || okFloatingBaseEstimation))
 
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
@@ -256,6 +262,8 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
     if(!okBaseEstimation)
         yError() << "\t - Base estimation";
 
+ if(!okPelvisIMU)
+        yError() << "\t - imu data";
     return false;
 }
 
