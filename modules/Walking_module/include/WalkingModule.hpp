@@ -65,6 +65,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_isPushActive;
         double m_isRollActive;
         double m_isPitchActive;
+        int m_timeIndexAfterPushDetection;
     iDynTree::VectorFixSize<5> m_nominalValuesLeft;
     iDynTree::VectorFixSize<5> m_nominalValuesRight;
     iDynTree::Vector3 m_currentValues;
@@ -91,7 +92,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;
     std::shared_ptr<FootPrint> m_jRightFootprints;
     StepList m_jRightstepList;
-
+iDynTree::Rotation m_intialIMUOrientation;
     //following three lines  added for filtering the global zmp to decrease the vibration during walking
     yarp::sig::Vector m_zmpFiltered; /**< Vector containing the filtered evaluated ZMP. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_ZMPFilter; /**< ZMP low pass filter .*/
@@ -156,6 +157,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
 
     std::deque<iDynTree::Vector2> m_CurrentDCMPositionAdjusted; /**< Deque containing the desired DCM position. */
     std::deque<iDynTree::Vector2> m_CurrentDCMVelocityAdjusted; /**< Deque containing the desired DCM position. */
+
+    iDynTree::Vector2  m_DCMPositionSmoothed;
 
     std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                             In general a main frame of a foot is the fix frame only during the
@@ -344,5 +347,6 @@ public:
      */
     virtual bool stopWalking() override;
 
+    bool DCMSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
 };
 #endif

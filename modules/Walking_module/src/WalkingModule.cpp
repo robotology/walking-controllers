@@ -557,7 +557,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
 
-        if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),10))
+        if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),m_intialIMUOrientation,m_FKSolver->getRootLinkToWorldTransform().getRotation(),10))
         {
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
@@ -602,7 +602,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionAdjusted.front());
             m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(m_loader.model(),20))
+            if(!m_robotControlHelper->getFeedbacks(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),20))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -722,7 +722,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(m_loader.model(),20))
+        if(!m_robotControlHelper->getFeedbacks(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),20))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -743,7 +743,10 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate 3D-LIPM reference signal
-        m_stableDCMModel->setInput(m_DCMPositionAdjusted.front());
+        if (!DCMSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed)) {
+         yError()<<"the DCM smoother can not evaluate the smoothed DCM!";
+        }
+        m_stableDCMModel->setInput(m_DCMPositionSmoothed);
         if(!m_stableDCMModel->integrateModel())
         {
             yError() << "[WalkingModule::updateModule] Unable to propagate the 3D-LIPM.";
@@ -1126,8 +1129,9 @@ bool WalkingModule::updateModule()
                 DCMVelocityDesiredAdjusted(0) = m_DCMVelocityAdjusted.front()(0);
                 DCMVelocityDesiredAdjusted(1) = m_DCMVelocityAdjusted.front()(1);
 
+
                 m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
-                m_walkingDCMReactiveController->setReferenceSignal(DCMPositionDesiredAdjusted,
+                m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionSmoothed,
                                                                    DCMVelocityDesiredAdjusted);
             }
 
@@ -1146,6 +1150,7 @@ bool WalkingModule::updateModule()
         double threshold = 0.001;
         bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
         m_walkingZMPController->setPhase(stancePhase);
+
 
         iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
@@ -1325,7 +1330,8 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,LfootAdaptedX,RfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),m_isRollPitchActiveVec);
+                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                      m_isRollPitchActiveVec,m_DCMPositionSmoothed);
         }
 
         propagateTime();
@@ -1407,7 +1413,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
     bool getExternalRobotBase = true;
-    if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),10, getExternalRobotBase))
+    if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),m_intialIMUOrientation,m_FKSolver->getRootLinkToWorldTransform().getRotation(),10, getExternalRobotBase))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1668,10 +1674,10 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
 
-//        if (m_useStepAdaptation) {
-//            StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
-//            StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
-//        }
+    //        if (m_useStepAdaptation) {
+    //            StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
+    //            StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
+    //        }
 
 
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
@@ -1809,12 +1815,13 @@ bool WalkingModule::startWalking()
                                       "rf_err_x", "rf_err_y", "rf_err_z",
                                       "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","Rfoot_adaptedX","Rfoot_adaptedY",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
-                                      "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","imu_roll","imu_pitch","imu_yaw","roll_des","pitch_des","yaw_des","IsRollActive","IsPitchActive"});
+                                      "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","imu_roll","imu_pitch","imu_yaw","roll_des","pitch_des",
+                                      "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
     {
-        m_robotControlHelper->resetFilters(m_loader.model());
+        m_robotControlHelper->resetFilters(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
 
         updateFKSolver();
 
@@ -1849,7 +1856,9 @@ bool WalkingModule::startWalking()
         }
     }
 
-
+    m_robotControlHelper->getFirstIMUData(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),100);
+    m_intialIMUOrientation=m_robotControlHelper->getInitialIMUOreintation();
+    yInfo()<<"initial imu orinetation with respect to walking world"<<m_intialIMUOrientation.toString();
     m_robotState = WalkingFSM::Walking;
 
     return true;
@@ -1937,5 +1946,21 @@ bool WalkingModule::stopWalking()
     reset();
 
     m_robotState = WalkingFSM::Stopped;
+    return true;
+}
+
+
+bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM ){
+    double kSmoother=0.04;
+    if (m_isPushActive>=0.1) {
+        m_timeIndexAfterPushDetection=0;
+    }
+    if (m_isPushActive>=0.1 || m_timeIndexAfterPushDetection<=10) {
+        m_timeIndexAfterPushDetection++;
+        iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+kSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
+    }
+    else {
+        smoothedDCM=adaptedDCM;
+    }
     return true;
 }

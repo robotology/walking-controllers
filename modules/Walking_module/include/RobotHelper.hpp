@@ -103,7 +103,7 @@ class RobotHelper
 //    iDynTree::Transform m_robotEstimatedBaseTransform; /**< World_T_robot base that come from estimator. */
 //    iDynTree::Twist m_robotEstimatedBaseTwist; /**< Robot twist base expressed in mixed representation that come from estimator.
 
-
+iDynTree::Rotation m_initialIMUOrientation;
 
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Robot base port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBaseEstimatorPort; /**< Robot base port. */
@@ -154,10 +154,10 @@ public:
      * Get all the feedback signal from the interfaces
      * @return true in case of success and false otherwise.
      */
-    bool getFeedbacks(const iDynTree::Model modelLoader,unsigned int maxAttempts = 1);
+    bool getFeedbacks(const iDynTree::Model modelLoader,const iDynTree::Rotation baseToWorldRotation,unsigned int maxAttempts = 1);
 
     //bool getFeedbacksRaw(unsigned int maxAttempts = 1);
-    bool getFeedbacksRaw( const iDynTree::Model modelLoader,unsigned int maxAttempts = 1, bool useBaseEst = false);
+    bool getFeedbacksRaw(const iDynTree::Model modelLoader, const iDynTree::Rotation intialIMUOrientation, const iDynTree::Rotation baseToWorldRotation, unsigned int maxAttempts = 1, bool useBaseEst = false);
 
     /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)
@@ -189,7 +189,7 @@ public:
      * Reset filters.
      * @return true in case of success and false otherwise.
      */
-    bool resetFilters(const iDynTree::Model modelLoader);
+    bool resetFilters(const iDynTree::Model modelLoader, const iDynTree::Rotation baseToWorldRotation);
 
     /**
      * Close the polydrives.
@@ -260,6 +260,8 @@ public:
     const iDynTree::LinAcceleration &getIMUAcceleration() const;
     const iDynTree::Rotation &getIMUOreintation() const;
     const iDynTree::AngVelocity &getIMUAngularVelocity() const;
+    bool getFirstIMUData(const iDynTree::Model modelLoader, const iDynTree::Rotation baseToWorldRotation, const int maxAttempts);
+    const iDynTree::Rotation &getInitialIMUOreintation() const;
 };
 
 #endif
