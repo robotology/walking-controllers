@@ -92,7 +92,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;
     std::shared_ptr<FootPrint> m_jRightFootprints;
     StepList m_jRightstepList;
-iDynTree::Rotation m_intialIMUOrientation;
+iDynTree::Rotation m_intialPelvisIMUOrientation;
+iDynTree::Rotation m_intialHeadIMUOrientation;
     //following three lines  added for filtering the global zmp to decrease the vibration during walking
     yarp::sig::Vector m_zmpFiltered; /**< Vector containing the filtered evaluated ZMP. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_ZMPFilter; /**< ZMP low pass filter .*/

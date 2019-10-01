@@ -88,14 +88,20 @@ class RobotHelper
 
     bool m_useExternalRobotBase; /**< True if an the base is provided by the extern. */
     bool m_useFloatingBaseEstimator; /**< True if an the base is provided by the base estimator. */
-    bool m_usePelvisIMU; /**< True if an the base is provided by the extern. */
+    bool m_usePelvisIMU; /**< True if an the pelvis imu will be used. */
+    bool m_useHeadIMU; /**< True if an the pelvis imu will be used. */
+
 
     iDynTree::Transform m_robotBaseTransform; /**< World_T_robot base. */
     iDynTree::Twist m_robotBaseTwist; /**< Robot twist base expressed in mixed representation. */
 
-    iDynTree::Rotation m_imuOrientation; /**< imu orientation data */
-    iDynTree::LinAcceleration m_imuAcceleration;/**< imu acceleration data */
-    iDynTree::AngVelocity m_imuAngularVelocity;/**< /**< imu angular velocity data */
+    iDynTree::Rotation m_headimuOrientation; /**< imu orientation data */
+    iDynTree::LinAcceleration m_headimuAcceleration;/**< imu acceleration data */
+    iDynTree::AngVelocity m_headimuAngularVelocity;/**< /**< imu angular velocity data */
+
+    iDynTree::Rotation m_pelvisimuOrientation; /**< imu orientation data */
+    iDynTree::LinAcceleration m_pelvisimuAcceleration;/**< imu acceleration data */
+    iDynTree::AngVelocity m_pelvisimuAngularVelocity;/**< /**< imu angular velocity data */
 
     iDynTree::Transform m_robotEstimatedBaseTransform; /**< World_T_robot base that come from estimator. */
     iDynTree::Twist m_robotEstimatedBaseTwist; /**< Robot twist base expressed in mixed representation that come from estimator. */
@@ -103,11 +109,13 @@ class RobotHelper
 //    iDynTree::Transform m_robotEstimatedBaseTransform; /**< World_T_robot base that come from estimator. */
 //    iDynTree::Twist m_robotEstimatedBaseTwist; /**< Robot twist base expressed in mixed representation that come from estimator.
 
-iDynTree::Rotation m_initialIMUOrientation;
+iDynTree::Rotation m_initialHeadIMUOrientation;
+iDynTree::Rotation m_initialPelvisIMUOrientation;
 
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBasePort; /**< Robot base port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBaseEstimatorPort; /**< Robot base port. */
-    yarp::os::BufferedPort<yarp::sig::Vector> m_pelvisIMUPort; /**< IMU base port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_pelvisIMUPort; /**< Pelvis IMU  port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_headIMUPort; /**< Head IMU port. */
     double m_heightOffset;
 
 
@@ -157,7 +165,7 @@ public:
     bool getFeedbacks(const iDynTree::Model modelLoader,const iDynTree::Rotation baseToWorldRotation,unsigned int maxAttempts = 1);
 
     //bool getFeedbacksRaw(unsigned int maxAttempts = 1);
-    bool getFeedbacksRaw(const iDynTree::Model modelLoader, const iDynTree::Rotation intialIMUOrientation, const iDynTree::Rotation baseToWorldRotation, unsigned int maxAttempts = 1, bool useBaseEst = false);
+    bool getFeedbacksRaw(const iDynTree::Model modelLoader, const iDynTree::Rotation intialPelvisIMUOrientation,const iDynTree::Rotation intialHeadIMUOrientation, const iDynTree::Rotation headToBaseRotation, unsigned int maxAttempts = 1, bool useBaseEst = false);
 
     /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)
@@ -257,11 +265,19 @@ public:
     bool isExternalRobotBaseUsed();
 
     bool isFloatingBaseEstimatorUsed();
-    const iDynTree::LinAcceleration &getIMUAcceleration() const;
-    const iDynTree::Rotation &getIMUOreintation() const;
-    const iDynTree::AngVelocity &getIMUAngularVelocity() const;
-    bool getFirstIMUData(const iDynTree::Model modelLoader, const iDynTree::Rotation baseToWorldRotation, const int maxAttempts);
-    const iDynTree::Rotation &getInitialIMUOreintation() const;
+    const iDynTree::LinAcceleration &getPelvisIMUAcceleration() const;
+    const iDynTree::Rotation &getPelvisIMUOreintation() const;
+    const iDynTree::AngVelocity &getPelvisIMUAngularVelocity() const;
+    bool getFirstPelvisIMUData(const iDynTree::Model modelLoader, const iDynTree::Rotation baseToWorldRotation, const int maxAttempts);
+    const iDynTree::Rotation &getInitialPelvisIMUOreintation() const;
+
+    const iDynTree::LinAcceleration &getHeadIMUAcceleration() const;
+    const iDynTree::Rotation &getHeadIMUOreintation() const;
+    const iDynTree::AngVelocity &getHeadIMUAngularVelocity() const;
+    bool getFirstHeadIMUData(const iDynTree::Model modelLoader, const iDynTree::Rotation baseToWorldRotation,const iDynTree::Rotation headToBaseRotation, const int maxAttempts);
+    const iDynTree::Rotation &getInitialHeadIMUOreintation() const;
+    bool isPelvisIMUUsed();
+    bool isHeadIMUUsed();
 };
 
 #endif
