@@ -557,7 +557,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
         iDynTree::Rotation Base_R_Head;
-    iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+        iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
 
 
         if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),m_intialPelvisIMUOrientation,m_intialHeadIMUOrientation,Base_R_Head,10))
@@ -767,13 +767,14 @@ bool WalkingModule::updateModule()
         m_isRollActive=0;
         iDynTree::Rotation imuRotation;
         iDynTree::Vector3 imuRPY;
+
         if (m_robotControlHelper->isHeadIMUUsed()) {
-            imuRotation=m_robotControlHelper->getPelvisIMUOreintation();
+            imuRotation=m_robotControlHelper->getHeadIMUOreintation();
             imuRPY= imuRotation.asRPY();
         }
 
         if (m_robotControlHelper->isPelvisIMUUsed()) {
-            imuRotation=m_robotControlHelper->getHeadIMUOreintation();
+            imuRotation=m_robotControlHelper->getPelvisIMUOreintation();
             imuRPY= imuRotation.asRPY();
         }
 
@@ -1344,7 +1345,7 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,LfootAdaptedX,RfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getPelvisIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getPelvisIMUOreintation().asRPY(),m_robotControlHelper->getHeadIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       m_isRollPitchActiveVec,m_DCMPositionSmoothed);
         }
 
@@ -1428,7 +1429,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // depend on the current state of the robot
     bool getExternalRobotBase = true;
     iDynTree::Rotation Base_R_Head;
-iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+    iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
 
     if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),m_intialPelvisIMUOrientation,m_intialHeadIMUOrientation,Base_R_Head,10, getExternalRobotBase))
     {
@@ -1832,7 +1833,7 @@ bool WalkingModule::startWalking()
                                       "rf_err_x", "rf_err_y", "rf_err_z",
                                       "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","Rfoot_adaptedX","Rfoot_adaptedY",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
-                                      "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","imu_roll","imu_pitch","imu_yaw","roll_des","pitch_des",
+                                      "dcm_estimated_x","dcm_estimated_y","IsPushActivex","IsPushActivey","pelvis_imu_roll","pelvis_imu_pitch","pelvis_imu_yaw","head_imu_roll","head_imu_pitch","head_imu_yaw","roll_des","pitch_des",
                                       "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y"});
     }
 
@@ -1881,10 +1882,9 @@ bool WalkingModule::startWalking()
 
     if (m_robotControlHelper->isHeadIMUUsed()) {
         iDynTree::Rotation Base_R_Head;
-iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+        iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
         m_robotControlHelper->getFirstHeadIMUData(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,100);
-        m_intialPelvisIMUOrientation=m_robotControlHelper->getInitialPelvisIMUOreintation();
-        yInfo()<<"initial imu orinetation with respect to walking world"<<m_intialPelvisIMUOrientation.toString();
+        m_intialHeadIMUOrientation=m_robotControlHelper->getInitialHeadIMUOreintation();
     }
     m_robotState = WalkingFSM::Walking;
 
