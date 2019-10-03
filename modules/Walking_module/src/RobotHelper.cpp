@@ -278,7 +278,18 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
                     //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
                     auto head_imu_idx = modelLoader.getFrameIndex("imu_frame");
                     auto head_R_imu = modelLoader.getFrameTransform(head_imu_idx).getRotation();
+
+                    yInfo()<<"head imu R"<<head_R_imu.asRPY()(0);
+                    yInfo()<<"head imu R"<<head_R_imu.asRPY()(1);
+                    yInfo()<<"head imu R"<<head_R_imu.asRPY()(2);
+
+                    auto root_imu_idx = modelLoader.getFrameIndex("root_link_imu_frame");
+                    auto root_R = modelLoader.getFrameTransform(root_imu_idx).getRotation();
+
+
+
                     auto root_R_imu=headToBaseRotation*head_R_imu;
+                     yInfo()<<"imu to root"<<root_R_imu.asRPY().toString();
                     // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
                     //yInfo()<<"m_imuOrientation"<<m_imuOrientation.asRPY().toString();
                     // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();

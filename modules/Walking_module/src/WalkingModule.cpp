@@ -1814,7 +1814,7 @@ bool WalkingModule::startWalking()
     {
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
                                       "dcm_des_x", "dcm_des_y","errorx","errory",
-                                      "dcm_des_dx", "dcm_des_dy","dcm_adj_dx", "dcm_adj_dy",
+                                      "dcm_des_dx", "dcm_des_dy","dcm_adj_x", "dcm_adj_y",
                                       "zmp_x", "zmp_y",
                                       "zmp_des_x", "zmp_des_y",
                                       "com_x", "com_y", "com_z",
@@ -1978,7 +1978,7 @@ bool WalkingModule::stopWalking()
 
 
 bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM ){
-    double kSmoother=0.04;
+    double kSmoother=0.2;
     if (m_isPushActive>=0.1) {
         m_timeIndexAfterPushDetection=0;
     }
