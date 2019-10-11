@@ -122,5 +122,13 @@ checkandset_dependency(YARP)
 find_package(iDynTree QUIET)
 checkandset_dependency(iDynTree)
 
+find_package(osqp QUIET)
+checkandset_dependency(osqp)
+
+find_package(OsqpEigen 0.4.0 QUIET)
+checkandset_dependency(OsqpEigen)
+
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libYARP_helper "Compile libYARP_helper?" ON WALKING_CONTROLLERS_HAS_YARP OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libiDynTree_helper "Compile libiDynTree_helper?" ON "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_HAS_YARP" OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libSimplified_model_controllers "Compile libSimplified_model_controllers?" ON
+                                    "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen" OFF)

@@ -10,8 +10,10 @@
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/EigenSparseHelpers.h>
 
-#include <MPCSolver.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/iDynTreeHelper/Helper.h>
+#include <WalkingControllers/SimplifiedModelControllers/MPCSolver.h>
+
+using namespace WalkingControllers;
 
 MPCSolver::MPCSolver(const int& stateSize, const int& inputSize,
                      const int& controllerHorizon,

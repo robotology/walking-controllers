@@ -17,8 +17,11 @@
 #include <iDynTree/Core/EigenSparseHelpers.h>
 #include <iDynTree/Core/Direction.h>
 
-#include <WalkingDCMModelPredictiveController.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/iDynTreeHelper/Helper.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/SimplifiedModelControllers/DCMModelPredictiveController.h>
+
+using namespace WalkingControllers;
 
 iDynSparseMatrix WalkingController::evaluateThetaMatrix()
 {
