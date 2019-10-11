@@ -10,7 +10,7 @@
  * @authors: Stefano Dafarra  <stefano.dafarra@iit.it>
  */
 
-#include "WalkingPIDHandler.hpp"
+#include <WalkingControllers/RobotHelper/PIDHandler.h>
 
 #include <yarp/dev/PolyDriver.h>
 #include <yarp/dev/IPidControl.h>
@@ -22,6 +22,8 @@
 
 #include <sstream>
 #include <cmath>
+
+using namespace WalkingControllers;
 
 WalkingPIDHandler::WalkingPIDHandler()
     :m_useGainScheduling(false)

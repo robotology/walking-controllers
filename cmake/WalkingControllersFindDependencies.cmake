@@ -132,3 +132,5 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libYARP_helper 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libiDynTree_helper "Compile libiDynTree_helper?" ON "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_HAS_YARP" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libSimplified_model_controllers "Compile libSimplified_model_controllers?" ON
                                     "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen" OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libRobot_helper "Compile libRobot_helper?" ON
+                                    "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper" OFF)

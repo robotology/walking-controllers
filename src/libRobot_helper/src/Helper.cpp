@@ -2,8 +2,11 @@
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/yarp/YARPConversions.h>
 
-#include <RobotHelper.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/RobotHelper/Helper.h>
+#include <WalkingControllers/iDynTreeHelper/Helper.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
                                 std::pair<std::string, double>& worstError)
