@@ -123,3 +123,4 @@ find_package(iDynTree QUIET)
 checkandset_dependency(iDynTree)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libYARP_helper "Compile libYARP_helper?" ON WALKING_CONTROLLERS_HAS_YARP OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libiDynTree_helper "Compile libiDynTree_helper?" ON "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_HAS_YARP" OFF)
