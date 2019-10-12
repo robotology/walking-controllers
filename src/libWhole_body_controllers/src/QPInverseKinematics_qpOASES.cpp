@@ -16,7 +16,9 @@
 #include <iDynTree/Model/Model.h>
 #include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
-#include <WalkingQPInverseKinematics_qpOASES.hpp>
+#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_qpOASES.h>
+
+using namespace WalkingControllers;
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 

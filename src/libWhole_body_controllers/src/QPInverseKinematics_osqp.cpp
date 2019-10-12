@@ -19,7 +19,9 @@
 #include <iDynTree/Model/Model.h>
 #include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
-#include <WalkingQPInverseKinematics_osqp.hpp>
+#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_osqp.h>
+
+using namespace WalkingControllers;
 
 void WalkingQPIK_osqp::setNumberOfConstraints()
 {

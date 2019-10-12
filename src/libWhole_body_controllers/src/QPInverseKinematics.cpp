@@ -20,8 +20,12 @@
 #include <iDynTree/Model/Model.h>
 #include <iDynTree/yarp/YARPConfigurationsLoader.h>
 
-#include <WalkingQPInverseKinematics.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/iDynTreeHelper/Helper.h>
+
+#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics.h>
+
+using namespace WalkingControllers;
 
 bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
                              const int &actuatedDOFs,

@@ -26,7 +26,9 @@
 // Eigen
 #include <Eigen/Core>
 
-#include <WalkingInverseKinematics.hpp>
+#include <WalkingControllers/WholeBodyControllers/InverseKinematics.h>
+
+using namespace WalkingControllers;
 
 WalkingIK::WalkingIK()
     : m_verbose(false)
