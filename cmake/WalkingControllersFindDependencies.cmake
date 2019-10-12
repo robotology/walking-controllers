@@ -148,6 +148,7 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libRobot_helper
                                     "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libWhole_body_controllers "Compile libWhole_body_controllers?" ON
                                     "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen;WALKING_CONTROLLERS_HAS_qpOASES;WALKING_CONTROLLERS_HAS_ICUB" OFF)
-
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libTrajectory_planner "Compile Trajectory_planner?" ON
                                     "WALKING_CONTROLLERS_HAS_Threads;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_UnicyclePlanner" OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libKinDyn_wrapper "Compile KinDyn_wrapper?" ON
+                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB" OFF)

@@ -1,5 +1,5 @@
 /**
- * @file WalkingForwardKinematics.cpp
+ * @file Wrapper.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
  * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
@@ -19,8 +19,10 @@
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
 
-#include "WalkingForwardKinematics.hpp"
-#include "Utils.hpp"
+#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
+
+using namespace WalkingControllers;
 
 bool WalkingFK::setRobotModel(const iDynTree::Model& model)
 {
