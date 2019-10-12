@@ -116,6 +116,9 @@ endmacro()
 ################################################################################
 # Find all packages
 
+find_package(Threads QUIET)
+checkandset_dependency(Threads)
+
 find_package(YARP QUIET)
 checkandset_dependency(YARP)
 
@@ -124,6 +127,9 @@ checkandset_dependency(ICUB)
 
 find_package(iDynTree QUIET)
 checkandset_dependency(iDynTree)
+
+find_package(UnicyclePlanner 0.1.102 QUIET)
+checkandset_dependency(UnicyclePlanner)
 
 find_package(osqp QUIET)
 checkandset_dependency(osqp)
@@ -142,3 +148,6 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libRobot_helper
                                     "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libWhole_body_controllers "Compile libWhole_body_controllers?" ON
                                     "WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_COMPILE_libiDynTree_helper;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen;WALKING_CONTROLLERS_HAS_qpOASES;WALKING_CONTROLLERS_HAS_ICUB" OFF)
+
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libTrajectory_planner "Compile Trajectory_planner?" ON
+                                    "WALKING_CONTROLLERS_HAS_Threads;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_UnicyclePlanner" OFF)

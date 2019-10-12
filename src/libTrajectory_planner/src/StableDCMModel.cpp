@@ -17,8 +17,10 @@
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 
-#include <StableDCMModel.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 bool StableDCMModel::initialize(const yarp::os::Searchable& config)
 {

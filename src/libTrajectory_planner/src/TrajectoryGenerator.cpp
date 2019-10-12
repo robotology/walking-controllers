@@ -13,8 +13,10 @@
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
 
-#include <TrajectoryGenerator.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 TrajectoryGenerator::~TrajectoryGenerator()
 {
