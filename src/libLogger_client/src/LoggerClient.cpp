@@ -9,8 +9,10 @@
 // YARP
 #include <yarp/os/LogStream.h>
 
-#include <LoggerClient.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/LoggerClient/LoggerClient.h>
+
+using namespace WalkingControllers;
 
 bool LoggerClient::configure(const yarp::os::Searchable& config, const std::string& name)
 {

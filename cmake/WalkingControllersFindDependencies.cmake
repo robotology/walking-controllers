@@ -154,3 +154,4 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libKinDyn_wrapp
                                     "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libRetargeting_helper "Compile Retargeting_helper?" ON
                                     "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB" OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libLogger_client "Compile Logger_client?" ON WALKING_CONTROLLERS_COMPILE_libYARP_helper OFF)

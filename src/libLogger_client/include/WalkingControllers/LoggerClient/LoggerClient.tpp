@@ -6,10 +6,10 @@
  * @date 2018
  */
 
-#include <Utils.hpp>
+#include <WalkingControllers/YarpHelper/Helper.h>
 
 template <typename... Args>
-void LoggerClient::sendData(const Args&... args)
+void WalkingControllers::LoggerClient::sendData(const Args&... args)
 {
     YarpHelper::sendVariadicVector(m_dataPort, args...);
 }
