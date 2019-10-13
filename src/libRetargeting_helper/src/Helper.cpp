@@ -1,5 +1,5 @@
 /**
- * @file WalkingRetargetingClient.cpp
+ * @file Helper.h
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
  * @copyright 2019 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
@@ -12,8 +12,10 @@
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Core/EigenHelpers.h>
 
-#include <Utils.hpp>
-#include <RetargetingClient.hpp>
+#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/RetargetingHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 void RetargetingClient::convertYarpVectorPoseIntoTransform(const yarp::sig::Vector& vector,
                                                            iDynTree::Transform& transform)

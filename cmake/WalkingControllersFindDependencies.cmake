@@ -152,3 +152,5 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libTrajectory_p
                                     "WALKING_CONTROLLERS_HAS_Threads;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_UnicyclePlanner" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libKinDyn_wrapper "Compile KinDyn_wrapper?" ON
                                     "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB" OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libRetargeting_helper "Compile Retargeting_helper?" ON
+                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_libYARP_helper;WALKING_CONTROLLERS_HAS_ICUB" OFF)
