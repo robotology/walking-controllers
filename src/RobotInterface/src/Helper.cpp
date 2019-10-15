@@ -9,7 +9,7 @@
 using namespace WalkingControllers;
 
 bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                                std::pair<std::string, double>& worstError)
+                                   std::pair<int, double>& worstError)
 {
     if(!m_encodersInterface)
     {
@@ -24,7 +24,7 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
     }
 
     // clear the std::pair
-    worstError.first = "";
+    worstError.first = 0;
     worstError.second = 0.0;
     double currentJointPositionRad;
     double absoluteJointErrorRad;
@@ -35,7 +35,7 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
                                                                                   desiredJointPositionsRad(i)));
         if(absoluteJointErrorRad > worstError.second)
         {
-            worstError.first = m_axesList[i];
+            worstError.first = i;
             worstError.second = absoluteJointErrorRad;
         }
     }
@@ -185,6 +185,18 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     remoteControlBoardsOpts.put("writeStrict", "on");
 
     m_actuatedDOFs = m_axesList.size();
+
+    yarp::os::Value *dangerousJoints;
+    if(!config.check("dangerous_joints", dangerousJoints))
+    {
+        yError() << "[configureRobot] Unable to find dangerous_joints into config file.";
+        return false;
+    }
+    if(!YarpUtilities::yarpListToBoolVector(dangerousJoints, m_dangerousJoints))
+    {
+        yError() << "[configureRobot] Unable to convert yarp list into a vector of bool.";
+        return false;
+    }
 
     // open the device
     if(!m_robotDevice.open(options))
@@ -501,7 +513,7 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
 
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
-    std::pair<std::string, double> worstError("", 0.0);
+    std::pair<int, double> worstError(0, 0.0);
 
     if(!getWorstError(desiredJointPositionsRad, worstError))
     {
@@ -571,7 +583,7 @@ bool RobotInterface::checkMotionDone(bool& motionDone)
     bool checkMotionDone = false;
     m_positionInterface->checkMotionDone(&checkMotionDone);
 
-    std::pair<std::string, double> worstError;
+    std::pair<int, double> worstError;
     if (!getWorstError(m_desiredJointPositionRad, worstError))
     {
         yError() << "[RobotInterface::checkMotionDone] Unable to get the worst error.";
@@ -583,7 +595,7 @@ bool RobotInterface::checkMotionDone(bool& motionDone)
     if (now - m_startingPositionControlTime > m_positioningTime + timeThreshold)
     {
         yError() << "[RobotInterface::checkMotionDone] The timer is expired but the joint "
-                 << worstError.first << " has an error of " << worstError.second
+                 << m_axesList[worstError.first] << " has an error of " << worstError.second
                  << " radians";
         return false;
     }
@@ -623,7 +635,7 @@ bool RobotInterface::setDirectPositionReferences(const iDynTree::VectorDynSize& 
         return false;
     }
 
-    std::pair<std::string, double> worstError("", 0.0);
+    std::pair<int, double> worstError(0, 0.0);
 
     if(!getWorstError(desiredPositionRad, worstError))
     {
@@ -631,11 +643,11 @@ bool RobotInterface::setDirectPositionReferences(const iDynTree::VectorDynSize& 
         return false;
     }
 
-    if(worstError.second > 0.5)
+    if(worstError.second > 0.5 && m_dangerousJoints[worstError.first])
     {
         yError() << "[RobotInterface::setDirectPositionReferences] The worst error between the current and the "
-                 << "desired position of the " << worstError.first
-                 << "-th joint is greater than 0.5 rad.";
+                 << "desired position of the " <<  m_axesList[worstError.first]
+                 << " joint is greater than 0.5 rad.";
         return false;
     }
 

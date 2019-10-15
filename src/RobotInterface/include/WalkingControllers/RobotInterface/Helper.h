@@ -35,6 +35,7 @@ namespace WalkingControllers
     {
         yarp::dev::PolyDriver m_robotDevice; /**< Main robot device. */
         std::vector<std::string> m_axesList; /**< Vector containing the name of the controlled joints. */
+        std::vector<bool> m_dangerousJoints; /**< Vector containing the the information related to the importance of the joint. */
         unsigned int m_actuatedDOFs; /**< Number of the actuated DoFs. */
 
         // YARP Interfaces exposed by the remotecontrolboardremapper
@@ -94,7 +95,7 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                           std::pair<std::string, double>& worstError);
+                           std::pair<int, double>& worstError);
 
         /**
          * Switch the control mode.
