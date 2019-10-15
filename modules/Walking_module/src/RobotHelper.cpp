@@ -262,7 +262,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                 headIMU=m_headIMUPort.read(false);
                 if (headIMU!=NULL) {
 
-                    m_headimuOrientation=m_headimuOrientation.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(2)));
+                    m_headimuOrientation=m_headimuOrientation.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(1)));
 
                     m_headimuAcceleration(0)=(*headIMU)(3) ;
                     m_headimuAcceleration(1)=(*headIMU)(4) ;

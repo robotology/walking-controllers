@@ -2027,7 +2027,7 @@ bool WalkingModule::stopWalking()
 
 
 bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM ){
-    double kSmoother=0.2;
+    double kSmoother=0.03;
     if (m_isPushActive>=0.1) {
         m_timeIndexAfterPushDetection=0;
     }
