@@ -40,8 +40,14 @@ install_basic_package_files(${PROJECT_NAME}
                             NAMESPACE WalkingControllers::
                             VERSION ${WalkingControllers_VERSION}
                             COMPATIBILITY AnyNewerVersion
+                            TARGETS_PROPERTY WalkingControllers_TARGETS
                             VARS_PREFIX ${PROJECT_NAME}
-                            NO_CHECK_REQUIRED_COMPONENTS_MACRO
-                            CONFIG_TEMPLATE ${CMAKE_SOURCE_DIR}/cmake/WalkingControllersConfig.cmake.in)
+                            NO_CHECK_REQUIRED_COMPONENTS_MACRO)
+
+option(BUILD_TESTING "Create tests using CMake" OFF)
+include(CTest)
+if(BUILD_TESTING AND WALKING_CONTROLLERS_COMPILE_tests)
+  add_subdirectory(tests)
+endif()
 
 include(AddUninstallTarget)

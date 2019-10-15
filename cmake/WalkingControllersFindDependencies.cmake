@@ -140,6 +140,10 @@ checkandset_dependency(OsqpEigen)
 find_package(qpOASES QUIET)
 checkandset_dependency(qpOASES)
 
+find_package(Catch2 QUIET)
+checkandset_dependency(Catch2)
+
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_tests "Compile tests?" ON WALKING_CONTROLLERS_HAS_Catch2 OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libYARP_helper "Compile libYARP_helper?" ON WALKING_CONTROLLERS_HAS_YARP OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libiDynTree_helper "Compile libiDynTree_helper?" ON "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_HAS_YARP" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_libSimplified_model_controllers "Compile libSimplified_model_controllers?" ON
