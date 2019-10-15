@@ -153,11 +153,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_nominalValuesLeft.zero();
     m_nominalValuesRight.zero();
     m_currentValues.zero();
-
+    m_DCMPositionSmoothed.zero();
     m_adaptatedFootLeftTwist.zero();
     m_adaptatedFootRightTwist.zero();
     m_currentFootLeftTwist.zero();
     m_currentFootRightTwist.zero();
+    m_DCMPositionAdjusted.push_back(m_DCMPositionSmoothed);
 
     iDynTree::Position tempTemp;
     iDynTree::Rotation tempRot;
@@ -560,7 +561,7 @@ bool WalkingModule::updateModule()
         iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
 
 
-        if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),m_intialPelvisIMUOrientation,m_intialHeadIMUOrientation,Base_R_Head,10))
+        if(!m_robotControlHelper->getFeedbacksRaw(10))
         {
             yError() << "[updateModule] Unable to get the feedback.";
             return false;
@@ -601,11 +602,22 @@ bool WalkingModule::updateModule()
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
 
             // reset the models
-            m_walkingZMPController->reset(m_DCMPositionAdjusted.front());
-            m_stableDCMModel->reset(m_DCMPositionAdjusted.front());
-            m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
+            if (m_useStepAdaptation) {
+                m_walkingZMPController->reset(m_DCMPositionAdjusted.front());
+                m_stableDCMModel->reset(m_DCMPositionAdjusted.front());
+                m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
+            }
+            else {
+                m_walkingZMPController->reset(m_DCMPositionDesired.front());
+                m_stableDCMModel->reset(m_DCMPositionDesired.front());
+                m_DCMEstimator->reset(m_DCMPositionDesired.front());
+
+            }
+            iDynTree::Rotation Base_R_Head;
+            iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),20))
+            if(!m_robotControlHelper->getFeedbacks(20))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -725,7 +737,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),20))
+        if(!m_robotControlHelper->getFeedbacks(20))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -747,10 +759,17 @@ bool WalkingModule::updateModule()
 
         yInfo()<<"FK_Pelvis Orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         // evaluate 3D-LIPM reference signal
-        if (!DCMSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed)) {
-            yError()<<"the DCM smoother can not evaluate the smoothed DCM!";
+        if(m_useStepAdaptation){
+
+            if (!DCMSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed)) {
+                yError()<<"the DCM smoother can not evaluate the smoothed DCM!";
+            }
+            m_stableDCMModel->setInput(m_DCMPositionSmoothed);
         }
-        m_stableDCMModel->setInput(m_DCMPositionSmoothed);
+        else {
+            m_stableDCMModel->setInput(m_DCMPositionDesired.front());
+        }
+
         if(!m_stableDCMModel->integrateModel())
         {
             yError() << "[WalkingModule::updateModule] Unable to propagate the 3D-LIPM.";
@@ -767,44 +786,53 @@ bool WalkingModule::updateModule()
         m_isRollActive=0;
         iDynTree::Rotation imuRotation;
         iDynTree::Vector3 imuRPY;
-
+      yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         if (m_robotControlHelper->isHeadIMUUsed()) {
-            imuRotation=m_robotControlHelper->getHeadIMUOreintation();
-            imuRPY= imuRotation.asRPY();
+            iDynTree::Rotation Base_R_Head;
+            iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+            GetBaseFromHeadIMU(Base_R_Head,m_robotControlHelper->getHeadIMUOreintation());
+            imuRPY= m_baseOrientationFromHeadIMU.asRPY();
         }
 
         if (m_robotControlHelper->isPelvisIMUUsed()) {
-            imuRotation=m_robotControlHelper->getPelvisIMUOreintation();
-            imuRPY= imuRotation.asRPY();
+            GetBaseFromPelvisIMU(m_robotControlHelper->getPelvisIMUOreintation());
+            imuRPY= m_baseOrientationFromPelvisIMU.asRPY();
         }
 
         //yInfo() <<"imuuu"<<imurolpitchyaw(0)<<imurolpitchyaw(1)<<imurolpitchyaw(2);
-        m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
+        if (m_useStepAdaptation) {
+            m_DCMEstimator->reset(m_DCMPositionAdjusted.front());
+        }
+        else {
+            m_DCMEstimator->reset(m_DCMPositionDesired.front());
+        }
+
         iDynTree::Rotation pelvisOrientation;
         pelvisOrientation=iDynTree::Rotation::Identity();
-        double miladTempP;
-        double miladTempR;
-        if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
-            miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
-            m_isPitchActive=1;
+        double miladTempP=0;;
+        double miladTempR=0;
+        if (m_useStepAdaptation) {
+            if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
+                miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
+                m_isPitchActive=1;
 
-            //miladTemp=0;
+                //miladTemp=0;
+            }
+            else {
+                miladTempP=0;
+            }
+
+            if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
+
+                miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
+                m_isRollActive=1;
+
+                //miladTemp=0;
+            }
+            else {
+                miladTempR=0;
+            }
         }
-        else {
-            miladTempP=0;
-        }
-
-        if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
-
-            miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
-            m_isRollActive=1;
-
-            //miladTemp=0;
-        }
-        else {
-            miladTempR=0;
-        }
-
 
         pelvisOrientation=iDynTree::Rotation::RPY (miladTempR,miladTempP,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
         //      yInfo()<<pelvisOrientation.toString();
@@ -1345,7 +1373,7 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,LfootAdaptedX,RfootAdaptedX,m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_robotControlHelper->getPelvisIMUOreintation().asRPY(),m_robotControlHelper->getHeadIMUOreintation().asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
+                                      estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_baseOrientationFromPelvisIMU.asRPY(),m_baseOrientationFromHeadIMU.asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       m_isRollPitchActiveVec,m_DCMPositionSmoothed);
         }
 
@@ -1417,6 +1445,28 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 
 bool WalkingModule::prepareRobot(bool onTheFly)
 {
+
+    bool getExternalRobotBase = true;
+
+
+    if(!m_robotControlHelper->getFeedbacksRaw(10, getExternalRobotBase))
+    {
+        yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
+        return false;
+    }
+
+
+    if (m_robotControlHelper->isPelvisIMUUsed()) {
+        getFirstPelvisIMUData(m_robotControlHelper->getPelvisIMUOreintation(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
+    }
+
+
+    if (m_robotControlHelper->isHeadIMUUsed()) {
+        iDynTree::Rotation Base_R_Head;
+        iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+        getFirstHeadIMUData(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,m_robotControlHelper->getHeadIMUOreintation());
+    }
+
     if(m_robotState != WalkingFSM::Configured && m_robotState != WalkingFSM::Stopped)
     {
         yError() << "[WalkingModule::prepareRobot] The robot can be prepared only at the "
@@ -1427,15 +1477,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    bool getExternalRobotBase = true;
-    iDynTree::Rotation Base_R_Head;
-    iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
 
-    if(!m_robotControlHelper->getFeedbacksRaw(m_loader.model(),m_intialPelvisIMUOrientation,m_intialHeadIMUOrientation,Base_R_Head,10, getExternalRobotBase))
-    {
-        yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
-        return false;
-    }
+
 
     if(onTheFly)
     {
@@ -1692,14 +1735,14 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
 
-    //        if (m_useStepAdaptation) {
-    //            StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
-    //            StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
-    //        }
+    if (m_useStepAdaptation) {
+        StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
+        StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
+    }
 
 
-    StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
-    StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
+    //    StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
+    //    StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
 
     StdHelper::appendVectorToDeque(ZMPPositionDesired, m_ZMPPositionDesired, mergePoint);
     StdHelper::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
@@ -1841,6 +1884,12 @@ bool WalkingModule::startWalking()
     {
         m_robotControlHelper->resetFilters(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
 
+        if(!m_robotControlHelper->getFeedbacksRaw(10))
+        {
+            yError() << "[updateModule] Unable to get the feedback.";
+            return false;
+        }
+
         updateFKSolver();
 
         // TODO this is useful for the simulation
@@ -1848,6 +1897,18 @@ bool WalkingModule::startWalking()
                                + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
 
         m_robotControlHelper->setHeightOffset(heightOffset);
+
+
+        if (m_robotControlHelper->isPelvisIMUUsed()) {
+            getFirstPelvisIMUData(m_robotControlHelper->getPelvisIMUOreintation(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
+        }
+
+
+        if (m_robotControlHelper->isHeadIMUUsed()) {
+            iDynTree::Rotation Base_R_Head;
+            iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
+            getFirstHeadIMUData(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,m_robotControlHelper->getHeadIMUOreintation());
+        }
     }
 
     iDynTree::Transform stanceFoot_T_world = m_trajectoryGenerator->swingLeft() ?
@@ -1873,19 +1934,7 @@ bool WalkingModule::startWalking()
             return false;
         }
     }
-    if (m_robotControlHelper->isPelvisIMUUsed()) {
-        m_robotControlHelper->getFirstPelvisIMUData(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),100);
-        m_intialPelvisIMUOrientation=m_robotControlHelper->getInitialPelvisIMUOreintation();
-        yInfo()<<"initial imu orinetation with respect to walking world"<<m_intialPelvisIMUOrientation.toString();
-    }
 
-
-    if (m_robotControlHelper->isHeadIMUUsed()) {
-        iDynTree::Rotation Base_R_Head;
-        iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
-        m_robotControlHelper->getFirstHeadIMUData(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,100);
-        m_intialHeadIMUOrientation=m_robotControlHelper->getInitialHeadIMUOreintation();
-    }
     m_robotState = WalkingFSM::Walking;
 
     return true;
@@ -1989,5 +2038,48 @@ bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
     else {
         smoothedDCM=adaptedDCM;
     }
+    return true;
+}
+
+bool WalkingModule::GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDynTree::Rotation headimuOrientation){
+    auto head_imu_idx = m_loader.model().getFrameIndex("imu_frame");
+    auto head_R_imu   = m_loader.model().getFrameTransform(head_imu_idx).getRotation();
+   // head_R_imu=iDynTree::Rotation::Identity();
+    iDynTree::Rotation root_R_imu;
+    iDynTree::toEigen(root_R_imu)=iDynTree::toEigen(headToBaseRotation)*iDynTree::toEigen(head_R_imu);
+    iDynTree::toEigen(m_baseOrientationFromHeadIMU)=iDynTree::toEigen(m_intialHeadIMUOrientation)*iDynTree::toEigen(headimuOrientation)*iDynTree::toEigen( root_R_imu.inverse());
+    yInfo()<<"head-pelvis orientation"<<m_baseOrientationFromHeadIMU.asRPY().toString();
+    return true;
+}
+
+bool WalkingModule::GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation){
+    auto root_imu_idx = m_loader.model().getFrameIndex("root_link_imu_frame");
+    auto root_R_imu = m_loader.model().getFrameTransform(root_imu_idx).getRotation();
+   // root_R_imu=iDynTree::Rotation::Identity();
+    iDynTree::toEigen(m_baseOrientationFromPelvisIMU)=iDynTree::toEigen(m_intialPelvisIMUOrientation)*iDynTree::toEigen(pelvisimuOrientation)*iDynTree::toEigen(root_R_imu.inverse());
+    yInfo()<<"base-pelvis orientation"<<m_baseOrientationFromPelvisIMU.asRPY().toString();
+    return true;
+}
+
+
+bool WalkingModule::getFirstPelvisIMUData(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation){
+    auto root_imu_idx = m_loader.model().getFrameIndex("root_link_imu_frame");
+    auto base_R_imu = m_loader.model().getFrameTransform(root_imu_idx).getRotation();
+  //  base_R_imu=iDynTree::Rotation::Identity();
+    iDynTree::toEigen(m_intialPelvisIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
+    yInfo()<<"base-pelvis init orientation"<<m_intialPelvisIMUOrientation.asRPY().toString();
+    return true;
+}
+
+bool WalkingModule::getFirstHeadIMUData(iDynTree::Rotation baseToWorldRotation,iDynTree::Rotation headToBaseRotation,iDynTree::Rotation imuOrientationtoIMUWorld){
+    auto head_imu_idx = m_loader.model().getFrameIndex("imu_frame");
+    auto head_R_imu = m_loader.model().getFrameTransform(head_imu_idx).getRotation();
+   // head_R_imu=iDynTree::Rotation::Identity();
+    auto root_R_imu=headToBaseRotation*head_R_imu;
+    //                yInfo()<<"head root_R_imu"<<root_R_imu.asRPY().toString();
+    iDynTree::toEigen(m_intialHeadIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(root_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
+    //  yInfo()<<"head imu init orientation"<<m_initialHeadIMUOrientation.asRPY().toString();
+    yInfo()<<"base-head init orientation"<<m_intialHeadIMUOrientation.asRPY().toString();
+
     return true;
 }

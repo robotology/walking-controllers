@@ -162,10 +162,10 @@ public:
      * Get all the feedback signal from the interfaces
      * @return true in case of success and false otherwise.
      */
-    bool getFeedbacks(const iDynTree::Model modelLoader,const iDynTree::Rotation baseToWorldRotation,unsigned int maxAttempts = 1);
+    bool getFeedbacks(unsigned int maxAttempts = 1);
 
     //bool getFeedbacksRaw(unsigned int maxAttempts = 1);
-    bool getFeedbacksRaw(const iDynTree::Model modelLoader, const iDynTree::Rotation intialPelvisIMUOrientation,const iDynTree::Rotation intialHeadIMUOrientation, const iDynTree::Rotation headToBaseRotation, unsigned int maxAttempts = 1, bool useBaseEst = false);
+    bool getFeedbacksRaw(unsigned int maxAttempts = 1, bool useBaseEst = false);
 
     /**
      * Set the desired position reference. (The position will be sent using PositionControl mode)

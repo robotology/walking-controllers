@@ -135,6 +135,9 @@ iDynTree::Rotation m_intialHeadIMUOrientation;
 
     std::deque<iDynTree::Transform> m_leftTrajectory; /**< Deque containing the trajectory of the left foot. */
     std::deque<iDynTree::Transform> m_rightTrajectory; /**< Deque containing the trajectory of the right foot. */
+iDynTree::Rotation m_baseOrientationFromHeadIMU;
+iDynTree::Rotation m_baseOrientationFromPelvisIMU;
+
 
     std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
     std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
@@ -349,5 +352,9 @@ public:
     virtual bool stopWalking() override;
 
     bool DCMSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
+    bool GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDynTree::Rotation headimuOrientation);
+    bool GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation);
+    bool getFirstHeadIMUData(iDynTree::Rotation baseToWorldRotation, iDynTree::Rotation headToBaseRotation, iDynTree::Rotation imuOrientationtoIMUWorld);
+    bool getFirstPelvisIMUData(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation);
 };
 #endif

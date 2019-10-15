@@ -46,11 +46,11 @@ bool RobotHelper::getFirstPelvisIMUData(const iDynTree::Model modelLoader,const 
                 //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
                 auto root_imu_idx = modelLoader.getFrameIndex("root_link_imu_frame");
                 auto base_R_imu = modelLoader.getFrameTransform(root_imu_idx).getRotation();
-
+base_R_imu=iDynTree::Rotation::Identity();
                 yInfo()<<"root_R_imu"<<base_R_imu.asRPY().toString();
                 // iDynTree::Rotation InitialIMUOrientation;
                 iDynTree::Rotation imuOrientationtoIMUWorld;
-                imuOrientationtoIMUWorld=imuOrientationtoIMUWorld.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
+                imuOrientationtoIMUWorld=imuOrientationtoIMUWorld.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad(0 ));
                 iDynTree::toEigen(m_initialPelvisIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
                 //  *imuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
                 // yInfo()<<"imubefore"<<m_imuOrientation.asRPY().toString();
@@ -88,12 +88,13 @@ bool RobotHelper::getFirstHeadIMUData(const iDynTree::Model modelLoader,const iD
                 //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
                 auto head_imu_idx = modelLoader.getFrameIndex("imu_frame");
                 auto head_R_imu = modelLoader.getFrameTransform(head_imu_idx).getRotation();
+                head_R_imu=iDynTree::Rotation::Identity();
                 auto root_R_imu=headToBaseRotation*head_R_imu;
-
+                //root_R_imu=iDynTree::Rotation::Identity();
                 yInfo()<<"head root_R_imu"<<root_R_imu.asRPY().toString();
                 // iDynTree::Rotation InitialIMUOrientation;
                 iDynTree::Rotation imuOrientationtoIMUWorld;
-                imuOrientationtoIMUWorld=imuOrientationtoIMUWorld.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(2) ));
+                imuOrientationtoIMUWorld=imuOrientationtoIMUWorld.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad(0 ));
                 iDynTree::toEigen(m_initialHeadIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(root_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
                 //  *imuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
                 // yInfo()<<"imubefore"<<m_imuOrientation.asRPY().toString();
@@ -120,7 +121,7 @@ bool RobotHelper::getFirstHeadIMUData(const iDynTree::Model modelLoader,const iD
 }
 
 
-bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTree::Rotation intialPelvisIMUOrientation,const iDynTree::Rotation intialHeadIMUOrientation,const iDynTree::Rotation headToBaseRotation,unsigned int maxAttempts, bool getBaseEst)
+bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 {
     if(!m_encodersInterface)
     {
@@ -240,23 +241,8 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
                 yarp::sig::Vector *pelvisIMU = NULL;
                 pelvisIMU=m_pelvisIMUPort.read(false);
                 if (pelvisIMU!=NULL) {
-                    //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
-                    auto root_imu_idx = modelLoader.getFrameIndex("root_link_imu_frame");
-                    auto root_R_imu = modelLoader.getFrameTransform(root_imu_idx).getRotation();
 
-                    // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
-                    //yInfo()<<"m_imuOrientation"<<m_imuOrientation.asRPY().toString();
-                    // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
-
-                    m_pelvisimuOrientation=m_pelvisimuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
-                    yInfo()<<"imubefore"<<m_pelvisimuOrientation.asRPY().toString();
-                    //                m_imuOrientation=root_R_imu.inverse()*m_imuOrientation;
-
-                    iDynTree::toEigen(m_pelvisimuOrientation)=iDynTree::toEigen(intialPelvisIMUOrientation)*iDynTree::toEigen(m_pelvisimuOrientation)*iDynTree::toEigen(root_R_imu.inverse());
-                    yInfo()<<"inital"<<intialPelvisIMUOrientation.asRPY().toString();
-                    //                                yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
-                    yInfo()<<"imuafter"<<m_pelvisimuOrientation.asRPY().toString();
-                    //m_imuOrientation
+                    m_pelvisimuOrientation=m_pelvisimuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2)));
                     m_pelvisimuAcceleration(0)=(*pelvisIMU)(3) ;
                     m_pelvisimuAcceleration(1)=(*pelvisIMU)(4) ;
                     m_pelvisimuAcceleration(2)=(*pelvisIMU)(5) ;
@@ -275,34 +261,9 @@ bool RobotHelper::getFeedbacksRaw(const iDynTree::Model modelLoader,const iDynTr
                 yarp::sig::Vector *headIMU = NULL;
                 headIMU=m_headIMUPort.read(false);
                 if (headIMU!=NULL) {
-                    //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
-                    auto head_imu_idx = modelLoader.getFrameIndex("imu_frame");
-                    auto head_R_imu = modelLoader.getFrameTransform(head_imu_idx).getRotation();
 
-                    yInfo()<<"head imu R"<<head_R_imu.asRPY()(0);
-                    yInfo()<<"head imu R"<<head_R_imu.asRPY()(1);
-                    yInfo()<<"head imu R"<<head_R_imu.asRPY()(2);
+                    m_headimuOrientation=m_headimuOrientation.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(2)));
 
-                    auto root_imu_idx = modelLoader.getFrameIndex("root_link_imu_frame");
-                    auto root_R = modelLoader.getFrameTransform(root_imu_idx).getRotation();
-
-
-
-                    auto root_R_imu=headToBaseRotation*head_R_imu;
-                     yInfo()<<"imu to root"<<root_R_imu.asRPY().toString();
-                    // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
-                    //yInfo()<<"m_imuOrientation"<<m_imuOrientation.asRPY().toString();
-                    // yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
-
-                    m_headimuOrientation=m_headimuOrientation.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(2) ));
-                    yInfo()<<"head imubefore"<<m_headimuOrientation.asRPY().toString();
-                    //                m_imuOrientation=root_R_imu.inverse()*m_imuOrientation;
-
-                    iDynTree::toEigen(m_headimuOrientation)=iDynTree::toEigen(intialHeadIMUOrientation)*iDynTree::toEigen(m_headimuOrientation)*iDynTree::toEigen( root_R_imu.inverse());
-                    yInfo()<<"head inital"<<intialHeadIMUOrientation.asRPY().toString();
-                    //                                yInfo()<<"root_R_imu"<<root_R_imu.asRPY().toString();
-                    yInfo()<<"head imuafter"<<m_headimuOrientation.asRPY().toString();
-                    //m_imuOrientation
                     m_headimuAcceleration(0)=(*headIMU)(3) ;
                     m_headimuAcceleration(1)=(*headIMU)(4) ;
                     m_headimuAcceleration(2)=(*headIMU)(5) ;
@@ -727,7 +688,7 @@ bool RobotHelper::configurePIDHandler(const yarp::os::Bottle& config)
 bool RobotHelper::resetFilters(const iDynTree::Model modelLoader,const iDynTree::Rotation baseToWorldRotation)
 {
     //if(!getFeedbacksRaw())
-    if(!getFeedbacksRaw(modelLoader,m_initialPelvisIMUOrientation,m_initialHeadIMUOrientation,baseToWorldRotation,100, true))
+    if(!getFeedbacksRaw(100, true))
     {
         yError() << "[RobotHelper::resetFilters] Unable to get the feedback from the robot";
         return false;
@@ -746,12 +707,12 @@ bool RobotHelper::resetFilters(const iDynTree::Model modelLoader,const iDynTree:
     return true;
 }
 
-bool RobotHelper::getFeedbacks(const iDynTree::Model modelLoader,iDynTree::Rotation baseToWorldRotation, unsigned int maxAttempts)
+bool RobotHelper::getFeedbacks( unsigned int maxAttempts)
 {
     // by default we consider the presence of a base estimation block
     bool useBaseEst = true;
 
-    if(!getFeedbacksRaw(modelLoader,m_initialPelvisIMUOrientation,m_initialHeadIMUOrientation,baseToWorldRotation,maxAttempts, useBaseEst))
+    if(!getFeedbacksRaw(maxAttempts, useBaseEst))
     {
         yError() << "[RobotHelper::getFeedbacks] Unable to get the feedback from the robot";
         return false;
