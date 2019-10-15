@@ -92,8 +92,8 @@ bool YarpUtilities::yarpListToBoolVector(yarp::os::Value*& input, std::vector<bo
     yarp::os::Bottle *bottle = input->asList();
     for(int i = 0; i < bottle->size(); i++)
     {
-        // check if the elements of the bottle are strings
-        if(!bottle->get(i).isString())
+        // check if the elements of the bottle are bool or integer
+        if(!bottle->get(i).isBool() && !bottle->get(i).isInt())
         {
             yError() << "[yarpListToBoolVector] There is a field that is not a bool.";
             return false;
