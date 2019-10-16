@@ -57,4 +57,6 @@ if(WALKING_CONTROLLERS_COMPILE_WalkingModule)
 
   install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
 
+  add_subdirectory(app)
+
 endif()
