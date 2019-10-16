@@ -14,12 +14,6 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # Check WalkingControllers dependencies, find necessary libraries.
 include(WalkingControllersFindDependencies)
 
-
-# find_package(YARP REQUIRED)
-# find_package(ICUBcontrib REQUIRED)
-
-# list(APPEND CMAKE_MODULE_PATH ${ICUBCONTRIB_MODULE_PATH})
-
 #set default build type to "Release" in single-config generators
 if(NOT CMAKE_CONFIGURATION_TYPES)
     if(NOT CMAKE_BUILD_TYPE)
@@ -29,9 +23,6 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
     set(ROBOTOLOGY_BUILD_TYPES "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${ROBOTOLOGY_BUILD_TYPES})
 endif()
-
-# add_subdirectory(modules)
-# add_subdirectory(app)
 
 add_subdirectory(src)
 
