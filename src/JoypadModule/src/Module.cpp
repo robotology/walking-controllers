@@ -11,8 +11,10 @@
 #include <yarp/os/Property.h>
 #include <yarp/os/Bottle.h>
 
-#include <JoypadModule.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/JoypadModule/Module.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
 {
@@ -179,7 +181,7 @@ bool JoypadModule::updateModule()
     float aButton, bButton, xButton, yButton, l1Button, r1Button;
 
     // prepare robot (A button)
-    m_joypadController->getButton(0, aButton); 
+    m_joypadController->getButton(0, aButton);
 
     // start walking (B button)
     m_joypadController->getButton(1, bButton);
@@ -201,7 +203,7 @@ bool JoypadModule::updateModule()
 
     x = -m_scaleX * deadzone(x);
     y = -m_scaleY * deadzone(y);
-    
+
     std::swap(x,y);
 
     if(aButton > 0)

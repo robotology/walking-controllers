@@ -11,7 +11,9 @@
 #include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
 
-#include "JoypadModule.hpp"
+#include <WalkingControllers/JoypadModule/Module.h>
+
+using namespace WalkingControllers;
 
 int main(int argc, char * argv[])
 {
