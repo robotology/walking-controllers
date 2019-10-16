@@ -16,6 +16,7 @@
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
 
+
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/Core/EigenHelpers.h>
@@ -23,8 +24,11 @@
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
 
-#include <WalkingModule.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/WalkingModule/Module.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/StdHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 void WalkingModule::propagateTime()
 {
