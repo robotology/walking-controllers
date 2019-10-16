@@ -1,5 +1,5 @@
 /**
- * @file WalkingLoggerModule.cpp
+ * @file LoggerModule.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
  * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
@@ -10,12 +10,14 @@
 #include <iomanip>
 
 // YARP
-#include "yarp/os/LogStream.h"
+#include <yarp/os/LogStream.h>
 #include <yarp/os/Time.h>
 #include <yarp/os/BufferedPort.h>
 
-#include <WalkingLoggerModule.hpp>
-#include <Utils.hpp>
+#include <WalkingControllers/LoggerModule/Module.h>
+#include <WalkingControllers/YarpHelper/Helper.h>
+
+using namespace WalkingControllers;
 
 double WalkingLoggerModule::getPeriod()
 {

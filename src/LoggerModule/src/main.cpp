@@ -12,8 +12,9 @@
 #include <yarp/os/RFModule.h>
 #include <yarp/os/BufferedPort.h>
 
-#include "WalkingLoggerModule.hpp"
+#include <WalkingControllers/LoggerModule/Module.h>
 
+using namespace WalkingControllers;
 
 int main(int argc, char * argv[])
 {
