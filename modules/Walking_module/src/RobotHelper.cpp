@@ -34,91 +34,6 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
     return true;
 }
 
-bool RobotHelper::getFirstPelvisIMUData(const iDynTree::Model modelLoader,const iDynTree::Rotation baseToWorldRotation,const int maxAttempts){
-    int attempt=0;
-    do {
-        if (m_usePelvisIMU) {
-            yarp::sig::Vector *pelvisIMU = NULL;
-            pelvisIMU=m_pelvisIMUPort.read(false);
-
-            if (pelvisIMU!=NULL) {
-                yInfo()<<"i'm there";
-                //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
-                auto root_imu_idx = modelLoader.getFrameIndex("root_link_imu_frame");
-                auto base_R_imu = modelLoader.getFrameTransform(root_imu_idx).getRotation();
-base_R_imu=iDynTree::Rotation::Identity();
-                yInfo()<<"root_R_imu"<<base_R_imu.asRPY().toString();
-                // iDynTree::Rotation InitialIMUOrientation;
-                iDynTree::Rotation imuOrientationtoIMUWorld;
-                imuOrientationtoIMUWorld=imuOrientationtoIMUWorld.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad(0 ));
-                iDynTree::toEigen(m_initialPelvisIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
-                //  *imuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
-                // yInfo()<<"imubefore"<<m_imuOrientation.asRPY().toString();
-                //m_imuOrientation=root_R_imu.inverse()*m_imuOrientation;
-                yInfo()<<"imu init orientation"<<m_initialPelvisIMUOrientation.asRPY().toString();
-
-
-                //yInfo()<<"imu"<<root_R_imu.asRPY().toString();
-                //                            yInfo()<<"imuafter"<<m_imuOrientation.asRPY().toString();
-                //m_imuOrientation
-                m_pelvisimuAcceleration(0)=(*pelvisIMU)(3) ;
-                m_pelvisimuAcceleration(1)=(*pelvisIMU)(4) ;
-                m_pelvisimuAcceleration(2)=(*pelvisIMU)(5) ;
-
-                m_pelvisimuAngularVelocity(0)=(*pelvisIMU)(6) ;
-                m_pelvisimuAngularVelocity(0)=(*pelvisIMU)(7) ;
-                m_pelvisimuAngularVelocity(0)=(*pelvisIMU)(8) ;
-            }
-        }
-        yarp::os::Time::delay(0.001);
-        attempt++;
-    } while (attempt < maxAttempts);
-    return true;
-}
-
-bool RobotHelper::getFirstHeadIMUData(const iDynTree::Model modelLoader,const iDynTree::Rotation baseToWorldRotation,const iDynTree::Rotation headToBaseRotation,const int maxAttempts){
-    int attempt=0;
-    do {
-        if (m_useHeadIMU) {
-            yarp::sig::Vector *headIMU = NULL;
-            headIMU=m_headIMUPort.read(false);
-
-            if (headIMU!=NULL) {
-                yInfo()<<"i'm there";
-                //yInfo()<<(*pelvisIMU)(0)<<iDynTree::rad2deg((*pelvisIMU)(1))<<(*pelvisIMU)(2);
-                auto head_imu_idx = modelLoader.getFrameIndex("imu_frame");
-                auto head_R_imu = modelLoader.getFrameTransform(head_imu_idx).getRotation();
-                head_R_imu=iDynTree::Rotation::Identity();
-                auto root_R_imu=headToBaseRotation*head_R_imu;
-                //root_R_imu=iDynTree::Rotation::Identity();
-                yInfo()<<"head root_R_imu"<<root_R_imu.asRPY().toString();
-                // iDynTree::Rotation InitialIMUOrientation;
-                iDynTree::Rotation imuOrientationtoIMUWorld;
-                imuOrientationtoIMUWorld=imuOrientationtoIMUWorld.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad(0 ));
-                iDynTree::toEigen(m_initialHeadIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(root_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
-                //  *imuOrientation.RPY(iDynTree::deg2rad((*pelvisIMU)(0)),iDynTree::deg2rad((*pelvisIMU)(1)),iDynTree::deg2rad((*pelvisIMU)(2) ));
-                // yInfo()<<"imubefore"<<m_imuOrientation.asRPY().toString();
-                //m_imuOrientation=root_R_imu.inverse()*m_imuOrientation;
-                yInfo()<<"head imu init orientation"<<m_initialHeadIMUOrientation.asRPY().toString();
-
-
-                //yInfo()<<"imu"<<root_R_imu.asRPY().toString();
-                //                            yInfo()<<"imuafter"<<m_imuOrientation.asRPY().toString();
-                //m_imuOrientation
-                m_headimuAcceleration(0)=(*headIMU)(3) ;
-                m_headimuAcceleration(1)=(*headIMU)(4) ;
-                m_headimuAcceleration(2)=(*headIMU)(5) ;
-
-                m_headimuAngularVelocity(0)=(*headIMU)(6) ;
-                m_headimuAngularVelocity(0)=(*headIMU)(7) ;
-                m_headimuAngularVelocity(0)=(*headIMU)(8) ;
-            }
-        }
-        yarp::os::Time::delay(0.001);
-        attempt++;
-    } while (attempt < maxAttempts);
-        return true;
-}
 
 
 bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
@@ -262,7 +177,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                 headIMU=m_headIMUPort.read(false);
                 if (headIMU!=NULL) {
 
-                    m_headimuOrientation=m_headimuOrientation.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(1)));
+                    m_headimuOrientation=m_headimuOrientation.RPY(iDynTree::deg2rad((*headIMU)(0)),iDynTree::deg2rad((*headIMU)(1)),iDynTree::deg2rad((*headIMU)(2)));
 
                     m_headimuAcceleration(0)=(*headIMU)(3) ;
                     m_headimuAcceleration(1)=(*headIMU)(4) ;
@@ -1079,11 +994,6 @@ const iDynTree::Rotation& RobotHelper::getPelvisIMUOreintation() const
     return m_pelvisimuOrientation;
 }
 
-const iDynTree::Rotation& RobotHelper::getInitialPelvisIMUOreintation() const
-{
-    return m_initialPelvisIMUOrientation;
-}
-
 
 const iDynTree::LinAcceleration& RobotHelper::getHeadIMUAcceleration() const
 {
@@ -1098,11 +1008,6 @@ const iDynTree::AngVelocity& RobotHelper::getHeadIMUAngularVelocity() const
 const iDynTree::Rotation& RobotHelper::getHeadIMUOreintation() const
 {
     return m_headimuOrientation;
-}
-
-const iDynTree::Rotation& RobotHelper::getInitialHeadIMUOreintation() const
-{
-    return m_initialHeadIMUOrientation;
 }
 
 
