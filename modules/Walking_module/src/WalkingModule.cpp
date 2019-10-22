@@ -786,16 +786,22 @@ bool WalkingModule::updateModule()
         m_isRollActive=0;
         iDynTree::Rotation imuRotation;
         iDynTree::Vector3 imuRPY;
-      yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
+        yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         if (m_robotControlHelper->isHeadIMUUsed()) {
             iDynTree::Rotation Base_R_Head;
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
-            GetBaseFromHeadIMU(Base_R_Head,m_robotControlHelper->getHeadIMUOreintation());
+            iDynTree::Rotation tempHeadIMURotation;
+            tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+
+            GetBaseFromHeadIMU(Base_R_Head,tempHeadIMURotation);
             imuRPY= m_baseOrientationFromHeadIMU.asRPY();
         }
 
         if (m_robotControlHelper->isPelvisIMUUsed()) {
-            GetBaseFromPelvisIMU(m_robotControlHelper->getPelvisIMUOreintation());
+            iDynTree::Rotation tempPelvisIMURotation;
+            tempPelvisIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getPelvisIMUOreintation().asRPY()(0),m_robotControlHelper->getPelvisIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+
+            GetBaseFromPelvisIMU(tempPelvisIMURotation);
             imuRPY= m_baseOrientationFromPelvisIMU.asRPY();
         }
 
@@ -1457,14 +1463,20 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
 
     if (m_robotControlHelper->isPelvisIMUUsed()) {
-        getFirstPelvisIMUData(m_robotControlHelper->getPelvisIMUOreintation(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
+        iDynTree::Rotation tempPelvisIMURotation;
+        tempPelvisIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getPelvisIMUOreintation().asRPY()(0),m_robotControlHelper->getPelvisIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+
+        getFirstPelvisIMUData(tempPelvisIMURotation,m_FKSolver->getRootLinkToWorldTransform().getRotation());
     }
 
 
     if (m_robotControlHelper->isHeadIMUUsed()) {
         iDynTree::Rotation Base_R_Head;
         iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
-        getFirstHeadIMUData(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,m_robotControlHelper->getHeadIMUOreintation());
+        iDynTree::Rotation tempHeadIMURotation;
+        tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+
+        getFirstHeadIMUData(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,tempHeadIMURotation);
     }
 
     if(m_robotState != WalkingFSM::Configured && m_robotState != WalkingFSM::Stopped)
@@ -1900,14 +1912,20 @@ bool WalkingModule::startWalking()
 
 
         if (m_robotControlHelper->isPelvisIMUUsed()) {
-            getFirstPelvisIMUData(m_robotControlHelper->getPelvisIMUOreintation(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
+            iDynTree::Rotation tempPelvisIMURotation;
+            tempPelvisIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getPelvisIMUOreintation().asRPY()(0),m_robotControlHelper->getPelvisIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+
+            getFirstPelvisIMUData(tempPelvisIMURotation,m_FKSolver->getRootLinkToWorldTransform().getRotation());
         }
 
 
         if (m_robotControlHelper->isHeadIMUUsed()) {
             iDynTree::Rotation Base_R_Head;
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
-            getFirstHeadIMUData(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,m_robotControlHelper->getHeadIMUOreintation());
+            iDynTree::Rotation tempHeadIMURotation;
+            tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+
+            getFirstHeadIMUData(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,tempHeadIMURotation);
         }
     }
 
