@@ -24,6 +24,15 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${ROBOTOLOGY_BUILD_TYPES})
 endif()
 
+option(ENABLE_RPATH "Enable RPATH for this library" ON)
+mark_as_advanced(ENABLE_RPATH)
+include(AddInstallRPATHSupport)
+add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+  LIB_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+  INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}"
+  DEPENDS ENABLE_RPATH
+  USE_LINK_PATH)
+
 add_subdirectory(src)
 
 include(InstallBasicPackageFiles)
