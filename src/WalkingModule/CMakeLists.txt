@@ -42,17 +42,17 @@ if(WALKING_CONTROLLERS_COMPILE_WalkingModule)
     ${${EXE_TARGET_NAME}_THRIFT_GEN_FILES})
 
   target_link_libraries(${EXE_TARGET_NAME}
-    WalkingControllers::YARP_helper
-    WalkingControllers::iDynTree_helper
-    WalkingControllers::Std_helper
-    WalkingControllers::Time_profiler
-    WalkingControllers::Robot_helper
-    WalkingControllers::KinDyn_wrapper
-    WalkingControllers::Trajectory_planner
-    WalkingControllers::Simplified_model_controllers
-    WalkingControllers::Whole_body_controllers
-    WalkingControllers::Retargeting_helper
-    WalkingControllers::Logger_client
+    WalkingControllers::YarpUtilities
+    WalkingControllers::iDynTreeUtilities
+    WalkingControllers::StdUtilities
+    WalkingControllers::TimeProfiler
+    WalkingControllers::RobotInterface
+    WalkingControllers::KinDynWrapper
+    WalkingControllers::TrajectoryPlanner
+    WalkingControllers::SimplifiedModelControllers
+    WalkingControllers::WholeBodyControllers
+    WalkingControllers::RetargetingHelper
+    WalkingControllers::LoggerClient
     )
 
   install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
