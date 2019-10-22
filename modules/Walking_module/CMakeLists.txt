@@ -17,7 +17,7 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
 # Find required package
 find_package(ICUB REQUIRED)
 find_package(UnicyclePlanner 0.1.102 REQUIRED)
-find_package(OsqpEigen REQUIRED)
+find_package(OsqpEigen 0.4.0 REQUIRED)
 find_package(qpOASES REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -40,8 +40,7 @@ set(${EXE_TARGET_NAME}_SRC
   src/WalkingZMPController.cpp
   src/StableDCMModel.cpp
   src/WalkingPIDHandler.cpp
-  src/WalkingLogger.cpp
-  src/TimeProfiler.cpp
+  src/RetargetingClient.cpp
   )
 
 # set hpp files
@@ -59,9 +58,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/WalkingZMPController.hpp
   include/StableDCMModel.hpp
   include/WalkingPIDHandler.hpp
-  include/WalkingLogger.hpp
-  include/WalkingLogger.tpp
-  include/TimeProfiler.hpp
+  include/RetargetingClient.hpp
   )
 
 # add include directories to the build.
@@ -87,6 +84,7 @@ target_link_libraries(${EXE_TARGET_NAME}
   ctrlLib
   UnicyclePlanner
   UtilityLibrary
+  LoggerClient
   OsqpEigen::OsqpEigen
   osqp::osqp
   Threads::Threads

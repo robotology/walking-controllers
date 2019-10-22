@@ -1,7 +1,7 @@
 /**
- * @file WalkingLogger.cpp
+ * @file LoggerClient.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
- * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
+ * @copyright 2019 iCub Facility - Istituto Italiano di Tecnologia
  *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
  * @date 2018
  */
@@ -9,10 +9,10 @@
 // YARP
 #include <yarp/os/LogStream.h>
 
-#include <WalkingLogger.hpp>
+#include <LoggerClient.hpp>
 #include <Utils.hpp>
 
-bool WalkingLogger::configure(const yarp::os::Searchable& config, const std::string& name)
+bool LoggerClient::configure(const yarp::os::Searchable& config, const std::string& name)
 {
     std::string portInput, portOutput;
 
@@ -61,7 +61,7 @@ bool WalkingLogger::configure(const yarp::os::Searchable& config, const std::str
     return true;
 }
 
-bool WalkingLogger::startRecord(const std::initializer_list<std::string>& strings)
+bool LoggerClient::startRecord(const std::initializer_list<std::string>& strings)
 {
     yarp::os::Bottle cmd, outcome;
 
@@ -76,7 +76,7 @@ bool WalkingLogger::startRecord(const std::initializer_list<std::string>& string
     return true;
 }
 
-void WalkingLogger::quit()
+void LoggerClient::quit()
 {
     // stop recording
     yarp::os::Bottle cmd, outcome;

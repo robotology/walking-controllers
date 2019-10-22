@@ -72,8 +72,6 @@ class WalkingController
     iDynTree::ConvexHullProjectionConstraint m_convexHullComputer; /**<iDynTree convex hull helper. */
     std::vector<iDynTree::Polygon> m_feetPolygons; /**<Vector containing the polygon of each foot (left and right). */
 
-    bool m_isSolutionEvaluated{false}; /**< True if the solution is evaluated. */
-
     /**
      * Pointer to the current MPCSolver.
      * A new MPC solver is initialized when a new phase occurs.
@@ -238,10 +236,9 @@ public:
 
     /**
      * Get the output of the controller.
-     * @param controllerOutput is the vector containing the output the controller.
-     * @return true/false in case of success/failure.
+     * @return the vector containing the output the controller.
      */
-    bool getControllerOutput(iDynTree::Vector2& controllerOutput);
+    const iDynTree::Vector2& getControllerOutput() const;
 
     /**
      * Reset the controller

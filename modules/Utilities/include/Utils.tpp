@@ -12,25 +12,25 @@
 // YARP
 #include <yarp/os/LogStream.h>
 
-template <unsigned int n>
-bool YarpHelper::yarpListToiDynTreeVectorFixSize(const yarp::os::Value& input, iDynTree::VectorFixSize<n>& output)
+template <typename T>
+bool YarpHelper::yarpListToVector(const yarp::os::Value& input, T& output)
 {
     if (input.isNull())
     {
-        yError() << "[yarpListToiDynTreeVectorFixSize] Empty input value.";
+        yError() << "[yarpListToVector] Empty input value.";
         return false;
     }
     if (!input.isList() || !input.asList())
     {
-        yError() << "[yarpListToiDynTreeVectorFixSize] Unable to read the input list.";
+        yError() << "[yarpListToVector] Unable to read the input list.";
         return false;
     }
     yarp::os::Bottle *inputPtr = input.asList();
 
-    if (inputPtr->size() != n)
+    if (inputPtr->size() != output.size())
     {
-        yError() << "[yarpListToiDynTreeVectorFixSize] The dimension set in the configuration file is not "
-                 << n;
+        yError() << "[yarpListToVector] The dimension set in the configuration file is not "
+                 << output.size();
         return false;
     }
 
@@ -38,12 +38,27 @@ bool YarpHelper::yarpListToiDynTreeVectorFixSize(const yarp::os::Value& input, i
     {
         if (!inputPtr->get(i).isDouble() && !inputPtr->get(i).isInt())
         {
-            yError() << "[yarpListToiDynTreeVectorFixSize] The input is expected to be a double";
+            yError() << "[yarpListToVector] The input is expected to be a double or an int";
             return false;
         }
         output(i) = inputPtr->get(i).asDouble();
     }
     return true;
+}
+
+template <typename  T>
+bool YarpHelper::getVectorFromSearchable(const yarp::os::Searchable& config,
+                                         const std::string& key,
+                                         T& vector)
+{
+    yarp::os::Value* value;
+    if(!config.check(key, value))
+    {
+        yError() << "[getiDynTreeVectorFixSizeFromSearchable] Missing field "<< key;
+        return false;
+    }
+
+    return yarpListToVector(*value, vector);
 }
 
 template <typename T>

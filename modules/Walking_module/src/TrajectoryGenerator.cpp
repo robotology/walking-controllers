@@ -49,14 +49,12 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
         return false;
     }
 
-    yarp::os::Value tempValue;
 
     m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     m_plannerHorizon = config.check("plannerHorizon", yarp::os::Value(20.0)).asDouble();
     double unicycleGain = config.check("unicycleGain", yarp::os::Value(10.0)).asDouble();
 
-    tempValue = config.find("referencePosition");
-    if(!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, m_referencePointDistance))
+    if(!YarpHelper::getVectorFromSearchable(config, "referencePosition", m_referencePointDistance))
     {
         yError() << "[configurePlanner] Initialization failed while reading referencePosition vector.";
         return false;
@@ -64,16 +62,14 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     // get left and right ZMP delta
     iDynTree::Vector2 leftZMPDelta;
-    tempValue = config.find("leftZMPDelta");
-    if (!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, leftZMPDelta))
+    if(!YarpHelper::getVectorFromSearchable(config, "leftZMPDelta", leftZMPDelta))
     {
         yError() << "[configurePlanner] Initialization failed while reading rStancePosition vector.";
         return false;
     }
 
     iDynTree::Vector2 rightZMPDelta;
-    tempValue = config.find("rightZMPDelta");
-    if (!YarpHelper::yarpListToiDynTreeVectorFixSize(tempValue, rightZMPDelta))
+    if(!YarpHelper::getVectorFromSearchable(config, "rightZMPDelta", rightZMPDelta))
     {
         yError() << "[configurePlanner] Initialization failed while reading rStancePosition vector.";
         return false;
