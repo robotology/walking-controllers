@@ -34,7 +34,7 @@ if(WALKING_CONTROLLERS_COMPILE_JoypadModule)
   # add an executable to the project using the specified source files.
   add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}_HDR})
 
-  target_link_libraries(${EXE_TARGET_NAME} WalkingControllers::YARP_helper)
+  target_link_libraries(${EXE_TARGET_NAME} WalkingControllers::YarpUtilities)
 
   install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
 

@@ -25,8 +25,8 @@
 #include <iDynTree/Model/Model.h>
 
 #include <WalkingControllers/WalkingModule/Module.h>
-#include <WalkingControllers/YarpHelper/Helper.h>
-#include <WalkingControllers/StdHelper/Helper.h>
+#include <WalkingControllers/YarpUtilities/Helper.h>
+#include <WalkingControllers/StdUtilities/Helper.h>
 
 using namespace WalkingControllers;
 
@@ -133,14 +133,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     std::string name;
-    if(!YarpHelper::getStringFromSearchable(generalOptions, "name", name))
+    if(!YarpUtilities::getStringFromSearchable(generalOptions, "name", name))
     {
         yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
         return false;
     }
     setName(name.c_str());
 
-    m_robotControlHelper = std::make_unique<RobotHelper>();
+    m_robotControlHelper = std::make_unique<RobotInterface>();
     yarp::os::Bottle& robotControlHelperOptions = rf.findGroup("ROBOT_CONTROL");
     robotControlHelperOptions.append(generalOptions);
     if(!m_robotControlHelper->configureRobot(robotControlHelperOptions))
@@ -1109,20 +1109,20 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     m_trajectoryGenerator->getMergePoints(mergePoints);
 
     // append vectors to deques
-    StdHelper::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
-    StdHelper::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
-    StdHelper::appendVectorToDeque(leftTwistTrajectory, m_leftTwistTrajectory, mergePoint);
-    StdHelper::appendVectorToDeque(rightTwistTrajectory, m_rightTwistTrajectory, mergePoint);
-    StdHelper::appendVectorToDeque(isLeftFixedFrame, m_isLeftFixedFrame, mergePoint);
+    StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(leftTwistTrajectory, m_leftTwistTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(rightTwistTrajectory, m_rightTwistTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(isLeftFixedFrame, m_isLeftFixedFrame, mergePoint);
 
-    StdHelper::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
-    StdHelper::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
+    StdUtilities::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
+    StdUtilities::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityDesired, mergePoint);
 
-    StdHelper::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
-    StdHelper::appendVectorToDeque(rightInContact, m_rightInContact, mergePoint);
+    StdUtilities::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
+    StdUtilities::appendVectorToDeque(rightInContact, m_rightInContact, mergePoint);
 
-    StdHelper::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
-    StdHelper::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
+    StdUtilities::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 

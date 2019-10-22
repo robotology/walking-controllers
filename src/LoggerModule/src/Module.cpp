@@ -15,7 +15,7 @@
 #include <yarp/os/BufferedPort.h>
 
 #include <WalkingControllers/LoggerModule/Module.h>
-#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/YarpUtilities/Helper.h>
 
 using namespace WalkingControllers;
 
@@ -109,7 +109,7 @@ bool WalkingLoggerModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     std::string name;
-    if(!YarpHelper::getStringFromSearchable(rf, "name", name))
+    if(!YarpUtilities::getStringFromSearchable(rf, "name", name))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
@@ -118,7 +118,7 @@ bool WalkingLoggerModule::configure(yarp::os::ResourceFinder &rf)
 
     // set data port name
     std::string dataPortName;
-    if(!YarpHelper::getStringFromSearchable(rf, "data_port_name", dataPortName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "data_port_name", dataPortName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
@@ -127,7 +127,7 @@ bool WalkingLoggerModule::configure(yarp::os::ResourceFinder &rf)
 
     // set rpc port name
     std::string rpcPortName;
-    if(!YarpHelper::getStringFromSearchable(rf, "rpc_port_name", rpcPortName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "rpc_port_name", rpcPortName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;

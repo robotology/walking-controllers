@@ -12,7 +12,7 @@
 #include <yarp/os/Bottle.h>
 
 #include <WalkingControllers/JoypadModule/Module.h>
-#include <WalkingControllers/YarpHelper/Helper.h>
+#include <WalkingControllers/YarpUtilities/Helper.h>
 
 using namespace WalkingControllers;
 
@@ -30,7 +30,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
 
     // set the module name
     std::string name;
-    if(!YarpHelper::getStringFromSearchable(rf, "name", name))
+    if(!YarpUtilities::getStringFromSearchable(rf, "name", name))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
@@ -38,27 +38,27 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     setName(name.c_str());
 
     // set the deadzone interval
-    if(!YarpHelper::getNumberFromSearchable(rf, "deadzone", m_deadzone))
+    if(!YarpUtilities::getNumberFromSearchable(rf, "deadzone", m_deadzone))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
     // set the maximum value measured by the joypad
-    if(!YarpHelper::getNumberFromSearchable(rf, "fullscale", m_fullscale))
+    if(!YarpUtilities::getNumberFromSearchable(rf, "fullscale", m_fullscale))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
     // set scaling factors
-    if(!YarpHelper::getNumberFromSearchable(rf, "scale_x", m_scaleX))
+    if(!YarpUtilities::getNumberFromSearchable(rf, "scale_x", m_scaleX))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
     }
 
-    if(!YarpHelper::getNumberFromSearchable(rf, "scale_y", m_scaleY))
+    if(!YarpUtilities::getNumberFromSearchable(rf, "scale_y", m_scaleY))
     {
         yError() << "[configure] Unable to get a double from a searchable";
         return false;
@@ -67,7 +67,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     // set the polydriver
     yarp::os::Property conf;
     std::string deviceName;
-    if(!YarpHelper::getStringFromSearchable(rf, "device", deviceName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "device", deviceName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
@@ -78,14 +78,14 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     if(deviceName == "JoypadControlClient")
     {
         std::string local;
-        if(!YarpHelper::getStringFromSearchable(rf, "local", local))
+        if(!YarpUtilities::getStringFromSearchable(rf, "local", local))
         {
             yError() << "[configure] Unable to get a string from searchable";
             return false;
         }
 
         std::string remote;
-        if(!YarpHelper::getStringFromSearchable(rf, "remote", remote))
+        if(!YarpUtilities::getStringFromSearchable(rf, "remote", remote))
         {
             yError() << "[configure] Unable to get a string from searchable";
             return false;
@@ -97,7 +97,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     else
     {
         int sticks;
-        if(!YarpHelper::getNumberFromSearchable(rf, "sticks", sticks))
+        if(!YarpUtilities::getNumberFromSearchable(rf, "sticks", sticks))
         {
             yError() << "[configure] Unable to get a number from searchable";
             return false;
@@ -122,7 +122,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     std::string portName;
-    if(!YarpHelper::getStringFromSearchable(rf, "rpcClientPort_name", portName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "rpcClientPort_name", portName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
@@ -130,14 +130,14 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     m_rpcClientPortName = "/" + name + portName;
     m_rpcClientPort.open(m_rpcClientPortName);
 
-    if(!YarpHelper::getStringFromSearchable(rf, "rpcServerPort_name", m_rpcServerPortName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "rpcServerPort_name", m_rpcServerPortName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
     yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
 
-    if(!YarpHelper::getStringFromSearchable(rf, "robotGoalOutputPort_name", portName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "robotGoalOutputPort_name", portName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
@@ -145,7 +145,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     m_robotGoalOutputPortName = "/" + name + portName;
     m_robotGoalPort.open(m_robotGoalOutputPortName);
 
-    if(!YarpHelper::getStringFromSearchable(rf, "robotGoalInputPort_name", m_robotGoalInputPortName))
+    if(!YarpUtilities::getStringFromSearchable(rf, "robotGoalInputPort_name", m_robotGoalInputPortName))
     {
         yError() << "[configure] Unable to get a string from searchable";
         return false;
