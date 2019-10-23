@@ -659,7 +659,7 @@ bool WalkingModule::updateModule()
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if(desiredUnicyclePosition != nullptr){
-            if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
+            if(!setPlannerInput((*desiredUnicyclePosition)(0), 0.0))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
@@ -2062,7 +2062,7 @@ bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
 bool WalkingModule::GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDynTree::Rotation headimuOrientation){
     auto head_imu_idx = m_loader.model().getFrameIndex("imu_frame");
     auto head_R_imu   = m_loader.model().getFrameTransform(head_imu_idx).getRotation();
-    head_R_imu=iDynTree::Rotation::Identity();
+    //head_R_imu=iDynTree::Rotation::Identity();
     iDynTree::Rotation base_R_imu;
     iDynTree::toEigen(base_R_imu)=iDynTree::toEigen(headToBaseRotation)*iDynTree::toEigen(head_R_imu);
     iDynTree::toEigen(m_baseOrientationFromHeadIMU)=iDynTree::toEigen(m_intialHeadIMUOrientation)*iDynTree::toEigen(headimuOrientation)*iDynTree::toEigen( base_R_imu.inverse());
@@ -2073,7 +2073,7 @@ bool WalkingModule::GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDy
 bool WalkingModule::GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation){
     auto base_imu_idx = m_loader.model().getFrameIndex("root_link_imu_frame");
     auto base_R_imu = m_loader.model().getFrameTransform(base_imu_idx).getRotation();
-    base_R_imu=iDynTree::Rotation::Identity();
+    //base_R_imu=iDynTree::Rotation::Identity();
     iDynTree::toEigen(m_baseOrientationFromPelvisIMU)=iDynTree::toEigen(m_intialPelvisIMUOrientation)*iDynTree::toEigen(pelvisimuOrientation)*iDynTree::toEigen(base_R_imu.inverse());
     yInfo()<<"base-pelvis orientation"<<m_baseOrientationFromPelvisIMU.asRPY().toString();
     return true;
@@ -2083,7 +2083,7 @@ bool WalkingModule::GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation
 bool WalkingModule::getFirstPelvisIMUData(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation){
     auto base_imu_idx = m_loader.model().getFrameIndex("root_link_imu_frame");
     auto base_R_imu = m_loader.model().getFrameTransform(base_imu_idx).getRotation();
-    base_R_imu=iDynTree::Rotation::Identity();
+    //base_R_imu=iDynTree::Rotation::Identity();
     iDynTree::toEigen(m_intialPelvisIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
     yInfo()<<"base-pelvis init orientation"<<m_intialPelvisIMUOrientation.asRPY().toString();
     return true;
@@ -2092,7 +2092,7 @@ bool WalkingModule::getFirstPelvisIMUData(iDynTree::Rotation imuOrientationtoIMU
 bool WalkingModule::getFirstHeadIMUData(iDynTree::Rotation baseToWorldRotation,iDynTree::Rotation headToBaseRotation,iDynTree::Rotation imuOrientationtoIMUWorld){
     auto head_imu_idx = m_loader.model().getFrameIndex("imu_frame");
     auto head_R_imu = m_loader.model().getFrameTransform(head_imu_idx).getRotation();
-    head_R_imu=iDynTree::Rotation::Identity();
+    //head_R_imu=iDynTree::Rotation::Identity();
     auto base_R_imu=headToBaseRotation*head_R_imu;
     iDynTree::toEigen(m_intialHeadIMUOrientation)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
     yInfo()<<"base-head init orientation"<<m_intialHeadIMUOrientation.asRPY().toString();
