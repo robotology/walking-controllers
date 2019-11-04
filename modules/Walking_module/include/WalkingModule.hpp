@@ -63,9 +63,9 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_tempCoP;
     double m_tempDCM;
     double m_isPushActive;
-        double m_isRollActive;
-        double m_isPitchActive;
-        int m_timeIndexAfterPushDetection;
+    double m_isRollActive;
+    double m_isPitchActive;
+    int m_timeIndexAfterPushDetection;
     iDynTree::VectorFixSize<5> m_nominalValuesLeft;
     iDynTree::VectorFixSize<5> m_nominalValuesRight;
     iDynTree::Vector3 m_currentValues;
@@ -92,8 +92,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;
     std::shared_ptr<FootPrint> m_jRightFootprints;
     StepList m_jRightstepList;
-iDynTree::Rotation m_intialPelvisIMUOrientation;
-iDynTree::Rotation m_intialHeadIMUOrientation;
+    iDynTree::Rotation m_WalkingWorld_R_PelvisIMUWorld;
+    iDynTree::Rotation m_WalkingWorld_R_HeadIMUWorld;
     //following three lines  added for filtering the global zmp to decrease the vibration during walking
     yarp::sig::Vector m_zmpFiltered; /**< Vector containing the filtered evaluated ZMP. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_ZMPFilter; /**< ZMP low pass filter .*/
@@ -135,8 +135,8 @@ iDynTree::Rotation m_intialHeadIMUOrientation;
 
     std::deque<iDynTree::Transform> m_leftTrajectory; /**< Deque containing the trajectory of the left foot. */
     std::deque<iDynTree::Transform> m_rightTrajectory; /**< Deque containing the trajectory of the right foot. */
-iDynTree::Rotation m_baseOrientationFromHeadIMU;
-iDynTree::Rotation m_baseOrientationFromPelvisIMU;
+    iDynTree::Rotation m_baseOrientationFromHeadIMU;
+    iDynTree::Rotation m_baseOrientationFromPelvisIMU;
 
 
     std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
@@ -354,7 +354,7 @@ public:
     bool DCMSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
     bool GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDynTree::Rotation headimuOrientation);
     bool GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation);
-    bool getFirstHeadIMUData(iDynTree::Rotation baseToWorldRotation, iDynTree::Rotation headToBaseRotation, iDynTree::Rotation imuOrientationtoIMUWorld);
-    bool getFirstPelvisIMUData(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation);
+    bool getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorldRotation, iDynTree::Rotation headToBaseRotation, iDynTree::Rotation imuOrientationtoIMUWorld);
+    bool getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation);
 };
 #endif
