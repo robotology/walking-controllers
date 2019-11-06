@@ -41,6 +41,7 @@ class WalkingFK
     iDynTree::FrameIndex m_frameLeftHandIndex; /**< Index of the frame attached to the left hand. */
     iDynTree::FrameIndex m_frameRightHandIndex; /**< Index of the frame attached to the right hand. */
     iDynTree::FrameIndex m_frameHeadIndex; /**< Index of the frame attached to the head. */
+    iDynTree::FrameIndex m_frameHeadIMUIndex; /**< Index of the frame attached to the head. */
 
     std::string m_baseFrameLeft; /**< Name of the left base frame. */
     std::string m_baseFrameRight;  /**< Name of the right base frame. */
@@ -260,6 +261,8 @@ public:
      * @return true/false in case of success/failure.
      */
     bool getCoMJacobian(iDynTree::MatrixDynSize &jacobian);
+    iDynTree::Transform getHeadIMUtoHeadTransform();
+    iDynTree::Transform getHeadIMUToWorldTransform();
 };
 
 #endif

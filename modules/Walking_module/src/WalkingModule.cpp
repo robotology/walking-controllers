@@ -505,8 +505,8 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     solver->setDesiredCoMPosition(desiredCoMPosition);
 
     // TODO probably the problem can be written locally w.r.t. the root or the base
-    solver->setDesiredHandsTransformation(m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->leftHandTransform(),
-                                          m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->rightHandTransform());
+    solver->setDesiredHandsTransformation(m_FKSolver->getHeadIMUToWorldTransform() * m_retargetingClient->leftHandTransform(),
+                                          m_FKSolver->getHeadIMUToWorldTransform() * m_retargetingClient->rightHandTransform());
 
     // set jacobians
     iDynTree::MatrixDynSize jacobian, comJacobian;
@@ -629,9 +629,9 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
+            m_retargetingClient->reset(m_FKSolver->getHeadIMUToWorldTransform().inverse()
                                        * m_FKSolver->getLeftHandToWorldTransform(),
-                                       m_FKSolver->getHeadToWorldTransform().inverse()
+                                       m_FKSolver->getHeadIMUToWorldTransform().inverse()
                                        * m_FKSolver->getRightHandToWorldTransform());
 
 
@@ -2060,9 +2060,8 @@ bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
 }
 
 bool WalkingModule::GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDynTree::Rotation headimuOrientation){
-    auto head_imu_idx = m_loader.model().getFrameIndex("imu_frame");
-    auto head_R_imu   = m_loader.model().getFrameTransform(head_imu_idx).getRotation();
-    head_R_imu=iDynTree::Rotation::Identity();
+    auto head_R_imu= m_FKSolver->getHeadIMUtoHeadTransform().getRotation();
+    //head_R_imu=iDynTree::Rotation::Identity();
     iDynTree::Rotation base_R_imu;
     iDynTree::toEigen(base_R_imu)=iDynTree::toEigen(headToBaseRotation)*iDynTree::toEigen(head_R_imu);
     iDynTree::toEigen(m_baseOrientationFromHeadIMU)=iDynTree::toEigen(m_WalkingWorld_R_HeadIMUWorld)*iDynTree::toEigen(headimuOrientation)*iDynTree::toEigen( base_R_imu.inverse());
@@ -2090,9 +2089,8 @@ bool WalkingModule::getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrient
 }
 
 bool WalkingModule::getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorldRotation,iDynTree::Rotation headToBaseRotation,iDynTree::Rotation imuOrientationtoIMUWorld){
-    auto head_imu_idx = m_loader.model().getFrameIndex("imu_frame");
-    auto head_R_imu = m_loader.model().getFrameTransform(head_imu_idx).getRotation();
-    head_R_imu=iDynTree::Rotation::Identity();
+    auto head_R_imu= m_FKSolver->getHeadIMUtoHeadTransform().getRotation();
+    //head_R_imu=iDynTree::Rotation::Identity();
     auto base_R_imu=headToBaseRotation*head_R_imu;
     iDynTree::toEigen(m_WalkingWorld_R_HeadIMUWorld)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
     yInfo()<<"base-head init orientation"<<m_WalkingWorld_R_HeadIMUWorld.asRPY().toString();
