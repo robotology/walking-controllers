@@ -757,7 +757,7 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        yInfo()<<"FK_Pelvis Orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
+//        yInfo()<<"FK_Pelvis Orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         // evaluate 3D-LIPM reference signal
         if(m_useStepAdaptation){
 
@@ -786,7 +786,7 @@ bool WalkingModule::updateModule()
         m_isRollActive=0;
         iDynTree::Rotation imuRotation;
         iDynTree::Vector3 imuRPY;
-        yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
+     //   yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         if (m_robotControlHelper->isHeadIMUUsed()) {
             iDynTree::Rotation Base_R_Head;
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
@@ -2045,11 +2045,11 @@ bool WalkingModule::stopWalking()
 
 
 bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM ){
-    double kSmoother=0.03;
+    double kSmoother=0.04;
     if (m_isPushActive>=0.1) {
         m_timeIndexAfterPushDetection=0;
     }
-    if (m_isPushActive>=0.1 || m_timeIndexAfterPushDetection<=500) {
+    if (m_isPushActive>=0.1 || m_timeIndexAfterPushDetection<=70) {
         m_timeIndexAfterPushDetection++;
         iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+kSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
     }
@@ -2065,7 +2065,7 @@ bool WalkingModule::GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDy
     iDynTree::Rotation base_R_imu;
     iDynTree::toEigen(base_R_imu)=iDynTree::toEigen(headToBaseRotation)*iDynTree::toEigen(head_R_imu);
     iDynTree::toEigen(m_baseOrientationFromHeadIMU)=iDynTree::toEigen(m_WalkingWorld_R_HeadIMUWorld)*iDynTree::toEigen(headimuOrientation)*iDynTree::toEigen( base_R_imu.inverse());
-    yInfo()<<"head-pelvis orientation"<<m_baseOrientationFromHeadIMU.asRPY().toString();
+    //yInfo()<<"head-pelvis orientation"<<m_baseOrientationFromHeadIMU.asRPY().toString();
     return true;
 }
 
@@ -2074,7 +2074,7 @@ bool WalkingModule::GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation
     auto base_R_imu = m_loader.model().getFrameTransform(base_imu_idx).getRotation();
     base_R_imu=iDynTree::Rotation::Identity();
     iDynTree::toEigen(m_baseOrientationFromPelvisIMU)=iDynTree::toEigen(m_WalkingWorld_R_PelvisIMUWorld)*iDynTree::toEigen(pelvisimuOrientation)*iDynTree::toEigen(base_R_imu.inverse());
-    yInfo()<<"base-pelvis orientation"<<m_baseOrientationFromPelvisIMU.asRPY().toString();
+   // yInfo()<<"base-pelvis orientation"<<m_baseOrientationFromPelvisIMU.asRPY().toString();
     return true;
 }
 
@@ -2084,7 +2084,7 @@ bool WalkingModule::getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrient
     auto base_R_imu = m_loader.model().getFrameTransform(base_imu_idx).getRotation();
     base_R_imu=iDynTree::Rotation::Identity();
     iDynTree::toEigen(m_WalkingWorld_R_PelvisIMUWorld)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
-    yInfo()<<"base-pelvis init orientation"<<m_WalkingWorld_R_PelvisIMUWorld.asRPY().toString();
+   // yInfo()<<"base-pelvis init orientation"<<m_WalkingWorld_R_PelvisIMUWorld.asRPY().toString();
     return true;
 }
 
@@ -2093,7 +2093,7 @@ bool WalkingModule::getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorld
     //head_R_imu=iDynTree::Rotation::Identity();
     auto base_R_imu=headToBaseRotation*head_R_imu;
     iDynTree::toEigen(m_WalkingWorld_R_HeadIMUWorld)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
-    yInfo()<<"base-head init orientation"<<m_WalkingWorld_R_HeadIMUWorld.asRPY().toString();
+    //yInfo()<<"base-head init orientation"<<m_WalkingWorld_R_HeadIMUWorld.asRPY().toString();
 
     return true;
 }
