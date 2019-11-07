@@ -35,12 +35,14 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_useHandRetargeting = false;
         m_useVirtualizer = false;
         m_useJointRetargeting = false;
+        m_useCoMHeightRetargeting = false;
         return true;
     }
 
     m_useHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
     m_useJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
+    m_useCoMHeightRetargeting = config.check("use_com_retargeting", yarp::os::Value(false)).asBool();
 
     if(m_useJointRetargeting && m_useHandRetargeting)
     {
@@ -132,18 +134,38 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_robotOrientationPort.open("/" + name + portName);
     }
 
+    if(m_useCoMHeightRetargeting)
+    {
+        if(!YarpUtilities::getStringFromSearchable(config, "com_height_retargeting_port_name", portName))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+            return false;
+        }
+        m_comHeightPort.open("/" + name + portName);
+
+        double smoothingTime;
+        if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+
+        m_comHeightSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, period, smoothingTime);
+    }
+
     return true;
 }
 
-void RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
+bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
                               const iDynTree::Transform& rightHandTransform,
-                              const iDynTree::VectorDynSize& jointValues)
+                              const iDynTree::VectorDynSize& jointValues,
+                              const double& comHeight)
 {
+    m_leftHandTransform = leftHandTransform;
+    m_rightHandTransform = rightHandTransform;
+
     if(m_useHandRetargeting)
     {
-        m_leftHandTransform = leftHandTransform;
-        m_rightHandTransform = rightHandTransform;
-
         iDynTree::toEigen(m_leftHandTransformYarp).segment<3>(0) =
             iDynTree::toEigen(m_leftHandTransform.getPosition());
 
@@ -161,6 +183,43 @@ void RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
     }
 
     m_retargetJoints = jointValues;
+
+    m_comHeight = comHeight;
+    m_comHeightVelocity = 0;
+    m_comConstantHeight = comHeight;
+
+    if(m_useCoMHeightRetargeting)
+    {
+        m_comHeightYarp(0) = comHeight;
+        m_comHeightSmoother->init(m_comHeightYarp);
+
+        // let's read the port to reset the comHeightInput
+        bool okCoMHeight = false;
+        unsigned int attempt = 0;
+        do
+        {
+            if(!okCoMHeight)
+            {
+                auto desiredCoMHeight = m_comHeightPort.read(false);
+                if(desiredCoMHeight != nullptr)
+                {
+                    m_comHeightInput = (*desiredCoMHeight)(2);
+                    okCoMHeight = true;
+                }
+            }
+
+            if(okCoMHeight)
+                return true;
+
+            yarp::os::Time::delay(0.001);
+            attempt++;
+        } while (attempt < 100);
+
+        yError() << "[RetargetingClient::reset] The retargeting port is not streaming data";
+        return false;
+    }
+
+    return true;
 }
 
 void RetargetingClient::getFeedback()
@@ -192,6 +251,28 @@ void RetargetingClient::getFeedback()
         }
     }
 
+
+    if(m_useCoMHeightRetargeting)
+    {
+        if(!m_isStancePhase)
+            m_comHeightYarp(0) = m_comConstantHeight;
+        else
+        {
+            auto desiredCoMHeight = m_comHeightPort.read(false);
+            if(desiredCoMHeight != nullptr)
+            {
+                m_comHeightYarp(0) += (*desiredCoMHeight)(2) - m_comHeightInput;
+                m_comHeightInput = (*desiredCoMHeight)(2);
+            }
+
+        }
+
+        m_comHeightSmoother->computeNextValues(m_comHeightYarp);
+        m_comHeight = m_comHeightSmoother->getPos()(0);
+        m_comHeightVelocity = m_comHeightSmoother->getVel()(0);
+
+    }
+
     return;
 }
 
@@ -208,6 +289,16 @@ const iDynTree::Transform& RetargetingClient::rightHandTransform() const
 const iDynTree::VectorDynSize& RetargetingClient::jointValues() const
 {
     return m_retargetJoints;
+}
+
+double RetargetingClient::comHeight() const
+{
+    return m_comHeight;
+}
+
+double RetargetingClient::comHeightVelocity() const
+{
+    return m_comHeightVelocity;
 }
 
 void RetargetingClient::close()
@@ -231,4 +322,9 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
     output.clear();
     output.push_back(rotation.asRPY()(2));
     m_robotOrientationPort.write(false);
+}
+
+bool RetargetingClient::setPhase(bool isStancePhase)
+{
+    m_isStancePhase = isStancePhase;
 }

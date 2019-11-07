@@ -504,11 +504,17 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
-                                       * m_FKSolver->getLeftHandToWorldTransform(),
-                                       m_FKSolver->getHeadToWorldTransform().inverse()
-                                       * m_FKSolver->getRightHandToWorldTransform(),
-                                       m_robotControlHelper->getJointPosition());
+            if(!m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
+                                          * m_FKSolver->getLeftHandToWorldTransform(),
+                                          m_FKSolver->getHeadToWorldTransform().inverse()
+                                          * m_FKSolver->getRightHandToWorldTransform(),
+                                          m_robotControlHelper->getJointPosition(),
+                                          m_comHeightTrajectory.front()))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to reset the retargeting client.";
+                return false;
+
+            }
 
 
             m_robotState = WalkingFSM::Prepared;
@@ -589,6 +595,9 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+        double threshold = 0.001;
+        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
+        m_retargetingClient->setPhase(stancePhase);
         m_retargetingClient->getFeedback();
 
         if(!updateFKSolver())
@@ -659,8 +668,6 @@ bool WalkingModule::updateModule()
         // inner COM-ZMP controller
         // if the the norm of desired DCM velocity is lower than a threshold then the robot
         // is stopped
-        double threshold = 0.001;
-        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
         m_walkingZMPController->setPhase(stancePhase);
 
         iDynTree::Vector2 desiredZMP;
@@ -694,13 +701,13 @@ bool WalkingModule::updateModule()
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_comHeightTrajectory.front();
+        desiredCoMPosition(2) = m_retargetingClient->comHeight();
 
 
         iDynTree::Vector3 desiredCoMVelocity;
         desiredCoMVelocity(0) = outputZMPCoMControllerVelocity(0);
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
-        desiredCoMVelocity(2) = m_comHeightVelocity.front();
+        desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
 
         // evaluate desired neck transformation
         double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
