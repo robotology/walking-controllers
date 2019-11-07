@@ -791,7 +791,7 @@ bool WalkingModule::updateModule()
             iDynTree::Rotation Base_R_Head;
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
             iDynTree::Rotation tempHeadIMURotation;
-            tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+            tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getHeadIMUToWorldTransform().getRotation().asRPY()(2));
 
             GetBaseFromHeadIMU(Base_R_Head,tempHeadIMURotation);
             imuRPY= m_baseOrientationFromHeadIMU.asRPY();
@@ -1474,7 +1474,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         iDynTree::Rotation Base_R_Head;
         iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
         iDynTree::Rotation tempHeadIMURotation;
-        tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+        tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getHeadIMUToWorldTransform().getRotation().asRPY()(2));
 
         getHeadIMUWorldToWalkingWorld(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,tempHeadIMURotation);
     }
@@ -1923,7 +1923,7 @@ bool WalkingModule::startWalking()
             iDynTree::Rotation Base_R_Head;
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
             iDynTree::Rotation tempHeadIMURotation;
-            tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
+            tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_FKSolver->getHeadIMUToWorldTransform().getRotation().asRPY()(2));
 
             getHeadIMUWorldToWalkingWorld(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,tempHeadIMURotation);
         }
