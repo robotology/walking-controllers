@@ -67,7 +67,7 @@ namespace WalkingControllers
         yarp::os::BufferedPort<yarp::sig::Vector> m_jointRetargetingPort; /**< joint retargeting port. */
         iDynTree::VectorDynSize m_retargetJoints; /**< Values of the retarget Joints. */
 
-        double m_comHeightInput;
+        double m_comHeightInputZero;
         double m_comHeight;
         double m_comHeightVelocity;
         double m_comConstantHeight;
@@ -144,7 +144,7 @@ namespace WalkingControllers
          */
         void setRobotBaseOrientation(const iDynTree::Rotation& rotation);
 
-        bool setPhase(bool isStancePhase);
+        void setPhase(bool isStancePhase);
     };
 };
 #endif

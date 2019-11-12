@@ -203,7 +203,7 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
                 auto desiredCoMHeight = m_comHeightPort.read(false);
                 if(desiredCoMHeight != nullptr)
                 {
-                    m_comHeightInput = (*desiredCoMHeight)(2);
+                    m_comHeightInputZero = (*desiredCoMHeight)(2);
                     okCoMHeight = true;
                 }
             }
@@ -260,17 +260,13 @@ void RetargetingClient::getFeedback()
         {
             auto desiredCoMHeight = m_comHeightPort.read(false);
             if(desiredCoMHeight != nullptr)
-            {
-                m_comHeightYarp(0) += (*desiredCoMHeight)(2) - m_comHeightInput;
-                m_comHeightInput = (*desiredCoMHeight)(2);
-            }
-
+                m_comHeightYarp(0) = (*desiredCoMHeight)(2) - m_comHeightInputZero
+                    + m_comConstantHeight;
         }
 
         m_comHeightSmoother->computeNextValues(m_comHeightYarp);
         m_comHeight = m_comHeightSmoother->getPos()(0);
         m_comHeightVelocity = m_comHeightSmoother->getVel()(0);
-
     }
 
     return;
@@ -324,7 +320,7 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
     m_robotOrientationPort.write(false);
 }
 
-bool RetargetingClient::setPhase(bool isStancePhase)
+void RetargetingClient::setPhase(bool isStancePhase)
 {
     m_isStancePhase = isStancePhase;
 }
