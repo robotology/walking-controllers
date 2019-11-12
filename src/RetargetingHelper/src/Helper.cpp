@@ -136,6 +136,8 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
 
     if(m_useCoMHeightRetargeting)
     {
+        m_comHeightYarp.resize(1);
+
         if(!YarpUtilities::getStringFromSearchable(config, "com_height_retargeting_port_name", portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
