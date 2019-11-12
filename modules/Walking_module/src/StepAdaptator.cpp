@@ -170,7 +170,7 @@ bool StepAdaptator::solve(bool isLeft)
 
     if(isLeft)
     {
-        yInfo() << "left";
+
         if(!m_convexHullComputer.buildConvexHull(xAxis, yAxis, planeOrigin,
                                                  std::vector<iDynTree::Polygon>(1, m_feetExtendedPolygon[0]),
                                                  feetTransforms))
@@ -181,7 +181,7 @@ bool StepAdaptator::solve(bool isLeft)
     }
     else
     {
-        yInfo() << "right";
+
         if(!m_convexHullComputer.buildConvexHull(xAxis, yAxis, planeOrigin,
                                                  std::vector<iDynTree::Polygon>(1, m_feetExtendedPolygon[1]),
                                                  feetTransforms))

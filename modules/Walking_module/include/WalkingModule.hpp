@@ -65,6 +65,7 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_isPushActive;
     double m_isRollActive;
     double m_isPitchActive;
+    int m_pushRecoveryActiveIndex;
     int m_timeIndexAfterPushDetection;
     iDynTree::VectorFixSize<5> m_nominalValuesLeft;
     iDynTree::VectorFixSize<5> m_nominalValuesRight;

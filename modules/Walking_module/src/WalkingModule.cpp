@@ -25,6 +25,7 @@
 
 #include <WalkingModule.hpp>
 #include <Utils.hpp>
+//timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step)
 double timeOffset;
 
 double impactTimeNominal, impactTimeAdjusted;
@@ -960,14 +961,29 @@ bool WalkingModule::updateModule()
                 m_isPushActive=0;
 
 
-                if((m_DCMPositionAdjusted.front()(0) - m_DCMEstimator->getDCMPosition()(0)) > m_stepAdaptator->getDCMErrorThreshold()(0) ||(m_DCMPositionAdjusted.front()(1) - m_DCMEstimator->getDCMPosition()(1))> m_stepAdaptator->getDCMErrorThreshold()(1) )
+                if((abs(m_DCMPositionSmoothed(0) - m_DCMEstimator->getDCMPosition()(0))) > m_stepAdaptator->getDCMErrorThreshold()(0) ||(abs(m_DCMPositionSmoothed(1) - m_DCMEstimator->getDCMPosition()(1)))> m_stepAdaptator->getDCMErrorThreshold()(1) )
                 {
-                    m_isPushActive=1;
-                    yInfo()<<"triggering the push recovery";
-                    // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-                    m_stepAdaptator->setCurrentDcmPosition(m_DCMEstimator->getDCMPosition());
+                    if (m_pushRecoveryActiveIndex>=5 && m_pushRecoveryActiveIndex<=10) {
+                        m_isPushActive=1;
+                        m_pushRecoveryActiveIndex++;
+                        yInfo()<<"triggering the push recovery";
+
+                        // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
+                        m_stepAdaptator->setCurrentDcmPosition(m_DCMEstimator->getDCMPosition());
+                    }
+                    else {
+                       m_pushRecoveryActiveIndex++;
+                         m_stepAdaptator->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
+                    }
+
                 }
                 else{
+                    if (m_pushRecoveryActiveIndex<6) {
+                        m_pushRecoveryActiveIndex=0;
+                    }
+                    else {
+                     m_pushRecoveryActiveIndex=11;
+                    }
                     m_stepAdaptator->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
                 }
 
@@ -979,6 +995,7 @@ bool WalkingModule::updateModule()
                 iDynTree::toEigen(nominalDcmOffset) = iDynTree::toEigen(dcmAtTimeAlpha) - iDynTree::toEigen(nextZmpPosition);
                 m_stepAdaptator->setNominalDcmOffset(nominalDcmOffset);
 
+                //timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step )
                 m_stepAdaptator->setTimings(omega, m_time - timeOffset, firstSS->getTrajectoryDomain().second,
                                             secondDS->getTrajectoryDomain().second - secondDS->getTrajectoryDomain().first);
                 //            yInfo()<<"m_DCMPositionAdjusted"<<m_DCMPositionAdjusted.front()(0);
@@ -1118,6 +1135,8 @@ bool WalkingModule::updateModule()
 
             else
             {
+
+
                 m_currentFootLeftAcceleration=m_adaptatedFootLeftAcceleration;
                 m_currentFootLeftTwist=m_adaptatedFootLeftTwist;
                 m_currentFootLeftTransform=m_adaptatedFootLeftTransform;
