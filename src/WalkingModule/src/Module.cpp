@@ -1190,6 +1190,12 @@ bool WalkingModule::startWalking()
     if(m_robotState == WalkingFSM::Prepared)
         m_robotControlHelper->resetFilters();
 
+    if (!m_robotControlHelper->setInteractionMode())
+    {
+        yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
+        return false;
+    }
+
     m_robotState = WalkingFSM::Walking;
 
     return true;

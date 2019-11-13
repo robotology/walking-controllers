@@ -129,6 +129,7 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
 bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
 {
+
     // robot name: used to connect to the robot
     std::string robot = config.check("robot", yarp::os::Value("icubSim")).asString();
 
@@ -186,6 +187,29 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
 
     m_actuatedDOFs = m_axesList.size();
 
+    m_isJointModeStiffVector.resize(m_actuatedDOFs);
+    m_JointModeStiffVectorDefult.resize(m_actuatedDOFs);
+    std::vector<bool>  modes;
+    modes.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorOfBooleanFromSearchable(config,"joint_is_stiff_mode",modes))
+    {
+        yError() << "[RobotInterface::configureRobot] Unable to find joint_is_stiff_mode into config file.";
+        return false;
+    }
+
+    for (unsigned int i=0;i<m_actuatedDOFs;i++)
+    {
+        m_JointModeStiffVectorDefult.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+        if(modes[i])
+        {
+            m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+        }
+        else
+        {
+            m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT;
+        }
+    }
+
     // open the device
     if(!m_robotDevice.open(options))
     {
@@ -228,6 +252,12 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     {
         yError() << "[configureRobot] Cannot obtain IControlMode interface";
         return false;
+    }
+
+    if(!m_robotDevice.view(m_InteractionInterface) || !m_InteractionInterface)
+    {
+             yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+            return false;
     }
 
     // resize the buffers
@@ -499,6 +529,12 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
         return false;
     }
 
+    if(m_InteractionInterface == nullptr)
+        {
+            yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
+            return false;
+        }
+
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
     std::pair<std::string, double> worstError("", 0.0);
@@ -528,7 +564,6 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
     }
 
     std::vector<double> refSpeeds(m_actuatedDOFs);
-
     double currentJointPositionRad;
     double absoluteJointErrorRad;
     for (int i = 0; i < m_actuatedDOFs; i++)
@@ -700,6 +735,7 @@ bool RobotInterface::close()
     m_leftWrenchPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
+    m_InteractionInterface->setInteractionModes(m_JointModeStiffVectorDefult.data());
     if(!m_robotDevice.close())
     {
         yError() << "[RobotInterface::close] Unable to close the device.";
@@ -756,4 +792,15 @@ int RobotInterface::getActuatedDoFs()
 WalkingPIDHandler& RobotInterface::getPIDHandler()
 {
     return *m_PIDHandler;
+}
+
+bool RobotInterface::setInteractionMode()
+{
+    if(!m_InteractionInterface->setInteractionModes(m_isJointModeStiffVector.data()))
+    {
+        yError() << "[RobotInterface::setInteractionMode] Error while setting the interaction modes of the joints";
+        return false;
+    }
+
+    return true;
 }
