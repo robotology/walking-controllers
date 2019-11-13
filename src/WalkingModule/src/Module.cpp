@@ -811,13 +811,14 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-                                      m_stableDCMModel->getCoMPosition(),
-                                      m_stableDCMModel->getCoMVelocity(),
+                                      m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight()),
+                                      m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+                                      m_robotControlHelper->getJointPosition(),
+                                      m_retargetingClient->jointValues());
         }
 
         propagateTime();
@@ -1180,8 +1181,8 @@ bool WalkingModule::startWalking()
                     "zmp_x", "zmp_y",
                     "zmp_des_x", "zmp_des_y",
                     "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y",
-                    "com_des_dx", "com_des_dy",
+                    "com_des_x", "com_des_y", "com_des_z",
+                    "com_des_dx", "com_des_dy", "com_des_dz",
                     "lf_x", "lf_y", "lf_z",
                     "lf_roll", "lf_pitch", "lf_yaw",
                     "rf_x", "rf_y", "rf_z",
@@ -1190,10 +1191,18 @@ bool WalkingModule::startWalking()
                     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_err_x", "lf_err_y", "lf_err_z",
-                    "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
-                    "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                    "neck_pitch", "neck_roll", "neck_yaw",
+                    "torso_pitch", "torso_roll", "torso_yaw",
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup", "l_wrist_pitch", "l_wrist_yaw",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup", "r_wrist_pitch", "r_wrist_yaw",
+                    "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
+                    "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
+                    "neck_pitch_des", "neck_roll_des", "neck_yaw_des",
+                    "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
+                    "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
+                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des"});
     }
 
     // if the robot was only prepared the filters has to be reseted
