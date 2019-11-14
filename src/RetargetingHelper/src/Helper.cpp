@@ -51,14 +51,17 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     }
 
     m_retargetJoints.resize(controlledJointsName.size());
+    m_retargetJointsYARP.resize(controlledJointsName.size());
 
     std::string portName;
 
     if(m_useHandRetargeting)
     {
+        const yarp::os::Bottle& option = config.findGroup("HAND_RETARGETING");
+
         // open left hand port
-        if(!YarpUtilities::getStringFromSearchable(config, "left_hand_transform_port_name",
-                                                portName))
+        if(!YarpUtilities::getStringFromSearchable(option, "left_hand_transform_port_name",
+                                                   portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
             return false;
@@ -66,7 +69,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_leftHandTransformPort.open("/" + name + portName);
 
         // open right hand port
-        if(!YarpUtilities::getStringFromSearchable(config, "right_hand_transform_port_name",
+        if(!YarpUtilities::getStringFromSearchable(option, "right_hand_transform_port_name",
                                                 portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
@@ -78,7 +81,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_rightHandTransformYarp.resize(6);
 
         double smoothingTime;
-        if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time", smoothingTime))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
@@ -90,10 +93,11 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
 
     if(m_useJointRetargeting)
     {
-        std::vector<std::string> retargetJointNames;
+        const yarp::os::Bottle& option = config.findGroup("JOINT_RETARGETING");
 
+        std::vector<std::string> retargetJointNames;
         yarp::os::Value *retargetJointNamesYarp;
-        if(!config.check("retargeting_joint_list", retargetJointNamesYarp))
+        if(!option.check("retargeting_joint_list", retargetJointNamesYarp))
         {
             yError() << "[RetargetingClient::initialize] Unable to find joints_list into config file.";
             return false;
@@ -114,19 +118,31 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             m_retargetJointsIndex.push_back(index);
         }
 
-        if(!YarpUtilities::getStringFromSearchable(config, "joint_retargeting_port_name",
+        if(!YarpUtilities::getStringFromSearchable(option, "joint_retargeting_port_name",
                                                 portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
             return false;
         }
         m_jointRetargetingPort.open("/" + name + portName);
+
+        double smoothingTime;
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time", smoothingTime))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+
+        m_jointRetargetingSmoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointsName.size(), period, smoothingTime);
+
     }
 
     if(m_useVirtualizer)
     {
-        if(!YarpUtilities::getStringFromSearchable(config, "robot_orientation_port_name",
-                                                portName))
+        const yarp::os::Bottle& option = config.findGroup("VIRTUALIZER");
+
+        if(!YarpUtilities::getStringFromSearchable(option, "robot_orientation_port_name",
+                                                   portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
             return false;
@@ -136,9 +152,11 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
 
     if(m_useCoMHeightRetargeting)
     {
+        const yarp::os::Bottle& option = config.findGroup("COM_RETARGETING");
+
         m_comHeightYarp.resize(1);
 
-        if(!YarpUtilities::getStringFromSearchable(config, "com_height_retargeting_port_name", portName))
+        if(!YarpUtilities::getStringFromSearchable(option, "com_height_retargeting_port_name", portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
             return false;
@@ -146,7 +164,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_comHeightPort.open("/" + name + portName);
 
         double smoothingTime;
-        if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time", smoothingTime))
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time", smoothingTime))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
@@ -184,7 +202,11 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
         m_rightHandSmoother->init(m_rightHandTransformYarp);
     }
 
+    // joint retargeting
     m_retargetJoints = jointValues;
+    iDynTree::toEigen(m_retargetJointsYARP) = iDynTree::toEigen(jointValues);
+    if (m_useJointRetargeting)
+        m_jointRetargetingSmoother->init(m_retargetJointsYARP);
 
     m_comHeight = comHeight;
     m_comHeightVelocity = 0;
@@ -249,8 +271,11 @@ void RetargetingClient::getFeedback()
         if(desiredJoint != nullptr)
         {
             for(int i =0; i < desiredJoint->size(); i++)
-                m_retargetJoints(m_retargetJointsIndex[i]) = (*desiredJoint)(i);
+                m_retargetJointsYARP(m_retargetJointsIndex[i]) = (*desiredJoint)(i);
         }
+
+        m_jointRetargetingSmoother->computeNextValues(m_retargetJointsYARP);
+        iDynTree::toEigen(m_retargetJoints) = iDynTree::toEigen(m_retargetJointsYARP);
     }
 
 

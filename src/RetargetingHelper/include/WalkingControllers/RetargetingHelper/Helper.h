@@ -66,6 +66,9 @@ namespace WalkingControllers
         std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
         yarp::os::BufferedPort<yarp::sig::Vector> m_jointRetargetingPort; /**< joint retargeting port. */
         iDynTree::VectorDynSize m_retargetJoints; /**< Values of the retarget Joints. */
+        yarp::sig::Vector m_retargetJointsYARP; /**< Values of the retarget Joints (YARP). */
+        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRetargetingSmoother; /**< Minimum jerk trajectory
+                                                                                   for the joint retargeting. */
 
         double m_comHeightInputZero;
         double m_comHeight;
