@@ -44,17 +44,32 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
     m_useCoMHeightRetargeting = config.check("use_com_retargeting", yarp::os::Value(false)).asBool();
 
+    // The approaching phase is set only if the startApproacingPhase method is called
+    m_isApproachingPhase = false;
+
     if(m_useJointRetargeting && m_useHandRetargeting)
     {
         yError() << "[RetargetingClient::initialize] You cannot enable the joint retargeting along with the hand retargeting.";
         return false;
     }
 
-    m_retargetJoints.resize(controlledJointsName.size());
+    m_jointRetargetingValue.resize(controlledJointsName.size());
     m_jointRetargeting.yarpVector.resize(controlledJointsName.size());
 
-    std::string portName;
+    if(!m_useHandRetargeting && !m_useVirtualizer &&
+       !m_useJointRetargeting && !m_useCoMHeightRetargeting)
+    {
+        return true;
+    }
 
+    // get the approaching phase duration
+    if(!YarpUtilities::getNumberFromSearchable(config, "approaching_phase_duration", m_approachPhaseDuration))
+    {
+        yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+        return false;
+    }
+
+    std::string portName;
     if(m_useHandRetargeting)
     {
         const yarp::os::Bottle& option = config.findGroup("HAND_RETARGETING");
@@ -80,15 +95,27 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_leftHand.yarpVector.resize(6);
         m_rightHand.yarpVector.resize(6);
 
-        double smoothingTime;
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time", smoothingTime))
+        double smoothingTimeApproching;
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching", smoothingTimeApproching))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
         }
+        m_leftHand.smoothingTimeInApproaching = smoothingTimeApproching;
+        m_rightHand.smoothingTimeInApproaching = smoothingTimeApproching;
 
-        m_leftHand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
-        m_rightHand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, smoothingTime);
+
+        double smoothingTimeWalking;
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", smoothingTimeWalking))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+        m_leftHand.smoothingTimeInWalking = smoothingTimeWalking;
+        m_rightHand.smoothingTimeInWalking = smoothingTimeWalking;
+
+        m_leftHand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, m_leftHand.smoothingTimeInApproaching);
+        m_rightHand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, m_rightHand.smoothingTimeInApproaching);
     }
 
     if(m_useJointRetargeting)
@@ -125,14 +152,21 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         }
         m_jointRetargeting.port.open("/" + name + portName);
 
-        double smoothingTime;
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time", smoothingTime))
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching",
+                                                   m_jointRetargeting.smoothingTimeInApproaching))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
         }
 
-        m_jointRetargeting.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointsName.size(), period, smoothingTime);
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", m_jointRetargeting.smoothingTimeInWalking))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+
+        m_jointRetargeting.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointsName.size(), period,
+                                                                                   m_jointRetargeting.smoothingTimeInApproaching);
 
     }
 
@@ -162,14 +196,19 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         }
         m_comHeight.port.open("/" + name + portName);
 
-        double smoothingTime;
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time", smoothingTime))
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching", m_comHeight.smoothingTimeInApproaching))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
         }
 
-        m_comHeight.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, period, smoothingTime);
+        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", m_comHeight.smoothingTimeInWalking))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+
+        m_comHeight.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, period, m_comHeight.smoothingTimeInApproaching);
     }
 
     return true;
@@ -202,7 +241,7 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
     }
 
     // joint retargeting
-    m_retargetJoints = jointValues;
+    m_jointRetargetingValue = jointValues;
     iDynTree::toEigen(m_jointRetargeting.yarpVector) = iDynTree::toEigen(jointValues);
     if (m_useJointRetargeting)
         m_jointRetargeting.smoother->init(m_jointRetargeting.yarpVector);
@@ -238,7 +277,8 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
             attempt++;
         } while (attempt < 100);
 
-        yError() << "[RetargetingClient::reset] The retargeting port is not streaming data";
+        if(!okCoMHeight)
+            yError() << "[RetargetingClient::reset] The CoM height is not coming from the yarp port.";
         return false;
     }
 
@@ -274,7 +314,7 @@ void RetargetingClient::getFeedback()
         }
 
         m_jointRetargeting.smoother->computeNextValues(m_jointRetargeting.yarpVector);
-        iDynTree::toEigen(m_retargetJoints) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
+        iDynTree::toEigen(m_jointRetargetingValue) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
     }
 
 
@@ -295,6 +335,14 @@ void RetargetingClient::getFeedback()
         m_comHeightVelocity = m_comHeight.smoother->getVel()(0);
     }
 
+    // check if the approaching phase is finished
+    if(m_isApproachingPhase)
+    {
+        double now = yarp::os::Time::now();
+        if(now - m_startingApproachingPhaseTime > m_approachPhaseDuration)
+            stopApproachingPhase();
+    }
+
     return;
 }
 
@@ -310,7 +358,7 @@ const iDynTree::Transform& RetargetingClient::rightHandTransform() const
 
 const iDynTree::VectorDynSize& RetargetingClient::jointValues() const
 {
-    return m_retargetJoints;
+    return m_jointRetargetingValue;
 }
 
 double RetargetingClient::comHeight() const
@@ -355,4 +403,57 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
 void RetargetingClient::setPhase(bool isStancePhase)
 {
     m_isStancePhase = isStancePhase;
+}
+
+void RetargetingClient::stopApproachingPhase()
+{
+    if(m_useHandRetargeting)
+    {
+        m_leftHand.smoother->setT(m_leftHand.smoothingTimeInWalking);
+        m_rightHand.smoother->setT(m_rightHand.smoothingTimeInWalking);
+    }
+
+    if(m_useJointRetargeting)
+    {
+        m_jointRetargeting.smoother->setT(m_jointRetargeting.smoothingTimeInWalking);
+    }
+
+    if(m_useCoMHeightRetargeting)
+    {
+        m_comHeight.smoother->setT(m_comHeight.smoothingTimeInWalking);
+    }
+
+    m_isApproachingPhase = false;
+}
+
+void RetargetingClient::startApproachingPhase()
+{
+    // if the retargeting is not used the approaching phase is not required
+    if(!m_useHandRetargeting && !m_useJointRetargeting && !m_useCoMHeightRetargeting)
+        return;
+
+    m_startingApproachingPhaseTime = yarp::os::Time::now();
+
+    if(m_useHandRetargeting)
+    {
+        m_leftHand.smoother->setT(m_leftHand.smoothingTimeInApproaching);
+        m_rightHand.smoother->setT(m_rightHand.smoothingTimeInApproaching);
+    }
+
+    if(m_useJointRetargeting)
+    {
+        m_jointRetargeting.smoother->setT(m_jointRetargeting.smoothingTimeInApproaching);
+    }
+
+    if(m_useCoMHeightRetargeting)
+    {
+        m_comHeight.smoother->setT(m_comHeight.smoothingTimeInApproaching);
+    }
+
+    m_isApproachingPhase = true;
+}
+
+bool RetargetingClient::isApproachingPhase() const
+{
+    return m_isApproachingPhase;
 }

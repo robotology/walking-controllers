@@ -821,10 +821,14 @@ bool WalkingModule::updateModule()
                                       m_retargetingClient->jointValues());
         }
 
-        propagateTime();
+        // in the approaching phase the robot should not move and the trajectories should not advance
+        if(!m_retargetingClient->isApproachingPhase())
+        {
+            propagateTime();
 
-        // advance all the signals
-        advanceReferenceSignals();
+            // advance all the signals
+            advanceReferenceSignals();
+        }
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
     }
@@ -1209,6 +1213,7 @@ bool WalkingModule::startWalking()
     if(m_robotState == WalkingFSM::Prepared)
         m_robotControlHelper->resetFilters();
 
+    m_retargetingClient->startApproachingPhase();
     m_robotState = WalkingFSM::Walking;
 
     return true;
@@ -1216,6 +1221,12 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(double x, double y)
 {
+    // in the approaching phase the robot should not move
+    // as soon as the approaching phase is finished the user
+    // can move the robot
+    if(m_retargetingClient->isApproachingPhase())
+        return true;
+
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
     {

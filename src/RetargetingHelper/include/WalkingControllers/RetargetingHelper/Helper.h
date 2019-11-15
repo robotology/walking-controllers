@@ -43,7 +43,6 @@ namespace WalkingControllers
             yarp::os::BufferedPort<yarp::sig::Vector> port;
             double smoothingTimeInApproaching;
             double smoothingTimeInWalking;
-
         } retargetingElement;
 
         bool m_useHandRetargeting; /**< True if the hand retargeting is used */
@@ -51,11 +50,11 @@ namespace WalkingControllers
         bool m_useJointRetargeting; /**< True if the joint retargeting is used */
         bool m_useCoMHeightRetargeting; /**< True if the com retargeting is used */
 
-        iDynTree::Transform m_leftHandTransform;
-        retargetingElement m_leftHand;
+        iDynTree::Transform m_leftHandTransform; /**< Desired left hand transform */
+        retargetingElement m_leftHand; /**< Left hand retargeting element */
 
-        iDynTree::Transform m_rightHandTransform;
-        retargetingElement m_rightHand;
+        iDynTree::Transform m_rightHandTransform; /**< Desired right hand transform */
+        retargetingElement m_rightHand; /**< Right hand retargeting element */
 
         double m_comHeightValue;
         double m_comHeightInputZero;
@@ -64,12 +63,16 @@ namespace WalkingControllers
         retargetingElement m_comHeight;
 
         std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
-        iDynTree::VectorDynSize m_retargetJoints; /**< Values of the retarget Joints. */
-        retargetingElement m_jointRetargeting;
+        iDynTree::VectorDynSize m_jointRetargetingValue; /**< Values of the retarget Joints. */
+        retargetingElement m_jointRetargeting; /**< Joint retargeting element */
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
-        bool m_isStancePhase{true};
+        bool m_isStancePhase{true}; /**< True if the robot is not walking */
+
+        bool m_isApproachingPhase; /**< True if the robot is in the approaching phase */
+        double m_startingApproachingPhaseTime; /**< Initial time of the approaching phase (seconds) */
+        double m_approachPhaseDuration; /**< Duration of the approaching phase (seconds) */
 
         /**
          * Convert a yarp vector containing position + rpy into an iDynTree homogeneous transform
@@ -78,6 +81,11 @@ namespace WalkingControllers
          */
         void convertYarpVectorPoseIntoTransform(const yarp::sig::Vector& vector,
                                                 iDynTree::Transform& transform);
+
+        /**
+         * Terminate the approaching phase
+         */
+        void stopApproachingPhase();
 
     public:
 
@@ -132,8 +140,16 @@ namespace WalkingControllers
          */
         const iDynTree::VectorDynSize& jointValues() const;
 
+        /**
+         * Get the CoM height
+         * @return height of the CoM
+         */
         double comHeight() const;
 
+        /**
+         * Get the CoM height velocity
+         * @return height velocity of the CoM
+         */
         double comHeightVelocity() const;
 
         /**
@@ -141,7 +157,19 @@ namespace WalkingControllers
          */
         void setRobotBaseOrientation(const iDynTree::Rotation& rotation);
 
+
         void setPhase(bool isStancePhase);
+
+        /**
+         * Start the approaching phase
+         */
+        void startApproachingPhase();
+
+        /**
+         * Check if the approaching phase is running
+         * @return true if the approaching phase is running
+         */
+        bool isApproachingPhase() const;
     };
 };
 #endif
