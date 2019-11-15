@@ -36,44 +36,38 @@ namespace WalkingControllers
     {
     private:
 
+        typedef struct
+        {
+            yarp::sig::Vector yarpVector;
+            std::unique_ptr<iCub::ctrl::minJerkTrajGen> smoother;
+            yarp::os::BufferedPort<yarp::sig::Vector> port;
+            double smoothingTimeInApproaching;
+            double smoothingTimeInWalking;
+
+        } retargetingElement;
+
         bool m_useHandRetargeting; /**< True if the hand retargeting is used */
         bool m_useVirtualizer; /**< True if the virtualizer is used */
         bool m_useJointRetargeting; /**< True if the joint retargeting is used */
         bool m_useCoMHeightRetargeting; /**< True if the com retargeting is used */
 
-        iDynTree::Transform m_leftHandTransform; /**< Left hand transform head_T_leftHand */
-        iDynTree::Transform m_rightHandTransform; /**< Right hand transform head_T_rightHand*/
+        iDynTree::Transform m_leftHandTransform;
+        retargetingElement m_leftHand;
 
-        yarp::sig::Vector m_leftHandTransformYarp; /**< Left hand position + rpy head_T_leftHand */
-        yarp::sig::Vector m_rightHandTransformYarp; /**< Right hand position + rpy head_T_rightHand*/
-        yarp::sig::Vector m_comHeightYarp; /**< Left hand position + rpy head_T_leftHand */
+        iDynTree::Transform m_rightHandTransform;
+        retargetingElement m_rightHand;
 
-        yarp::os::BufferedPort<yarp::sig::Vector> m_leftHandTransformPort; /**< Right hand position + rpy head_T_rightHand*/
-        yarp::os::BufferedPort<yarp::sig::Vector> m_rightHandTransformPort; /**< Right hand position + rpy head_T_rightHand*/
-        yarp::os::BufferedPort<yarp::sig::Vector> m_comHeightPort; /**< CoMHeight */
-
-        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_leftHandSmoother; /**< Minimum jerk trajectory
-                                                                           for the left hand. */
-
-        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_rightHandSmoother; /**< Minimum jerk trajectory
-                                                                            for the right hand. */
-
-        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_comHeightSmoother; /**< CoM Height smooter. */
-
-
-        yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
-
-        std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
-        yarp::os::BufferedPort<yarp::sig::Vector> m_jointRetargetingPort; /**< joint retargeting port. */
-        iDynTree::VectorDynSize m_retargetJoints; /**< Values of the retarget Joints. */
-        yarp::sig::Vector m_retargetJointsYARP; /**< Values of the retarget Joints (YARP). */
-        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRetargetingSmoother; /**< Minimum jerk trajectory
-                                                                                   for the joint retargeting. */
-
+        double m_comHeightValue;
         double m_comHeightInputZero;
-        double m_comHeight;
         double m_comHeightVelocity;
         double m_comConstantHeight;
+        retargetingElement m_comHeight;
+
+        std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
+        iDynTree::VectorDynSize m_retargetJoints; /**< Values of the retarget Joints. */
+        retargetingElement m_jointRetargeting;
+
+        yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
         bool m_isStancePhase{true};
 
