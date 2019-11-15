@@ -326,7 +326,8 @@ void RetargetingClient::getFeedback()
         {
             auto desiredCoMHeight = m_comHeight.port.read(false);
             if(desiredCoMHeight != nullptr)
-                m_comHeight.yarpVector(0) = (*desiredCoMHeight)(2) - m_comHeightInputZero
+
+                m_comHeight.yarpVector(0) = ((*desiredCoMHeight)(2) - m_comHeightInputZero) * 0.5
                     + m_comConstantHeight;
         }
 
