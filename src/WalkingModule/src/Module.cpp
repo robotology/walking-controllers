@@ -322,6 +322,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
+    // TODO please remove me. Counters are evil
+    double stancePhaseTimeOutSeconds = rf.check("stance_phase_time_out",yarp::os::Value(0.5)).asDouble();
+
+    m_stancePhaseMaxCounter = (int) std::round(stancePhaseTimeOutSeconds/m_dT);
+
+    yInfo() << "m_stancePhaseMaxCounter " << m_stancePhaseMaxCounter
+            << " stancePhaseTimeOutSeconds " << stancePhaseTimeOutSeconds;
+
     yInfo() << "[WalkingModule::configure] Ready to play!";
 
     return true;
@@ -591,12 +599,16 @@ bool WalkingModule::updateModule()
         if(m_isStancePhaseStarting &&
            iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < treshold)
         {
-            m_isStancePhase = true;
-            m_isStancePhaseStarting = false;
+            m_stancePhaseCounter--;
+            if(m_stancePhaseCounter == 0)
+            {
+                m_isStancePhase = true;
+                m_isStancePhaseStarting = false;
+            }
         }
 
         // TODO remove me
-        yInfo() << "m_isStancePhase " << m_isStancePhase << " isStancePhaseStarting " << m_isStancePhaseStarting;
+        yInfo() << "m_isStancePhase " << m_isStancePhase << " isStancePhaseStarting " << m_isStancePhaseStarting << " m_stancePhaseCounter " << m_stancePhaseCounter;
 
         // get feedbacks and evaluate useful quantities
         if(!m_robotControlHelper->getFeedbacks(10))
@@ -832,10 +844,10 @@ bool WalkingModule::updateModule()
         // in the approaching phase the robot should not move and the trajectories should not advance
         if(!m_retargetingClient->isApproachingPhase())
         {
-            propagateTime();
+                propagateTime();
 
-            // advance all the signals
-            advanceReferenceSignals();
+                // advance all the signals
+                advanceReferenceSignals();
         }
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
@@ -1280,9 +1292,15 @@ bool WalkingModule::setPlannerInput(double x, double y)
     double treshold = 0.01;
     // the robot is about to move
     if(iDynTree::toEigen(m_desiredPosition).norm() > treshold)
+    {
         m_isStancePhase = false;
+        m_isStancePhaseStarting = false;
+    }
     else
+    {
         m_isStancePhaseStarting = true;
+        m_stancePhaseCounter = m_stancePhaseMaxCounter;
+    }
 
     return true;
 }

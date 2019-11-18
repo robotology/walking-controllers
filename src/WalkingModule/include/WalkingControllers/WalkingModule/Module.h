@@ -131,6 +131,8 @@ namespace WalkingControllers
 
         bool m_isStancePhase{true}; /**< if true the robot is not walking */
         bool m_isStancePhaseStarting{false};
+        int m_stancePhaseCounter;
+        int m_stancePhaseMaxCounter;
 
         /**
          * Get the robot model from the resource finder and set it.
