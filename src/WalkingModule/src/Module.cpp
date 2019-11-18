@@ -378,9 +378,7 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
                               iDynTree::VectorDynSize &output)
 {
     bool ok = true;
-    double threshold = 0.001;
-    bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-    solver->setPhase(stancePhase);
+    solver->setPhase(m_isStancePhase);
 
     ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
                                 m_FKSolver->getLeftFootToWorldTransform(),
@@ -588,6 +586,18 @@ bool WalkingModule::updateModule()
             }
         }
 
+        // check if the stance phase is started
+        double treshold = 0.01;
+        if(m_isStancePhaseStarting &&
+           iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < treshold)
+        {
+            m_isStancePhase = true;
+            m_isStancePhaseStarting = false;
+        }
+
+        // TODO remove me
+        yInfo() << "m_isStancePhase " << m_isStancePhase << " isStancePhaseStarting " << m_isStancePhaseStarting;
+
         // get feedbacks and evaluate useful quantities
         if(!m_robotControlHelper->getFeedbacks(10))
         {
@@ -595,9 +605,7 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        double threshold = 0.001;
-        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-        m_retargetingClient->setPhase(stancePhase);
+        m_retargetingClient->setPhase(m_isStancePhase);
         m_retargetingClient->getFeedback();
 
         if(!updateFKSolver())
@@ -668,7 +676,7 @@ bool WalkingModule::updateModule()
         // inner COM-ZMP controller
         // if the the norm of desired DCM velocity is lower than a threshold then the robot
         // is stopped
-        m_walkingZMPController->setPhase(stancePhase);
+        m_walkingZMPController->setPhase(m_isStancePhase);
 
         iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
@@ -1268,6 +1276,13 @@ bool WalkingModule::setPlannerInput(double x, double y)
     m_desiredPosition(1) = y;
 
     m_newTrajectoryRequired = true;
+
+    double treshold = 0.01;
+    // the robot is about to move
+    if(iDynTree::toEigen(m_desiredPosition).norm() > treshold)
+        m_isStancePhase = false;
+    else
+        m_isStancePhaseStarting = true;
 
     return true;
 }

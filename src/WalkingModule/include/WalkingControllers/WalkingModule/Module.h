@@ -129,6 +129,9 @@ namespace WalkingControllers
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
+        bool m_isStancePhase{true}; /**< if true the robot is not walking */
+        bool m_isStancePhaseStarting{false};
+
         /**
          * Get the robot model from the resource finder and set it.
          * @param rf is the reference to a resource finder object.
