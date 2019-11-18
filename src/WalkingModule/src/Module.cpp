@@ -1298,8 +1298,11 @@ bool WalkingModule::setPlannerInput(double x, double y)
     }
     else
     {
+        // if the stance phase has not started reset the counter
+        if(!m_isStancePhaseStarting)
+            m_stancePhaseCounter = m_stancePhaseMaxCounter;
+
         m_isStancePhaseStarting = true;
-        m_stancePhaseCounter = m_stancePhaseMaxCounter;
     }
 
     return true;
