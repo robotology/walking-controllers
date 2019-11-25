@@ -498,7 +498,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(10))
+            if(!m_robotControlHelper->getFeedbacks(100))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
