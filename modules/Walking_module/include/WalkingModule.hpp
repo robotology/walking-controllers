@@ -66,9 +66,12 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     double m_isRollActive;
     double m_isPitchActive;
     int m_pushRecoveryActiveIndex;
-    double m_kSmoother;
+    double m_kDCMSmoother;
+    double m_kFootSmoother;
     int m_indexSmoother;
+    int m_indexFootSmoother;
     int m_timeIndexAfterPushDetection;
+    int m_FootTimeIndexAfterPushDetection;
     iDynTree::Vector2 m_errorOfLastDCMPushDetection;
     iDynTree::VectorFixSize<5> m_nominalValuesLeft;
     iDynTree::VectorFixSize<5> m_nominalValuesRight;
@@ -77,6 +80,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::vector<std::shared_ptr<GeneralSupportTrajectory>> m_DCMSubTrajectories;
     iDynTree::Transform m_adaptatedFootLeftTransform;
     iDynTree::Twist m_adaptatedFootLeftTwist;
+    iDynTree::Transform m_smoothedFootLeftTransform;
+    iDynTree::Twist m_smoothedFootLeftTwist;
     iDynTree::SpatialAcc m_adaptatedFootLeftAcceleration;
     iDynTree::Transform m_currentFootLeftTransform;
     iDynTree::Twist m_currentFootLeftTwist;
@@ -93,6 +98,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     iDynTree::Vector3 rightAdaptedStepParameters;
     iDynTree::Transform m_adaptatedFootRightTransform;
     iDynTree::Twist m_adaptatedFootRightTwist;
+    iDynTree::Transform m_smoothedFootRightTransform;
+    iDynTree::Twist m_smoothedFootRightTwist;
     iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;
     std::shared_ptr<FootPrint> m_jRightFootprints;
     StepList m_jRightstepList;
@@ -360,5 +367,6 @@ public:
     bool GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation);
     bool getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorldRotation, iDynTree::Rotation headToBaseRotation, iDynTree::Rotation imuOrientationtoIMUWorld);
     bool getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation);
+    bool FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory, iDynTree::Transform &smoothedFootTrajectory);
 };
 #endif

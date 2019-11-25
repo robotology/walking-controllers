@@ -170,15 +170,18 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     tempTemp.zero();
     m_adaptatedFootLeftTransform.setPosition(tempTemp);
     m_currentFootLeftTransform.setPosition(tempTemp);
+    m_smoothedFootLeftTransform.setPosition(tempTemp);
 
     m_adaptatedFootRightTransform.setPosition(tempTemp);
     m_currentFootRightTransform.setPosition(tempTemp);
+    m_smoothedFootRightTransform.setPosition(tempTemp);
 
     m_currentFootLeftTransform.setRotation(tempRot);
     m_adaptatedFootLeftTransform.setRotation(tempRot);
-
+    m_smoothedFootLeftTransform.setRotation(tempRot);
     m_currentFootRightTransform.setRotation(tempRot);
     m_adaptatedFootRightTransform.setRotation(tempRot);
+    m_smoothedFootRightTransform.setRotation(tempRot);
     // module name (used as prefix for opened ports)
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
@@ -488,11 +491,11 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     //    solver->setDesiredFeetTwist(m_adaptatedFootLeftTwist,
     //                                m_adaptatedFootRightTwist);
     if (m_useStepAdaptation) {
-        solver->setDesiredFeetTransformation(m_currentFootLeftTransform,
-                                             m_currentFootRightTransform);
+        solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
+                                             m_rightTrajectory.front());
 
-        solver->setDesiredFeetTwist(m_currentFootLeftTwist,
-                                    m_currentFootRightTwist);
+        solver->setDesiredFeetTwist(m_leftTwistTrajectory.front(),
+                                    m_rightTwistTrajectory.front());
     }
     else {
         solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
@@ -766,6 +769,32 @@ bool WalkingModule::updateModule()
         //        yInfo()<<"FK_Pelvis Orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
         // evaluate 3D-LIPM reference signal
         if(m_useStepAdaptation){
+            if (!m_leftInContact.front() || !m_rightInContact.front())
+            {
+
+                if(!m_leftInContact.front()){
+                    if (!FeetTrajectorySmoother(m_adaptatedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform)) {
+                   yError()<<"the Left Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
+                    }
+                }
+
+
+                if(!m_rightInContact.front()){
+                    if (!FeetTrajectorySmoother(m_adaptatedFootRightTransform,m_rightTrajectory.front(),m_smoothedFootRightTransform)) {
+                   yError()<<"the Right Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
+                    }
+                }
+            }
+            else
+            {
+
+                //m_currentFootLeftTwist=m_adaptatedFootLeftTwist;
+                m_smoothedFootLeftTransform=m_adaptatedFootLeftTransform;
+
+                //m_currentFootRightTwist=m_adaptatedFootRightTwist;
+                m_smoothedFootRightTransform=m_adaptatedFootRightTransform;
+            }
+
 
             if (!DCMSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed)) {
                 yError()<<"the DCM smoother can not evaluate the smoothed DCM!";
@@ -1025,7 +1054,13 @@ bool WalkingModule::updateModule()
                 {
                     double timeOfSmoothing=(secondDS->getTrajectoryDomain().second)/2 +m_stepAdaptator->getDesiredImpactTime()-(m_time - timeOffset);
                     m_indexSmoother=timeOfSmoothing/m_dT;
-                    m_kSmoother=0;
+                    m_kDCMSmoother=0;
+                }
+                if(m_pushRecoveryActiveIndex==(5+1))
+                {
+                    double timeOfSmoothing=m_stepAdaptator->getDesiredImpactTime()-(m_time - timeOffset);
+                    m_indexFootSmoother=timeOfSmoothing/m_dT;
+                    m_kFootSmoother=0;
                 }
                 impactTimeAdjusted = m_stepAdaptator->getDesiredImpactTime() + timeOffset;
 
@@ -1404,7 +1439,7 @@ bool WalkingModule::updateModule()
             iDynTree::Vector6 m_isPushActiveVec;
             m_isPushActiveVec(0)=m_isPushActive;
             m_isPushActiveVec(1)=m_indexSmoother;
-            m_isPushActiveVec(2)= m_kSmoother;
+            m_isPushActiveVec(2)= m_kDCMSmoother;
             m_isPushActiveVec(3)= m_stepAdaptator->getDesiredImpactTime()-(m_time - timeOffset);
             m_isPushActiveVec(4)=m_timeIndexAfterPushDetection;
             m_isPushActiveVec(5)=m_pushRecoveryActiveIndex;
@@ -1840,7 +1875,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 
     if (m_useStepAdaptation) {
-        m_mergePoints.size();
+
 
 
         m_adaptatedFootLeftTwist.zero();
@@ -1849,7 +1884,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
         m_adaptatedFootRightAcceleration.zero();
 
         m_adaptatedFootLeftTransform = leftTrajectory.front();
+        m_smoothedFootLeftTransform=leftTrajectory.front();
         m_adaptatedFootRightTransform = rightTrajectory.front();
+        m_smoothedFootRightTransform=rightTrajectory.front();
         m_adaptatedFootRightTwist.zero();
 
         // int numberOfSubTrajectories = m_DCMSubTrajectories.size();
@@ -2087,45 +2124,59 @@ bool WalkingModule::stopWalking()
     return true;
 }
 
-
-bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM ){
+bool WalkingModule::FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform,const iDynTree::Transform desiredFootTransform,iDynTree::Transform& smoothedFootTransform )
+{
 
     if(m_pushRecoveryActiveIndex<6 )
     {
-        m_kSmoother=0;
+        m_kFootSmoother=0;
+        m_FootTimeIndexAfterPushDetection=0;
+    }
+    else if (m_pushRecoveryActiveIndex>=6 && m_FootTimeIndexAfterPushDetection<(m_indexFootSmoother))
+    {
+        m_FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection+1;
+
+        m_kFootSmoother=((double)(m_FootTimeIndexAfterPushDetection)/((double)(m_indexFootSmoother)));
+        if(m_FootTimeIndexAfterPushDetection==m_indexFootSmoother)
+        {
+            m_indexFootSmoother=0;
+        }
+    }
+    else {
+        m_kFootSmoother=1;
+    }
+smoothedFootTransform.setRotation(adaptedFeetTransform.getRotation());
+iDynTree::Position tempPosition;
+iDynTree::toEigen(tempPosition)=iDynTree::toEigen(desiredFootTransform.getPosition())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTransform.getPosition())-iDynTree::toEigen(desiredFootTransform.getPosition()));
+        smoothedFootTransform.setPosition(tempPosition);
+    return true;
+}
+
+bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM )
+{
+
+    if(m_pushRecoveryActiveIndex<6 )
+    {
+        m_kDCMSmoother=0;
         m_timeIndexAfterPushDetection=0;
     }
     else if (m_pushRecoveryActiveIndex>=6 && m_timeIndexAfterPushDetection<(m_indexSmoother))
     {
         m_timeIndexAfterPushDetection=m_timeIndexAfterPushDetection+1;
 
-        m_kSmoother=((double)(m_timeIndexAfterPushDetection)/((double)(m_indexSmoother)));
+        m_kDCMSmoother=((double)(m_timeIndexAfterPushDetection)/((double)(m_indexSmoother)));
         if(m_timeIndexAfterPushDetection==m_indexSmoother)
         {
             m_pushRecoveryActiveIndex=0;
             m_indexSmoother=0;
-            yInfo()<<"shsggsgsgsgsgsjjjjjjjjjjjjjjjjjjjshssgahsbsbbs";
-            yInfo()<<"shsggsgsgsgsgsjjjjjjjjjjjjjjjjjjjshssgahsbsbbs";
-            yInfo()<<"shsggsgsgsgsgsjjjjjjjjjjjjjjjjjjjshssgahsbsbbs";
-            yInfo()<<"shsggsgsgsgsgsjjjjjjjjjjjjjjjjjjjshssgahsbsbbs";
         }
-
-
-
-
     }
     else {
-        m_kSmoother=1;
+        m_kDCMSmoother=1;
 
     }
 
-
-//    if (m_pushRecoveryActiveIndex<11-1+m_indexSmoother) {
-        iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+m_kSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
-//    }
-//    else {
-//        smoothedDCM=adaptedDCM;
-//    }
+        iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+m_kDCMSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
     return true;
 }
 
