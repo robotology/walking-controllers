@@ -66,6 +66,7 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
          std::vector<yarp::dev::InteractionModeEnum> m_isJointModeStiffVector;/**< Joint is in the stiff or compliance mode */
          std::vector<yarp::dev::InteractionModeEnum> m_JointModeStiffVectorDefult;/**< All the joints are in the stiff  mode */
+         std::vector<yarp::dev::InteractionModeEnum> m_currentModeofJoints;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
         // yarp::sig::Vector m_positionFeedbackDegFiltered;
         yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
@@ -84,6 +85,7 @@ namespace WalkingControllers
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
         bool m_useWrenchFilter; /**< True if the wrench filter is used. */
 
+        std::vector<bool>  m_jointModes; /**< True if the joint is in the stiff mode */
         double m_startingPositionControlTime;
         bool m_positionMoveSkipped;
 
@@ -97,7 +99,7 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                           std::pair<std::string, double>& worstError);
+                           std::pair<int, double> &worstError);
 
         /**
          * Switch the control mode.
