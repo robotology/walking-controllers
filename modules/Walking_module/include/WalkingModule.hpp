@@ -367,6 +367,6 @@ public:
     bool GetBaseFromPelvisIMU(iDynTree::Rotation pelvisimuOrientation);
     bool getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorldRotation, iDynTree::Rotation headToBaseRotation, iDynTree::Rotation imuOrientationtoIMUWorld);
     bool getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation);
-    bool FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory, iDynTree::Transform &smoothedFootTrajectory);
+    bool FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory, iDynTree::Transform &smoothedFootTrajectory, const iDynTree::Twist adaptedFeetTwist, const iDynTree::Twist desiredFootTwist, iDynTree::Twist &smoothedFootTwist);
 };
 #endif
