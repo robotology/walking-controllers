@@ -1057,6 +1057,7 @@ bool WalkingModule::updateModule()
                 {
                     double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +m_stepAdaptator->getDesiredImpactTime()-(m_time - timeOffset);
                     m_indexSmoother=timeOfSmoothing/m_dT;
+                    m_indexSmoother=m_indexSmoother;
                     m_kDCMSmoother=0;
                 }
                 if(m_pushRecoveryActiveIndex==(5+1))
@@ -2176,8 +2177,9 @@ bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
         m_kDCMSmoother=((double)(m_timeIndexAfterPushDetection)/((double)(m_indexSmoother)));
         if(m_timeIndexAfterPushDetection==m_indexSmoother)
         {
-            m_pushRecoveryActiveIndex=0;
+
             m_indexSmoother=0;
+            m_pushRecoveryActiveIndex=0;
         }
     }
     else {
