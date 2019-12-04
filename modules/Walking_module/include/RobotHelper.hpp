@@ -89,7 +89,8 @@ class RobotHelper
     bool m_useExternalRobotBase; /**< True if an the base is provided by the extern. */
     bool m_useFloatingBaseEstimator; /**< True if an the base is provided by the base estimator. */
     bool m_usePelvisIMU; /**< True if an the pelvis imu will be used. */
-    bool m_useHeadIMU; /**< True if an the pelvis imu will be used. */
+    bool m_useHeadIMU; /**< True if an the head imu will be used. */
+    bool m_useFeetIMUSimulation; /**< True if an the Feet imu will be used. */
 
 
     iDynTree::Transform m_robotBaseTransform; /**< World_T_robot base. */
@@ -98,6 +99,14 @@ class RobotHelper
     iDynTree::Rotation m_headimuOrientation; /**< imu orientation data */
     iDynTree::LinAcceleration m_headimuAcceleration;/**< imu acceleration data */
     iDynTree::AngVelocity m_headimuAngularVelocity;/**< /**< imu angular velocity data */
+
+    iDynTree::Rotation m_leftFootIMUOrientation; /**< left foot imu orientation data */
+    iDynTree::LinAcceleration m_leftFootIMUAcceleration;/**< left foot imu acceleration data */
+    iDynTree::AngVelocity m_leftFootIMUAngularVelocity;/**< left foot imu angular velocity data */
+
+    iDynTree::Rotation m_rightFootIMUOrientation; /**< right foot imu orientation data */
+    iDynTree::LinAcceleration m_rightFootIMUAcceleration;/**< right foot imu acceleration data */
+    iDynTree::AngVelocity m_rightFootIMUAngularVelocity;/**< right foot imu angular velocity data */
 
     iDynTree::Rotation m_pelvisimuOrientation; /**< imu orientation data */
     iDynTree::LinAcceleration m_pelvisimuAcceleration;/**< imu acceleration data */
@@ -116,6 +125,8 @@ iDynTree::Rotation m_initialPelvisIMUOrientation;
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotBaseEstimatorPort; /**< Robot base port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_pelvisIMUPort; /**< Pelvis IMU  port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_headIMUPort; /**< Head IMU port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_leftFootIMUPort; /**< Left Foot IMU port. */
+    yarp::os::BufferedPort<yarp::sig::Vector> m_rightFootIMUPort; /**< Right Foot IMU port. */
     double m_heightOffset;
 
 
@@ -278,6 +289,13 @@ public:
     const iDynTree::Rotation &getInitialHeadIMUOreintation() const;
     bool isPelvisIMUUsed();
     bool isHeadIMUUsed();
+    bool isFeetIMUUsedSimulation();
+    const iDynTree::LinAcceleration &getLeftFootIMUAcceleration() const;
+    const iDynTree::AngVelocity &getLeftFootIMUAngularVelocity() const;
+    const iDynTree::Rotation &getLeftFootIMUOreintation() const;
+    const iDynTree::LinAcceleration &getRightFootIMUAcceleration() const;
+    const iDynTree::AngVelocity &getRightFootIMUAngularVelocity() const;
+    const iDynTree::Rotation &getRightFootIMUOreintation() const;
 };
 
 #endif

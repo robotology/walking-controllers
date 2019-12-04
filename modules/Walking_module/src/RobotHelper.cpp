@@ -52,6 +52,9 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 
     bool okBaseEstimation = true;
     bool okPelvisIMU = true;
+    bool okRFootIMU = true;
+    bool okLFootIMU = true;
+
     bool okHeadIMU = true;
     bool okFloatingBaseEstimation = true;
     if(getBaseEst){
@@ -66,6 +69,11 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 
     if(m_usePelvisIMU)
         okPelvisIMU = !m_usePelvisIMU;
+
+    if(m_useFeetIMUSimulation){
+        okLFootIMU = !m_useFeetIMUSimulation;
+        okRFootIMU = !m_useFeetIMUSimulation;
+    }
 
     if(m_useHeadIMU)
         okHeadIMU = !m_useHeadIMU;
@@ -151,6 +159,43 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
             }
         }
 
+        if (m_useFeetIMUSimulation) {
+
+            if(!okRFootIMU){
+                yarp::sig::Vector *rFootIMU = NULL;
+                rFootIMU=m_rightFootIMUPort.read(false);
+                if (rFootIMU!=NULL) {
+
+                    m_rightFootIMUOrientation=m_rightFootIMUOrientation.RPY(iDynTree::deg2rad((*rFootIMU)(0)),iDynTree::deg2rad((*rFootIMU)(1)),iDynTree::deg2rad((*rFootIMU)(2)));
+                    m_rightFootIMUAcceleration(0)=(*rFootIMU)(3) ;
+                    m_rightFootIMUAcceleration(1)=(*rFootIMU)(4) ;
+                    m_rightFootIMUAcceleration(2)=(*rFootIMU)(5) ;
+
+                    m_rightFootIMUAngularVelocity(0)=(*rFootIMU)(6) ;
+                    m_rightFootIMUAngularVelocity(1)=(*rFootIMU)(7) ;
+                    m_rightFootIMUAngularVelocity(2)=(*rFootIMU)(8) ;
+                    okRFootIMU=true;
+                }
+            }
+
+            if(!okLFootIMU){
+                yarp::sig::Vector *lFootIMU = NULL;
+                lFootIMU=m_leftFootIMUPort.read(false);
+                if (lFootIMU!=NULL) {
+
+                    m_leftFootIMUOrientation=m_leftFootIMUOrientation.RPY(iDynTree::deg2rad((*lFootIMU)(0)),iDynTree::deg2rad((*lFootIMU)(1)),iDynTree::deg2rad((*lFootIMU)(2)));
+                    m_leftFootIMUAcceleration(0)=(*lFootIMU)(3) ;
+                    m_leftFootIMUAcceleration(1)=(*lFootIMU)(4) ;
+                    m_leftFootIMUAcceleration(2)=(*lFootIMU)(5) ;
+
+                    m_leftFootIMUAngularVelocity(0)=(*lFootIMU)(6) ;
+                    m_leftFootIMUAngularVelocity(1)=(*lFootIMU)(7) ;
+                    m_leftFootIMUAngularVelocity(2)=(*lFootIMU)(8) ;
+                    okLFootIMU=true;
+                }
+            }
+        }
+
         if (m_usePelvisIMU) {
             if(!okPelvisIMU){
                 yarp::sig::Vector *pelvisIMU = NULL;
@@ -191,7 +236,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
             }
         }
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okHeadIMU && okPelvisIMU &&  (okBaseEstimation || okFloatingBaseEstimation))
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okHeadIMU && okPelvisIMU && okLFootIMU  && okRFootIMU && okRFootIMU && (okBaseEstimation || okFloatingBaseEstimation))
 
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
@@ -237,6 +282,13 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 
     if(!okHeadIMU)
         yError() << "\t - Head imu data";
+
+    if(!okLFootIMU)
+        yError() << "\t - Left Foot imu data";
+
+    if(!okRFootIMU)
+        yError() << "\t - Right Foot imu data";
+
     return false;
 }
 
@@ -480,6 +532,44 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         if(!yarp::os::Network::connect(headIMUPortName,"/" + name + "/headIMU:i"))
         {
             yError() << "Unable to connect to port " << "/" + name + "/headIMU::i";
+            return false;
+        }
+    }
+
+
+
+    m_useFeetIMUSimulation=config.check("m_use_feet_imu_simulation", yarp::os::Value("False")).asBool();
+    if (m_useFeetIMUSimulation) {
+        m_leftFootIMUPort.open("/" + name + "/leftFootIMU:i");
+        // connect port
+
+        std::string leftFootIMUPortName;
+        if(!YarpHelper::getStringFromSearchable(config, "imu_lfoot_port_name", leftFootIMUPortName))
+        {
+            yError() << "[RobotHelper::leftFootIMUPort] Unable to get the string from searchable.";
+            return false;
+        }
+
+        if(!yarp::os::Network::connect(leftFootIMUPortName,"/" + name + "/leftFootIMU:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/leftFootIMU::i";
+            return false;
+        }
+
+
+        m_rightFootIMUPort.open("/" + name + "/rightFootIMU:i");
+        // connect port
+
+        std::string rightFootIMUPortName;
+        if(!YarpHelper::getStringFromSearchable(config, "imu_rfoot_port_name", rightFootIMUPortName))
+        {
+            yError() << "[RobotHelper::rightFootIMUPort] Unable to get the string from searchable.";
+            return false;
+        }
+
+        if(!yarp::os::Network::connect(rightFootIMUPortName,"/" + name + "/rightFootIMU:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/rightFootIMU::i";
             return false;
         }
     }
@@ -995,6 +1085,36 @@ const iDynTree::Rotation& RobotHelper::getPelvisIMUOreintation() const
 }
 
 
+const iDynTree::LinAcceleration& RobotHelper::getLeftFootIMUAcceleration() const
+{
+    return m_leftFootIMUAcceleration;
+}
+
+const iDynTree::AngVelocity& RobotHelper::getLeftFootIMUAngularVelocity() const
+{
+    return m_leftFootIMUAngularVelocity;
+}
+
+const iDynTree::Rotation& RobotHelper::getLeftFootIMUOreintation() const
+{
+    return m_leftFootIMUOrientation;
+}
+
+const iDynTree::LinAcceleration& RobotHelper::getRightFootIMUAcceleration() const
+{
+    return m_rightFootIMUAcceleration;
+}
+
+const iDynTree::AngVelocity& RobotHelper::getRightFootIMUAngularVelocity() const
+{
+    return m_rightFootIMUAngularVelocity;
+}
+
+const iDynTree::Rotation& RobotHelper::getRightFootIMUOreintation() const
+{
+    return m_rightFootIMUOrientation;
+}
+
 const iDynTree::LinAcceleration& RobotHelper::getHeadIMUAcceleration() const
 {
     return m_headimuAcceleration;
@@ -1034,4 +1154,9 @@ bool RobotHelper::isPelvisIMUUsed()
 bool RobotHelper::isHeadIMUUsed()
 {
     return m_useHeadIMU;
+}
+
+bool RobotHelper::isFeetIMUUsedSimulation()
+{
+    return m_useFeetIMUSimulation;
 }

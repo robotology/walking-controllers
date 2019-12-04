@@ -105,6 +105,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     StepList m_jRightstepList;
     iDynTree::Rotation m_WalkingWorld_R_PelvisIMUWorld;
     iDynTree::Rotation m_WalkingWorld_R_HeadIMUWorld;
+    iDynTree::Rotation m_WalkingWorld_R_LFootIMUWorld;
+    iDynTree::Rotation m_WalkingWorld_R_RFootIMUWorld;
     //following three lines  added for filtering the global zmp to decrease the vibration during walking
     yarp::sig::Vector m_zmpFiltered; /**< Vector containing the filtered evaluated ZMP. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_ZMPFilter; /**< ZMP low pass filter .*/
@@ -148,6 +150,8 @@ class WalkingModule: public yarp::os::RFModule, public WalkingCommands
     std::deque<iDynTree::Transform> m_rightTrajectory; /**< Deque containing the trajectory of the right foot. */
     iDynTree::Rotation m_baseOrientationFromHeadIMU;
     iDynTree::Rotation m_baseOrientationFromPelvisIMU;
+    iDynTree::Rotation m_leftFootRotationFromIMU;
+    iDynTree::Rotation m_rightFootRotationFromIMU;
 
 
     std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
@@ -368,5 +372,7 @@ public:
     bool getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorldRotation, iDynTree::Rotation headToBaseRotation, iDynTree::Rotation imuOrientationtoIMUWorld);
     bool getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation baseToWorldRotation);
     bool FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory, iDynTree::Transform &smoothedFootTrajectory, const iDynTree::Twist adaptedFeetTwist, const iDynTree::Twist desiredFootTwist, iDynTree::Twist &smoothedFootTwist);
+    bool getFeetIMUWorldToWalkingWorld(iDynTree::Rotation imuToFootRotation, iDynTree::Rotation FootToWorldRotation, iDynTree::Rotation imuOrientationtoIMUWorld, iDynTree::Rotation &worldIMUToWorldWalk);
+    bool GetFootOrientationFromFootIMU(iDynTree::Rotation footIMUWorldToWalkingWorld, iDynTree::Rotation imuToFootRotation, iDynTree::Rotation footimuOrientation, iDynTree::Rotation footToWorldRotation, iDynTree::Rotation &footOrientationFromIMU);
 };
 #endif

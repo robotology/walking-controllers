@@ -175,6 +175,33 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
+    std::string lFootIMUFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "left_imu_foot_frame", lFootIMUFrame))
+    {
+        yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameLFootIMUIndex = m_kinDyn.model().getFrameIndex(lFootIMUFrame);
+    if(m_frameLFootIMUIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << lFootIMUFrame;
+        return false;
+    }
+
+
+    std::string rFootIMUFrame;
+    if(!YarpHelper::getStringFromSearchable(config, "right_imu_foot_frame",rFootIMUFrame))
+    {
+        yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
+        return false;
+    }
+    m_frameRFootIMUIndex = m_kinDyn.model().getFrameIndex(rFootIMUFrame);
+    if(m_frameRFootIMUIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rFootIMUFrame;
+        return false;
+    }
+
     std::string rootFrame;
     if(!YarpHelper::getStringFromSearchable(config, "root_frame", rootFrame))
     {
@@ -559,5 +586,17 @@ bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
 iDynTree::Transform WalkingFK::getHeadIMUtoHeadTransform(){
 
     return m_kinDyn.getRelativeTransform(m_frameHeadIndex,m_frameHeadIMUIndex);
+
+}
+
+iDynTree::Transform WalkingFK::getRFootIMUtoFootTransform(){
+
+    return m_kinDyn.getRelativeTransform(m_frameRightIndex,m_frameRFootIMUIndex);
+
+}
+
+iDynTree::Transform WalkingFK::getLFootIMUtoFootTransform(){
+
+    return m_kinDyn.getRelativeTransform(m_frameLeftIndex,m_frameLFootIMUIndex);
 
 }

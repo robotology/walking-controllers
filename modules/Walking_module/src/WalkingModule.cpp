@@ -476,10 +476,19 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     double threshold = 0.001;
     bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
     solver->setPhase(stancePhase);
+//removeme
+iDynTree::Transform tempLeftFoot;
+tempLeftFoot.setPosition(m_FKSolver->getLeftFootToWorldTransform().getPosition());
+tempLeftFoot.setRotation(m_leftFootRotationFromIMU);
+
+iDynTree::Transform tempRightFoot;
+tempRightFoot.setPosition(m_FKSolver->getRightFootToWorldTransform().getPosition());
+tempRightFoot.setRotation(m_rightFootRotationFromIMU);
+
 
     ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
-                                m_FKSolver->getLeftFootToWorldTransform(),
-                                m_FKSolver->getRightFootToWorldTransform(),
+                                tempLeftFoot,
+                                tempRightFoot,
                                 m_FKSolver->getLeftHandToWorldTransform(),
                                 m_FKSolver->getRightHandToWorldTransform(),
                                 m_FKSolver->getNeckOrientation(),
@@ -776,14 +785,14 @@ bool WalkingModule::updateModule()
 
                 if(!m_leftInContact.front()){
                     if (!FeetTrajectorySmoother(m_adaptatedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform,m_adaptatedFootLeftTwist,m_leftTwistTrajectory.front(),m_smoothedFootLeftTwist)) {
-                   yError()<<"the Left Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
+                        yError()<<"the Left Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
                     }
                 }
 
 
                 if(!m_rightInContact.front()){
                     if (!FeetTrajectorySmoother(m_adaptatedFootRightTransform,m_rightTrajectory.front(),m_smoothedFootRightTransform,m_adaptatedFootRightTwist,m_rightTwistTrajectory.front(),m_smoothedFootRightTwist)) {
-                   yError()<<"the Right Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
+                        yError()<<"the Right Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
                     }
                 }
             }
@@ -825,6 +834,24 @@ bool WalkingModule::updateModule()
         iDynTree::Rotation imuRotation;
         iDynTree::Vector3 imuRPY;
         //   yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
+        if (m_robotControlHelper->isFeetIMUUsedSimulation()) {
+            //iDynTree::Rotation tempFeetIMURotation;
+            //if (m_leftInContact.front()) {
+                //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(0),m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(1),0);
+                GetFootOrientationFromFootIMU(m_WalkingWorld_R_LFootIMUWorld,m_FKSolver->getLFootIMUtoFootTransform().getRotation(),m_robotControlHelper->getLeftFootIMUOreintation(),
+                                              m_FKSolver->getLeftFootToWorldTransform().getRotation(),m_leftFootRotationFromIMU);
+                //imuRPY= m_leftFootRotationFromIMU.asRPY();
+            //}
+          //  if(m_rightInContact.front()){
+                //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),0);
+                GetFootOrientationFromFootIMU(m_WalkingWorld_R_RFootIMUWorld,m_FKSolver->getRFootIMUtoFootTransform().getRotation(),m_robotControlHelper->getRightFootIMUOreintation(),
+                                              m_FKSolver->getRightFootToWorldTransform().getRotation(),m_rightFootRotationFromIMU);
+               // m_rightFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),0);
+                //imuRPY= m_rightFootRotationFromIMU.asRPY();
+            //}
+        }
+
+
         if (m_robotControlHelper->isHeadIMUUsed()) {
             iDynTree::Rotation Base_R_Head;
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
@@ -832,10 +859,10 @@ bool WalkingModule::updateModule()
             iDynTree::Rotation tempHeadIMURotationforYAW;
             iDynTree::toEigen(tempHeadIMURotationforYAW)=iDynTree::toEigen(m_WalkingWorld_R_HeadIMUWorld.inverse())*iDynTree::toEigen(m_FKSolver->getHeadIMUToWorldTransform().getRotation());
             tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),tempHeadIMURotationforYAW.asRPY()(2));
-
             GetBaseFromHeadIMU(Base_R_Head,tempHeadIMURotation);
             imuRPY= m_baseOrientationFromHeadIMU.asRPY();
         }
+
 
         if (m_robotControlHelper->isPelvisIMUUsed()) {
             iDynTree::Rotation tempPelvisIMURotation;
@@ -1006,7 +1033,11 @@ bool WalkingModule::updateModule()
                         yInfo()<<"triggering the push recovery";
 
                         // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-                        m_stepAdaptator->setCurrentDcmPosition(m_DCMEstimator->getDCMPosition());
+                        iDynTree::Vector2 tempDCMError;
+                        tempDCMError(1)=0.00;
+                        tempDCMError(0)=0.00;
+                        iDynTree::toEigen(tempDCMError)=iDynTree::toEigen(m_DCMEstimator->getDCMPosition())+iDynTree::toEigen(tempDCMError);
+                        m_stepAdaptator->setCurrentDcmPosition(tempDCMError);
                     }
                     else {
                         m_pushRecoveryActiveIndex++;
@@ -1021,7 +1052,7 @@ bool WalkingModule::updateModule()
                     }
                     else if(m_pushRecoveryActiveIndex==(5+1)) {
                         m_stepAdaptator->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
-                         m_pushRecoveryActiveIndex++;
+                        m_pushRecoveryActiveIndex++;
                     }
                     else {
                         m_stepAdaptator->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
@@ -1462,7 +1493,8 @@ bool WalkingModule::updateModule()
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,m_adaptatedFootLeftTransform.getPosition(),m_adaptatedFootRightTransform.getPosition(),m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_baseOrientationFromPelvisIMU.asRPY(),m_baseOrientationFromHeadIMU.asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      m_isRollPitchActiveVec,m_DCMPositionSmoothed,m_smoothedFootLeftTransform.getPosition(),m_smoothedFootLeftTwist.getLinearVec3(),m_leftTwistTrajectory.front().getLinearVec3(),m_adaptatedFootLeftTwist.getLinearVec3());
+                                      m_isRollPitchActiveVec,m_DCMPositionSmoothed,m_smoothedFootLeftTransform.getPosition(),m_smoothedFootLeftTwist.getLinearVec3(),m_leftTwistTrajectory.front().getLinearVec3(),m_adaptatedFootLeftTwist.getLinearVec3(),
+                                      m_leftFootRotationFromIMU.asRPY(),m_rightFootRotationFromIMU.asRPY());
         }
 
         propagateTime();
@@ -1557,7 +1589,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
         iDynTree::Rotation tempHeadIMURotation;
         tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_robotControlHelper->getHeadIMUOreintation().asRPY()(2));
-
         getHeadIMUWorldToWalkingWorld(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,tempHeadIMURotation);
     }
 
@@ -1973,7 +2004,9 @@ bool WalkingModule::startWalking()
                                       "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","Lfoot_adaptedZ","Rfoot_adaptedX","Rfoot_adaptedY","Rfoot_adaptedZ",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
                                       "dcm_estimated_x","dcm_estimated_y","IsPushActivex","indexSmoother","k_smoother","step_timing","timeIndexAfterPushDetection","pushRecoveryActiveIndex","pelvis_imu_roll","pelvis_imu_pitch","pelvis_imu_yaw","head_imu_roll","head_imu_pitch","head_imu_yaw","roll_des","pitch_des",
-                                      "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y","lf_smoothed_x","lf_smoothed_y","lf_smoothed_z","lf_smoothed_dx","lf_smoothed_dy","lf_smoothed_dz","lf_des_dx", "lf_des_dy", "lf_des_dz","lf_adapted_dx","lf_adapted_dy","lf_adapted_dz"});
+                                      "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y","lf_smoothed_x","lf_smoothed_y","lf_smoothed_z","lf_smoothed_dx","lf_smoothed_dy","lf_smoothed_dz","lf_des_dx", "lf_des_dy", "lf_des_dz","lf_adapted_dx","lf_adapted_dy","lf_adapted_dz",
+                                      "lfoot_imu_roll", "lfoot_imu_pitch", "lfoot_imu_yaw",
+                                      "rfoot_imu_roll", "rfoot_imu_pitch", "rfoot_imu_yaw"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
@@ -1998,7 +2031,6 @@ bool WalkingModule::startWalking()
         if (m_robotControlHelper->isPelvisIMUUsed()) {
             iDynTree::Rotation tempPelvisIMURotation;
             tempPelvisIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getPelvisIMUOreintation().asRPY()(0),m_robotControlHelper->getPelvisIMUOreintation().asRPY()(1),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(2));
-
             getPelvisIMUWorldToWalkingWorld(tempPelvisIMURotation,m_FKSolver->getRootLinkToWorldTransform().getRotation());
         }
 
@@ -2008,9 +2040,20 @@ bool WalkingModule::startWalking()
             iDynTree::toEigen(Base_R_Head)=iDynTree::toEigen(m_FKSolver->getRootLinkToWorldTransform().getRotation().inverse())*iDynTree::toEigen(m_FKSolver->getHeadToWorldTransform().getRotation());
             iDynTree::Rotation tempHeadIMURotation;
             tempHeadIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getHeadIMUOreintation().asRPY()(0),m_robotControlHelper->getHeadIMUOreintation().asRPY()(1),m_robotControlHelper->getHeadIMUOreintation().asRPY()(2));
-
-
             getHeadIMUWorldToWalkingWorld(m_FKSolver->getRootLinkToWorldTransform().getRotation(),Base_R_Head,tempHeadIMURotation);
+        }
+
+
+        if (m_robotControlHelper->isFeetIMUUsedSimulation()) {
+            iDynTree::Rotation tempRFootIMURotation;
+            iDynTree::Rotation tempLFootIMURotation;
+            tempRFootIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(2));
+            tempLFootIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(0),m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(1),m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(2));
+
+            getFeetIMUWorldToWalkingWorld(m_FKSolver->getLFootIMUtoFootTransform().getRotation(),m_FKSolver->getLeftFootToWorldTransform().getRotation(),
+                                          tempLFootIMURotation,m_WalkingWorld_R_LFootIMUWorld);
+            getFeetIMUWorldToWalkingWorld(m_FKSolver->getRFootIMUtoFootTransform().getRotation(),m_FKSolver->getLeftFootToWorldTransform().getRotation(),
+                                          tempRFootIMURotation,m_WalkingWorld_R_RFootIMUWorld);
         }
     }
 
@@ -2150,15 +2193,15 @@ bool WalkingModule::FeetTrajectorySmoother(const iDynTree::Transform adaptedFeet
     else {
         m_kFootSmoother=1;
     }
-smoothedFootTransform.setRotation(adaptedFeetTransform.getRotation());
-smoothedFootTwist.setAngularVec3(adaptedFeetTwist.getAngularVec3());
+    smoothedFootTransform.setRotation(adaptedFeetTransform.getRotation());
+    smoothedFootTwist.setAngularVec3(adaptedFeetTwist.getAngularVec3());
 
-iDynTree::Position tempPosition;
-iDynTree::LinVelocity tempVel;
-iDynTree::toEigen(tempPosition)=iDynTree::toEigen(desiredFootTransform.getPosition())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTransform.getPosition())-iDynTree::toEigen(desiredFootTransform.getPosition()));
-iDynTree::toEigen(tempVel)=iDynTree::toEigen(desiredFootTwist.getLinearVec3())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTwist.getLinearVec3())-iDynTree::toEigen(desiredFootTwist.getLinearVec3()));
-        smoothedFootTransform.setPosition(tempPosition);
-        smoothedFootTwist.setLinearVec3(tempVel);
+    iDynTree::Position tempPosition;
+    iDynTree::LinVelocity tempVel;
+    iDynTree::toEigen(tempPosition)=iDynTree::toEigen(desiredFootTransform.getPosition())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTransform.getPosition())-iDynTree::toEigen(desiredFootTransform.getPosition()));
+    iDynTree::toEigen(tempVel)=iDynTree::toEigen(desiredFootTwist.getLinearVec3())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTwist.getLinearVec3())-iDynTree::toEigen(desiredFootTwist.getLinearVec3()));
+    smoothedFootTransform.setPosition(tempPosition);
+    smoothedFootTwist.setLinearVec3(tempVel);
     return true;
 }
 
@@ -2187,9 +2230,11 @@ bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
 
     }
 
-        iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+m_kDCMSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
+    iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+m_kDCMSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
     return true;
 }
+
+
 
 bool WalkingModule::GetBaseFromHeadIMU(iDynTree::Rotation headToBaseRotation,iDynTree::Rotation headimuOrientation){
     auto head_R_imu= m_FKSolver->getHeadIMUtoHeadTransform().getRotation();
@@ -2220,6 +2265,13 @@ bool WalkingModule::getPelvisIMUWorldToWalkingWorld(iDynTree::Rotation imuOrient
     return true;
 }
 
+bool WalkingModule::getFeetIMUWorldToWalkingWorld(iDynTree::Rotation imuToFootRotation,iDynTree::Rotation FootToWorldRotation,iDynTree::Rotation imuOrientationtoIMUWorld,iDynTree::Rotation& worldIMUToWorldWalk ){
+    iDynTree::toEigen(worldIMUToWorldWalk)=iDynTree::toEigen(FootToWorldRotation)*iDynTree::toEigen(imuToFootRotation)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
+    //yInfo()<<"base-head init orientation"<<m_WalkingWorld_R_HeadIMUWorld.asRPY().toString();
+    return true;
+}
+
+
 bool WalkingModule::getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorldRotation,iDynTree::Rotation headToBaseRotation,iDynTree::Rotation imuOrientationtoIMUWorld){
     auto head_R_imu= m_FKSolver->getHeadIMUtoHeadTransform().getRotation();
     //head_R_imu=iDynTree::Rotation::Identity();
@@ -2227,5 +2279,15 @@ bool WalkingModule::getHeadIMUWorldToWalkingWorld(iDynTree::Rotation baseToWorld
     iDynTree::toEigen(m_WalkingWorld_R_HeadIMUWorld)=iDynTree::toEigen(baseToWorldRotation)*iDynTree::toEigen(base_R_imu)*iDynTree::toEigen(imuOrientationtoIMUWorld.inverse());
     //yInfo()<<"base-head init orientation"<<m_WalkingWorld_R_HeadIMUWorld.asRPY().toString();
 
+    return true;
+}
+
+bool WalkingModule::GetFootOrientationFromFootIMU(iDynTree::Rotation footIMUWorldToWalkingWorld,iDynTree::Rotation imuToFootRotation,iDynTree::Rotation footimuOrientation,iDynTree::Rotation footToWorldRotation,iDynTree::Rotation& footOrientationFromIMU){
+    iDynTree::Rotation tempIMUToWorld;
+    iDynTree::Rotation tempIMUToWorldDesired;
+    iDynTree::toEigen(tempIMUToWorldDesired)=iDynTree::toEigen(footToWorldRotation)*iDynTree::toEigen(imuToFootRotation);
+    iDynTree::toEigen(tempIMUToWorld)=iDynTree::toEigen(footIMUWorldToWalkingWorld)*iDynTree::toEigen(footimuOrientation);
+    tempIMUToWorld=iDynTree::Rotation::RPY(tempIMUToWorld.asRPY()(0),tempIMUToWorld.asRPY()(1),tempIMUToWorldDesired.asRPY()(2));
+    iDynTree::toEigen(footOrientationFromIMU)=iDynTree::toEigen(tempIMUToWorld)*iDynTree::toEigen( imuToFootRotation.inverse());
     return true;
 }
