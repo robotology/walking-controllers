@@ -834,7 +834,7 @@ bool WalkingModule::updateModule()
         iDynTree::Rotation imuRotation;
         iDynTree::Vector3 imuRPY;
         //   yInfo()<<"flso;ver pelvis orientation"<<m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY().toString();
-        if (m_robotControlHelper->isFeetIMUUsedSimulation()) {
+        if (m_robotControlHelper->isFeetIMUUsedSimulation() || m_robotControlHelper->isFeetIMUUsedExperiment()) {
             //iDynTree::Rotation tempFeetIMURotation;
             //if (m_leftInContact.front()) {
                 //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(0),m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(1),0);
@@ -2044,7 +2044,7 @@ bool WalkingModule::startWalking()
         }
 
 
-        if (m_robotControlHelper->isFeetIMUUsedSimulation()) {
+        if (m_robotControlHelper->isFeetIMUUsedSimulation() || m_robotControlHelper->isFeetIMUUsedExperiment()) {
             iDynTree::Rotation tempRFootIMURotation;
             iDynTree::Rotation tempLFootIMURotation;
             tempRFootIMURotation=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(2));

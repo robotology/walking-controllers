@@ -22,6 +22,7 @@
 #include <yarp/dev/IVelocityControl.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/Timer.h>
+#include <yarp/dev/MultipleAnalogSensorsInterfaces.h>
 
 #include <iCub/ctrl/filters.h>
 
@@ -32,6 +33,14 @@
 
 #include <WalkingPIDHandler.hpp>
 #include <iDynTree/Model/Model.h>
+//#include <yarp/dev/MultipleAnalogSensorsClient.h>
+#include <yarp/dev/DeviceDriver.h>
+#include <yarp/dev/Wrapper.h>
+#include <yarp/dev/IEncoders.h>
+#include <yarp/dev/IAnalogSensor.h>
+#include <yarp/dev/GenericSensorInterfaces.h>
+#include <yarp/dev/MultipleAnalogSensorsInterfaces.h>
+#include <yarp/os/RpcClient.h>
 
 class RobotHelper
 {
@@ -91,6 +100,8 @@ class RobotHelper
     bool m_usePelvisIMU; /**< True if an the pelvis imu will be used. */
     bool m_useHeadIMU; /**< True if an the head imu will be used. */
     bool m_useFeetIMUSimulation; /**< True if an the Feet imu will be used. */
+    bool m_useFeetIMUExperiment; /**< True if an the Feet imu will be used. */
+
 
 
     iDynTree::Transform m_robotBaseTransform; /**< World_T_robot base. */
@@ -127,9 +138,15 @@ iDynTree::Rotation m_initialPelvisIMUOrientation;
     yarp::os::BufferedPort<yarp::sig::Vector> m_headIMUPort; /**< Head IMU port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_leftFootIMUPort; /**< Left Foot IMU port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_rightFootIMUPort; /**< Right Foot IMU port. */
+    yarp::dev::PolyDriver  m_masRemapperFeetIMU;
+    yarp::os::Property m_masRemapperProperty;
+
     double m_heightOffset;
 
 
+    yarp::dev::IThreeAxisLinearAccelerometers* m_accelerometers{nullptr};
+    yarp::dev::IThreeAxisGyroscopes* m_gyros{nullptr};
+    yarp::dev::IOrientationSensors* m_imu_orientation_sensors{nullptr};
 
     int m_controlMode{-1}; /**< Current position control mode */
 
@@ -290,12 +307,14 @@ public:
     bool isPelvisIMUUsed();
     bool isHeadIMUUsed();
     bool isFeetIMUUsedSimulation();
+    bool isFeetIMUUsedExperiment();
     const iDynTree::LinAcceleration &getLeftFootIMUAcceleration() const;
     const iDynTree::AngVelocity &getLeftFootIMUAngularVelocity() const;
     const iDynTree::Rotation &getLeftFootIMUOreintation() const;
     const iDynTree::LinAcceleration &getRightFootIMUAcceleration() const;
     const iDynTree::AngVelocity &getRightFootIMUAngularVelocity() const;
     const iDynTree::Rotation &getRightFootIMUOreintation() const;
+
 };
 
 #endif
