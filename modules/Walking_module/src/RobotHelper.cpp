@@ -84,7 +84,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
 
     if(m_useHeadIMU)
         okHeadIMU = !m_useHeadIMU;
-
+yInfo()<<"milad2";
     unsigned int attempt = 0;
     do
     {
@@ -165,7 +165,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                 }
             }
         }
-
+yInfo()<<"milad3";
         if (m_useFeetIMUSimulation) {
 
             if(!okRFootIMU){
@@ -218,21 +218,21 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                 lFootOrientationSensor.resize(3);
                 lFootOrientationSensor.zero();
 
-
+yInfo()<<"milad4";
                 std::string nameOfSensor;
                 m_gyros->getThreeAxisGyroscopeName(0,nameOfSensor);
                 if (!(nameOfSensor=="l_foot_ft_gyro_3b13")) {
                     yError()<<"[RobotHelper::FootIMUExperiment]This index is not related to left foot IMU";
                     return false;
                 }
-
+yInfo()<<"milad5";
 //                if((m_accelerometers->getThreeAxisLinearAccelerometerStatus(0)==yarp::dev::MAS_OK)||
 //                        (m_gyros->getThreeAxisGyroscopeStatus(0)==yarp::dev::MAS_OK)||
 //                        (m_imu_orientation_sensors->getOrientationSensorStatus(0)==yarp::dev::MAS_OK)){
 //                    yWarning()<<"[RobotHelper::FootIMUExperiment]unable to get right foot imu data";
 
 //                }
-
+yInfo()<<"milad6";
                 if (!m_gyros->getThreeAxisGyroscopeMeasure(0,lFootGyro,time) || !(m_gyros->getThreeAxisGyroscopeStatus(0)==yarp::dev::MAS_OK)) {
                     yWarning()<<"[RobotHelper::FootIMUExperiment]Unable to recieve the left foot gyro data";
                      okLFootIMUExperiment=false;
@@ -241,7 +241,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                  yInfo()<<nameOfSensor<<"Gyro"<<lFootGyro.toString();
                 okLFootIMUExperiment=true;
                 }
-
+yInfo()<<"milad7";
 
                 if (!m_accelerometers->getThreeAxisLinearAccelerometerMeasure(0,lFootAccelerometer,time) || !(m_accelerometers->getThreeAxisLinearAccelerometerStatus(0)==yarp::dev::MAS_OK)) {
                     yWarning()<<"[RobotHelper::FootIMUExperiment]Unable to recieve the left foot accelerometer data";
@@ -252,7 +252,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                  okLFootIMUExperiment=true;
                 }
 
-
+yInfo()<<"milad8";
                 if (!m_imu_orientation_sensors->getOrientationSensorMeasureAsRollPitchYaw(0,lFootOrientationSensor,time) || !(m_imu_orientation_sensors->getOrientationSensorStatus(0)==yarp::dev::MAS_OK)) {
                    yWarning()<<"[RobotHelper::FootIMUExperiment]Unable to recieve the left foot accelerometer data";
                    okLFootIMUExperiment=false;
@@ -262,7 +262,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                  okLFootIMUExperiment=true;
                 }
 
-
+yInfo()<<"milad9";
                 m_leftFootIMUOrientation=m_leftFootIMUOrientation.RPY(iDynTree::deg2rad((lFootOrientationSensor)(0)),iDynTree::deg2rad((lFootOrientationSensor)(1)),iDynTree::deg2rad((lFootOrientationSensor)(2)));
                 m_leftFootIMUAcceleration(0)=(lFootAccelerometer)(0) ;
                 m_leftFootIMUAcceleration(1)=(lFootAccelerometer)(1) ;
@@ -273,7 +273,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                 m_leftFootIMUAngularVelocity(2)=(lFootGyro)(2) ;
                 okLFootIMU=okLFootIMUExperiment;
                 }
-
+yInfo()<<"milad10";
 
             if(!okRFootIMUExperiment){
                 double time=0;
@@ -293,7 +293,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                     yError()<<"[RobotHelper::FootIMUExperiment]This index is not related to right foot IMU";
                     return false;
                 }
-
+yInfo()<<"milad11";
 //                if((m_accelerometers->getThreeAxisLinearAccelerometerStatus(1)==yarp::dev::MAS_OK)||
 //                        (m_gyros->getThreeAxisGyroscopeStatus(1)==yarp::dev::MAS_OK)||
 //                        (m_imu_orientation_sensors->getOrientationSensorStatus(1))==yarp::dev::MAS_OK){
@@ -312,7 +312,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                     yInfo()<<nameOfSensor<<"Gyro"<<rFootGyro.toString();
                     okRFootIMUExperiment=true;
                 }
-
+yInfo()<<"milad12";
 
                 if (!m_accelerometers->getThreeAxisLinearAccelerometerMeasure(1,rFootAccelerometer,time) || !(m_accelerometers->getThreeAxisLinearAccelerometerStatus(1)==yarp::dev::MAS_OK)) {
 
@@ -324,7 +324,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                     okRFootIMUExperiment=true;
                 }
 
-
+yInfo()<<"milad13";
                 if (!m_imu_orientation_sensors->getOrientationSensorMeasureAsRollPitchYaw(1,rFootOrientationSensor,time)  || !(m_imu_orientation_sensors->getOrientationSensorStatus(1)==yarp::dev::MAS_OK)) {
 
                     yWarning()<<"[RobotHelper::FootIMUExperiment]Unable to recieve the right foot accelerometer data";
@@ -335,7 +335,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                     okRFootIMUExperiment=true;
                 }
 
-
+yInfo()<<"milad14";
                 m_rightFootIMUOrientation=m_rightFootIMUOrientation.RPY(iDynTree::deg2rad((rFootOrientationSensor)(0)),iDynTree::deg2rad((rFootOrientationSensor)(1)),iDynTree::deg2rad((rFootOrientationSensor)(2)));
                 m_rightFootIMUAcceleration(0)=(rFootAccelerometer)(0) ;
                 m_rightFootIMUAcceleration(1)=(rFootAccelerometer)(1) ;
