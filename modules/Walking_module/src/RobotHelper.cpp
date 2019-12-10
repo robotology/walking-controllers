@@ -738,7 +738,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
         left_mas_client_property.put("remote",leftFootIMUPortName);
         left_mas_client_property.put("local", "/" + name + "/left_leg/inertials");
-        left_mas_client_property.put("device","multipleanalogsensorclient");
+        left_mas_client_property.put("device","multipleanalogsensorsclient");
 
         if(!left_leg_inertial_client.open(left_mas_client_property))
         {
@@ -759,7 +759,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
         right_mas_client_property.put("remote",rightFootIMUPortName);
         right_mas_client_property.put("local", "/" + name + "/right_leg/inertials");
-        right_mas_client_property.put("device","multipleanalogsensorclient");
+        right_mas_client_property.put("device","multipleanalogsensorsclient");
 
         if(!right_leg_inertial_client.open(right_mas_client_property))
         {
@@ -767,7 +767,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
 
-        m_masRemapperProperty.put("device", "multipleanalogsensorremapper");
+        m_masRemapperProperty.put("device", "multipleanalogsensorsremapper");
         yarp::os::Bottle threeAxisGyroscopes;
         yarp::os::Bottle & gyrosList = threeAxisGyroscopes.addList();
         gyrosList.addString("l_foot_ft_gyro_3b13");
@@ -779,13 +779,13 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         yarp::os::Bottle & accelerometerList = threeAxisAccelerometer.addList();
         accelerometerList.addString("l_foot_ft_acc_3b13");
         accelerometerList.addString("r_foot_ft_acc_3b14");
-        m_masRemapperProperty.put("ThreeAxisLinearAccelerometersNames",accelerometerList.get(0));
+        m_masRemapperProperty.put("ThreeAxisLinearAccelerometersNames",threeAxisAccelerometer.get(0));
 
         yarp::os::Bottle orientation;
         yarp::os::Bottle & orientationList = orientation.addList();
         orientationList.addString("l_foot_ft_eul_3b13");
         orientationList.addString("r_foot_ft_eul_3b14");
-        m_masRemapperProperty.put("OrientationSensorsNames",orientationList.get(0));
+        m_masRemapperProperty.put("OrientationSensorsNames",orientation.get(0));
 
         if(!m_masRemapperFeetIMU.open(m_masRemapperProperty))
         {
