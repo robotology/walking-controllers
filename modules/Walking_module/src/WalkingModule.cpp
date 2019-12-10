@@ -476,14 +476,14 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     double threshold = 0.001;
     bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
     solver->setPhase(stancePhase);
-//removeme
-iDynTree::Transform tempLeftFoot;
-tempLeftFoot.setPosition(m_FKSolver->getLeftFootToWorldTransform().getPosition());
-tempLeftFoot.setRotation(m_leftFootRotationFromIMU);
+    //removeme
+    iDynTree::Transform tempLeftFoot;
+    tempLeftFoot.setPosition(m_FKSolver->getLeftFootToWorldTransform().getPosition());
+    tempLeftFoot.setRotation(m_leftFootRotationFromIMU);
 
-iDynTree::Transform tempRightFoot;
-tempRightFoot.setPosition(m_FKSolver->getRightFootToWorldTransform().getPosition());
-tempRightFoot.setRotation(m_rightFootRotationFromIMU);
+    iDynTree::Transform tempRightFoot;
+    tempRightFoot.setPosition(m_FKSolver->getRightFootToWorldTransform().getPosition());
+    tempRightFoot.setRotation(m_rightFootRotationFromIMU);
 
 
     ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
@@ -837,17 +837,17 @@ bool WalkingModule::updateModule()
         if (m_robotControlHelper->isFeetIMUUsedSimulation() || m_robotControlHelper->isFeetIMUUsedExperiment()) {
             //iDynTree::Rotation tempFeetIMURotation;
             //if (m_leftInContact.front()) {
-                //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(0),m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(1),0);
-                GetFootOrientationFromFootIMU(m_WalkingWorld_R_LFootIMUWorld,m_FKSolver->getLFootIMUtoFootTransform().getRotation(),m_robotControlHelper->getLeftFootIMUOreintation(),
-                                              m_FKSolver->getLeftFootToWorldTransform().getRotation(),m_leftFootRotationFromIMU);
-                //imuRPY= m_leftFootRotationFromIMU.asRPY();
+            //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(0),m_robotControlHelper->getLeftFootIMUOreintation().asRPY()(1),0);
+            GetFootOrientationFromFootIMU(m_WalkingWorld_R_LFootIMUWorld,m_FKSolver->getLFootIMUtoFootTransform().getRotation(),m_robotControlHelper->getLeftFootIMUOreintation(),
+                                          m_FKSolver->getLeftFootToWorldTransform().getRotation(),m_leftFootRotationFromIMU);
+            //imuRPY= m_leftFootRotationFromIMU.asRPY();
             //}
-          //  if(m_rightInContact.front()){
-                //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),0);
-                GetFootOrientationFromFootIMU(m_WalkingWorld_R_RFootIMUWorld,m_FKSolver->getRFootIMUtoFootTransform().getRotation(),m_robotControlHelper->getRightFootIMUOreintation(),
-                                              m_FKSolver->getRightFootToWorldTransform().getRotation(),m_rightFootRotationFromIMU);
-               // m_rightFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),0);
-                //imuRPY= m_rightFootRotationFromIMU.asRPY();
+            //  if(m_rightInContact.front()){
+            //m_leftFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),0);
+            GetFootOrientationFromFootIMU(m_WalkingWorld_R_RFootIMUWorld,m_FKSolver->getRFootIMUtoFootTransform().getRotation(),m_robotControlHelper->getRightFootIMUOreintation(),
+                                          m_FKSolver->getRightFootToWorldTransform().getRotation(),m_rightFootRotationFromIMU);
+            // m_rightFootRotationFromIMU=iDynTree::Rotation::RPY(m_robotControlHelper->getRightFootIMUOreintation().asRPY()(0),m_robotControlHelper->getRightFootIMUOreintation().asRPY()(1),0);
+            //imuRPY= m_rightFootRotationFromIMU.asRPY();
             //}
         }
 
@@ -885,25 +885,52 @@ bool WalkingModule::updateModule()
         double miladTempP=0;
         double miladTempR=0;
         if (m_useStepAdaptation) {
-            if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
-                miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
-                m_isPitchActive=1;
+            if(m_robotControlHelper->isHeadIMUUsed() || m_robotControlHelper->isPelvisIMUUsed()){
+                if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
+                    miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
+                    m_isPitchActive=1;
 
-                //miladTemp=0;
+                    //miladTemp=0;
+                }
+                else {
+                    miladTempP=0;
+                }
+
+                if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
+
+                    miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
+                    m_isRollActive=1;
+                }
+                else {
+                    miladTempR=0;
+                }
             }
-            else {
-                miladTempP=0;
-            }
+            else if (m_robotControlHelper->isFeetIMUUsedExperiment() || m_robotControlHelper->isFeetIMUUsedSimulation()) {
+                if (m_leftInContact.front() && !m_rightInContact.front()) {
+                imuRPY= m_leftFootRotationFromIMU.asRPY();
+                }
+               else if (!m_leftInContact.front() && m_rightInContact.front()) {
+                imuRPY= m_rightFootRotationFromIMU.asRPY();
+                }
+                else {
+               imuRPY.zero();
+                }
+                if ((abs(imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
+                    miladTempP=imuRPY(1);
+                    m_isPitchActive=1;
+                }
+                else {
+                    miladTempP=0;
+                }
 
-            if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
 
-                miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
-                m_isRollActive=1;
-
-                //miladTemp=0;
-            }
-            else {
-                miladTempR=0;
+                if ( (abs(imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
+                    miladTempR=imuRPY(0);
+                    m_isRollActive=1;
+                }
+                else {
+                    miladTempR=0;
+                }
             }
         }
 
