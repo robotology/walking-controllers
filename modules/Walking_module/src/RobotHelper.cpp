@@ -238,6 +238,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                      okLFootIMUExperiment=false;
                 }
                 else{
+                 yInfo()<<nameOfSensor<<"Gyro"<<lFootGyro.toString();
                 okLFootIMUExperiment=true;
                 }
 
@@ -247,6 +248,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                     okLFootIMUExperiment=false;
                 }
                 else {
+                      yInfo()<<nameOfSensor<<"Accel"<<lFootAccelerometer.toString();
                  okLFootIMUExperiment=true;
                 }
 
@@ -256,6 +258,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                    okLFootIMUExperiment=false;
                 }
                 else{
+                    yInfo()<<nameOfSensor<<"Orientation"<<lFootOrientationSensor.toString();
                  okLFootIMUExperiment=true;
                 }
 
@@ -306,24 +309,29 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                     okRFootIMUExperiment=false;
                 }
                 else {
+                    yInfo()<<nameOfSensor<<"Gyro"<<rFootGyro.toString();
                     okRFootIMUExperiment=true;
                 }
 
 
                 if (!m_accelerometers->getThreeAxisLinearAccelerometerMeasure(1,rFootAccelerometer,time) || !(m_accelerometers->getThreeAxisLinearAccelerometerStatus(1)==yarp::dev::MAS_OK)) {
+
                     yWarning()<<"[RobotHelper::FootIMUExperiment]Unable to recieve the right foot accelerometer data";
                     okRFootIMUExperiment=false;
                 }
                 else {
+                     yInfo()<<nameOfSensor<<"Accel"<<rFootAccelerometer.toString();
                     okRFootIMUExperiment=true;
                 }
 
 
                 if (!m_imu_orientation_sensors->getOrientationSensorMeasureAsRollPitchYaw(1,rFootOrientationSensor,time)  || !(m_imu_orientation_sensors->getOrientationSensorStatus(1)==yarp::dev::MAS_OK)) {
+
                     yWarning()<<"[RobotHelper::FootIMUExperiment]Unable to recieve the right foot accelerometer data";
                     okRFootIMUExperiment=false;
                 }
                 else {
+                     yInfo()<<nameOfSensor<<"Orientation"<<rFootOrientationSensor.toString();
                     okRFootIMUExperiment=true;
                 }
 
