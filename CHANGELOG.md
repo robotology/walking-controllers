@@ -5,6 +5,7 @@ All notable changes to this project are documented in this file.
 ### Added
 - The `CHANGELOG.md` file
 - Implement the `WalkingControllersFindDepencies.cmake`
+- Adding the possibility of selecting Stiff/Compliant mode in joint level.
 ### Changed
 - General refactoring of the library. The WalkingModule is now split in several library. Namelly:
    - `YarpUtilities`: utilities for using `YARP`
