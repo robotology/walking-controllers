@@ -487,8 +487,8 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
 
 
     ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
-                                tempLeftFoot,
-                                tempRightFoot,
+                                m_FKSolver->getLeftFootToWorldTransform(),
+                                m_FKSolver->getRightFootToWorldTransform(),
                                 m_FKSolver->getLeftHandToWorldTransform(),
                                 m_FKSolver->getRightHandToWorldTransform(),
                                 m_FKSolver->getNeckOrientation(),
