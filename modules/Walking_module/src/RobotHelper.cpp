@@ -781,12 +781,24 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
 
+        yarp::dev::PolyDriverList mas_clients_list;
+        yarp::dev::PolyDriverDescriptor right_leg_inertials;
+        right_leg_inertials.key = "right_leg_inertials";
+        right_leg_inertials.poly = &right_leg_inertial_client;
+
+        yarp::dev::PolyDriverDescriptor left_leg_inertials;
+        left_leg_inertials.key = "left_leg_inertials";
+        left_leg_inertials.poly = &left_leg_inertial_client;
+
+        mas_clients_list.push(right_leg_inertials);
+        mas_clients_list.push(left_leg_inertials);
+
         m_masRemapperProperty.put("device", "multipleanalogsensorsremapper");
         yarp::os::Bottle threeAxisGyroscopes;
         yarp::os::Bottle & gyrosList = threeAxisGyroscopes.addList();
         gyrosList.addString("l_foot_ft_gyro_3b13");
         gyrosList.addString("r_foot_ft_gyro_3b14");
-        m_masRemapperProperty.put("ThreeAxisGyroscopeNames",threeAxisGyroscopes.get(0));
+        m_masRemapperProperty.put("ThreeAxisGyroscopesNames",threeAxisGyroscopes.get(0));
 
 
         yarp::os::Bottle threeAxisAccelerometer;
@@ -806,6 +818,22 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             yError() << "[RobotHelper::FootIMUPorts] Unable to open  MAS remapper for feet IMU";
             return false;
         }
+
+        // Attach the remapper to the clients
+        yarp::dev::IMultipleWrapper* remapperWrapperInterface{nullptr};
+        if (!m_masRemapperFeetIMU.view(remapperWrapperInterface))
+        {
+            yError()<<"[RobotHelper::FootIMUPorts] wrapper View failed for the MAS interfaces";
+            return false;
+        }
+
+        if (remapperWrapperInterface == nullptr)
+        {
+            yError()<<"[RobotHelper::FootIMUPorts] wrapper View failed for the MAS interfaces";
+            return false;
+        }
+
+        remapperWrapperInterface->attachAll(mas_clients_list);
 
 
         if (!(m_masRemapperFeetIMU.view(m_gyros)) ||!(m_masRemapperFeetIMU.view(m_accelerometers)) || !(m_masRemapperFeetIMU.view(m_imu_orientation_sensors))) {
