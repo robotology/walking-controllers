@@ -821,7 +821,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             yError()<<"[RobotHelper::FootIMUPorts] Accelerometers sensor interface pointer is null!";
             return false;
         }
-        yInfo()<<"mdjdjj dhhdhhdhh"
+        yInfo()<<"mdjdjj dhhdhhdhh";
         if (m_imu_orientation_sensors==NULL) {
             yError()<<"[RobotHelper::FootIMUPorts] Orientation sensor interface pointer is null!";
             return false;
