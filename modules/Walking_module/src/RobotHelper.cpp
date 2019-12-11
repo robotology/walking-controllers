@@ -813,16 +813,16 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
 
-        if (m_gyros==NULL) {
+        if (m_gyros==nullptr) {
             yError()<<"[RobotHelper::FootIMUPorts] Gyroscope interface pointer is null!";
             return false;
         }
-        if (m_accelerometers==NULL) {
+        if (m_accelerometers==nullptr) {
             yError()<<"[RobotHelper::FootIMUPorts] Accelerometers sensor interface pointer is null!";
             return false;
         }
         yInfo()<<"mdjdjj dhhdhhdhh";
-        if (m_imu_orientation_sensors==NULL) {
+        if (m_imu_orientation_sensors==nullptr) {
             yError()<<"[RobotHelper::FootIMUPorts] Orientation sensor interface pointer is null!";
             return false;
         }
