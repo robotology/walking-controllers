@@ -140,6 +140,12 @@ iDynTree::Rotation m_initialPelvisIMUOrientation;
     yarp::os::BufferedPort<yarp::sig::Vector> m_rightFootIMUPort; /**< Right Foot IMU port. */
     yarp::dev::PolyDriver  m_masRemapperFeetIMU;
     yarp::os::Property m_masRemapperProperty;
+    yarp::dev::PolyDriver left_leg_inertial_client;
+    yarp::dev::PolyDriver right_leg_inertial_client;
+    yarp::dev::PolyDriverList mas_clients_list;
+    yarp::dev::PolyDriverDescriptor right_leg_inertials;
+    yarp::dev::PolyDriverDescriptor left_leg_inertials;
+    yarp::dev::IMultipleWrapper* remapperWrapperInterface{nullptr};
 
     double m_heightOffset;
 

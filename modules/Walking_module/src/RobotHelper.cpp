@@ -219,14 +219,19 @@ yInfo()<<"milad3";
                 lFootOrientationSensor.zero();
 
 yInfo()<<"milad4";
-                std::string nameOfSensor;
+                std::string nameOfSensor{" "};
 
                 if(m_gyros->getNrOfThreeAxisGyroscopes()!=2)
                 {
                     yError()<<"[RobotHelper::FootIMUExperiment]The number of feet gyroscopes is not two!";
                     return false;
                 }
-                m_gyros->getThreeAxisGyroscopeName(0,nameOfSensor);
+yInfo() << "---->" << m_gyros->getNrOfThreeAxisGyroscopes();
+
+
+yInfo() << "milad4a";
+
+                m_gyros->getThreeAxisGyroscopeName(static_cast<size_t>(0),nameOfSensor);
                 if (!(nameOfSensor=="l_foot_ft_gyro_3b13")) {
                     yError()<<"[RobotHelper::FootIMUExperiment]This index is not related to left foot IMU";
                     return false;
@@ -739,7 +744,6 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_useFeetIMUExperiment=config.check("m_use_feet_imu_experiment", yarp::os::Value("False")).asBool();
     if (m_useFeetIMUExperiment) {
 
-        yarp::dev::PolyDriver left_leg_inertial_client;
         yarp::os::Property left_mas_client_property;
 
         std::string leftFootIMUPortName;
@@ -760,7 +764,6 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
 
-        yarp::dev::PolyDriver right_leg_inertial_client;
         yarp::os::Property right_mas_client_property;
 
         std::string rightFootIMUPortName;
@@ -781,12 +784,9 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
 
-        yarp::dev::PolyDriverList mas_clients_list;
-        yarp::dev::PolyDriverDescriptor right_leg_inertials;
         right_leg_inertials.key = "right_leg_inertials";
         right_leg_inertials.poly = &right_leg_inertial_client;
 
-        yarp::dev::PolyDriverDescriptor left_leg_inertials;
         left_leg_inertials.key = "left_leg_inertials";
         left_leg_inertials.poly = &left_leg_inertial_client;
 
@@ -820,7 +820,6 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
         }
 
         // Attach the remapper to the clients
-        yarp::dev::IMultipleWrapper* remapperWrapperInterface{nullptr};
         if (!m_masRemapperFeetIMU.view(remapperWrapperInterface))
         {
             yError()<<"[RobotHelper::FootIMUPorts] wrapper View failed for the MAS interfaces";
@@ -833,7 +832,11 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             return false;
         }
 
-        remapperWrapperInterface->attachAll(mas_clients_list);
+        if (!remapperWrapperInterface->attachAll(mas_clients_list))
+	{
+	    yError()<<"[RobotHelper::FootIMUPorts] could not attach to MAS clients";
+            return false;
+	}
 
 
         if (!(m_masRemapperFeetIMU.view(m_gyros)) ||!(m_masRemapperFeetIMU.view(m_accelerometers)) || !(m_masRemapperFeetIMU.view(m_imu_orientation_sensors))) {
@@ -854,6 +857,16 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
             yError()<<"[RobotHelper::FootIMUPorts] Orientation sensor interface pointer is null!";
             return false;
         }
+
+for (size_t idx = 0; idx < m_imu_orientation_sensors->getNrOfOrientationSensors(); idx++ )
+{
+	std::string temp{" "};
+m_imu_orientation_sensors->getOrientationSensorName(idx, temp);
+yInfo() << "asdsafdsfsd";
+yInfo() << "---->" << temp;
+
+}
+
     }
 
 
