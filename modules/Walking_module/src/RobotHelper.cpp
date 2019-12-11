@@ -220,6 +220,7 @@ yInfo()<<"milad3";
 
 yInfo()<<"milad4";
                 std::string nameOfSensor;
+
                 if(m_gyros->getNrOfThreeAxisGyroscopes()!=2)
                 {
                     yError()<<"[RobotHelper::FootIMUExperiment]The number of feet gyroscopes is not two!";
@@ -808,11 +809,22 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
 
 
         if (!(m_masRemapperFeetIMU.view(m_gyros)) ||!(m_masRemapperFeetIMU.view(m_accelerometers)) || !(m_masRemapperFeetIMU.view(m_imu_orientation_sensors))) {
-            yError("[RobotHelper::FootIMUPorts] View failed for the MAS interfaces");
+            yError()<<"[RobotHelper::FootIMUPorts] View failed for the MAS interfaces";
             return false;
         }
 
-
+        if (m_gyros==NULL) {
+            yError()<<"[RobotHelper::FootIMUPorts] Gyroscope interface pointer is null!";
+            return false;
+        }
+        if (m_accelerometers==NULL) {
+            yError()<<"[RobotHelper::FootIMUPorts] Accelerometers sensor interface pointer is null!";
+            return false;
+        }
+        if (m_imu_orientation_sensors==NULL) {
+            yError()<<"[RobotHelper::FootIMUPorts] Orientation sensor interface pointer is null!";
+            return false;
+        }
     }
 
 
