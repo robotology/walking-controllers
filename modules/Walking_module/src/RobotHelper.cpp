@@ -220,6 +220,11 @@ yInfo()<<"milad3";
 
 yInfo()<<"milad4";
                 std::string nameOfSensor;
+                if(m_gyros->getNrOfThreeAxisGyroscopes()!=2)
+                {
+                    yError()<<"[RobotHelper::FootIMUExperiment]The number of feet gyroscopes is not two!";
+                    return false;
+                }
                 m_gyros->getThreeAxisGyroscopeName(0,nameOfSensor);
                 if (!(nameOfSensor=="l_foot_ft_gyro_3b13")) {
                     yError()<<"[RobotHelper::FootIMUExperiment]This index is not related to left foot IMU";
