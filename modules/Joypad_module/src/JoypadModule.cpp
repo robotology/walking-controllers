@@ -179,7 +179,7 @@ bool JoypadModule::updateModule()
     float aButton, bButton, xButton, yButton, l1Button, r1Button;
 
     // prepare robot (A button)
-    m_joypadController->getButton(0, aButton); 
+    m_joypadController->getButton(0, aButton);
 
     // start walking (B button)
     m_joypadController->getButton(1, bButton);
@@ -199,10 +199,14 @@ bool JoypadModule::updateModule()
     m_joypadController->getAxis(0, x);
     m_joypadController->getAxis(1, y);
 
+    yInfo() << "pre-scale " << x << " " << y;
+
     x = -m_scaleX * deadzone(x);
     y = -m_scaleY * deadzone(y);
-    
+
     std::swap(x,y);
+
+    yInfo() << "post-scale " << x << " " << y;
 
     if(aButton > 0)
     {

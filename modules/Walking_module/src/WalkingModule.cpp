@@ -1056,14 +1056,21 @@ bool WalkingModule::updateModule()
                 {
                     if (m_pushRecoveryActiveIndex==5 ) {
                         m_isPushActive=1;
-                        m_pushRecoveryActiveIndex++;
-                        yInfo()<<"triggering the push recovery";
-
-                        // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
                         iDynTree::Vector2 tempDCMError;
                         tempDCMError(1)=0.00;
                         tempDCMError(0)=0.00;
-                        iDynTree::toEigen(tempDCMError)=iDynTree::toEigen(m_DCMEstimator->getDCMPosition())+iDynTree::toEigen(tempDCMError);
+                        m_pushRecoveryActiveIndex++;
+                        yInfo()<<"triggering the push recovery";
+                           if((abs(m_DCMPositionSmoothed(0) - m_DCMEstimator->getDCMPosition()(0))) > m_stepAdaptator->getDCMErrorThreshold()(0)){
+                        // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
+                      
+                              tempDCMError(0)=m_DCMEstimator->getDCMPosition()(0);
+                            }
+                          if((abs(m_DCMPositionSmoothed(1) - m_DCMEstimator->getDCMPosition()(1))) > m_stepAdaptator->getDCMErrorThreshold()(1)){
+                        // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
+                        
+                              tempDCMError(1)=m_DCMEstimator->getDCMPosition()(1);
+                           }
                         m_stepAdaptator->setCurrentDcmPosition(tempDCMError);
                     }
                     else {
@@ -1521,7 +1528,7 @@ bool WalkingModule::updateModule()
                                       errorL, errorR,m_adaptatedFootLeftTransform.getPosition(),m_adaptatedFootRightTransform.getPosition(),m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_baseOrientationFromPelvisIMU.asRPY(),m_baseOrientationFromHeadIMU.asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       m_isRollPitchActiveVec,m_DCMPositionSmoothed,m_smoothedFootLeftTransform.getPosition(),m_smoothedFootLeftTwist.getLinearVec3(),m_leftTwistTrajectory.front().getLinearVec3(),m_adaptatedFootLeftTwist.getLinearVec3(),
-                                      m_leftFootRotationFromIMU.asRPY(),m_rightFootRotationFromIMU.asRPY());
+                                      m_leftFootRotationFromIMU.asRPY(),m_rightFootRotationFromIMU.asRPY(),m_robotControlHelper->getLeftFootIMUOreintation().asRPY(),m_robotControlHelper->getRightFootIMUOreintation().asRPY());
         }
 
         propagateTime();
@@ -2033,7 +2040,8 @@ bool WalkingModule::startWalking()
                                       "dcm_estimated_x","dcm_estimated_y","IsPushActivex","indexSmoother","k_smoother","step_timing","timeIndexAfterPushDetection","pushRecoveryActiveIndex","pelvis_imu_roll","pelvis_imu_pitch","pelvis_imu_yaw","head_imu_roll","head_imu_pitch","head_imu_yaw","roll_des","pitch_des",
                                       "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y","lf_smoothed_x","lf_smoothed_y","lf_smoothed_z","lf_smoothed_dx","lf_smoothed_dy","lf_smoothed_dz","lf_des_dx", "lf_des_dy", "lf_des_dz","lf_adapted_dx","lf_adapted_dy","lf_adapted_dz",
                                       "lfoot_imu_roll", "lfoot_imu_pitch", "lfoot_imu_yaw",
-                                      "rfoot_imu_roll", "rfoot_imu_pitch", "rfoot_imu_yaw"});
+                                      "rfoot_imu_roll", "rfoot_imu_pitch", "rfoot_imu_yaw","l_imu_roll", "l_imu_pitch", "l_imu_yaw",
+                                      "r_imu_roll", "r_imu_pitch", "r_imu_yaw"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
