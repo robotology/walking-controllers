@@ -2079,7 +2079,7 @@ bool WalkingModule::startWalking()
 
             getFeetIMUWorldToWalkingWorld(m_FKSolver->getLFootIMUtoFootTransform().getRotation(),m_FKSolver->getLeftFootToWorldTransform().getRotation(),
                                           tempLFootIMURotation,m_WalkingWorld_R_LFootIMUWorld);
-            getFeetIMUWorldToWalkingWorld(m_FKSolver->getRFootIMUtoFootTransform().getRotation(),m_FKSolver->getLeftFootToWorldTransform().getRotation(),
+            getFeetIMUWorldToWalkingWorld(m_FKSolver->getRFootIMUtoFootTransform().getRotation(),m_FKSolver->getRightFootToWorldTransform().getRotation(),
                                           tempRFootIMURotation,m_WalkingWorld_R_RFootIMUWorld);
         }
     }
@@ -2314,7 +2314,7 @@ bool WalkingModule::GetFootOrientationFromFootIMU(iDynTree::Rotation footIMUWorl
     iDynTree::Rotation tempIMUToWorldDesired;
     iDynTree::toEigen(tempIMUToWorldDesired)=iDynTree::toEigen(footToWorldRotation)*iDynTree::toEigen(imuToFootRotation);
     iDynTree::toEigen(tempIMUToWorld)=iDynTree::toEigen(footIMUWorldToWalkingWorld)*iDynTree::toEigen(footimuOrientation);
-    tempIMUToWorld=iDynTree::Rotation::RPY(tempIMUToWorld.asRPY()(0),tempIMUToWorld.asRPY()(1),tempIMUToWorldDesired.asRPY()(2));
+    tempIMUToWorld=iDynTree::Rotation::RPY(tempIMUToWorld.asRPY()(0),tempIMUToWorld.asRPY()(1),0);
     iDynTree::toEigen(footOrientationFromIMU)=iDynTree::toEigen(tempIMUToWorld)*iDynTree::toEigen( imuToFootRotation.inverse());
     return true;
 }
