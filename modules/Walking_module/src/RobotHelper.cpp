@@ -273,7 +273,7 @@ bool RobotHelper::getFeedbacksRaw(unsigned int maxAttempts, bool getBaseEst)
                 }
 
 
-                m_leftFootIMUOrientation=m_leftFootIMUOrientation.RPY(iDynTree::deg2rad((lFootOrientationSensor)(0)),iDynTree::deg2rad((lFootOrientationSensor)(1)),iDynTree::deg2rad((lFootOrientationSensor)(2)));
+                m_leftFootIMUOrientation=m_leftFootIMUOrientation.RPY(-1*iDynTree::deg2rad((lFootOrientationSensor)(1)),-1*iDynTree::deg2rad((lFootOrientationSensor)(2)),-1*iDynTree::deg2rad((lFootOrientationSensor)(0)));
                 m_leftFootIMUAcceleration(0)=(lFootAccelerometer)(0) ;
                 m_leftFootIMUAcceleration(1)=(lFootAccelerometer)(1) ;
                 m_leftFootIMUAcceleration(2)=(lFootAccelerometer)(2) ;
