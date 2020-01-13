@@ -7,7 +7,7 @@
 #include <iDynTree/Model/Model.h>
 
 bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                                std::pair<std::string, double>& worstError)
+                                std::pair<int, double>& worstError)
 {
     if(!m_encodersInterface)
     {
@@ -16,7 +16,7 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
     }
 
     // clear the std::pair
-    worstError.first = "";
+worstError.first = 0;
     worstError.second = 0.0;
     double currentJointPositionRad;
     double absoluteJointErrorRad;
@@ -25,10 +25,13 @@ bool RobotHelper::getWorstError(const iDynTree::VectorDynSize& desiredJointPosit
         currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
         absoluteJointErrorRad = std::fabs(iDynTreeHelper::shortestAngularDistance(currentJointPositionRad,
                                                                                   desiredJointPositionsRad(i)));
-        if(absoluteJointErrorRad > worstError.second)
+        if(m_currentModeofJoints.at(i)==yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF)
         {
-            worstError.first = m_axesList[i];
-            worstError.second = absoluteJointErrorRad;
+            if(absoluteJointErrorRad > worstError.second)
+                        {
+                            worstError.first =i;
+                            worstError.second = absoluteJointErrorRad;
+                        }
         }
     }
     return true;
@@ -515,11 +518,45 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
     m_actuatedDOFs = m_axesList.size();
 
     // open the device
+    m_isJointModeStiffVector.resize(m_actuatedDOFs);
+        m_JointModeStiffVectorDefult.resize(m_actuatedDOFs);
+        m_jointModes.resize(m_actuatedDOFs);
+        yInfo()<<m_actuatedDOFs;
+
+        if(!YarpHelper::getVectorOfBooleanFromSearchable(config,"joint_is_stiff_mode",m_jointModes))
+        {
+            yError() << "[RobotInterface::configureRobot] Unable to find joint_is_stiff_mode into config file.";
+            return false;
+        }
+
+        for (unsigned int i=0;i<m_actuatedDOFs;i++)
+        {
+            m_JointModeStiffVectorDefult.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+            if(m_jointModes[i])
+            {
+                m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+            }
+            else
+            {
+                m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT;
+            }
+        }
+        m_currentModeofJoints=m_JointModeStiffVectorDefult;
+
+         // open the device
+
     if(!m_robotDevice.open(options))
     {
         yError() << "[configureRobot] Could not open remotecontrolboardremapper object.";
         return false;
     }
+
+    if(!m_robotDevice.view(m_InteractionInterface) || !m_InteractionInterface)
+    {
+             yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+            return false;
+    }
+
 
     // obtain the interfaces
     if(!m_robotDevice.view(m_encodersInterface) || !m_encodersInterface)
@@ -1082,9 +1119,15 @@ bool RobotHelper::setPositionReferences(const iDynTree::VectorDynSize& desiredJo
         return false;
     }
 
+    if(m_InteractionInterface == nullptr)
+        {
+            yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
+            return false;
+        }
+
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
-    std::pair<std::string, double> worstError("", 0.0);
+    std::pair<int, double> worstError(0, 0.0);
 
     if(!getWorstError(desiredJointPositionsRad, worstError))
     {
@@ -1154,7 +1197,7 @@ bool RobotHelper::checkMotionDone(bool& motionDone)
     bool checkMotionDone = false;
     m_positionInterface->checkMotionDone(&checkMotionDone);
 
-    std::pair<std::string, double> worstError;
+    std::pair<int, double> worstError;
     if (!getWorstError(m_desiredJointPositionRad, worstError))
     {
         yError() << "[RobotHelper::checkMotionDone] Unable to get the worst error.";
@@ -1166,7 +1209,7 @@ bool RobotHelper::checkMotionDone(bool& motionDone)
     if (now - m_startingPositionControlTime > m_positioningTime + timeThreshold)
     {
         yError() << "[RobotHelper::checkMotionDone] The timer is expired but the joint "
-                 << worstError.first << " has an error of " << worstError.second
+                 << m_axesList[worstError.first] << " has an error of " << worstError.second
                  << " radians";
         return false;
     }
@@ -1206,8 +1249,8 @@ bool RobotHelper::setDirectPositionReferences(const iDynTree::VectorDynSize& des
         return false;
     }
 
-    std::pair<std::string, double> worstError("", 0.0);
 
+    std::pair<int, double> worstError(0, 0.0);
     if(!getWorstError(desiredPositionRad, worstError))
     {
         yError() << "[RobotHelper::setDirectPositionReferences] Unable to get the worst error.";
@@ -1283,6 +1326,7 @@ bool RobotHelper::close()
     m_leftWrenchPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
+    m_InteractionInterface->setInteractionModes(m_JointModeStiffVectorDefult.data());
     if(!m_robotDevice.close())
     {
         yError() << "[RobotHelper::close] Unable to close the device.";
@@ -1341,6 +1385,18 @@ WalkingPIDHandler& RobotHelper::getPIDHandler()
     return *m_PIDHandler;
 }
 
+bool RobotHelper::setInteractionMode()
+{
+    if(!m_InteractionInterface->setInteractionModes(m_isJointModeStiffVector.data()))
+    {
+        yError() << "[RobotInterface::setInteractionMode] Error while setting the interaction modes of the joints";
+        return false;
+    }
+
+        m_currentModeofJoints = m_isJointModeStiffVector;
+
+    return true;
+}
 
 const iDynTree::Transform& RobotHelper::getBaseTransform() const
 {

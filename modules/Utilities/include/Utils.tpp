@@ -61,6 +61,7 @@ bool YarpHelper::getVectorFromSearchable(const yarp::os::Searchable& config,
     return yarpListToVector(*value, vector);
 }
 
+
 template <typename T>
 void YarpHelper::mergeSigVector(yarp::sig::Vector& vector, const T& t)
 {

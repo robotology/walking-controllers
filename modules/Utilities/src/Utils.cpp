@@ -182,6 +182,39 @@ bool YarpHelper::getStringFromSearchable(const yarp::os::Searchable& config, con
     return true;
 }
 
+bool YarpHelper::getVectorOfBooleanFromSearchable(const yarp::os::Searchable& config,const std::string& key,std::vector <bool> & output)
+{
+    yarp::os::Value* valuePtr;
+    if(!config.check(key, valuePtr))
+    {
+        yError() << "[getiDynTreeVectorFixSizeFromSearchable] Missing field "<< key;
+        return false;
+    }
+
+    yarp::os::Value value=*valuePtr;
+    yarp::os::Bottle *inputPtr = value.asList();
+
+    if (inputPtr->size() != output.size())
+    {
+        yError() << "[getVectorOfBooleanFromSearchable] The dimension set in the configuration file is not "
+                 << output.size();
+        return false;
+    }
+
+    for (unsigned int i = 0; i < inputPtr->size(); i++)
+    {
+        if (!inputPtr->get(i).isBool())
+        {
+            yError() << "[getVectorOfBooleanFromSearchable] The input is expected to be boolean";
+            return false;
+        }
+        output[i]= inputPtr->get(i).asBool();
+    }
+
+    return true;
+}
+
+
 bool YarpHelper::getNumberFromSearchable(const yarp::os::Searchable& config, const std::string& key,
                                          double& number)
 {

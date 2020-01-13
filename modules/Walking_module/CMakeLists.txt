@@ -65,6 +65,7 @@ set(${EXE_TARGET_NAME}_HDR
   include/QPSolver.hpp
   include/StepAdaptator.hpp
   include/DCMEstimator.hpp
+  include/RobotHelper.hpp
   )
 
 # add include directories to the build.

@@ -1527,7 +1527,7 @@ bool WalkingModule::updateModule()
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       errorL, errorR,m_adaptatedFootLeftTransform.getPosition(),m_adaptatedFootRightTransform.getPosition(),m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_baseOrientationFromPelvisIMU.asRPY(),m_baseOrientationFromHeadIMU.asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
-                                      m_isRollPitchActiveVec,m_DCMPositionSmoothed,m_smoothedFootLeftTransform.getPosition(),m_smoothedFootLeftTwist.getLinearVec3(),m_leftTwistTrajectory.front().getLinearVec3(),m_adaptatedFootLeftTwist.getLinearVec3(),
+                                      m_isRollPitchActiveVec,m_DCMPositionSmoothed,m_smoothedFootRightTransform.getPosition(),m_smoothedFootLeftTransform.getPosition(),m_smoothedFootLeftTwist.getLinearVec3(),m_leftTwistTrajectory.front().getLinearVec3(),m_adaptatedFootLeftTwist.getLinearVec3(),
                                       m_leftFootRotationFromIMU.asRPY(),m_rightFootRotationFromIMU.asRPY(),m_robotControlHelper->getLeftFootIMUOreintation().asRPY(),m_robotControlHelper->getRightFootIMUOreintation().asRPY());
         }
 
@@ -2038,7 +2038,7 @@ bool WalkingModule::startWalking()
                                       "rf_err_roll", "rf_err_pitch", "rf_err_yaw","Lfoot_adaptedX","Lfoot_adaptedY","Lfoot_adaptedZ","Rfoot_adaptedX","Rfoot_adaptedY","Rfoot_adaptedZ",
                                       "base_x", "base_y", "base_z", "base_roll", "base_pitch", "base_yaw","estimate_base_x", "estimate_base_y", "estimate_base_z",
                                       "dcm_estimated_x","dcm_estimated_y","IsPushActivex","indexSmoother","k_smoother","step_timing","timeIndexAfterPushDetection","pushRecoveryActiveIndex","pelvis_imu_roll","pelvis_imu_pitch","pelvis_imu_yaw","head_imu_roll","head_imu_pitch","head_imu_yaw","roll_des","pitch_des",
-                                      "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y","lf_smoothed_x","lf_smoothed_y","lf_smoothed_z","lf_smoothed_dx","lf_smoothed_dy","lf_smoothed_dz","lf_des_dx", "lf_des_dy", "lf_des_dz","lf_adapted_dx","lf_adapted_dy","lf_adapted_dz",
+                                      "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y","rf_smoothed_x","rf_smoothed_y","rf_smoothed_z","lf_smoothed_x","lf_smoothed_y","lf_smoothed_z","lf_smoothed_dx","lf_smoothed_dy","lf_smoothed_dz","lf_des_dx", "lf_des_dy", "lf_des_dz","lf_adapted_dx","lf_adapted_dy","lf_adapted_dz",
                                       "lfoot_imu_roll", "lfoot_imu_pitch", "lfoot_imu_yaw",
                                       "rfoot_imu_roll", "rfoot_imu_pitch", "rfoot_imu_yaw","l_imu_roll", "l_imu_pitch", "l_imu_yaw",
                                       "r_imu_roll", "r_imu_pitch", "r_imu_yaw"});
@@ -2046,6 +2046,12 @@ bool WalkingModule::startWalking()
 
     if(m_robotState == WalkingFSM::Prepared)
     {
+        if (!m_robotControlHelper->setInteractionMode())
+           {
+               yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
+               return false;
+           }
+
         m_robotControlHelper->resetFilters(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
 
         if(!m_robotControlHelper->getFeedbacksRaw(10))
@@ -2220,13 +2226,16 @@ bool WalkingModule::FeetTrajectorySmoother(const iDynTree::Transform adaptedFeet
         m_FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection+1;
 
         m_kFootSmoother=((double)(m_FootTimeIndexAfterPushDetection)/((double)(m_indexFootSmoother)));
+
         if(m_FootTimeIndexAfterPushDetection==m_indexFootSmoother)
         {
             m_indexFootSmoother=0;
         }
     }
     else {
+
         m_kFootSmoother=1;
+
     }
     smoothedFootTransform.setRotation(adaptedFeetTransform.getRotation());
     smoothedFootTwist.setAngularVec3(adaptedFeetTwist.getAngularVec3());

@@ -41,6 +41,7 @@
 #include <yarp/dev/GenericSensorInterfaces.h>
 #include <yarp/dev/MultipleAnalogSensorsInterfaces.h>
 #include <yarp/os/RpcClient.h>
+#include <yarp/dev/IInteractionMode.h>
 
 class RobotHelper
 {
@@ -55,7 +56,7 @@ class RobotHelper
     yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
     yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
     yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
-
+    yarp::dev::IInteractionMode *m_InteractionInterface{nullptr}; /**< Stiff/compliant mode interface. */
     std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
     yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
@@ -74,11 +75,16 @@ class RobotHelper
     iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
     iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
 
+
     // yarp::sig::Vector m_positionFeedbackDegFiltered;
     yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
     std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_velocityFilter; /**< Joint velocity low pass filter .*/
     bool m_useVelocityFilter; /**< True if the joint velocity filter is used. */
+    std::vector<yarp::dev::InteractionModeEnum> m_isJointModeStiffVector;/**< Joint is in the stiff or compliance mode */
+    std::vector<yarp::dev::InteractionModeEnum> m_JointModeStiffVectorDefult;/**< All the joints are in the stiff  mode */
+    std::vector<yarp::dev::InteractionModeEnum> m_currentModeofJoints;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
+    std::vector<bool>  m_jointModes; /**< True if the joint is in the stiff mode */
 
     yarp::os::BufferedPort<yarp::sig::Vector> m_leftWrenchPort; /**< Left foot wrench port. */
     yarp::os::BufferedPort<yarp::sig::Vector> m_rightWrenchPort; /**< Right foot wrench port. */
@@ -164,7 +170,7 @@ iDynTree::Rotation m_initialPelvisIMUOrientation;
      * @return true in case of success and false otherwise.
      */
     bool getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                       std::pair<std::string, double>& worstError);
+                       std::pair<int, double> &worstError);
 
     /**
      * Switch the control mode.
@@ -320,6 +326,11 @@ public:
     const iDynTree::LinAcceleration &getRightFootIMUAcceleration() const;
     const iDynTree::AngVelocity &getRightFootIMUAngularVelocity() const;
     const iDynTree::Rotation &getRightFootIMUOreintation() const;
+    /**
+     * Set the intraction mode of the joints(stiff/compliant).
+     * @return true in case of success and false otherwise.
+     */
+    bool setInteractionMode();
 
 };
 
