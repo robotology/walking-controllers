@@ -511,8 +511,8 @@ void WalkingQPIK::evaluateHessianMatrix()
     else
     {
         // think about the possibility to project in the null space the joint regularization
-        hessianDense += iDynTree::toEigen(m_jointRegularizationHessian)
-            + iDynTree::toEigen(m_leftHandJacobian).transpose()
+        hessianDense += iDynTree::toEigen(m_jointRegularizationHessian);
+        hessianDense += iDynTree::toEigen(m_leftHandJacobian).transpose()
             * iDynTree::toEigen(m_handWeightSmoother->getPos()).asDiagonal()
             * iDynTree::toEigen(m_leftHandJacobian)
             + iDynTree::toEigen(m_rightHandJacobian).transpose()
