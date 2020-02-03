@@ -138,7 +138,7 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
 
 bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 {
-
+milad1=1;
     m_removeMe=1;
     m_errorOfLastDCMPushDetection.zero();
     m_pushRecoveryActiveIndex=0;
@@ -567,8 +567,31 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
 
 bool WalkingModule::updateModule()
 {
-    std::lock_guard<std::mutex> guard(m_mutex);
 
+    std::lock_guard<std::mutex> guard(m_mutex);
+//    if (m_robotState==WalkingFSM::Walking) {
+
+//    milad1=milad1+1;
+//    if((milad1%400)==1){
+//        if(!m_robotControlHelper->setInteractionMode())
+//        {
+//            yError() << "[WalkingModule::updateModule] Unable to set the intraction modes";
+//            return false;
+//        }
+
+// milad1=1;
+//            yInfo()<<"it's a compliant mode"<<milad1;
+//    }
+//        else if((milad1%400)==200){
+//        if(!m_robotControlHelper->setIntractionModeToStiffMode())
+//        {
+//            yError() << "[WalkingModule::updateModule] Unable to set the intraction modes";
+//            return false;
+//        }
+
+//        yInfo()<<"it's a stiff mode";
+//    }
+//    }
     //    iDynTree::Rotation imuRotation=m_robotControlHelper->getIMUOreintation();
     //    iDynTree::Vector3 imurolpitchyaw= imuRotation.asRPY();
     //    yInfo() <<"imuuu"<<imurolpitchyaw(0)<<imurolpitchyaw(1)<<imurolpitchyaw(2);
@@ -699,7 +722,6 @@ bool WalkingModule::updateModule()
             // when we are near to the merge point the new trajectory is evaluated
             if(m_newTrajectoryMergeCounter == 10)
             {
-
                 double initTimeTrajectory;
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
@@ -730,8 +752,20 @@ bool WalkingModule::updateModule()
                 }
             }
 
+
+//            if(m_newTrajectoryMergeCounter == 10)
+//            {
+//                if(!m_robotControlHelper->setIntractionModeToStiffMode())
+//                {
+//                    yError() << "[WalkingModule::updateModule] Unable to set the intraction modes to stiff mode";
+//                    return false;
+//                }
+//            }
+
+
             if(m_newTrajectoryMergeCounter == 2)
             {
+
                 m_errorOfLastDCMPushDetection.zero();
 
 
@@ -886,7 +920,7 @@ bool WalkingModule::updateModule()
         double miladTempR=0;
         if (m_useStepAdaptation) {
             if(m_robotControlHelper->isHeadIMUUsed() || m_robotControlHelper->isPelvisIMUUsed()){
-                if ((abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
+                if (/*(abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1)))*/abs(m_qDesired(14)-m_robotControlHelper->getJointPosition()(14))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
                     miladTempP=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(1)-imuRPY(1);
                     m_isPitchActive=1;
 
@@ -896,7 +930,7 @@ bool WalkingModule::updateModule()
                     miladTempP=0;
                 }
 
-                if ( (abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
+                if ( /*(abs(m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0)))*/ abs(m_qDesired(15)-m_robotControlHelper->getJointPosition()(15))>m_stepAdaptator->getRollPitchErrorThreshold()(0)) {
 
                     miladTempR=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY()(0)-imuRPY(0);
                     m_isRollActive=1;
@@ -907,13 +941,13 @@ bool WalkingModule::updateModule()
             }
             else if (m_robotControlHelper->isFeetIMUUsedExperiment() || m_robotControlHelper->isFeetIMUUsedSimulation()) {
                 if (m_leftInContact.front() && !m_rightInContact.front()) {
-                imuRPY= m_leftFootRotationFromIMU.asRPY();
+                    imuRPY= m_leftFootRotationFromIMU.asRPY();
                 }
-               else if (!m_leftInContact.front() && m_rightInContact.front()) {
-                imuRPY= m_rightFootRotationFromIMU.asRPY();
+                else if (!m_leftInContact.front() && m_rightInContact.front()) {
+                    imuRPY= m_rightFootRotationFromIMU.asRPY();
                 }
                 else {
-               imuRPY.zero();
+                    imuRPY.zero();
                 }
                 if ((abs(imuRPY(1)))>m_stepAdaptator->getRollPitchErrorThreshold()(1) ) {
                     miladTempP=imuRPY(1);
@@ -1014,6 +1048,9 @@ bool WalkingModule::updateModule()
             if (!m_leftInContact.front() || !m_rightInContact.front())
             {
 
+
+
+
                 indexPush++;
 
                 int numberOfSubTrajectories = m_DCMSubTrajectories.size();
@@ -1061,16 +1098,16 @@ bool WalkingModule::updateModule()
                         tempDCMError(0)=0.00;
                         m_pushRecoveryActiveIndex++;
                         yInfo()<<"triggering the push recovery";
-                           if((abs(m_DCMPositionSmoothed(0) - m_DCMEstimator->getDCMPosition()(0))) > m_stepAdaptator->getDCMErrorThreshold()(0)){
-                        // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-                      
-                              tempDCMError(0)=m_DCMEstimator->getDCMPosition()(0);
-                            }
-                          if((abs(m_DCMPositionSmoothed(1) - m_DCMEstimator->getDCMPosition()(1))) > m_stepAdaptator->getDCMErrorThreshold()(1)){
-                        // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-                        
-                              tempDCMError(1)=m_DCMEstimator->getDCMPosition()(1);
-                           }
+                        if((abs(m_DCMPositionSmoothed(0) - m_DCMEstimator->getDCMPosition()(0))) > m_stepAdaptator->getDCMErrorThreshold()(0)){
+                            // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
+
+                            tempDCMError(0)=m_DCMEstimator->getDCMPosition()(0);
+                        }
+                        if((abs(m_DCMPositionSmoothed(1) - m_DCMEstimator->getDCMPosition()(1))) > m_stepAdaptator->getDCMErrorThreshold()(1)){
+                            // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
+
+                            tempDCMError(1)=m_DCMEstimator->getDCMPosition()(1);
+                        }
                         m_stepAdaptator->setCurrentDcmPosition(tempDCMError);
                     }
                     else {
@@ -1516,6 +1553,12 @@ bool WalkingModule::updateModule()
             iDynTree::Vector2 m_isRollPitchActiveVec;
             m_isRollPitchActiveVec(0)=m_isRollActive;
             m_isRollPitchActiveVec(1)=m_isPitchActive;
+            iDynTree::Vector4 rollPitchTorso;
+            rollPitchTorso(0)=m_robotControlHelper->getJointPosition()(14);
+            rollPitchTorso(1)=m_robotControlHelper->getJointPosition()(15);
+
+            rollPitchTorso(2)=m_qDesired(14);
+            rollPitchTorso(3)=m_qDesired(15);
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),DCMError, m_DCMVelocityDesired.front(),m_DCMPositionAdjusted.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
@@ -1528,7 +1571,7 @@ bool WalkingModule::updateModule()
                                       errorL, errorR,m_adaptatedFootLeftTransform.getPosition(),m_adaptatedFootRightTransform.getPosition(),m_FKSolver->getRootLinkToWorldTransform().getPosition(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       estimatedBasePose,m_dcmEstimatedI,m_isPushActiveVec,m_baseOrientationFromPelvisIMU.asRPY(),m_baseOrientationFromHeadIMU.asRPY(),m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY(),
                                       m_isRollPitchActiveVec,m_DCMPositionSmoothed,m_smoothedFootRightTransform.getPosition(),m_smoothedFootLeftTransform.getPosition(),m_smoothedFootLeftTwist.getLinearVec3(),m_leftTwistTrajectory.front().getLinearVec3(),m_adaptatedFootLeftTwist.getLinearVec3(),
-                                      m_leftFootRotationFromIMU.asRPY(),m_rightFootRotationFromIMU.asRPY(),m_robotControlHelper->getLeftFootIMUOreintation().asRPY(),m_robotControlHelper->getRightFootIMUOreintation().asRPY());
+                                      m_leftFootRotationFromIMU.asRPY(),m_rightFootRotationFromIMU.asRPY(),m_robotControlHelper->getLeftFootIMUOreintation().asRPY(),m_robotControlHelper->getRightFootIMUOreintation().asRPY(),rollPitchTorso);
         }
 
         propagateTime();
@@ -2041,16 +2084,16 @@ bool WalkingModule::startWalking()
                                       "yaw_des","IsRollActive","IsPitchActive","dcm_smoothed_x","dcm_smoothed_y","rf_smoothed_x","rf_smoothed_y","rf_smoothed_z","lf_smoothed_x","lf_smoothed_y","lf_smoothed_z","lf_smoothed_dx","lf_smoothed_dy","lf_smoothed_dz","lf_des_dx", "lf_des_dy", "lf_des_dz","lf_adapted_dx","lf_adapted_dy","lf_adapted_dz",
                                       "lfoot_imu_roll", "lfoot_imu_pitch", "lfoot_imu_yaw",
                                       "rfoot_imu_roll", "rfoot_imu_pitch", "rfoot_imu_yaw","l_imu_roll", "l_imu_pitch", "l_imu_yaw",
-                                      "r_imu_roll", "r_imu_pitch", "r_imu_yaw"});
+                                      "r_imu_roll", "r_imu_pitch", "r_imu_yaw","torso_pitch_real", "torso_roll_real", "torso_pitch_des","torso_roll_des"});
     }
 
     if(m_robotState == WalkingFSM::Prepared)
     {
         if (!m_robotControlHelper->setInteractionMode())
-           {
-               yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
-               return false;
-           }
+        {
+            yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
+            return false;
+        }
 
         m_robotControlHelper->resetFilters(m_loader.model(),m_FKSolver->getRootLinkToWorldTransform().getRotation());
 
@@ -2121,6 +2164,8 @@ bool WalkingModule::startWalking()
             return false;
         }
     }
+
+
 
     m_robotState = WalkingFSM::Walking;
 

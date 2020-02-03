@@ -332,6 +332,7 @@ public:
      */
     bool setInteractionMode();
 
+    bool setIntractionModeToStiffMode();
 };
 
 #endif

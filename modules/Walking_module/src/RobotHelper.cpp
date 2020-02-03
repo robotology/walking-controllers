@@ -541,6 +541,7 @@ bool RobotHelper::configureRobot(const yarp::os::Searchable& config)
                 m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT;
             }
         }
+
         m_currentModeofJoints=m_JointModeStiffVectorDefult;
 
          // open the device
@@ -1395,6 +1396,17 @@ bool RobotHelper::setInteractionMode()
 
         m_currentModeofJoints = m_isJointModeStiffVector;
 
+    return true;
+}
+
+bool RobotHelper::setIntractionModeToStiffMode()
+{
+    if(!m_InteractionInterface->setInteractionModes(m_JointModeStiffVectorDefult.data()))
+    {
+        yError() << "[RobotInterface::setIntractionModeToStiffMode] Error while setting the stiff interaction modes of the joints";
+        return false;
+    }
+    m_currentModeofJoints = m_JointModeStiffVectorDefult;
     return true;
 }
 
