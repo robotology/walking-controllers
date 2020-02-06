@@ -479,13 +479,6 @@ void WalkingQPIK::setDesiredHandsTransformation(const iDynTree::Transform& desir
     m_desiredRightHandToWorldTransform = desiredRightHandToWorldTransform;
 }
 
-void WalkingQPIK::setDesiredHandsTwist(const iDynTree::Twist& leftHandTwist,
-                                       const iDynTree::Twist& rightHandTwist)
-{
-    m_desiredLeftHandTwist = leftHandTwist;
-    m_desiredRightHandTwist = rightHandTwist;
-}
-
 void WalkingQPIK::setDesiredCoMVelocity(const iDynTree::Vector3& comVelocity)
 {
     m_desiredComVelocity = comVelocity;

@@ -65,8 +65,6 @@ namespace WalkingControllers
         iDynTree::Twist m_leftFootCorrection; /**< Correction of the desired velocity related to the left foot (evaluated using the position error). */
         iDynTree::Twist m_rightFootCorrection; /**< Correction of the desired velocity related to the left foot (evaluated using the position error). */
 
-        iDynTree::Twist m_desiredLeftHandTwist; /**< Desired Twist of the left hand. */
-        iDynTree::Twist m_desiredRightHandTwist; /**< Desired Twist of the right hand. */
         iDynTree::Vector3 m_desiredComVelocity; /**< Desired Linear velocity of the CoM. */
 
         iDynTree::Position m_desiredComPosition; /**< Desired Linear velocity of the CoM. */
@@ -92,7 +90,7 @@ namespace WalkingControllers
 
         int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 6) */
         int m_numberOfConstraints; /**<Number of constraints in the QP problem (# of joints + 12) */
-        int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
+        unsigned int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
 
         iDynTree::VectorDynSize m_jointRegularizationGains;  /**< Gain related to the joint regularization. */
         double m_kPosFoot; /**< Gain related to the desired foot position. */
@@ -279,15 +277,6 @@ namespace WalkingControllers
          */
         void setDesiredFeetTwist(const iDynTree::Twist& leftFootTwist,
                                  const iDynTree::Twist& rightFootTwist);
-
-        /**
-         * Set the desired twist of both feet
-         * @param leftHandTwist contain the desired twist of the left hand (MIXED representation);
-         * @param rightHandTwist contain the desired twist of the right hand (MIXED representation).
-         */
-        void setDesiredHandsTwist(const iDynTree::Twist& leftHandTwist,
-                                  const iDynTree::Twist& rightHandTwist);
-
 
         /**
          * Set the desired CoMVelocity

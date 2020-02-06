@@ -45,7 +45,7 @@ void WalkingQPIK_osqp::initializeSolverSpecificMatrices()
         startingRow += 3;
 
     if(m_useJointsLimitsConstraint)
-        for(int i = 0; i < m_actuatedDOFs; i++)
+        for(unsigned int i = 0; i < m_actuatedDOFs; i++)
             m_constraintsMatrixSparse(startingRow + i, i + 6) = 1;
 }
 
@@ -59,7 +59,7 @@ void WalkingQPIK_osqp::setJointVelocitiesBounds()
         else
             numberOfTaskConstraints = 6 + 6;
 
-        for(int i = 0; i < m_actuatedDOFs; i++)
+        for(unsigned int i = 0; i < m_actuatedDOFs; i++)
         {
             m_lowerBound(i + numberOfTaskConstraints) = m_kJointLimitsLowerBound *
                 std::tanh(m_jointPosition(i) - m_jointPositionsLowerBounds(i))
@@ -204,7 +204,7 @@ bool WalkingQPIK_osqp::solve()
     }
 
     iDynTree::toEigen(m_solution) = m_optimizerSolver->getSolution();
-    for(int i = 0; i < m_actuatedDOFs; i++)
+    for(unsigned int i = 0; i < m_actuatedDOFs; i++)
         m_desiredJointVelocitiesOutput(i) = m_solution(i + 6);
 
     return true;
