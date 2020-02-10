@@ -560,10 +560,10 @@ void WalkingQPIK::evaluateGradientVector()
            * (regularizationTerm - jointPosition);
     else
     {
-        Eigen::Map<Eigen::Vector3d> leftHandCorrectionLinear(iDynTree::toEigen(m_leftHandCorrection.getLinearVec3()));
-        Eigen::Map<Eigen::Vector3d> leftHandCorrectionAngular(iDynTree::toEigen(m_leftHandCorrection.getAngularVec3()));
-        Eigen::Map<Eigen::Vector3d> rightHandCorrectionLinear(iDynTree::toEigen(m_rightHandCorrection.getLinearVec3()));
-        Eigen::Map<Eigen::Vector3d> rightHandCorrectionAngular(iDynTree::toEigen(m_rightHandCorrection.getAngularVec3()));
+        Eigen::Map<Eigen::Vector3d> leftHandCorrectionLinearVel(iDynTree::toEigen(m_leftHandCorrection.getLinearVec3()));
+        Eigen::Map<Eigen::Vector3d> leftHandCorrectionAngularVel(iDynTree::toEigen(m_leftHandCorrection.getAngularVec3()));
+        Eigen::Map<Eigen::Vector3d> rightHandCorrectionLinearVel(iDynTree::toEigen(m_rightHandCorrection.getLinearVec3()));
+        Eigen::Map<Eigen::Vector3d> rightHandCorrectionAngularVel(iDynTree::toEigen(m_rightHandCorrection.getAngularVec3()));
 
         auto saturationLambda = [](const Eigen::Map<Eigen::Vector3d>& input, double saturationValue) -> Eigen::Vector3d {
             if (saturationValue > 0)
@@ -587,28 +587,28 @@ void WalkingQPIK::evaluateGradientVector()
         };
 
         //  left hand
-        leftHandCorrectionLinear = m_kPosHand * iDynTree::toEigen(m_leftHandToWorldTransform.getPosition()
+        leftHandCorrectionLinearVel = m_kPosHand * iDynTree::toEigen(m_leftHandToWorldTransform.getPosition()
                                                                   - m_desiredLeftHandToWorldTransform.getPosition());
-        leftHandCorrectionLinear = saturationLambda(leftHandCorrectionLinear, m_maxHandLinearVelocity);
+        leftHandCorrectionLinearVel = saturationLambda(leftHandCorrectionLinearVel, m_maxHandLinearVelocity);
 
         iDynTree::Matrix3x3 leftHandAttitudeError = iDynTreeUtilities::Rotation::skewSymmetric(m_leftHandToWorldTransform.getRotation() *
                                                                                             m_desiredLeftHandToWorldTransform.getRotation().inverse());
 
-        leftHandCorrectionAngular = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
-        leftHandCorrectionAngular = saturationLambda(leftHandCorrectionAngular, m_maxHandAngularVelocity);
+        leftHandCorrectionAngularVel = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(leftHandAttitudeError)));
+        leftHandCorrectionAngularVel = saturationLambda(leftHandCorrectionAngularVel, m_maxHandAngularVelocity);
 
 
         //  right hand
-        rightHandCorrectionLinear = m_kPosHand * iDynTree::toEigen(m_rightHandToWorldTransform.getPosition()
+        rightHandCorrectionLinearVel = m_kPosHand * iDynTree::toEigen(m_rightHandToWorldTransform.getPosition()
                                                                    - m_desiredRightHandToWorldTransform.getPosition());
-        rightHandCorrectionLinear = saturationLambda(rightHandCorrectionLinear, m_maxHandLinearVelocity);
+        rightHandCorrectionLinearVel = saturationLambda(rightHandCorrectionLinearVel, m_maxHandLinearVelocity);
 
 
         iDynTree::Matrix3x3 rightHandAttitudeError = iDynTreeUtilities::Rotation::skewSymmetric(m_rightHandToWorldTransform.getRotation() *
                                                                                              m_desiredRightHandToWorldTransform.getRotation().inverse());
 
-        rightHandCorrectionAngular = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
-        rightHandCorrectionAngular = saturationLambda(rightHandCorrectionAngular, m_maxHandAngularVelocity);
+        rightHandCorrectionAngularVel = m_kAttHand * (iDynTree::unskew(iDynTree::toEigen(rightHandAttitudeError)));
+        rightHandCorrectionAngularVel = saturationLambda(rightHandCorrectionAngularVel, m_maxHandAngularVelocity);
 
 
         gradient +=
