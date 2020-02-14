@@ -99,7 +99,7 @@ namespace WalkingControllers
          * This method has to be called before updateTrajectories() method
          * @return true/false in case of success/failure.
          */
-        bool generateFirstTrajectories();
+        bool generateFirstTrajectories(const iDynTree::Position& initialPosition = iDynTree::Position::Zero());
 
         /**
          * Generate the first trajectory.
