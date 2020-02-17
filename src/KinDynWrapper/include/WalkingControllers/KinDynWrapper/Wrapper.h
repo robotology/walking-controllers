@@ -115,25 +115,6 @@ namespace WalkingControllers
         bool initialize(const yarp::os::Searchable& config,
                         const iDynTree::Model& model);
 
-//        /**
-//         * Evaluate the first world to base transformation.
-//         * @note: The The first reference frame is always the left foot.
-//         * @note: please use this method only with evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
-//         * @param leftFootTransform transformation from the world to the left foot frame (l_sole);
-//         * @return true/false in case of success/failure.
-//         */
-//        bool evaluateFirstWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform);
-
-//        /**
-//         * Evaluate the world to base transformation
-//         * @note: During the walking task the frame shift from the left to the right foot.
-//         * the new base frame is attached where the foot is.
-//         * @note: please use this method only with evaluateFirstWorldToBaseTransformation();
-//         * @param isLeftFixedFrame true if the main frame of the left foot is fixed one.
-//         * @return true/false in case of success/failure.
-//         */
-//        bool evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
-
         /**
          * Evaluate the world to base transformation
          * @param rootTransform transformation from the world to the root frame.

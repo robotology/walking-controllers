@@ -469,16 +469,6 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-//            // send the reference again in order to reduce error
-//            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-//            {
-//                yError() << "[prepareRobot] Error while setting the initial position using "
-//                         << "POSITION DIRECT mode.";
-//                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
-//                reset();
-//                m_robotState = WalkingFSM::Stopped;
-//                return true;
-//            }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
@@ -1041,14 +1031,14 @@ bool WalkingModule::generateFirstTrajectories()
             yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
             return false;
         }
-           }
-           else
-           {
-               if(!m_trajectoryGenerator->generateFirstTrajectories())
-               {
-                   yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-                   return false;
-               }
+    }
+    else
+    {
+        if(!m_trajectoryGenerator->generateFirstTrajectories())
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
     }
 
     if(!updateTrajectories(0))
@@ -1158,13 +1148,13 @@ bool WalkingModule::updateFKSolver()
         if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
                                                           m_rightTrajectory.front(),
                                                           m_isLeftFixedFrame.front()))
-                {
-                    yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
-                    return false;
-                }
-            }
-            else
-            {
+        {
+            yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
+    }
+    else
+    {
         m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
                                                       m_robotControlHelper->getBaseTwist());
 
