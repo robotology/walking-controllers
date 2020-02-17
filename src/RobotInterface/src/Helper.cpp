@@ -17,6 +17,12 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
         return false;
     }
 
+    if(!m_encodersInterface->getEncoders(m_positionFeedbackDeg.data()))
+    {
+        yError() << "[RobotInterface::getWorstError] Error reading encoders.";
+        return false;
+    }
+
     // clear the std::pair
     worstError.first = 0;
     worstError.second = 0.0;

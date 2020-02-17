@@ -88,8 +88,8 @@ namespace WalkingControllers
 
         /**
          * Set The base frames for enabling using Gazebo as a base estimator.
-         * @param baseFrame the frame name inside model that supposed to be a root frame;
-         * @param name name of the frame attached to the base;
+         * @param baseFrame the frame name inside model;
+         * @param name label for storing the frame information;
          * @return true/false in case of success/failure.
          */
         bool setBaseFrame(const std::string& baseFrame, const std::string& name);

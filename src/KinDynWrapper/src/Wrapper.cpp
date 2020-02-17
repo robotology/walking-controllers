@@ -324,8 +324,7 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         }
     }
 
-    if(m_firstStep)
-        m_firstStep = false;
+    m_firstStep = false;
 
     m_comEvaluated = false;
     m_dcmEvaluated = false;
