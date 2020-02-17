@@ -78,6 +78,12 @@ yarp_add_idl(${EXE_TARGET_NAME}_THRIFT_GEN_FILES ${${EXE_TARGET_NAME}_THRIFT_HDR
 add_executable(${EXE_TARGET_NAME} ${${EXE_TARGET_NAME}_SRC} ${${EXE_TARGET_NAME}_HDR}
   ${${EXE_TARGET_NAME}_THRIFT_GEN_FILES})
 
+# Workaround for the bug in Eigen3 3.3 with MSVC
+# See https://github.com/robotology/walking-controllers/issues/47
+if (MSVC AND (${EIGEN3_VERSION} VERSION_LESS 3.4))
+  target_compile_definitions(${EXE_TARGET_NAME} PRIVATE WALKING_CONTROLLERS_EIGEN_3_3_WORKAROUND)
+endif()
+
 target_link_libraries(${EXE_TARGET_NAME}
   ${YARP_LIBRARIES}
   ${iDynTree_LIBRARIES}
