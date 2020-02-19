@@ -452,7 +452,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
 
-        if(!m_robotControlHelper->getFeedbacksRaw(10))
+        if(!m_robotControlHelper->getFeedbacksRaw(100))
             {
                 yError() << "[updateModule] Unable to get the feedback.";
                 return false;
@@ -487,7 +487,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(10))
+            if(!m_robotControlHelper->getFeedbacks(100))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -577,7 +577,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(10))
+        if(!m_robotControlHelper->getFeedbacks(100))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -886,7 +886,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
     bool getExternalRobotBase = true;
-    if(!m_robotControlHelper->getFeedbacksRaw(10, getExternalRobotBase))
+    if(!m_robotControlHelper->getFeedbacksRaw(100, getExternalRobotBase))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1214,8 +1214,8 @@ bool WalkingModule::startWalking()
          // TODO this is useful for the simulation
          double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
                                 + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
-        if(m_robotControlHelper->isExternalRobotBaseUsed())
-            m_robotControlHelper->setHeightOffset(heightOffset);
+
+        m_robotControlHelper->setHeightOffset(heightOffset);
      }
 
     if (!m_robotControlHelper->setInteractionMode())

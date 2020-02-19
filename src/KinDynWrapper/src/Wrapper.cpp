@@ -52,6 +52,7 @@ bool WalkingFK::setBaseFrame(const std::string& baseFrame, const std::string& na
     // note: in the following the base frames will be:
     // - left_foot when the left foot is the stance foot;
     // - right_foot when the right foot is the stance foot.
+    //.-.root when the external base supposed to be used
     m_frameBaseIndex = m_kinDyn.model().getFrameIndex(baseFrame);
     if(m_frameBaseIndex == iDynTree::FRAME_INVALID_INDEX)
     {
@@ -313,11 +314,12 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         // the left foot
         if(m_prevContactLeft || m_firstStep)
         {
-            m_worldToBaseTransform = rightFootTransform * m_frameHlinkRight;
-            if(!m_kinDyn.setFloatingBase(m_baseFrameRight))
+            auto base = m_baseFrames["rightFoot"];
+            m_worldToBaseTransform = rightFootTransform * base.second;
+            if(!m_kinDyn.setFloatingBase(base.first))
             {
                 yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
-                         << "base on link " << m_baseFrameRight;
+                         << "base on link " << base.first;
                 return false;
             }
             m_prevContactLeft = false;
