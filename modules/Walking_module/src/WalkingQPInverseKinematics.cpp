@@ -6,6 +6,11 @@
  * @date 2018
  */
 
+// Workaround for Eigen 3.3 on MSVC
+#ifdef WALKING_CONTROLLERS_EIGEN_3_3_WORKAROUND
+#include <eigen_workaround/SparseCwiseUnaryOp.h>
+#endif
+
 // std
 #include <cmath>
 
