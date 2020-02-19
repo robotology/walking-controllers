@@ -142,7 +142,7 @@ namespace WalkingControllers
          */
         bool getFeedbacks(unsigned int maxAttempts = 1);
 
-        bool getFeedbacksRaw(unsigned int maxAttempts = 1, bool useBaseEst = false);
+        bool getFeedbacksRaw(unsigned int maxAttempts = 1);
 
         /**
          * Set the desired position reference. (The position will be sent using PositionControl mode)

@@ -885,8 +885,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    bool getExternalRobotBase = true;
-    if(!m_robotControlHelper->getFeedbacksRaw(100, getExternalRobotBase))
+    if(!m_robotControlHelper->getFeedbacksRaw(100))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
