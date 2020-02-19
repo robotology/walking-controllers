@@ -1210,11 +1210,13 @@ bool WalkingModule::startWalking()
 
         updateFKSolver();
 
-         // TODO this is useful for the simulation
-         double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
-                                + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+         if (m_robotControlHelper->isExternalRobotBaseUsed())
+         {
+             double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+                                    + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+             m_robotControlHelper->setHeightOffset(heightOffset);
+         }
 
-        m_robotControlHelper->setHeightOffset(heightOffset);
      }
 
     if (!m_robotControlHelper->setInteractionMode())
