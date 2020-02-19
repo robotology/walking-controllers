@@ -301,7 +301,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& in
     m_desiredPoint(1) = m_referencePointDistance(1) + initialPosition(1);
 
     // add the initial point
-if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_desiredPoint))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
