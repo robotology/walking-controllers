@@ -59,8 +59,7 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
     bool okLeftWrench = false;
     bool okRightWrench = false;
 
-    bool okBaseEstimation = true;
-    okBaseEstimation = !m_useExternalRobotBase;
+    bool okBaseEstimation = !m_useExternalRobotBase;
 
     unsigned int attempt = 0;
     do
