@@ -26,6 +26,12 @@ if(WALKING_CONTROLLERS_COMPILE_WholeBodyControllers)
   # add an executable to the project using the specified source files.
   add_library(${LIBRARY_TARGET_NAME} SHARED ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR})
 
+  # Workaround for the bug in Eigen3 3.3 with MSVC
+  # See https://github.com/robotology/walking-controllers/issues/47
+  if (MSVC AND (${EIGEN3_VERSION} VERSION_LESS 3.4))
+    target_compile_definitions(${LIBRARY_TARGET_NAME} PRIVATE WALKING_CONTROLLERS_EIGEN_3_3_WORKAROUND)
+  endif()
+
   set_target_properties(${LIBRARY_TARGET_NAME} PROPERTIES VERSION ${WalkingControllers_VERSION}
     PUBLIC_HEADER "${YARP_helper_HDR}")
 
