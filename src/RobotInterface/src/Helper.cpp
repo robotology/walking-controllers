@@ -61,7 +61,6 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
     bool okBaseEstimation = true;
 
-    if(m_useExternalRobotBase)
     okBaseEstimation = !m_useExternalRobotBase;
 
     unsigned int attempt = 0;
@@ -95,28 +94,25 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             }
         }
 
-        if(m_useExternalRobotBase)
-        {
-            if(!okBaseEstimation)
+        if(!okBaseEstimation)
+            {
+                yarp::sig::Vector *base = NULL;
+                base = m_robotBasePort.read(false);
+                if(base != NULL)
                 {
-                    yarp::sig::Vector *base = NULL;
-                    base = m_robotBasePort.read(false);
-                    if(base != NULL)
-                    {
-                        m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
-                                                                            (*base)(1),
-                                                                            (*base)(2) - m_heightOffset));
+                    m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
+                                                                        (*base)(1),
+                                                                        (*base)(2) - m_heightOffset));
 
-                        m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
-                                                                                 (*base)(4),
-                                                                                 (*base)(5)));
+                    m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
+                                                                             (*base)(4),
+                                                                             (*base)(5)));
 
-                        m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
-                        m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
-                        okBaseEstimation = true;
-                    }
+                    m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
+                    m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
+                    okBaseEstimation = true;
                 }
-        }
+            }
 
         if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation)
         {
