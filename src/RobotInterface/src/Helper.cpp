@@ -100,12 +100,12 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             if(base != NULL)
             {
                 m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
-                                                                        (*base)(1),
-                                                                        (*base)(2) - m_heightOffset));
+                                                                    (*base)(1),
+                                                                    (*base)(2) - m_heightOffset));
 
                 m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
-                                                                             (*base)(4),
-                                                                             (*base)(5)));
+                                                                         (*base)(4),
+                                                                         (*base)(5)));
 
                 m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
                 m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
