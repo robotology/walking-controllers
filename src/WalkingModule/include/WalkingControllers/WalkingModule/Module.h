@@ -23,6 +23,9 @@
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
+#include <iDynTree/Core/Transform.h>
+#include <iDynTree/Core/Twist.h>
+#include <iDynTree/Core/SpatialAcc.h>
 
 // WalkingControllers library
 #include <WalkingControllers/RobotInterface/Helper.h>
@@ -39,8 +42,10 @@
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_osqp.h>
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_qpOASES.h>
 
-#include <WalkingControllers/KinDynWrapper/Wrapper.h>
+#include <WalkingControllers/StepAdaptationController/StepAdaptationController.hpp>
+#include <WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp>
 
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
 #include <WalkingControllers/RetargetingHelper/Helper.h>
 
 #include <WalkingControllers/LoggerClient/LoggerClient.h>
@@ -66,6 +71,68 @@ namespace WalkingControllers
         double m_dT; /**< RFModule period. */
         double m_time; /**< Current time. */
         std::string m_robot; /**< Robot name. */
+        double m_stepHeight; /**< maximum height of step. */
+        double m_startOfWalkingTime;  /**< The time that the robot starts walking. */
+
+        double m_timeOffset;/**< timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step)*/
+        double m_impactTimeNominal;/**< Nominal absolute time of the impact */
+        double m_impactTimeAdjusted;/**< Adjusted absolute time of the impact */
+        iDynTree::Vector2 m_zmpNominal;/**< Nominal 2D zmp position */
+        iDynTree::Vector2 m_zmpAdjusted;/**< Absolute 2D zmp position */
+        int m_indexPush;/**< Number of control cycle that step adjustment is active */
+
+        iDynTree::Vector2 m_dcmEstimatedI; /**< The estimated DCM. */
+
+        std::vector<std::shared_ptr<GeneralSupportTrajectory>> m_DCMSubTrajectories;/**< The different trajectories that are output of DCM motion planing. */
+
+        iDynTree::Transform m_adaptedFootLeftTransform;/**< The adapted transform of left foot. */
+        iDynTree::Transform m_adaptedFootRightTransform;/**< The adapted transform of right foot. */
+        iDynTree::Twist m_adaptedFootRightTwist;/**< The adapted twist of right foot. */
+        iDynTree::Twist m_adaptedFootLeftTwist;/**< The adapted twist of left foot. */
+        iDynTree::SpatialAcc m_adaptedFootLeftAcceleration;/**< The adapted acceleration of the left foot. */
+        iDynTree::SpatialAcc m_adaptedFootRightAcceleration;/**< The adapted acceleration of the right foot. */
+
+        iDynTree::Transform m_currentFootLeftTransform;/**< The current adapted transform of the left foot that has been found in previous control cycle. */
+        iDynTree::Transform m_currentFootRightTransform;/**< The current adapted transform of the right foot that has been found in previous control cycle. */
+        iDynTree::Twist m_currentFootLeftTwist;/**< The current adapted twist of  the left foot that has been found in previous control cycle. */
+        iDynTree::Twist m_currentFootRightTwist;/**< The current adapted twist of  the right foot that has been found in previous control cycle. */
+        iDynTree::SpatialAcc m_currentFootLeftAcceleration; /**< The current adapted acceleration of  the left foot that has been found in previous control cycle. */
+        iDynTree::SpatialAcc m_currentFootRightAcceleration;/**< The current adapted acceleratiom of  the right foot that has been found in previous control cycle. */
+
+        std::shared_ptr<FootPrint> m_jleftFootprints; /**< The left foot prints */
+        std::shared_ptr<FootPrint> m_jRightFootprints;/**< The right foot prints */
+
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionLeft;
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionRight;
+
+        StepList m_jLeftstepList; /**< The list of left foot steps */
+        StepList m_jRightstepList;/**< The list of right foot steps */
+
+        StepAdapterOutput m_outputStepAdaptation;/**< The structure of outputs of step adaptation */
+        StepAdapterInput m_inputStepAdaptation;/**< The structure of inputs of step adaptation */
+
+        double m_isPushActive;/**< Is push recovery active? */
+        double m_isRollActive;/**< Is the threshold of roll angles of arm active? */
+        double m_isPitchActive;/**< Is the threshold of pitch angles of arm active? */
+        int m_pushRecoveryActiveIndex;/**< The number of control cycles that push recovery is active? */
+        double m_kDCMSmoother;/**< The gain for smoothing of the DCM trajectories */
+        double m_kFootSmoother;/**< The gain for smoothing of the feet trajectories */
+        int m_indexSmoother;/**< The index for the control cycle number of the  DCM trajectories smoothing */
+        int m_indexFootSmoother;/**< The index for the control cycle number of the  feet trajectories smoothing */
+        int m_timeIndexAfterPushDetection;/**< The index for the control cycle number after detecting the push that is used for DCM smoothing*/
+        int m_FootTimeIndexAfterPushDetection;/**< The index for the control cycle number after detecting the push that is used for feet trajectory smoothing*/
+
+        iDynTree::Transform m_smoothedFootLeftTransform;/**< The smoothed transform of left foot after adaptation. */
+        iDynTree::Transform m_smoothedFootRightTransform;/**< The smoothed transform of right foot after adaptation. */
+        iDynTree::Twist m_smoothedFootLeftTwist;/**< The smoothed twist of left foot after adaptation. */
+        iDynTree::Twist m_smoothedFootRightTwist;/**< The smoothed twist of right foot after adaptation. */
+        iDynTree::Vector2  m_DCMPositionSmoothed;/**< The smoothed position of DCM after adaptation. */
+
+        std::deque<iDynTree::Vector2> m_CurrentDCMPositionAdjusted; /**< Deque containing the desired DCM position. */
+        std::deque<iDynTree::Vector2> m_CurrentDCMVelocityAdjusted; /**< Deque containing the desired DCM position. */
+
+       bool m_firstStep; /**< True if this is the first step. */
+       bool m_useStepAdaptation; /**< True if the step adaptation is used. */
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
@@ -74,6 +141,7 @@ namespace WalkingControllers
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
+        std::unique_ptr<TrajectoryGenerator> m_trajectoryGeneratorStepAdjustment; /**< Pointer to the trajectory generator object. */
         std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
         std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
@@ -85,6 +153,7 @@ namespace WalkingControllers
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
         std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+        std::unique_ptr<StepAdaptationController> m_stepAdapter; /**< Pointer to the step adaptation object. */
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
         double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -96,6 +165,10 @@ namespace WalkingControllers
         std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
         std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
 
+        std::deque<iDynTree::SpatialAcc> m_leftAccelerationTrajectory; /**< Deque containing the acceleration trajectory of the left foot. */
+        std::deque<iDynTree::SpatialAcc> m_rightAccelerationTrajectory; /**< Deque containing the acceleration trajectory of the right foot. */
+
+        std::deque<iDynTree::Vector2> m_ZMPPositionDesired; /**< Deque containing the desired ZMP position. */
         std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
         std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
         std::deque<bool> m_leftInContact; /**< Deque containing the left foot state. */
@@ -104,6 +177,10 @@ namespace WalkingControllers
         std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
         std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
         std::deque<bool> m_isStancePhase; /**< if true the robot is not walking */
+        std::deque<iDynTree::Vector2> m_DCMPositionAdjusted; /**< Deque containing the DCM adjusted position. */
+        std::deque<iDynTree::Vector2> m_DCMVelocityAdjusted; /**< Deque containing the DCM adjusted velocity. */
+        std::deque<double> m_weightInLeft; /**< Deque containing the left foot weight percentage. */
+        std::deque<double> m_weightInRight; /**< Deque containing the right foot weight percentage. */
 
         std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                                 In general a main frame of a foot is the fix frame only during the
@@ -228,6 +305,11 @@ namespace WalkingControllers
          */
         void reset();
 
+        bool dcmSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
+
+        bool feetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory,
+                                    iDynTree::Transform &smoothedFootTrajectory, const iDynTree::Twist adaptedFeetTwist,
+                                    const iDynTree::Twist desiredFootTwist, iDynTree::Twist &smoothedFootTwist);
     public:
 
         /**
@@ -286,6 +368,8 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         virtual bool stopWalking() override;
+
+        bool runStepAdaptation(iDynTree::Vector2 measuredZMP);
     };
 };
 #endif

@@ -21,6 +21,8 @@
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
 #include <yarp/dev/IInteractionMode.h>
+#include <yarp/dev/IImpedanceControl.h>
+
 #include <yarp/sig/Vector.h>
 #include <yarp/os/Timer.h>
 
@@ -53,7 +55,7 @@ namespace WalkingControllers
         yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
         yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
         yarp::dev::IInteractionMode *m_interactionInterface{nullptr}; /**< Stiff/compliant mode interface. */
-
+        yarp::dev::IImpedanceControl *m_impedanceControlInterface{nullptr};
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
         yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
@@ -71,6 +73,9 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
         iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
         iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
+         std::vector<yarp::dev::InteractionModeEnum> m_isJointModeStiffVector;/**< Joint is in the stiff or compliance mode */
+         std::vector<yarp::dev::InteractionModeEnum> m_JointModeStiffVectorDefult;/**< All the joints are in the stiff  mode */
+         std::vector<yarp::dev::InteractionModeEnum> m_currentModeofJoints;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
         // yarp::sig::Vector m_positionFeedbackDegFiltered;
         yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
@@ -89,6 +94,9 @@ namespace WalkingControllers
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
         bool m_useWrenchFilter; /**< True if the wrench filter is used. */
 
+        iDynTree::VectorDynSize  m_stiffnessGainVector; /**< the vector of stifness gains for the joint */
+        iDynTree::VectorDynSize  m_dampingGainVector; /**< the vector of damping gains for the joint */
+        std::vector<bool>  m_jointModes; /**< True if the joint is in the stiff mode */
         double m_startingPositionControlTime;
         bool m_positionMoveSkipped;
 
@@ -254,6 +262,11 @@ namespace WalkingControllers
          */
         bool isExternalRobotBaseUsed();
 
+        /**
+         * Set the impedance control gains of the joints(stiffness/damping).
+         * @return true in case of success and false otherwise.
+         */
+        bool setImpedanceControlGain();
     };
 };
 #endif

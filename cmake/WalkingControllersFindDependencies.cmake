@@ -131,7 +131,7 @@ checkandset_dependency(ICUBcontrib)
 find_package(iDynTree QUIET)
 checkandset_dependency(iDynTree)
 
-find_package(UnicyclePlanner 0.1.102 QUIET)
+find_package(UnicyclePlanner 0.2.102 QUIET)
 checkandset_dependency(UnicyclePlanner)
 
 find_package(osqp QUIET)
@@ -162,8 +162,11 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_RetargetingHelp
                                     "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_LoggerClient "Compile LoggerClient library?" ON WALKING_CONTROLLERS_COMPILE_YarpUtilities OFF)
 
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_StepAdaptationController "Compile StepAdaptationController library?" ON
+                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen" OFF)
+
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_WalkingModule "Compile WalkingModule app?" ON
-  "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_COMPILE_RobotInterface;WALKING_CONTROLLERS_COMPILE_KinDynWrapper;WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner;WALKING_CONTROLLERS_COMPILE_SimplifiedModelControllers;WALKING_CONTROLLERS_COMPILE_WholeBodyControllers;WALKING_CONTROLLERS_COMPILE_RetargetingHelper;WALKING_CONTROLLERS_COMPILE_LoggerClient;WALKING_CONTROLLERS_HAS_ICUBcontrib" OFF)
+  "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_COMPILE_RobotInterface;WALKING_CONTROLLERS_COMPILE_KinDynWrapper;WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner;WALKING_CONTROLLERS_COMPILE_SimplifiedModelControllers;WALKING_CONTROLLERS_COMPILE_WholeBodyControllers;WALKING_CONTROLLERS_COMPILE_RetargetingHelper;WALKING_CONTROLLERS_COMPILE_LoggerClient;WALKING_CONTROLLERS_HAS_ICUBcontrib;WALKING_CONTROLLERS_COMPILE_StepAdaptationController" OFF)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_JoypadModule "Compile JoypadModule app?" ON "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUBcontrib" OFF)
 

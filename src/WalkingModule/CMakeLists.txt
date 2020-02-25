@@ -53,6 +53,7 @@ if(WALKING_CONTROLLERS_COMPILE_WalkingModule)
     WalkingControllers::WholeBodyControllers
     WalkingControllers::RetargetingHelper
     WalkingControllers::LoggerClient
+    WalkingControllers::StepAdaptationController
     )
 
   install(TARGETS ${EXE_TARGET_NAME} DESTINATION bin)
