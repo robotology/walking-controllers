@@ -51,6 +51,9 @@ namespace WalkingControllers
         double m_nominalWidth; /**< Nominal width between two feet. */
         double m_initTime; /**< Init time of the current trajectory. */
 
+        double m_nominalCoMHeight; /**< Nominal CoM height during walking. */
+        double m_switchOverSwingRatio;/**< Double support suration devided by single support duration. */
+
         iDynTree::Vector2 m_referencePointDistance; /**< Vector between the center of the unicycle and the point that has to be reach the goal. */
 
         GeneratorState m_generatorState{GeneratorState::NotConfigured}; /**< Useful to track the generator state. */
@@ -240,6 +243,81 @@ namespace WalkingControllers
          * Reset the planner
          */
         void reset();
+
+        /**
+        * Get the desired 2D-ZMP position trajectory
+        * @param ZMPPositionTrajectory desired trajectory of the ZMP.
+        * @return true/false in case of success/failure.
+        */
+        bool getZMPPositionTrajectory(std::vector<iDynTree::Vector2>& ZMPPositionTrajectory);
+
+        /**
+         * Get the desired trajectories
+         * @param dcmSubTrajectories desired trajectories.
+         * @return true/false in case of success/failure.
+         */
+        bool getDCMSubTrajectories(std::vector<std::shared_ptr<GeneralSupportTrajectory>>& dcmSubTrajectories);
+
+        /**
+         * Get the feet acceleration
+         * @param lFootAcceleration vector containing the left foot acceleration;
+         * @param rFootAcceleration vector containing the right foot acceleration.
+         * @return true/false in case of success/failure.
+         */
+        bool getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAcceleration, std::vector<iDynTree::SpatialAcc>& rFootAcceleration);
+
+        /**
+         * Generate trajectories for a given footprints
+         * @param left the left foot footprint;
+         * @param right the right foot footprint;
+         * @param initTime
+         * @param initialState
+         * @return true/false in case of success/failure.
+         */
+        bool generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime, DCMInitialState initialState);
+
+        /**
+         * Get the phases of each foot during walking from unicycle
+         * @param leftPhases vector containing all the phases that left foot experience.
+         * @param rightPhases vector containing all the phases that right foot experience.
+         * @return true/false in case of success/failure.
+         */
+        bool getStepPhases(std::vector<StepPhase> &leftPhases, std::vector<StepPhase> &rightPhases);
+
+        /**
+         * Get the left foot print
+         * @param leftFootPrint pointer to the left footprint
+         * @return true/false in case of success/failure.
+         */
+        bool getLeftFootprint(std::shared_ptr<FootPrint>& leftFootPrint);
+
+        /**
+         * Get the right foot print
+         * @param rightFootPrint pointer to the right footprint
+         * @return true/false in case of success/failure.
+         */
+        bool getRightFootprint(std::shared_ptr<FootPrint>& rightFootPrint);
+
+         /**
+          * Get the Nominal CoM height trajectory for omega calculation
+          * @param nominalCoMHeight  nominal CoM height
+          * @return true/false in case of success/failure.
+          */
+         bool getNominalCoMHeight(double & nominalCoMHeight);
+
+         /**
+          * Get the ratio of double support to single support
+          * @param switchOverSwingRatio returning ratio of double support to single support
+          * @return true/false in case of success/failure.
+          */
+         bool getSwitchOverSwingRatio(double &switchOverSwingRatio);
+
+         /**
+          * Get the DCM boundary condition at merge point
+          * @param DCMBoundryConditionAtMergePoint is DCM boundary condition at merge point
+          * @return true/false in case of success/failure.
+          */
+         bool getDCMBoundaryConditionAtMergePoint(DCMInitialState DCMBoundryConditionAtMergePoint);
     };
 };
 
