@@ -6,8 +6,8 @@
  * @date 2020
  */
 
-#ifndef WALKING_CONTROLLERS_QP_SOLVER_H
-#define WALKING_CONTROLLERS_QP_SOLVER_H
+#ifndef WALKING_CONTROLLERS_STEPADAPTATION_QP_SOLVER_H
+#define WALKING_CONTROLLERS_STEPADAPTATION_QP_SOLVER_H
 
 // std
 #include <deque>
@@ -28,7 +28,7 @@ namespace WalkingControllers
 /**
  * QPSolver class
  */
-    class QPSolver
+    class StepAdaptationQPSolver
     {
         /**
          * Pointer to the optimization solver
@@ -52,11 +52,11 @@ namespace WalkingControllers
     public:
 
         /**
-         * Constructor of QPSolver.
+         * Constructor of StepAdaptationQPSolver.
          * @param inputSize size of the controlled input vector;
          * @param numberOfAllConstraints number of equality and inequality constraints!
          */
-        QPSolver(const int& inputSize, const int& numberOfAllConstraints);
+        StepAdaptationQPSolver(const int& inputSize, const int& numberOfAllConstraints);
 
         /**
          * Set the hessian matrix.
@@ -131,7 +131,7 @@ namespace WalkingControllers
          * Get the solver solution
          * @return the entire solution of the solver
          */
-        iDynTree::VectorDynSize getSolution();
+        const iDynTree::VectorDynSize getSolution() const;
 
     };
 };

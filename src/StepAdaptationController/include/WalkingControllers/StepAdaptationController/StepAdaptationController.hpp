@@ -28,7 +28,7 @@
 #include <deque>
 
 // solver
-#include <WalkingControllers/StepAdaptationController/QPSolver.hpp>
+#include <WalkingControllers/StepAdaptationController/StepAdaptationQPSolver.hpp>
 
 //interpolation
 #include <iDynTree/Core/CubicSpline.h>
@@ -89,7 +89,7 @@ namespace WalkingControllers
          * Pointer to the current QPSolver.
          * A new MPC solver is initialized when a new phase occurs.
          */
-        std::shared_ptr<QPSolver> m_currentQPSolver;
+        std::shared_ptr<StepAdaptationQPSolver> m_currentQPSolver;
 
     public:
         /**

@@ -10,12 +10,12 @@ if(WALKING_CONTROLLERS_COMPILE_StepAdaptationController)
   # set cpp files
   set(${LIBRARY_TARGET_NAME}_SRC
     src/StepAdaptationController.cpp
-    src/QPSolver.cpp
+    src/StepAdaptationQPSolver.cpp
     )
 
   # set hpp files
   set(${LIBRARY_TARGET_NAME}_HDR
-    include/WalkingControllers/StepAdaptationController/QPSolver.hpp
+    include/WalkingControllers/StepAdaptationController/StepAdaptationQPSolver.hpp
     include/WalkingControllers/StepAdaptationController/StepAdaptationController.hpp
     )
 
@@ -49,7 +49,7 @@ if(WALKING_CONTROLLERS_COMPILE_StepAdaptationController)
     LIBRARY       DESTINATION "${CMAKE_INSTALL_LIBDIR}"                                          COMPONENT shlib
     ARCHIVE       DESTINATION "${CMAKE_INSTALL_LIBDIR}"                                          COMPONENT lib
     RUNTIME       DESTINATION "${CMAKE_INSTALL_BINDIR}"                                          COMPONENT bin
-    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/WalkingControllers/TrajectoryPlanner" COMPONENT dev)
+    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/WalkingControllers/StepAdaptationController" COMPONENT dev)
 
   set_property(GLOBAL APPEND PROPERTY WalkingControllers_TARGETS ${LIBRARY_TARGET_NAME})
 

@@ -7,12 +7,12 @@
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/EigenSparseHelpers.h>
 
-#include <WalkingControllers/StepAdaptationController/QPSolver.hpp>
+#include <WalkingControllers/StepAdaptationController/StepAdaptationQPSolver.hpp>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 using namespace WalkingControllers;
-QPSolver::QPSolver(const int& inputSize, const int& numberOfConstraints)
+StepAdaptationQPSolver::StepAdaptationQPSolver(const int& inputSize, const int& numberOfConstraints)
     :m_inputSize(inputSize), m_numberOfConstraints(numberOfConstraints)
 {
     // instantiate the solver class
@@ -50,7 +50,7 @@ QPSolver::QPSolver(const int& inputSize, const int& numberOfConstraints)
     m_isFirstTime = true;
 }
 
-bool QPSolver::setHessianMatrix(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight, const double& sigmaWeight)
+bool StepAdaptationQPSolver::setCostFunctionWeights(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight, const double& sigmaWeight)
 {
     m_hessianMatrix(0,0) = zmpWeight(0);
     m_hessianMatrix(1,1) = zmpWeight(1);
@@ -63,7 +63,7 @@ bool QPSolver::setHessianMatrix(const iDynTree::Vector2& zmpWeight, const iDynTr
     return true;
 }
 
-bool QPSolver::setGradientVector(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight, const double& sigmaWeight,
+bool StepAdaptationQPSolver::setGradientVector(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight, const double& sigmaWeight,
                                  const iDynTree::Vector2& zmpNominal, const iDynTree::Vector2& dcmOffsetNominal, const double& sigmaNominal)
 {
     iDynTree::toEigen(m_gradient).segment(0, 2) = -(iDynTree::toEigen(zmpWeight).asDiagonal() * iDynTree::toEigen(zmpNominal));
@@ -89,7 +89,7 @@ bool QPSolver::setGradientVector(const iDynTree::Vector2& zmpWeight, const iDynT
     return true;
 }
 
-bool QPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition, const iDynTree::Vector2& currentZmpPosition,
+bool StepAdaptationQPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition, const iDynTree::Vector2& currentZmpPosition,
                                     const iDynTree::MatrixDynSize& convexHullMatrix)
 {
     if(convexHullMatrix.rows() != 4 || convexHullMatrix.cols() != 2)
@@ -115,7 +115,7 @@ bool QPSolver::setConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition,
     return true;
 }
 
-bool QPSolver::setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
+bool StepAdaptationQPSolver::setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
                                             const double& stepDuration, const double& stepDurationTollerance, const double& remainingSingleSupportDuration, const double& omega)
 {
     if(convexHullVector.size() != 4)
@@ -139,17 +139,17 @@ bool QPSolver::setBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition
     return true;
 }
 
-bool QPSolver::isInitialized()
+bool StepAdaptationQPSolver::isInitialized()
 {
     return m_QPSolver->isInitialized();
 }
 
-bool QPSolver::initialize()
+bool StepAdaptationQPSolver::initialize()
 {
     return m_QPSolver->initSolver();
 }
 
-bool QPSolver::solve()
+bool StepAdaptationQPSolver::solve()
 {
     MatrixXd constraintMatrix = MatrixXd(iDynTree::toEigen(m_constraintsMatrix));
     MatrixXd hessianMatrix = MatrixXd(iDynTree::toEigen(m_hessianMatrix));
@@ -182,7 +182,7 @@ bool QPSolver::solve()
     return true;
 }
 
-iDynTree::VectorDynSize QPSolver::getSolution()
+const iDynTree::VectorDynSize StepAdaptationQPSolver::getSolution() const
 {
     return m_solution;
 }

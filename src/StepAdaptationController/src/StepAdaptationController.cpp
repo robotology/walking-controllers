@@ -36,7 +36,7 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
     // constraints are dynamics (2) zmp position (2) impact time(1)
     m_numberOfConstraint = 7;
 
-    m_currentQPSolver = std::make_shared<QPSolver>(m_inputSize, m_numberOfConstraint);
+    m_currentQPSolver = std::make_shared<StepAdaptationQPSolver>(m_inputSize, m_numberOfConstraint);
 
     if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",  m_zmpPositionWeight))
     {
