@@ -182,7 +182,7 @@ bool StepAdaptationQPSolver::solve()
     return true;
 }
 
-const iDynTree::VectorDynSize StepAdaptationQPSolver::getSolution() const
+const iDynTree::VectorDynSize& StepAdaptationQPSolver::getSolution() const
 {
     return m_solution;
 }

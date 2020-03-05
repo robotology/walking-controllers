@@ -131,7 +131,7 @@ namespace WalkingControllers
          * Get the solver solution
          * @return the entire solution of the solver
          */
-        const iDynTree::VectorDynSize getSolution() const;
+        const iDynTree::VectorDynSize& getSolution() const;
 
     };
 };
