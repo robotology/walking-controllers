@@ -10,12 +10,10 @@ if(WALKING_CONTROLLERS_COMPILE_StepAdaptationController)
   # set cpp files
   set(${LIBRARY_TARGET_NAME}_SRC
     src/StepAdaptationController.cpp
-    src/StepAdaptationQPSolver.cpp
     )
 
   # set hpp files
   set(${LIBRARY_TARGET_NAME}_HDR
-    include/WalkingControllers/StepAdaptationController/StepAdaptationQPSolver.hpp
     include/WalkingControllers/StepAdaptationController/StepAdaptationController.hpp
     )
 

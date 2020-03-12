@@ -12,6 +12,7 @@
 
 // std
 #include <memory>
+#include <deque>
 
 // eigen
 #include <Eigen/Sparse>
@@ -20,6 +21,11 @@
 #include <iDynTree/Core/Triplets.h>
 #include <iDynTree/Core/SparseMatrix.h>
 #include <iDynTree/ConvexHullHelpers.h>
+#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/Core/MatrixDynSize.h>
+
+// osqp-eigen
+#include <OsqpEigen/OsqpEigen.h>
 
 // yarp
 #include <yarp/os/Value.h>
@@ -27,14 +33,13 @@
 #include <unordered_map>
 #include <deque>
 
-// solver
-#include <WalkingControllers/StepAdaptationController/StepAdaptationQPSolver.hpp>
-
 //interpolation
 #include <iDynTree/Core/CubicSpline.h>
 #include <iDynTree/Core/Twist.h>
 #include <iDynTree/Core/EigenHelpers.h>
 
+#include <qpOASES.hpp>
+#include <WalkingControllers/iDynTreeUtilities/Helper.h>
 
 /**
  * StepAdaptationController class contains the controller instances.
@@ -43,6 +48,25 @@ namespace WalkingControllers
 {
     class StepAdaptationController
     {
+        /**
+         * Pointer to the optimization solver
+         */
+        std::unique_ptr<OsqpEigen::Solver> m_QPSolver; /**< OsqpEigen Optimization solver. */
+        std::unique_ptr<qpOASES::SQProblem> m_QPSolver_qpOASES{nullptr}; /**< qpOASES Optimization solver. */
+
+        iDynSparseMatrix m_hessianMatrix;/**< hessian matrix of cost function. */
+        iDynSparseMatrix m_constraintsMatrix; /**< constraints matrix. */
+        iDynTree::VectorDynSize m_gradient;/**< Gradient vector. */
+        iDynTree::VectorDynSize m_lowerBound; /**< Lower bound vector. */
+        iDynTree::VectorDynSize m_upperBound; /**< Upper bound vector. */
+
+        iDynTree::VectorDynSize m_solution;  /**< solution vector of the optimization. */
+
+        int m_inputSize; /**< Size of the controlled input vector . */
+        int m_numberOfConstraints; /**< Size of the constraint vector . */
+
+        bool m_isFirstTime;/**< boolean  that indicates whether the solver has been already initilized? . */
+
         iDynTree::Vector2 m_zmpPositionNominal; /**< The next desired step position(The zmp position for next single support) .. */
         iDynTree::Vector2 m_dcmOffsetNominal; /**< The next desired dcm offset*/
         double m_sigmaNominal; /**< The exponential function of step duration multplied by the natural frequency of the LIPM.*/
@@ -68,7 +92,6 @@ namespace WalkingControllers
         double m_currentTime;/**< The  current time.*/
         double m_nextDoubleSupportDuration;/**< The timing of next double support.*/
 
-        int m_inputSize;  /**< Size of the input vector.. */
         int m_numberOfConstraint;  /**< Size of the input vector.. */
 
         /**
@@ -85,17 +108,88 @@ namespace WalkingControllers
 
         bool m_isSolutionEvaluated{false}; /**< True if the solution is evaluated. */
 
-        /**
-         * Pointer to the current QPSolver.
-         * A new MPC solver is initialized when a new phase occurs.
-         */
-        std::shared_ptr<StepAdaptationQPSolver> m_currentQPSolver;
-
     public:
         /**
          * Constructor of step adaptation controller.
+         * @param inputSize size of the controlled input vector;
+         * @param numberOfAllConstraints number of equality and inequality constraints!
          */
-        StepAdaptationController();
+        StepAdaptationController(const int& inputSize, const int& numberOfAllConstraints);
+
+        /**
+         * Compute the hessian matrix.
+         * Please do not call this function to update the hessian matrix! It can be set only once.
+         * @param zmpWeight weight of next step position term in cost function.
+         * @param dcmOffsetWeight weight of dcm offset term in cost function.
+         * @param sigmaWeight weight of next step timing term in cost function.
+         * @return true/false in case of success/failure.
+         */
+        bool computeHessianMatrix(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight,
+                              const double& sigmaWeight);
+
+        /**
+         * Compute or update the linear constraints matrix(A) related to equality and inequality constraints(C<Ax<B)
+         * If the solver is already set the linear constraints matrix is updated otherwise it is set for
+         * the first time.
+         * @param currentDcmPosition This vector includes the current value of real DCM ;
+         * @param currentZmpPosition This vector includes the current value of stance foot position ;
+         * @param convexHullMatrix The convex hull matrix related to allowable next step position;
+         * @return true/false in case of success/failure.
+         */
+        bool computeConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition, const iDynTree::Vector2& currentZmpPosition,
+                                  const iDynTree::MatrixDynSize& convexHullMatrix);
+
+        /**
+         * Compute or update the gradient
+         * @param zmpWeight weight of next step position term in cost function.
+         * @param dcmOffsetWeight weight of dcm offset term in cost function.
+         * @param sigmaWeight weight of next step timing term in cost function.
+         * @param zmpNominal vector of nominal values of next step position .
+         * @param dcmOffsetNominal vector of nominal values of dcm offset.
+         * @param sigmaNominal vector of nominal values of exp(w*steptiming) .
+         * @return true/false in case of success/failure.
+         */
+        bool computeGradientVector(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight,
+                               const double& sigmaWeight,const iDynTree::Vector2& zmpNominal,
+                               const iDynTree::Vector2& dcmOffsetNominal, const double& sigmaNominal);
+
+        /**
+         * Set or update the lower and the upper bounds
+         * @param zmpPosition This vector includes the current value of stance foot position ;
+         * @param convexHullVector The convex hull vector related to allowable next step position;
+         * @param stepDuration The nominal value of step timing ;
+         * @param stepDurationTollerance The tollerance of the max and min step timing value with respect to the nominal value ;
+         * @param remainingSingleSupportDuration The remained amount of single support duration ;
+         * @param omega The natural frequency of LIPM ;
+         * @return true/false in case of success/failure.
+         */
+        bool computeBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
+                                          const double& stepDuration, const double& stepDurationTollerance,
+                                          const double& remainingSingleSupportDuration,const double& omega);
+
+        /**
+         * Get the state of the solver.
+         * @return true if the solver is initialized false otherwise.
+         */
+        bool isInitialized();
+
+        /**
+         * Initialize the solver.
+         * @return true/false in case of success/failure.
+         */
+        bool initialize();
+
+        /**
+         * Solve the optimization problem.
+         * @return true/false in case of success/failure.
+         */
+        bool solve();
+
+        /**
+         * Get the solver solution
+         * @return the entire solution of the solver
+         */
+        const iDynTree::VectorDynSize& getSolution() const;
 
         /**
          * Initialize the method
@@ -116,23 +210,6 @@ namespace WalkingControllers
          * Reset the controller
          */
         void reset();
-        /**
-         * Run the step adaptation and set constraints and gradient vector and solve the QP problem and find the adapted foot trajectory.
-         * @param maxFootHeight maximum height of the swing foot.
-         * @param takeOffTime take off time of the swing foot.
-         * @param yawAngleAtImpact yaw angle of the swing foot at landing moment.
-         * @param zmpOffset offset between zmp and the stance foot position.
-         * @param currentFootTransform Transform of the current swing foot.
-         * @param currentFootTwist Current twist of the swing foot.
-         * @param adaptatedFootTransform  Adapted transform of the swing foot.
-         * @param adaptedFootTwist Adapted twist of the swing foot.
-         * @param adaptedFootAcceleration Adapted acceleration of the swing foot.
-         * @return true/false in case of success/failure.
-         */
-        bool getAdaptatedFootTrajectory(double maxFootHeight, double dt, double takeOffTime, double yawAngleAtImpact,
-                                        iDynTree::Vector2 zmpOffset, const iDynTree::Transform& currentFootTransform,
-                                        const iDynTree::Twist& currentFootTwist, iDynTree::Transform& adaptatedFootTransform,
-                                        iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration);
 
         /**
          * Set the nominal next step position and yaw angle
@@ -203,6 +280,24 @@ namespace WalkingControllers
          * @return 2D vector of the DCM error threshold that will be used for push detection.
          */
         iDynTree::Vector2 getDCMErrorThreshold();
+        /**
+         * Run the step adaptation and set constraints and gradient vector and solve the QP problem and find the adapted foot trajectory.
+         * @param maxFootHeight maximum height of the swing foot.
+         * @param takeOffTime take off time of the swing foot.
+         * @param yawAngleAtImpact yaw angle of the swing foot at landing moment.
+         * @param zmpOffset offset between zmp and the stance foot position.
+         * @param currentFootTransform Transform of the current swing foot.
+         * @param currentFootTwist Current twist of the swing foot.
+         * @param adaptatedFootTransform  Adapted transform of the swing foot.
+         * @param adaptedFootTwist Adapted twist of the swing foot.
+         * @param adaptedFootAcceleration Adapted acceleration of the swing foot.
+         * @return true/false in case of success/failure.
+         */
+        bool getAdaptatedFootTrajectory(double maxFootHeight, double dt, double takeOffTime, double yawAngleAtImpact,
+                                        iDynTree::Vector2 zmpOffset, const iDynTree::Transform& currentFootTransform,
+                                        const iDynTree::Twist& currentFootTwist, iDynTree::Transform& adaptatedFootTransform,
+                                        iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration);
+
     };
 };
 
