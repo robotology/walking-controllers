@@ -1,0 +1,25 @@
+<!-- Copyright (C) 2019 Fondazione Istituto Italiano di Tecnologia (IIT) -->
+<!-- All Rights Reserved. -->
+<!-- Author: Giulio Romualdi <giulio.romualdi@iit.it> -->
+
+<application>
+
+  <name>DCM walking </name>
+  <description>2D-DCM walking application.</description>
+  <version>1.0</version>
+  <authors>
+    <author email="giulio.romualdi@iit.it">Giulio Romualdi</author>
+  </authors>
+
+  <!-- Modules -->
+  <module>
+    <name>WalkingModule</name>
+    <node>icub-head</node>
+  </module>
+
+  <module>
+    <name>WalkingJoypadModule</name>
+    <node>icub-head</node>
+  </module>
+
+</application>

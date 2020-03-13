@@ -5,15 +5,14 @@
 cmake_minimum_required(VERSION 3.5)
 set(CMAKE_CXX_STANDARD 14)
 
-project(walking-controllers
-    VERSION 0.2.0)
+## MAIN project
+project(WalkingControllers
+  VERSION 0.3.0)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-find_package(YARP REQUIRED)
-find_package(ICUBcontrib REQUIRED)
-
-list(APPEND CMAKE_MODULE_PATH ${ICUBCONTRIB_MODULE_PATH})
+# Check WalkingControllers dependencies, find necessary libraries.
+include(WalkingControllersFindDependencies)
 
 #set default build type to "Release" in single-config generators
 if(NOT CMAKE_CONFIGURATION_TYPES)
@@ -25,7 +24,30 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${ROBOTOLOGY_BUILD_TYPES})
 endif()
 
-add_subdirectory(modules)
-add_subdirectory(app)
+option(ENABLE_RPATH "Enable RPATH for this library" ON)
+mark_as_advanced(ENABLE_RPATH)
+include(AddInstallRPATHSupport)
+add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+  LIB_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+  INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}"
+  DEPENDS ENABLE_RPATH
+  USE_LINK_PATH)
+
+add_subdirectory(src)
+
+include(InstallBasicPackageFiles)
+install_basic_package_files(${PROJECT_NAME}
+                            NAMESPACE WalkingControllers::
+                            VERSION ${WalkingControllers_VERSION}
+                            COMPATIBILITY AnyNewerVersion
+                            TARGETS_PROPERTY WalkingControllers_TARGETS
+                            VARS_PREFIX ${PROJECT_NAME}
+                            NO_CHECK_REQUIRED_COMPONENTS_MACRO)
+
+option(BUILD_TESTING "Create tests using CMake" OFF)
+include(CTest)
+if(BUILD_TESTING AND WALKING_CONTROLLERS_COMPILE_tests)
+  add_subdirectory(tests)
+endif()
 
 include(AddUninstallTarget)
