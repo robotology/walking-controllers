@@ -3,6 +3,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 ### Added
+
+### Changed
+
+## [0.3.0] - 2020-03-16
+### Added
 - The `CHANGELOG.md` file
 - Implement the `WalkingControllersFindDepencies.cmake`
 - Adding the possibility of selecting Stiff/Compliant mode in joint level.
@@ -72,7 +77,8 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
-[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.2.0...devel
+[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.3.0...devel
+[0.3.0]: https://github.com/robotology/walking-controllers/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/robotology/walking-controllers/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/robotology/walking-controllers/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/robotology/walking-controllers/releases/tag/v0.0.1
