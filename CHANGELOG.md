@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file.
 - The `CHANGELOG.md` file
 - Implement the `WalkingControllersFindDepencies.cmake`
 - Adding the possibility of selecting Stiff/Compliant mode in joint level.
+- Adding the possibility to use Gazebo base data inside the walking controller
+
 ### Changed
 - General refactoring of the library. The WalkingModule is now split in several library. Namelly:
    - `YarpUtilities`: utilities for using `YARP`
@@ -17,6 +19,16 @@ All notable changes to this project are documented in this file.
    - `TrajectoryPlanner` library related to trajectory planner
    - `KinDynWrapper` iDynTree `KinDynComputation` wrapper.
    - `RetargetingClient` client for the retargeting
+
+- Adding the `use_external_robot_base` parameter inside the `dcm_walking_with_joypad.ini`
+- Adding the Gazebo base data port inside the `robotControl.ini`
+- Tunning the `zmpControllerParams.ini` and `dcmReactiveControllerParams.ini` 
+- Modifying the follwoing classes for geting and using Gazebo base data:
+  - `/KinDynWrapper/Wrapper`
+  - `RobotInterface/Helper`
+  - `TrajectoryPlanner/TrajectoryGenerator`
+  - `WalkingModule`
+
 
 ## [0.2.0] - 2019-10-24
 ### Added
