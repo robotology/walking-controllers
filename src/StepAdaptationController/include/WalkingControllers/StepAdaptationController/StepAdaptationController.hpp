@@ -12,10 +12,6 @@
 
 // std
 #include <memory>
-#include <deque>
-
-// eigen
-#include <Eigen/Sparse>
 
 // iDynTree
 #include <iDynTree/Core/Triplets.h>
@@ -31,12 +27,6 @@
 #include <yarp/os/Value.h>
 
 #include <unordered_map>
-#include <deque>
-
-//interpolation
-#include <iDynTree/Core/CubicSpline.h>
-#include <iDynTree/Core/Twist.h>
-#include <iDynTree/Core/EigenHelpers.h>
 
 #include <qpOASES.hpp>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
@@ -75,17 +65,14 @@ namespace WalkingControllers
         iDynTree::Vector2 m_dcmOffsetWeight;/**< The wight of dcm offset term in the cost function.*/
         double m_sigmaWeight;/**< The wight of step timing term in the cost function.*/
 
-        iDynTree::Vector2 m_dcm_ErrorThreshold; /**< The threshold for activating the push recovery based on DCM error.*/
-        iDynTree::Vector2 m_roll_pitch_ErrorThreshold; /**< The threshold for activating the pendulum estimator based on the foot orientation error.*/
+        iDynTree::Vector2 m_dcmErrorThreshold; /**< The threshold for activating the push recovery based on DCM error.*/
+        iDynTree::Vector2 m_rollPitchErrorThreshold; /**< The threshold for activating the pendulum estimator based on the foot orientation error.*/
 
         iDynTree::Vector2 m_currentZmpPosition; /**< The current step position(The zmp position of current stance foot). */
         iDynTree::Vector2 m_currentDcmPosition; /**< The current DCM position.*/
-        iDynTree::Vector2 m_zmpPositionTollerance_x;/**< The tollerance of step position in x direction.*/
-        iDynTree::Vector2 m_zmpPositionTollerance_yLeft;/**< The tollerance of step position in y direction(left).*/
-        iDynTree::Vector2 m_zmpPositionTollerance_yRight;/**< The tollerance of step position in y direction(right).*/
 
         double m_stepTiming; /**< The remanined single support duration+(next double support duration)/2 .*/
-        double m_stepDurationTolerance;/**< The tollerance of step timing with respect to the nominal value.*/
+        double m_stepDurationTolerance;/**< The tolerance of step timing with respect to the nominal value.*/
         double m_remainingSingleSupportDuration;/**< The remained single support duration.*/
         double m_omega;/**< The natural frequency of LIPM.*/
 
@@ -97,7 +84,8 @@ namespace WalkingControllers
         /**
          *The buffered vectors for the interpolation of the foot trajectory
          */
-        iDynTree::VectorDynSize m_xPositionsBuffer, m_yPositionsBuffer, m_zPositionsBuffer,m_zzPositionsBuffer, m_yawsBuffer, m_timesBuffer, m_zTimesBuffer,m_zzTimesBuffer;
+        iDynTree::VectorDynSize m_xPositionsBuffer, m_yPositionsBuffer, m_zFirstPiecePositionsBuffer,m_zSecondPiecePositionsBuffer,
+                                m_yawsBuffer, m_timesBuffer, m_zFirstPieceTimesBuffer,m_zSecondPieceTimesBuffer;
 
         iDynTree::ConvexHullProjectionConstraint m_convexHullComputer; /**< iDynTree convex hull helper. */
         std::vector<iDynTree::Polygon> m_feetExtendedPolygon;/**< convex hull of the allowable landing foot position. */
@@ -158,13 +146,13 @@ namespace WalkingControllers
          * @param zmpPosition This vector includes the current value of stance foot position ;
          * @param convexHullVector The convex hull vector related to allowable next step position;
          * @param stepDuration The nominal value of step timing ;
-         * @param stepDurationTollerance The tollerance of the max and min step timing value with respect to the nominal value ;
+         * @param stepDurationTolerance The tolerance of the max and min step timing value with respect to the nominal value ;
          * @param remainingSingleSupportDuration The remained amount of single support duration ;
          * @param omega The natural frequency of LIPM ;
          * @return true/false in case of success/failure.
          */
         bool computeBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
-                                          const double& stepDuration, const double& stepDurationTollerance,
+                                          const double& stepDuration, const double& stepDurationTolerance,
                                           const double& remainingSingleSupportDuration,const double& omega);
 
         /**

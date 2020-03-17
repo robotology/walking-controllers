@@ -12,10 +12,18 @@
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/SpatialAcc.h>
 #include <iDynTree/Core/Direction.h>
+#include <iDynTree/Core/CubicSpline.h>
+#include <iDynTree/Core/Twist.h>
 
 #include <WalkingControllers/StepAdaptationController/StepAdaptationController.hpp>
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
+
+// eigen
+#include <Eigen/Sparse>
+
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
+using namespace WalkingControllers;
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 using namespace WalkingControllers;
@@ -25,12 +33,12 @@ StepAdaptationController::StepAdaptationController(const int &inputSize, const i
     , m_numberOfConstraints(numberOfAllConstraints)
     , m_xPositionsBuffer(2)
     , m_yPositionsBuffer(2)
-    , m_zPositionsBuffer(3)
-    , m_zzPositionsBuffer(2)
+    , m_zFirstPiecePositionsBuffer(3)
+    , m_zSecondPiecePositionsBuffer(2)
     , m_yawsBuffer(2)
     , m_timesBuffer(2)
-    , m_zTimesBuffer(3)
-    , m_zzTimesBuffer(2)
+    , m_zFirstPieceTimesBuffer(3)
+    , m_zSecondPieceTimesBuffer(2)
 {
     // instantiate the solver class
     m_QPSolver = std::make_unique<OsqpEigen::Solver>();
@@ -100,13 +108,13 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
         return false;
     }
 
-    if(!YarpUtilities::getVectorFromSearchable(config, "threshold_dcm_error",  m_dcm_ErrorThreshold))
+    if(!YarpUtilities::getVectorFromSearchable(config, "threshold_dcm_error",  m_dcmErrorThreshold))
     {
         yError() << "[StepAdaptationController::initialize] Unable to get the vector of DCM error threshold";
         return false;
     }
 
-    if(!YarpUtilities::getVectorFromSearchable(config, "threshold_roll_pitch_error",  m_roll_pitch_ErrorThreshold))
+    if(!YarpUtilities::getVectorFromSearchable(config, "threshold_roll_pitch_error",  m_rollPitchErrorThreshold))
     {
         yError() << "[StepAdaptationController::initialize] Unable to get the vector of roll pitch imu error threshold";
         return false;
@@ -213,7 +221,7 @@ bool StepAdaptationController::computeConstraintsMatrix(const iDynTree::Vector2&
 }
 
 bool StepAdaptationController::computeBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
-                                            const double& stepDuration, const double& stepDurationTollerance, const double& remainingSingleSupportDuration, const double& omega)
+                                            const double& stepDuration, const double& stepDurationTolerance, const double& remainingSingleSupportDuration, const double& omega)
 {
     if(convexHullVector.size() != 4)
     {
@@ -230,8 +238,8 @@ bool StepAdaptationController::computeBoundsVectorOfConstraints(const iDynTree::
     m_lowerBound(4) = -qpOASES::INFTY;
     m_lowerBound(5) = -qpOASES::INFTY;
 
-    m_upperBound(6) = std::exp((stepDuration + stepDurationTollerance) * omega);
-    m_lowerBound(6) = std::exp((stepDuration - std::min(stepDurationTollerance, remainingSingleSupportDuration)) * omega);
+    m_upperBound(6) = std::exp((stepDuration + stepDurationTolerance) * omega);
+    m_lowerBound(6) = std::exp((stepDuration - std::min(stepDurationTolerance, remainingSingleSupportDuration)) * omega);
 
     return true;
 }
@@ -409,17 +417,17 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
     double maxFootHeightTime = (getDesiredImpactTime() - takeOffTime) * 0.8 + takeOffTime;
     if (m_currentTime < maxFootHeightTime)
     {
-        m_zTimesBuffer(0)= m_currentTime;
-        m_zTimesBuffer(1)= maxFootHeightTime;
-        m_zTimesBuffer(2)= getDesiredImpactTime();
-        m_zPositionsBuffer(0)= currentFootTransform.getPosition()(2);
-        m_zPositionsBuffer(1)= maxFootHeight;
-        m_zPositionsBuffer(2)= 0;
+        m_zFirstPieceTimesBuffer(0)= m_currentTime;
+        m_zFirstPieceTimesBuffer(1)= maxFootHeightTime;
+        m_zFirstPieceTimesBuffer(2)= getDesiredImpactTime();
+        m_zFirstPiecePositionsBuffer(0)= currentFootTransform.getPosition()(2);
+        m_zFirstPiecePositionsBuffer(1)= maxFootHeight;
+        m_zFirstPiecePositionsBuffer(2)= 0;
 
         zSpline.setInitialConditions(currentFootTwist.getLinearVec3()(2), 0.0);
         zSpline.setFinalConditions(0.0,0.0);
 
-        if (!zSpline.setData(m_zTimesBuffer, m_zPositionsBuffer))
+        if (!zSpline.setData(m_zFirstPieceTimesBuffer, m_zFirstPiecePositionsBuffer))
         {
             std::cerr << "[StepAdaptationController::getAdaptatedFootTrajectory] Failed to initialize the z-dimension spline." << std::endl;
             return false;
@@ -427,16 +435,16 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
     }
     else
     {
-        m_zzTimesBuffer(0)= m_currentTime;
-        m_zzTimesBuffer(1)= getDesiredImpactTime();
+        m_zSecondPieceTimesBuffer(0)= m_currentTime;
+        m_zSecondPieceTimesBuffer(1)= getDesiredImpactTime();
 
         iDynTree::Position PositionsBuffer=currentFootTransform.getPosition();
-        m_zzPositionsBuffer(0)=PositionsBuffer(2);
-        m_zzPositionsBuffer(1)= 0;
+        m_zSecondPiecePositionsBuffer(0)=PositionsBuffer(2);
+        m_zSecondPiecePositionsBuffer(1)= 0;
         zSpline.setInitialConditions(currentFootTwist.getLinearVec3()(2), 0.0);
         zSpline.setFinalConditions(0.0,0.0);
 
-        if (!zSpline.setData(m_zzTimesBuffer, m_zzPositionsBuffer))
+        if (!zSpline.setData(m_zSecondPieceTimesBuffer, m_zSecondPiecePositionsBuffer))
         {
             std::cerr << "[StepAdaptationController::getAdaptatedFootTrajectory] Failed to initialize the z-dimension spline." << std::endl;
             return false;
@@ -515,10 +523,10 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
 }
 
 iDynTree::Vector2 StepAdaptationController::getDCMErrorThreshold(){
-    return m_dcm_ErrorThreshold;
+    return m_dcmErrorThreshold;
 }
 iDynTree::Vector2 StepAdaptationController::getRollPitchErrorThreshold(){
-    return m_roll_pitch_ErrorThreshold;
+    return m_rollPitchErrorThreshold;
 }
 
 void StepAdaptationController::reset(){
