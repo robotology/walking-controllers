@@ -28,9 +28,9 @@ using namespace WalkingControllers;
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXd;
 using namespace WalkingControllers;
 
-StepAdaptationController::StepAdaptationController(const int &inputSize, const int &numberOfAllConstraints)
-    : m_inputSize(inputSize)
-    , m_numberOfConstraints(numberOfAllConstraints)
+StepAdaptationController::StepAdaptationController()
+    : m_inputSize(5)
+    , m_numberOfConstraints(7)
     , m_xPositionsBuffer(2)
     , m_yPositionsBuffer(2)
     , m_zFirstPiecePositionsBuffer(3)
@@ -40,22 +40,11 @@ StepAdaptationController::StepAdaptationController(const int &inputSize, const i
     , m_zFirstPieceTimesBuffer(3)
     , m_zSecondPieceTimesBuffer(2)
 {
-    // instantiate the solver class
-    m_QPSolver = std::make_unique<OsqpEigen::Solver>();
 
-    //set the number of deceision variables of QP problem
-    m_QPSolver->data()->setNumberOfVariables(inputSize);
-
-    // set the number of all constraints includes inequality and equality constraints
-    m_QPSolver->data()->setNumberOfConstraints(numberOfAllConstraints);
-
-    m_QPSolver->settings()->setVerbosity(false);
-    m_QPSolver->settings()->setPolish(true);
-
-    m_constraintsMatrix.resize(numberOfAllConstraints, inputSize);
-    m_upperBound.resize(numberOfAllConstraints);
-    m_lowerBound.resize(numberOfAllConstraints);
-    m_gradient.resize(inputSize);
+    m_constraintsMatrix.resize(m_numberOfConstraints, m_inputSize);
+    m_upperBound.resize(m_numberOfConstraints);
+    m_lowerBound.resize(m_numberOfConstraints);
+    m_gradient.resize(m_inputSize);
 
     // set the constant elements of the constraint matrix
     m_constraintsMatrix(0, 0) = 1;
@@ -64,11 +53,11 @@ StepAdaptationController::StepAdaptationController(const int &inputSize, const i
     m_constraintsMatrix(1, 4) = 1;
     m_constraintsMatrix(6, 2) = 1;
 
-    m_hessianMatrix.resize(m_inputSize, m_inputSize);
+    m_hessianMatrix.resize(m_inputSize, m_numberOfConstraints);
     m_solution.resize(m_inputSize);
 
     // qpoases
-    m_QPSolver_qpOASES = std::make_unique<qpOASES::SQProblem>(inputSize,
+    m_QPSolver_qpOASES = std::make_unique<qpOASES::SQProblem>(m_inputSize,
                                                               m_numberOfConstraints);
 
     m_QPSolver_qpOASES->setPrintLevel(qpOASES::PL_LOW);
@@ -77,9 +66,6 @@ StepAdaptationController::StepAdaptationController(const int &inputSize, const i
 
 bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
 {
-
-    m_inputSize = 5;
-    m_numberOfConstraint = 7;
 
     if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",  m_zmpPositionWeight))
     {
@@ -142,7 +128,7 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
         return false;
     }
 
-    if(!computeHessianMatrix(m_zmpPositionWeight, m_dcmOffsetWeight, m_sigmaWeight))
+    if(!computeHessianMatrix())
     {
         yError() << "[StepAdaptationController::initialize] Unable set the hessian";
         return false;
@@ -152,28 +138,26 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
     reset();
 
     return true;
-
 }
 
-bool StepAdaptationController::computeHessianMatrix(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight, const double& sigmaWeight)
+bool StepAdaptationController::computeHessianMatrix()
 {
-    m_hessianMatrix(0,0) = zmpWeight(0);
-    m_hessianMatrix(1,1) = zmpWeight(1);
+    m_hessianMatrix(0,0) = m_zmpPositionWeight(0);
+    m_hessianMatrix(1,1) = m_zmpPositionWeight(1);
 
-    m_hessianMatrix(2,2) = sigmaWeight;
+    m_hessianMatrix(2,2) = m_sigmaWeight;
 
-    m_hessianMatrix(3,3) = dcmOffsetWeight(0);
-    m_hessianMatrix(4,4) = dcmOffsetWeight(1);
+    m_hessianMatrix(3,3) = m_dcmOffsetWeight(0);
+    m_hessianMatrix(4,4) = m_dcmOffsetWeight(1);
 
     return true;
 }
 
-bool StepAdaptationController::computeGradientVector(const iDynTree::Vector2& zmpWeight, const iDynTree::Vector2& dcmOffsetWeight, const double& sigmaWeight,
-                                 const iDynTree::Vector2& zmpNominal, const iDynTree::Vector2& dcmOffsetNominal, const double& sigmaNominal)
+bool StepAdaptationController::computeGradientVector()
 {
-    iDynTree::toEigen(m_gradient).segment(0, 2) = -(iDynTree::toEigen(zmpWeight).asDiagonal() * iDynTree::toEigen(zmpNominal));
-    m_gradient(2) = -sigmaWeight * sigmaNominal;
-    iDynTree::toEigen(m_gradient).segment(3, 2)  = -(iDynTree::toEigen(dcmOffsetWeight).asDiagonal() * iDynTree::toEigen(dcmOffsetNominal));
+    iDynTree::toEigen(m_gradient).segment(0, 2) = -(iDynTree::toEigen(m_zmpPositionWeight).asDiagonal() * iDynTree::toEigen(m_zmpPositionNominal));
+    m_gradient(2) = -m_sigmaWeight * m_sigmaNominal;
+    iDynTree::toEigen(m_gradient).segment(3, 2)  = -(iDynTree::toEigen(m_dcmOffsetWeight).asDiagonal() * iDynTree::toEigen(m_dcmOffsetNominal));
 
     if(m_QPSolver->isInitialized())
     {
@@ -194,52 +178,50 @@ bool StepAdaptationController::computeGradientVector(const iDynTree::Vector2& zm
     return true;
 }
 
-bool StepAdaptationController::computeConstraintsMatrix(const iDynTree::Vector2& currentDcmPosition, const iDynTree::Vector2& currentZmpPosition,
-                                    const iDynTree::MatrixDynSize& convexHullMatrix)
+bool StepAdaptationController::computeConstraintsMatrix()
 {
-    if(convexHullMatrix.rows() != 4 || convexHullMatrix.cols() != 2)
+    if(m_convexHullComputer.A.rows() != 4 || m_convexHullComputer.A.cols() != 2)
     {
-        yError() << "QPSolver::setConstraintsMatrix the convex hull matrix size is strange " << convexHullMatrix.toString();
+        yError() << "QPSolver::setConstraintsMatrix the convex hull matrix size is strange " << m_convexHullComputer.A.toString();
         return false;
     }
 
     iDynTree::Vector2 temp;
-    iDynTree::toEigen(temp) = iDynTree::toEigen(currentZmpPosition) - iDynTree::toEigen(currentDcmPosition);
+    iDynTree::toEigen(temp) = iDynTree::toEigen(m_currentZmpPosition) - iDynTree::toEigen(m_currentDcmPosition);
 
     m_constraintsMatrix(0, 2) = temp(0);
     m_constraintsMatrix(1, 2) = temp(1);
-    m_constraintsMatrix(2, 0) = convexHullMatrix(0, 0);
-    m_constraintsMatrix(2, 1) = convexHullMatrix(0, 1);
-    m_constraintsMatrix(3, 0) = convexHullMatrix(1, 0);
-    m_constraintsMatrix(3, 1) = convexHullMatrix(1, 1);
-    m_constraintsMatrix(4, 0) = convexHullMatrix(2, 0);
-    m_constraintsMatrix(4, 1) = convexHullMatrix(2, 1);
-    m_constraintsMatrix(5, 0) = convexHullMatrix(3, 0);
-    m_constraintsMatrix(5, 1) = convexHullMatrix(3, 1);
+    m_constraintsMatrix(2, 0) = m_convexHullComputer.A(0, 0);
+    m_constraintsMatrix(2, 1) = m_convexHullComputer.A(0, 1);
+    m_constraintsMatrix(3, 0) = m_convexHullComputer.A(1, 0);
+    m_constraintsMatrix(3, 1) = m_convexHullComputer.A(1, 1);
+    m_constraintsMatrix(4, 0) = m_convexHullComputer.A(2, 0);
+    m_constraintsMatrix(4, 1) = m_convexHullComputer.A(2, 1);
+    m_constraintsMatrix(5, 0) = m_convexHullComputer.A(3, 0);
+    m_constraintsMatrix(5, 1) = m_convexHullComputer.A(3, 1);
 
     return true;
 }
 
-bool StepAdaptationController::computeBoundsVectorOfConstraints(const iDynTree::Vector2& zmpPosition, const iDynTree::VectorDynSize& convexHullVector,
-                                            const double& stepDuration, const double& stepDurationTolerance, const double& remainingSingleSupportDuration, const double& omega)
+bool StepAdaptationController::computeBoundsVectorOfConstraints()
 {
-    if(convexHullVector.size() != 4)
+    if(m_convexHullComputer.b.size() != 4)
     {
-        yError() << "QPSolver::setConstraintsVector the convex hull vector size is strange " << convexHullVector.toString();
+        yError() << "QPSolver::setConstraintsVector the convex hull vector size is strange " << m_convexHullComputer.b.toString();
         return  false;
     }
 
-    iDynTree::toEigen(m_upperBound).segment(0, 2) = iDynTree::toEigen(zmpPosition);
-    iDynTree::toEigen(m_lowerBound).segment(0, 2) = iDynTree::toEigen(zmpPosition);
-    iDynTree::toEigen(m_upperBound).segment(2, 4) = iDynTree::toEigen(convexHullVector);
+    iDynTree::toEigen(m_upperBound).segment(0, 2) = iDynTree::toEigen(m_currentZmpPosition);
+    iDynTree::toEigen(m_lowerBound).segment(0, 2) = iDynTree::toEigen(m_currentZmpPosition);
+    iDynTree::toEigen(m_upperBound).segment(2, 4) = iDynTree::toEigen(m_convexHullComputer.b);
 
     m_lowerBound(2) = -qpOASES::INFTY;
     m_lowerBound(3) = -qpOASES::INFTY;
     m_lowerBound(4) = -qpOASES::INFTY;
     m_lowerBound(5) = -qpOASES::INFTY;
 
-    m_upperBound(6) = std::exp((stepDuration + stepDurationTolerance) * omega);
-    m_lowerBound(6) = std::exp((stepDuration - std::min(stepDurationTolerance, remainingSingleSupportDuration)) * omega);
+    m_upperBound(6) = std::exp((m_stepTiming + m_stepDurationTolerance) * m_omega);
+    m_lowerBound(6) = std::exp((m_stepTiming - std::min(m_stepDurationTolerance, m_remainingSingleSupportDuration)) * m_omega);
 
     return true;
 }
@@ -319,22 +301,19 @@ bool StepAdaptationController::solve(bool isLeft)
         }
     }
 
-    if (!computeGradientVector(m_zmpPositionWeight, m_dcmOffsetWeight, m_sigmaWeight,
-                                              m_zmpPositionNominal, m_dcmOffsetNominal, m_sigmaNominal))
+    if (!computeGradientVector())
     {
         yError() << "[StepAdaptationController::RunStepAdaptationController] Unable to set the Gradient Vector";
         return false;
     }
 
-    if(!computeConstraintsMatrix(m_currentDcmPosition, m_currentZmpPosition, m_convexHullComputer.A))
+    if(!computeConstraintsMatrix())
     {
         yError() << "[StepAdaptationController::RunStepAdaptationController] Unable to set the constraint matrix";
         return false;
     }
 
-    if(!computeBoundsVectorOfConstraints(m_currentZmpPosition, m_convexHullComputer.b,
-                                                        m_stepTiming, m_stepDurationTolerance, m_remainingSingleSupportDuration,
-                                                        m_omega))
+    if(!computeBoundsVectorOfConstraints())
     {
         yError() << "[StepAdaptationController::RunStepAdaptationController] Unable to set the bounds";
         return false;
@@ -394,37 +373,38 @@ iDynTree::Vector2 StepAdaptationController::getDesiredZmp()
     return desiredZmp;
 }
 
-bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, double dt, double takeOffTime, double yawAngleAtImpact, iDynTree::Vector2 zmpOffset,
-                                               const iDynTree::Transform& currentFootTransform, const iDynTree::Twist& currentFootTwist,
-                                               iDynTree::Transform& adaptatedFootTransform, iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration)
+bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input,
+                                                          iDynTree::Transform& adaptatedFootTransform, iDynTree::Twist& adaptedFootTwist,
+                                                          iDynTree::SpatialAcc& adaptedFootAcceleration)
 {
+
     iDynTree::CubicSpline xSpline, ySpline, zSpline, yawSpline;
 
     if(m_currentTime >= getDesiredImpactTime())
     {
         adaptedFootTwist.zero();
         iDynTree::Position newPosition;
-        newPosition(0)=getDesiredZmp()(0) - (cos(yawAngleAtImpact) * zmpOffset(0) - sin(yawAngleAtImpact) * zmpOffset(1));
-        newPosition(1)=getDesiredZmp()(1) - (cos(yawAngleAtImpact) * zmpOffset(1) + sin(yawAngleAtImpact) * zmpOffset(0));
+        newPosition(0)=getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpOffset(0) - sin(input.yawAngleAtImpact) * input.zmpOffset(1));
+        newPosition(1)=getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpOffset(1) + sin(input.yawAngleAtImpact) * input.zmpOffset(0));
         newPosition(2)= 0;
         adaptatedFootTransform.setPosition(newPosition);
 
-        adaptatedFootTransform.setRotation(iDynTree::Rotation::RPY(0.0, 0.0, yawAngleAtImpact));
+        adaptatedFootTransform.setRotation(iDynTree::Rotation::RPY(0.0, 0.0, input.yawAngleAtImpact));
 
         return true;
     }
 
-    double maxFootHeightTime = (getDesiredImpactTime() - takeOffTime) * 0.8 + takeOffTime;
+    double maxFootHeightTime = (getDesiredImpactTime() - input.takeOffTime) * 0.8 + input.takeOffTime;
     if (m_currentTime < maxFootHeightTime)
     {
         m_zFirstPieceTimesBuffer(0)= m_currentTime;
         m_zFirstPieceTimesBuffer(1)= maxFootHeightTime;
         m_zFirstPieceTimesBuffer(2)= getDesiredImpactTime();
-        m_zFirstPiecePositionsBuffer(0)= currentFootTransform.getPosition()(2);
-        m_zFirstPiecePositionsBuffer(1)= maxFootHeight;
+        m_zFirstPiecePositionsBuffer(0)= input.currentFootTransform.getPosition()(2);
+        m_zFirstPiecePositionsBuffer(1)= input.maxFootHeight;
         m_zFirstPiecePositionsBuffer(2)= 0;
 
-        zSpline.setInitialConditions(currentFootTwist.getLinearVec3()(2), 0.0);
+        zSpline.setInitialConditions(input.currentFootTwist.getLinearVec3()(2), 0.0);
         zSpline.setFinalConditions(0.0,0.0);
 
         if (!zSpline.setData(m_zFirstPieceTimesBuffer, m_zFirstPiecePositionsBuffer))
@@ -438,10 +418,10 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
         m_zSecondPieceTimesBuffer(0)= m_currentTime;
         m_zSecondPieceTimesBuffer(1)= getDesiredImpactTime();
 
-        iDynTree::Position PositionsBuffer=currentFootTransform.getPosition();
+        iDynTree::Position PositionsBuffer=input.currentFootTransform.getPosition();
         m_zSecondPiecePositionsBuffer(0)=PositionsBuffer(2);
         m_zSecondPiecePositionsBuffer(1)= 0;
-        zSpline.setInitialConditions(currentFootTwist.getLinearVec3()(2), 0.0);
+        zSpline.setInitialConditions(input.currentFootTwist.getLinearVec3()(2), 0.0);
         zSpline.setFinalConditions(0.0,0.0);
 
         if (!zSpline.setData(m_zSecondPieceTimesBuffer, m_zSecondPiecePositionsBuffer))
@@ -451,15 +431,15 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
         }
     }
 
-    m_xPositionsBuffer(0)= currentFootTransform.getPosition()(0);
-    m_yPositionsBuffer(0)= currentFootTransform.getPosition()(1);
+    m_xPositionsBuffer(0)= input.currentFootTransform.getPosition()(0);
+    m_yPositionsBuffer(0)= input.currentFootTransform.getPosition()(1);
 
-    m_yawsBuffer(0) = currentFootTransform.getRotation().asRPY()(2);
+    m_yawsBuffer(0) = input.currentFootTransform.getRotation().asRPY()(2);
 
-    m_xPositionsBuffer(1)= getDesiredZmp()(0) - (cos(yawAngleAtImpact) * zmpOffset(0) - sin(yawAngleAtImpact) * zmpOffset(1));
-    m_yPositionsBuffer(1)= getDesiredZmp()(1) - (cos(yawAngleAtImpact) * zmpOffset(1) + sin(yawAngleAtImpact) * zmpOffset(0));
+    m_xPositionsBuffer(1)= getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpOffset(0) - sin(input.yawAngleAtImpact) * input.zmpOffset(1));
+    m_yPositionsBuffer(1)= getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpOffset(1) + sin(input.yawAngleAtImpact) * input.zmpOffset(0));
 
-    m_yawsBuffer(1) = yawAngleAtImpact;
+    m_yawsBuffer(1) = input.yawAngleAtImpact;
 
     m_timesBuffer(0) = m_currentTime;
     m_timesBuffer(1) = getDesiredImpactTime();
@@ -469,10 +449,10 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
     iDynTree::AngularMotionVector3 rightTrivializedAngVelocity;
     iDynTree::Vector3 rpyDerivativeCurrent;
     iDynTree::Vector3 rpyDerivative;
-    iDynTree::toEigen(rpyDerivativeCurrent) = iDynTree::toEigen(iDynTree::Rotation::RPYRightTrivializedDerivativeInverse(0.0, 0.0, m_yawsBuffer(0))) * iDynTree::toEigen(currentFootTwist.getAngularVec3());
+    iDynTree::toEigen(rpyDerivativeCurrent) = iDynTree::toEigen(iDynTree::Rotation::RPYRightTrivializedDerivativeInverse(0.0, 0.0, m_yawsBuffer(0))) * iDynTree::toEigen(input.currentFootTwist.getAngularVec3());
 
-    xSpline.setInitialConditions(currentFootTwist.getLinearVec3()(0), 0.0);
-    ySpline.setInitialConditions(currentFootTwist.getLinearVec3()(1), 0.0);
+    xSpline.setInitialConditions(input.currentFootTwist.getLinearVec3()(0), 0.0);
+    ySpline.setInitialConditions(input.currentFootTwist.getLinearVec3()(1), 0.0);
     yawSpline.setInitialConditions(rpyDerivativeCurrent(2), 0.0);
 
     xSpline.setFinalConditions(0.0,0.0);
@@ -499,11 +479,11 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(double maxFootHeight, 
     iDynTree::Vector3 linearAcceleration;
     iDynTree::Vector3 rpySecondDerivative;
 
-    newPosition(0) = xSpline.evaluatePoint(m_currentTime + dt, linearVelocity(0), linearAcceleration(0));
-    newPosition(1) = ySpline.evaluatePoint(m_currentTime + dt, linearVelocity(1), linearAcceleration(1));
-    newPosition(2) = zSpline.evaluatePoint(m_currentTime + dt, linearVelocity(2), linearAcceleration(2));
+    newPosition(0) = xSpline.evaluatePoint(m_currentTime + input.discretizationTime, linearVelocity(0), linearAcceleration(0));
+    newPosition(1) = ySpline.evaluatePoint(m_currentTime + input.discretizationTime, linearVelocity(1), linearAcceleration(1));
+    newPosition(2) = zSpline.evaluatePoint(m_currentTime + input.discretizationTime, linearVelocity(2), linearAcceleration(2));
 
-    yawAngle = yawSpline.evaluatePoint(m_currentTime + dt, rpyDerivative(2), rpySecondDerivative(2));
+    yawAngle = yawSpline.evaluatePoint(m_currentTime + input.discretizationTime, rpyDerivative(2), rpySecondDerivative(2));
 
     adaptatedFootTransform.setPosition(newPosition);
     adaptatedFootTransform.setRotation(iDynTree::Rotation::RPY(0.0, 0.0, yawAngle));
