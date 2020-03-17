@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 ### Changed
-
+- Fix the windows compilation (https://github.com/robotology/walking-controllers/pull/59)
 ## [0.3.0] - 2020-03-16
 ### Added
 - The `CHANGELOG.md` file
