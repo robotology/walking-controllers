@@ -38,7 +38,7 @@ typedef struct{
     double discretizationTime ;
     double takeOffTime;
     double yawAngleAtImpact;
-    iDynTree::Vector2 zmpOffset;
+    iDynTree::Vector2 zmpToCenterOfFootPosition;
     iDynTree::Transform currentFootTransform;
     iDynTree::Twist currentFootTwist;
     iDynTree::Transform adaptatedFootTransform;

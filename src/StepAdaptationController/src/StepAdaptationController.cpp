@@ -87,8 +87,8 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
 
     m_feetExtendedPolygon.resize(2);
     iDynTree::Polygon foot;
-    iDynTree::Vector4 zmpOffsetLeftFoot;
-    if(!YarpUtilities::getVectorFromSearchable(config, "zmp_offset_leftFoot",  zmpOffsetLeftFoot))
+    iDynTree::Vector4 nextZmpConstraintBoundLeftFoot  ;
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_left_foot  ",  nextZmpConstraintBoundLeftFoot))
     {
         yError() << "[StepAdaptationController::initialize] Unable to get the vector";
         return false;
@@ -106,19 +106,19 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
         return false;
     }
 
-    foot = iDynTree::Polygon::XYRectangleFromOffsets(zmpOffsetLeftFoot(0), zmpOffsetLeftFoot(1),
-                                                     zmpOffsetLeftFoot(2), zmpOffsetLeftFoot(3));
+    foot = iDynTree::Polygon::XYRectangleFromOffsets(nextZmpConstraintBoundLeftFoot(0), nextZmpConstraintBoundLeftFoot(1),
+                                                     nextZmpConstraintBoundLeftFoot(2), nextZmpConstraintBoundLeftFoot(3));
     m_feetExtendedPolygon[0] = foot;
 
-    iDynTree::Vector4 zmpOffsetRightFoot;
-    if(!YarpUtilities::getVectorFromSearchable(config, "zmp_offset_rightFoot", zmpOffsetRightFoot))
+    iDynTree::Vector4 nextZmpConstraintBoundRightFoot;
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_right_foot  ", nextZmpConstraintBoundRightFoot))
     {
         yError() << "[StepAdaptationController::initialize] Unable to get the vector";
         return false;
     }
 
-    foot = iDynTree::Polygon::XYRectangleFromOffsets(zmpOffsetRightFoot(0), zmpOffsetRightFoot(1),
-                                                     zmpOffsetRightFoot(2), zmpOffsetRightFoot(3));
+    foot = iDynTree::Polygon::XYRectangleFromOffsets(nextZmpConstraintBoundRightFoot(0), nextZmpConstraintBoundRightFoot(1),
+                                                     nextZmpConstraintBoundRightFoot(2), nextZmpConstraintBoundRightFoot(3));
 
     m_feetExtendedPolygon[1] = foot;
 
@@ -384,8 +384,8 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGe
     {
         adaptedFootTwist.zero();
         iDynTree::Position newPosition;
-        newPosition(0)=getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpOffset(0) - sin(input.yawAngleAtImpact) * input.zmpOffset(1));
-        newPosition(1)=getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpOffset(1) + sin(input.yawAngleAtImpact) * input.zmpOffset(0));
+        newPosition(0)=getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0) - sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1));
+        newPosition(1)=getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1) + sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0));
         newPosition(2)= 0;
         adaptatedFootTransform.setPosition(newPosition);
 
@@ -436,8 +436,8 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGe
 
     m_yawsBuffer(0) = input.currentFootTransform.getRotation().asRPY()(2);
 
-    m_xPositionsBuffer(1)= getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpOffset(0) - sin(input.yawAngleAtImpact) * input.zmpOffset(1));
-    m_yPositionsBuffer(1)= getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpOffset(1) + sin(input.yawAngleAtImpact) * input.zmpOffset(0));
+    m_xPositionsBuffer(1)= getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0) - sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1));
+    m_yPositionsBuffer(1)= getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1) + sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0));
 
     m_yawsBuffer(1) = input.yawAngleAtImpact;
 
