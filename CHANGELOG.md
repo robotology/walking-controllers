@@ -17,6 +17,7 @@ All notable changes to this project are documented in this file.
    - `TrajectoryPlanner` library related to trajectory planner
    - `KinDynWrapper` iDynTree `KinDynComputation` wrapper.
    - `RetargetingClient` client for the retargeting
+- `TrajectoryGenerator` class of the `TrajectoryPlanner` library includes now the method `getWeightPercentage` to retrieve the amount of weight on each foot requested by the planner.   
 
 ## [0.2.0] - 2019-10-24
 ### Added
