@@ -201,13 +201,6 @@ namespace WalkingControllers
         void setCurrentDcmPosition(const iDynTree::Vector2& currentDcmPosition);
 
         /**
-         * Get the output of the controller.
-         * @param controllerOutput is the vector containing the output the controller.
-         * @return true/false in case of success/failure.
-         */
-        bool getControllerOutput(iDynTree::Vector3& controllerOutput);
-
-        /**
          * Get the adapted step timing.
          * @return The adapted step timing.
          */
