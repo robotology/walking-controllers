@@ -22,9 +22,6 @@
 #include <iDynTree/Core/Twist.h>
 #include <iDynTree/Core/SpatialAcc.h>
 
-// osqp-eigen
-#include <OsqpEigen/OsqpEigen.h>
-
 // yarp
 #include <yarp/os/Value.h>
 
@@ -33,7 +30,7 @@
 #include <qpOASES.hpp>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
 
-typedef struct{
+struct footTrajectoryGenerationInput{
     double maxFootHeight;
     double discretizationTime ;
     double takeOffTime;
@@ -41,10 +38,7 @@ typedef struct{
     iDynTree::Vector2 zmpToCenterOfFootPosition;
     iDynTree::Transform currentFootTransform;
     iDynTree::Twist currentFootTwist;
-    iDynTree::Transform adaptatedFootTransform;
-    iDynTree::Twist adaptedFootTwist;
-    iDynTree::SpatialAcc adaptedFootAcceleration;
-} footTrajectoryGenerationInput;
+};
 
 /**
  * StepAdaptationController class contains the controller instances.
@@ -56,7 +50,6 @@ namespace WalkingControllers
         /**
          * Pointer to the optimization solver
          */
-        std::unique_ptr<OsqpEigen::Solver> m_QPSolver; /**< OsqpEigen Optimization solver. */
         std::unique_ptr<qpOASES::SQProblem> m_QPSolver_qpOASES{nullptr}; /**< qpOASES Optimization solver. */
 
         iDynSparseMatrix m_hessianMatrix;/**< hessian matrix of cost function. */
@@ -150,29 +143,11 @@ namespace WalkingControllers
         bool isInitialized();
 
         /**
-         * Initialize the solver.
-         * @return true/false in case of success/failure.
-         */
-        bool initialize();
-
-        /**
-         * Solve the optimization problem.
-         * @return true/false in case of success/failure.
-         */
-        bool solve();
-
-        /**
-         * Get the solver solution
-         * @return the entire solution of the solver
-         */
-        const iDynTree::VectorDynSize& getSolution() const;
-
-        /**
          * Initialize the method
          * @param config yarp searchable configuration variable.
          * @return true/false in case of success/failure
          */
-        bool initialize(const yarp::os::Searchable& config);
+        bool Configure(const yarp::os::Searchable& config);
 
         /**
          * Solve the Optimization problem. If the QPSolver is not set It will be initialized.
@@ -245,6 +220,12 @@ namespace WalkingControllers
         iDynTree::Vector2 getDesiredZmp();
 
         /**
+         * Get the next DCM Offset
+         * @return The DCM offset of the next step.
+         */
+        iDynTree::Vector2 getDesiredDCMOffset();
+
+        /**
          * Get the roll and pitch error threshold that has been set by the configuration file.
          * @return 2D vector of roll and pitch error threshold that will be used for push detection.
          */
@@ -265,7 +246,6 @@ namespace WalkingControllers
          */
         bool getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input, iDynTree::Transform& adaptatedFootTransform,
                                         iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration);
-
     };
 };
 

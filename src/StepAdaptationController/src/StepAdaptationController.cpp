@@ -64,45 +64,45 @@ StepAdaptationController::StepAdaptationController()
     m_isFirstTime = true;
 }
 
-bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
+bool StepAdaptationController::Configure(const yarp::os::Searchable &config)
 {
 
     if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",  m_zmpPositionWeight))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the vector";
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
     if(!YarpUtilities::getVectorFromSearchable(config, "next_dcm_offset_weight",  m_dcmOffsetWeight))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the vector";
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
     if(!YarpUtilities::getNumberFromSearchable(config, "sigma_weight", m_sigmaWeight))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the number";
+        yError() << "[StepAdaptationController::Configure] Unable to get the number";
         return false;
     }
 
     m_feetExtendedPolygon.resize(2);
     iDynTree::Polygon foot;
-    iDynTree::Vector4 nextZmpConstraintBoundLeftFoot  ;
+    iDynTree::Vector4 nextZmpConstraintBoundLeftFoot;
     if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_left_foot  ",  nextZmpConstraintBoundLeftFoot))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the vector";
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
     if(!YarpUtilities::getVectorFromSearchable(config, "threshold_dcm_error",  m_dcmErrorThreshold))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the vector of DCM error threshold";
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector of DCM error threshold";
         return false;
     }
 
     if(!YarpUtilities::getVectorFromSearchable(config, "threshold_roll_pitch_error",  m_rollPitchErrorThreshold))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the vector of roll pitch imu error threshold";
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector of roll pitch imu error threshold";
         return false;
     }
 
@@ -113,7 +113,7 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
     iDynTree::Vector4 nextZmpConstraintBoundRightFoot;
     if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_right_foot  ", nextZmpConstraintBoundRightFoot))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the vector";
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
@@ -124,13 +124,13 @@ bool StepAdaptationController::initialize(const yarp::os::Searchable &config)
 
     if(!YarpUtilities::getNumberFromSearchable(config, "step_duration_tolerance", m_stepDurationTolerance))
     {
-        yError() << "[StepAdaptationController::initialize] Unable to get the number";
+        yError() << "[StepAdaptationController::Configure] Unable to get the number";
         return false;
     }
 
     if(!computeHessianMatrix())
     {
-        yError() << "[StepAdaptationController::initialize] Unable set the hessian";
+        yError() << "[StepAdaptationController::Configure] Unable set the hessian";
         return false;
     }
 
@@ -159,22 +159,6 @@ bool StepAdaptationController::computeGradientVector()
     m_gradient(2) = -m_sigmaWeight * m_sigmaNominal;
     iDynTree::toEigen(m_gradient).segment(3, 2)  = -(iDynTree::toEigen(m_dcmOffsetWeight).asDiagonal() * iDynTree::toEigen(m_dcmOffsetNominal));
 
-    if(m_QPSolver->isInitialized())
-    {
-        if(!m_QPSolver->updateGradient(iDynTree::toEigen(m_gradient)))
-        {
-            yError()<<"[QPSolver::setGradientVector]:unable to update the Gradient Vector";
-            return false;
-        }
-    }
-    else
-    {
-        if(!m_QPSolver->data()->setGradient(iDynTree::toEigen(m_gradient)))
-        {
-            yError()<<"[QPSolver::setGradientVector]:unable to set the Gradient Vector for the first time";
-            return false;
-        }
-    }
     return true;
 }
 
@@ -321,12 +305,6 @@ bool StepAdaptationController::solve(bool isLeft)
 
     m_isSolutionEvaluated = false;
 
-    if(!solve())
-    {
-        yError() << "[StepAdaptationController::solve] Unable to solve the step adaptation problem.";
-        return false;
-    }
-
     MatrixXd constraintMatrix = MatrixXd(iDynTree::toEigen(m_constraintsMatrix));
     MatrixXd hessianMatrix = MatrixXd(iDynTree::toEigen(m_hessianMatrix));
 
@@ -361,16 +339,24 @@ bool StepAdaptationController::solve(bool isLeft)
 
 double StepAdaptationController::getDesiredImpactTime()
 {
-    double optimalStepDuration = std::log(getSolution()(2)) / m_omega;
+    double optimalStepDuration = std::log(m_solution(2)) / m_omega;
     return m_currentTime + optimalStepDuration - m_nextDoubleSupportDuration / 2;
 }
 
 iDynTree::Vector2 StepAdaptationController::getDesiredZmp()
 {
     iDynTree::Vector2 desiredZmp;
-    desiredZmp(0) = getSolution()(0);
-    desiredZmp(1) = getSolution()(1);
+    desiredZmp(0) = m_solution(0);
+    desiredZmp(1) = m_solution(1);
     return desiredZmp;
+}
+
+iDynTree::Vector2 StepAdaptationController::getDesiredDCMOffset()
+{
+    iDynTree::Vector2 desiredDCMOffset;
+    desiredDCMOffset(0) = m_solution(3);
+    desiredDCMOffset(1) = m_solution(4);
+    return desiredDCMOffset;
 }
 
 bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input,
@@ -511,19 +497,4 @@ iDynTree::Vector2 StepAdaptationController::getRollPitchErrorThreshold(){
 
 void StepAdaptationController::reset(){
     m_isSolutionEvaluated = false;
-}
-
-const iDynTree::VectorDynSize& StepAdaptationController::getSolution() const
-{
-    return m_solution;
-}
-
-bool StepAdaptationController::isInitialized()
-{
-    return m_QPSolver->isInitialized();
-}
-
-bool StepAdaptationController::initialize()
-{
-    return m_QPSolver->initSolver();
 }
