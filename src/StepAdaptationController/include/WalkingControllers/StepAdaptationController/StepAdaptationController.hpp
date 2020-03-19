@@ -79,15 +79,14 @@ namespace WalkingControllers
         iDynTree::Vector2 m_currentZmpPosition; /**< The current step position(The zmp position of current stance foot). */
         iDynTree::Vector2 m_currentDcmPosition; /**< The current DCM position.*/
 
-        double m_stepTiming; /**< The remanined single support duration+(next double support duration)/2 .*/
-        double m_stepDurationTolerance;/**< The tolerance of step timing with respect to the nominal value.*/
         double m_remainingSingleSupportDuration;/**< The remained single support duration.*/
+        double m_stepTiming; /**< The remanined single support duration+(next double support duration)/2  that is used for optimization.*/
+        double m_stepDurationTolerance;/**< The tolerance of step timing with respect to the nominal value.*/
+
         double m_omega;/**< The natural frequency of LIPM.*/
 
         double m_currentTime;/**< The  current time.*/
         double m_nextDoubleSupportDuration;/**< The timing of next double support.*/
-
-        int m_numberOfConstraint;  /**< Size of the input vector.. */
 
         /**
          *The buffered vectors for the interpolation of the foot trajectory
@@ -135,12 +134,6 @@ namespace WalkingControllers
          * @param numberOfAllConstraints number of equality and inequality constraints!
          */
         StepAdaptationController();
-
-        /**
-         * Get the state of the solver.
-         * @return true if the solver is initialized false otherwise.
-         */
-        bool isInitialized();
 
         /**
          * Initialize the method

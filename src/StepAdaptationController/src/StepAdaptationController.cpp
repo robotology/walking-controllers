@@ -40,7 +40,6 @@ StepAdaptationController::StepAdaptationController()
     , m_zFirstPieceTimesBuffer(3)
     , m_zSecondPieceTimesBuffer(2)
 {
-
     m_constraintsMatrix.resize(m_numberOfConstraints, m_inputSize);
     m_upperBound.resize(m_numberOfConstraints);
     m_lowerBound.resize(m_numberOfConstraints);
