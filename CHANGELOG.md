@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 ### Changed
-
+    - Add missing includes in `TimeProfiler` (https://github.com/robotology/walking-controllers/pull/60)
 
 ## [0.3.1] - 2020-03-18
 ### Changed
