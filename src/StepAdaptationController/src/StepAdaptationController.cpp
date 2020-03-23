@@ -1,4 +1,3 @@
-
 // std
 #define NOMINMAX
 #include <algorithm>

@@ -137,8 +137,6 @@ namespace WalkingControllers
     public:
         /**
          * Constructor of step adaptation controller.
-         * @param inputSize size of the controlled input vector;
-         * @param numberOfAllConstraints number of equality and inequality constraints!
          */
         StepAdaptationController();
 

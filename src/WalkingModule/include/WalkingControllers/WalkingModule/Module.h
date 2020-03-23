@@ -39,13 +39,14 @@
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_osqp.h>
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_qpOASES.h>
 
+#include <WalkingControllers/StepAdaptationController/StepAdaptationController.hpp>
+#include <WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp>
+
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>
-
 #include <WalkingControllers/RetargetingHelper/Helper.h>
-
 #include <WalkingControllers/LoggerClient/LoggerClient.h>
-
 #include <WalkingControllers/TimeProfiler/TimeProfiler.h>
+
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -66,6 +67,63 @@ namespace WalkingControllers
         double m_dT; /**< RFModule period. */
         double m_time; /**< Current time. */
         std::string m_robot; /**< Robot name. */
+        double m_stepHeight;
+        double m_startOfWalkingTime;
+
+        iDynTree::Vector2 m_dcmEstimatedI;
+        double m_tempCoP;
+        double m_tempDCM;
+        iDynTree::VectorFixSize<5> m_nominalValuesLeft;
+        iDynTree::VectorFixSize<5> m_nominalValuesRight;
+        iDynTree::Vector3 m_currentValues;
+
+        std::vector<std::shared_ptr<GeneralSupportTrajectory>> m_DCMSubTrajectories;
+
+        iDynTree::Transform m_adaptatedFootLeftTransform;
+        iDynTree::Transform m_adaptatedFootRightTransform;
+        iDynTree::Twist m_adaptatedFootRightTwist;
+        iDynTree::Twist m_adaptatedFootLeftTwist;
+        iDynTree::SpatialAcc m_adaptatedFootLeftAcceleration;
+        iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;
+        iDynTree::Vector3 m_leftAdaptedStepParameters;
+        iDynTree::Vector3 m_rightAdaptedStepParameters;
+
+        iDynTree::Transform m_currentFootLeftTransform;
+        iDynTree::Transform m_currentFootRightTransform;
+        iDynTree::Twist m_currentFootLeftTwist;
+        iDynTree::Twist m_currentFootRightTwist;
+        iDynTree::SpatialAcc m_currentFootLeftAcceleration;
+        iDynTree::SpatialAcc m_currentFootRightAcceleration;
+
+        std::shared_ptr<FootPrint> m_jleftFootprints;
+        std::shared_ptr<FootPrint> m_jRightFootprints;
+
+        StepList m_jLeftstepList;
+        StepList m_jRightstepList;
+
+        double m_isPushActive;
+        double m_isRollActive;
+        double m_isPitchActive;
+        int m_pushRecoveryActiveIndex;
+        double m_kDCMSmoother;
+        double m_kFootSmoother;
+        int m_indexSmoother;
+        int m_indexFootSmoother;
+        int m_timeIndexAfterPushDetection;
+        int m_FootTimeIndexAfterPushDetection;
+        iDynTree::Vector2 m_errorOfLastDCMPushDetection;
+
+        iDynTree::Transform m_smoothedFootLeftTransform;
+        iDynTree::Twist m_smoothedFootLeftTwist;
+        iDynTree::Transform m_smoothedFootRightTransform;
+        iDynTree::Twist m_smoothedFootRightTwist;
+        iDynTree::Vector2  m_DCMPositionSmoothed;
+
+        std::deque<iDynTree::Vector2> m_CurrentDCMPositionAdjusted; /**< Deque containing the desired DCM position. */
+        std::deque<iDynTree::Vector2> m_CurrentDCMVelocityAdjusted; /**< Deque containing the desired DCM position. */
+
+       bool m_firstStep; /**< True if this is the first step. */
+       bool m_useStepAdaptation; /**< True if the step adaptation is used. */
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
@@ -85,6 +143,8 @@ namespace WalkingControllers
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
         std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+        std::unique_ptr<StepAdaptationController> m_stepAdapter; /**< Pointer to the step adaptation object. */
+        std::unique_ptr<DCMSimpleEstimator> m_DCMEstimator; /**< Pointer to the step adaptation Utils object. */
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
         double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -96,6 +156,10 @@ namespace WalkingControllers
         std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
         std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
 
+        std::deque<iDynTree::SpatialAcc> m_leftAccelerationTrajectory; /**< Deque containing the acceleration trajectory of the left foot. */
+        std::deque<iDynTree::SpatialAcc> m_rightAccelerationTrajectory; /**< Deque containing the acceleration trajectory of the right foot. */
+
+        std::deque<iDynTree::Vector2> m_ZMPPositionDesired; /**< Deque containing the desired ZMP position. */
         std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
         std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
         std::deque<bool> m_leftInContact; /**< Deque containing the left foot state. */
@@ -103,7 +167,10 @@ namespace WalkingControllers
         std::deque<double> m_comHeightTrajectory; /**< Deque containing the CoM height trajectory. */
         std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
         std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
-
+        std::deque<iDynTree::Vector2> m_DCMPositionAdjusted; /**< Deque containing the DCM adjusted position. */
+        std::deque<iDynTree::Vector2> m_DCMVelocityAdjusted; /**< Deque containing the DCM adjusted velocity. */
+        std::deque<double> m_weightInLeft; /**< Deque containing the left foot weight percentage. */
+        std::deque<double> m_weightInRight; /**< Deque containing the right foot weight percentage. */
         std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                                 In general a main frame of a foot is the fix frame only during the
                                                 stance and the switch out phases. */
@@ -285,6 +352,13 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         virtual bool stopWalking() override;
+
+        bool DCMSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
+
+        bool FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory,
+                                    iDynTree::Transform &smoothedFootTrajectory, const iDynTree::Twist adaptedFeetTwist,
+                                    const iDynTree::Twist desiredFootTwist, iDynTree::Twist &smoothedFootTwist);
+
     };
 };
 #endif

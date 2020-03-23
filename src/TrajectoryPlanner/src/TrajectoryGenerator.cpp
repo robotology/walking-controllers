@@ -93,6 +93,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double landingVelocity = config.check("stepLandingVelocity", yarp::os::Value(0.0)).asDouble();
     double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asDouble();
     double comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
+    m_nominalCoMHeight=comHeight;
     double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
     double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asDouble();
     double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asDouble();
@@ -125,7 +126,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
-    unicyclePlanner->addTerminalStep(false);
+    unicyclePlanner->addTerminalStep(true);
     unicyclePlanner->startWithLeft(m_swingLeft);
     unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
 
@@ -150,6 +151,48 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
     m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
+
+    // step adjustment
+    std::shared_ptr<UnicyclePlanner> unicyclePlannerStepAdj = m_trajectoryGeneratorStepAdj.unicyclePlanner();
+    ok = ok && unicyclePlannerStepAdj->setDesiredPersonDistance(m_referencePointDistance(0),
+                                                                m_referencePointDistance(1));
+    ok = ok && unicyclePlannerStepAdj->setControllerGain(unicycleGain);
+    ok = ok && unicyclePlannerStepAdj->setMaximumIntegratorStepSize(m_dT);
+    ok = ok && unicyclePlannerStepAdj->setMaxStepLength(maxStepLength);
+    ok = ok && unicyclePlannerStepAdj->setWidthSetting(minWidth, m_nominalWidth);
+    ok = ok && unicyclePlannerStepAdj->setMaxAngleVariation(maxAngleVariation);
+    ok = ok && unicyclePlannerStepAdj->setCostWeights(positionWeight, timeWeight);
+    ok = ok && unicyclePlannerStepAdj->setStepTimings(minStepDuration,
+                                               maxStepDuration, nominalDuration);
+    ok = ok && unicyclePlannerStepAdj->setPlannerPeriod(m_dT);
+    ok = ok && unicyclePlannerStepAdj->setMinimumAngleForNewSteps(minAngleVariation);
+    ok = ok && unicyclePlannerStepAdj->setMinimumStepLength(minStepLength);
+    ok = ok && unicyclePlannerStepAdj->setSlowWhenTurnGain(slowWhenTurningGain);
+    unicyclePlannerStepAdj->addTerminalStep(true);
+    unicyclePlannerStepAdj->startWithLeft(m_swingLeft);
+    unicyclePlannerStepAdj->resetStartingFootIfStill(startWithSameFoot);
+
+    ok = ok && m_trajectoryGeneratorStepAdj.setSwitchOverSwingRatio(switchOverSwingRatio);
+    ok = ok && m_trajectoryGeneratorStepAdj.setTerminalHalfSwitchTime(lastStepSwitchTime);
+    ok = ok && m_trajectoryGeneratorStepAdj.setPauseConditions(maxStepDuration, nominalDuration);
+
+    if (m_useMinimumJerk) {
+        m_feetGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addFeetMinimumJerkGenerator();
+    } else {
+        m_feetGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addFeetCubicSplineGenerator();
+    }
+    ok = ok && m_feetGeneratorStepAdj->setStepHeight(stepHeight);
+    ok = ok && m_feetGeneratorStepAdj->setFootLandingVelocity(landingVelocity);
+    ok = ok && m_feetGeneratorStepAdj->setFootApexTime(apexTime);
+    ok = ok && m_feetGeneratorStepAdj->setPitchDelta(pitchDelta);
+
+    m_heightGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addCoMHeightTrajectoryGenerator();
+    ok = ok && m_heightGeneratorStepAdj->setCoMHeightSettings(comHeight, comHeightDelta);
+    ok = ok && m_trajectoryGeneratorStepAdj.setMergePointRatio(mergePointRatio);
+
+    m_dcmGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addDCMTrajectoryGenerator();
+    m_dcmGeneratorStepAdj->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
+    m_dcmGeneratorStepAdj->setOmega(sqrt(9.81/comHeight));
 
     m_correctLeft = true;
 
@@ -496,6 +539,22 @@ bool TrajectoryGenerator::isTrajectoryAsked()
     return m_generatorState == GeneratorState::Called;
 }
 
+bool TrajectoryGenerator::generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
+                                                             const double &initTime)
+{
+    DCMInitialState initialState;
+    initialState.initialPosition = m_DCMBoundaryConditionAtMergePointPosition;
+    initialState.initialVelocity = m_DCMBoundaryConditionAtMergePointVelocity;
+
+    if (!m_dcmGeneratorStepAdj->setDCMInitialState(initialState))
+    {
+        yError() << "[TrajectoryGenerator_Thread] Failed to set the initial state.";
+        return  false;
+    }
+
+    return m_trajectoryGeneratorStepAdj.generateFromFootPrints(left, right, initTime, m_dT);
+}
+
 bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
 {
     if(!isTrajectoryComputed())
@@ -505,6 +564,31 @@ bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2
     }
 
     DCMPositionTrajectory = m_dcmGenerator->getDCMPosition();
+    return true;
+}
+
+bool TrajectoryGenerator::getDCMPositionTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
+{
+    DCMPositionTrajectory = m_dcmGeneratorStepAdj->getDCMPosition();
+    return true;
+}
+
+bool TrajectoryGenerator::getDCMVelocityTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory)
+{
+    DCMVelocityTrajectory = m_dcmGeneratorStepAdj->getDCMVelocity();
+    return true;
+}
+
+
+bool TrajectoryGenerator::getZMPPositionTrajectory(std::vector<iDynTree::Vector2>& ZMPPositionTrajectory)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getZMPPositionTrajectory] No trajectories are available";
+        return false;
+    }
+
+    ZMPPositionTrajectory = m_dcmGenerator->getZMPPosition();
     return true;
 }
 
@@ -518,6 +602,11 @@ bool TrajectoryGenerator::getDCMVelocityTrajectory(std::vector<iDynTree::Vector2
 
     DCMVelocityTrajectory = m_dcmGenerator->getDCMVelocity();
     return true;
+}
+
+bool TrajectoryGenerator::getDCMSubTrajectory(std::vector<std::shared_ptr<GeneralSupportTrajectory>> & dcmSubTrajectories)
+{
+    dcmSubTrajectories= m_dcmGenerator->getDCMSubTrajectories();
 }
 
 bool TrajectoryGenerator::getFeetTrajectories(std::vector<iDynTree::Transform>& lFootTrajectory,
@@ -545,6 +634,19 @@ bool TrajectoryGenerator::getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
 
     m_feetGenerator->getFeetTwistsInMixedRepresentation(lFootTwist, rFootTwist);
 
+    return true;
+}
+
+bool TrajectoryGenerator::getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAcceleration,
+                                              std::vector<iDynTree::SpatialAcc>& rFootAcceleration)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getFeetAcceleration] No trajectories are available";
+        return false;
+    }
+
+    m_feetGenerator->getFeetAccelerationInMixedRepresentation(lFootAcceleration, rFootAcceleration);
     return true;
 }
 
@@ -595,6 +697,68 @@ bool TrajectoryGenerator::getCoMHeightVelocity(std::vector<double>& CoMHeightVel
     }
 
     m_heightGenerator->getCoMHeightVelocity(CoMHeightVelocity);
+    return true;
+}
+
+bool TrajectoryGenerator::getWeightPercentage(std::vector<double> &weightInLeft,
+                                              std::vector<double> &weightInRight)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getWeightPercentage] No trajectories are available";
+        return false;
+    }
+
+    m_dcmGenerator->getWeightPercentage(weightInLeft, weightInRight);
+    return true;
+}
+
+bool TrajectoryGenerator::getStepPhases(std::vector<StepPhase> &leftPhases, std::vector<StepPhase> &rightPhases)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getStepPhases] No trajectories are available";
+        return false;
+    }
+
+    m_trajectoryGenerator.getStepPhases(leftPhases,rightPhases);
+        return true;
+}
+
+bool TrajectoryGenerator::getLeftFootprint(std::shared_ptr<FootPrint>& leftFootPrint)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getLeftFootprint] No trajectories are available";
+        return false;
+    }
+    leftFootPrint=m_trajectoryGenerator.getLeftFootPrint();
+
+    return true;
+}
+
+bool TrajectoryGenerator::getRightFootprint(std::shared_ptr<FootPrint>& rightFootPrint)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getRightFootprint] No trajectories are available";
+        return false;
+    }
+    rightFootPrint=m_trajectoryGenerator.getRightFootPrint();
+
+    return true;
+}
+
+bool TrajectoryGenerator::getNominalCoMHeight(double& nominalCoMHeight)
+{
+    nominalCoMHeight=m_nominalCoMHeight;
+    return true;
+}
+
+
+bool TrajectoryGenerator::getSwitchOverSwingRatio(double& switchOverSwingRatio)
+{
+    switchOverSwingRatio=m_switchOverSwingRatio;
     return true;
 }
 
