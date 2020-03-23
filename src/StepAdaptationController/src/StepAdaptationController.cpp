@@ -63,7 +63,7 @@ StepAdaptationController::StepAdaptationController()
     m_isFirstTime = true;
 }
 
-bool StepAdaptationController::Configure(const yarp::os::Searchable &config)
+bool StepAdaptationController::configure(const yarp::os::Searchable &config)
 {
 
     if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",  m_zmpPositionWeight))
@@ -244,7 +244,7 @@ void StepAdaptationController::setCurrentDcmPosition(const iDynTree::Vector2& cu
     m_currentDcmPosition = currentDcmPosition;
 }
 
-bool StepAdaptationController::solve(bool isLeft)
+bool StepAdaptationController::solve(SwingFoot swingFoot)
 {
 
     // generate the convex hull
@@ -261,7 +261,7 @@ bool StepAdaptationController::solve(bool isLeft)
     std::vector<iDynTree::Transform> feetTransforms;
     feetTransforms.push_back(m_footTransform);
 
-    if(isLeft)
+    if(swingFoot==SwingFoot::Left)
     {
 
         if(!m_convexHullComputer.buildConvexHull(xAxis, yAxis, planeOrigin,

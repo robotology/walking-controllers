@@ -40,11 +40,18 @@ struct footTrajectoryGenerationInput{
     iDynTree::Twist currentFootTwist;
 };
 
+
 /**
  * StepAdaptationController class contains the controller instances.
  */
 namespace WalkingControllers
 {
+
+/**
+ * Enumerator for understanding which foot is in  the swing phase.
+ */
+    enum class SwingFoot{Left,Right};
+
     class StepAdaptationController
     {
         /**
@@ -140,14 +147,14 @@ namespace WalkingControllers
          * @param config yarp searchable configuration variable.
          * @return true/false in case of success/failure
          */
-        bool Configure(const yarp::os::Searchable& config);
+        bool configure(const yarp::os::Searchable& config);
 
         /**
          * Solve the Optimization problem. If the QPSolver is not set It will be initialized.
          * @param isLeft is true if left foot is the swing foot
          * @return true/false in case of success/failure.
          */
-        bool solve(bool isLeft);
+        bool solve(SwingFoot swingFoot);
 
         /**
          * Reset the controller
