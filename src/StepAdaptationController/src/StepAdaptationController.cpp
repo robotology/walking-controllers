@@ -86,7 +86,7 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
     m_feetExtendedPolygon.resize(2);
     iDynTree::Polygon foot;
     iDynTree::Vector4 nextZmpConstraintBoundLeftFoot;
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_left_foot  ",  nextZmpConstraintBoundLeftFoot))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_left_foot",  nextZmpConstraintBoundLeftFoot))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
@@ -109,7 +109,7 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
     m_feetExtendedPolygon[0] = foot;
 
     iDynTree::Vector4 nextZmpConstraintBoundRightFoot;
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_right_foot  ", nextZmpConstraintBoundRightFoot))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_right_foot", nextZmpConstraintBoundRightFoot))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
