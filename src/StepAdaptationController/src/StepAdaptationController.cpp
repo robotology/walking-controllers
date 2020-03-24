@@ -51,7 +51,7 @@ StepAdaptationController::StepAdaptationController()
     m_constraintsMatrix(1, 4) = 1;
     m_constraintsMatrix(6, 2) = 1;
 
-    m_hessianMatrix.resize(m_inputSize, m_numberOfConstraints);
+    m_hessianMatrix.resize(m_inputSize, m_inputSize);
     m_solution.resize(m_inputSize);
 
     // qpoases
@@ -65,19 +65,19 @@ StepAdaptationController::StepAdaptationController()
 bool StepAdaptationController::configure(const yarp::os::Searchable &config)
 {
 
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",  m_zmpPositionWeight))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",m_zmpPositionWeight))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_dcm_offset_weight",  m_dcmOffsetWeight))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_dcm_offset_weight",m_dcmOffsetWeight))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
-    if(!YarpUtilities::getNumberFromSearchable(config, "sigma_weight", m_sigmaWeight))
+    if(!YarpUtilities::getNumberFromSearchable(config, "sigma_weight",m_sigmaWeight))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the number";
         return false;

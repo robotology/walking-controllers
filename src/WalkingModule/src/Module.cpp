@@ -958,7 +958,8 @@ bool WalkingModule::updateModule()
                     }
 
                 }
-                else{
+                else
+                {
                     if (m_pushRecoveryActiveIndex<=5)
                     {
                         m_pushRecoveryActiveIndex=0;
@@ -992,10 +993,11 @@ bool WalkingModule::updateModule()
                 {
                 swingFoot=SwingFoot::Left;
                 }
-                else if (!m_rightInContact.front())
+                else
                 {
                 swingFoot=SwingFoot::Right;
                 }
+
                 if(!m_stepAdapter->solve(swingFoot))
                 {
                     yError() << "unable to solve the problem step adjustment";
@@ -1371,7 +1373,16 @@ bool WalkingModule::updateModule()
             m_isPushActiveVec(0)=m_isPushActive;
             m_isPushActiveVec(1)=m_indexSmoother;
             m_isPushActiveVec(2)= m_kDCMSmoother;
-            m_isPushActiveVec(3)= m_stepAdapter->getDesiredImpactTime()-(m_time - timeOffset);
+
+            if (m_useStepAdaptation)
+            {
+                m_isPushActiveVec(3)= m_stepAdapter->getDesiredImpactTime()-(m_time - timeOffset);
+            }
+            else
+            {
+                m_isPushActiveVec(3)=0;
+            }
+
             m_isPushActiveVec(4)=m_timeIndexAfterPushDetection;
             m_isPushActiveVec(5)=m_pushRecoveryActiveIndex;
 
