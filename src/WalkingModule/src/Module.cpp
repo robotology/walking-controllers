@@ -846,14 +846,28 @@ bool WalkingModule::updateModule()
                     TempPitch=0;
                 }
 
-                if (leftArmRollError>m_stepAdapter->getRollPitchErrorThreshold()(0) && m_leftInContact.front())
+                if (leftArmRollError>m_stepAdapter->getRollPitchErrorThreshold()(0) )
                 {
-                    TempRoll=1*leftArmRollError;
+                    if (m_leftInContact.front())
+                    {
+                        TempRoll=1*leftArmRollError;
+                    }
+                    if (m_rightInContact.front())
+                    {
+                        TempRoll=-1*leftArmRollError;
+                    }
                     m_isRollActive=1;
                 }
-                else if( rightArmRollError>m_stepAdapter->getRollPitchErrorThreshold()(0) && m_rightInContact.front())
+                else if( rightArmRollError>m_stepAdapter->getRollPitchErrorThreshold()(0) )
                 {
-                    TempRoll=-1*rightArmRollError;
+                    if (m_rightInContact.front())
+                    {
+                        TempRoll=-1*rightArmRollError;
+                    }
+                    if (m_leftInContact.front())
+                    {
+                        TempRoll=+1*rightArmRollError;
+                    }
                     m_isRollActive=1;
                 }
                 else
