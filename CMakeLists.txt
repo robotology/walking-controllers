@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 ## MAIN project
 project(WalkingControllers
-  VERSION 0.3.0)
+  VERSION 0.4.101)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
