@@ -97,9 +97,10 @@ namespace WalkingControllers
         /**
          * Generate the first trajectory.
          * This method has to be called before updateTrajectories() method
+         * @param initialPosition Intitial position of the base that will be recicved form gazebo base data
          * @return true/false in case of success/failure.
          */
-        bool generateFirstTrajectories();
+        bool generateFirstTrajectories(const iDynTree::Position& initialBasePosition = iDynTree::Position::Zero());
 
         /**
          * Generate the first trajectory.

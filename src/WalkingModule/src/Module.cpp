@@ -451,6 +451,13 @@ bool WalkingModule::updateModule()
 
     if(m_robotState == WalkingFSM::Preparing)
     {
+
+        if(!m_robotControlHelper->getFeedbacksRaw(100))
+            {
+                yError() << "[updateModule] Unable to get the feedback.";
+                return false;
+            }
+
         bool motionDone = false;
         if(!m_robotControlHelper->checkMotionDone(motionDone))
         {
@@ -462,16 +469,6 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
-            // send the reference again in order to reduce error
-            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-            {
-                yError() << "[prepareRobot] Error while setting the initial position using "
-                         << "POSITION DIRECT mode.";
-                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
-                reset();
-                m_robotState = WalkingFSM::Stopped;
-                return true;
-            }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
@@ -490,7 +487,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(10))
+            if(!m_robotControlHelper->getFeedbacks(100))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -580,7 +577,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(10))
+        if(!m_robotControlHelper->getFeedbacks(100))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -888,7 +885,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(10))
+    if(!m_robotControlHelper->getFeedbacksRaw(100))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1026,10 +1023,21 @@ bool WalkingModule::generateFirstTrajectories()
         return false;
     }
 
-    if(!m_trajectoryGenerator->generateFirstTrajectories())
+    if(m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
-        return false;
+        if(!m_trajectoryGenerator->generateFirstTrajectories(m_robotControlHelper->getBaseTransform().getPosition()))
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
+    }
+    else
+    {
+        if(!m_trajectoryGenerator->generateFirstTrajectories())
+        {
+            yError() << "[WalkingModule::generateFirstTrajectories] Failed while retrieving new trajectories from the unicycle";
+            return false;
+        }
     }
 
     if(!updateTrajectories(0))
@@ -1134,12 +1142,21 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
 bool WalkingModule::updateFKSolver()
 {
-    if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
-                                                      m_rightTrajectory.front(),
-                                                      m_isLeftFixedFrame.front()))
+    if(!m_robotControlHelper->isExternalRobotBaseUsed())
     {
-        yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
-        return false;
+        if(!m_FKSolver->evaluateWorldToBaseTransformation(m_leftTrajectory.front(),
+                                                          m_rightTrajectory.front(),
+                                                          m_isLeftFixedFrame.front()))
+        {
+            yError() << "[WalkingModule::updateFKSolver] Unable to evaluate the world to base transformation.";
+            return false;
+        }
+    }
+    else
+    {
+        m_FKSolver->evaluateWorldToBaseTransformation(m_robotControlHelper->getBaseTransform(),
+                                                      m_robotControlHelper->getBaseTwist());
+
     }
 
     if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
@@ -1188,7 +1205,19 @@ bool WalkingModule::startWalking()
 
     // if the robot was only prepared the filters has to be reseted
     if(m_robotState == WalkingFSM::Prepared)
+    {
         m_robotControlHelper->resetFilters();
+
+        updateFKSolver();
+
+         if (m_robotControlHelper->isExternalRobotBaseUsed())
+         {
+             double heightOffset = (m_FKSolver->getLeftFootToWorldTransform().getPosition()(2)
+                                    + m_FKSolver->getRightFootToWorldTransform().getPosition()(2)) / 2;
+             m_robotControlHelper->setHeightOffset(heightOffset);
+         }
+
+     }
 
     if (!m_robotControlHelper->setInteractionMode())
     {

@@ -99,6 +99,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
                                                yarp::os::Value(0.4)).asDouble();
     double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
+    double lastStepDCMOffset = config.check("lastStepDCMOffset", yarp::os::Value(0.0)).asDouble();
 
     m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
 
@@ -150,6 +151,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
     m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
+    ok = ok && m_dcmGenerator->setLastStepDCMOffsetPercentage(lastStepDCMOffset);
 
     m_correctLeft = true;
 
@@ -272,7 +274,7 @@ void TrajectoryGenerator::computeThread()
     }
 }
 
-bool TrajectoryGenerator::generateFirstTrajectories()
+bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& initialBasePosition)
 {
     // check if this step is the first one
     {
@@ -297,11 +299,11 @@ bool TrajectoryGenerator::generateFirstTrajectories()
     double endTime = initTime + m_plannerHorizon;
 
     // at the beginning iCub has to stop
-    m_desiredPoint(0) = m_referencePointDistance(0);
-    m_desiredPoint(1) = m_referencePointDistance(1);
+    m_desiredPoint(0) = m_referencePointDistance(0) + initialBasePosition(0);
+    m_desiredPoint(1) = m_referencePointDistance(1) + initialBasePosition(1);
 
     // add the initial point
-    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_referencePointDistance))
+    if(!unicyclePlanner->addDesiredTrajectoryPoint(initTime, m_desiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
