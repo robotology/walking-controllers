@@ -612,6 +612,19 @@ bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
     return true;
 }
 
+bool TrajectoryGenerator::getWeightPercentage(std::vector<double> &weightInLeft,
+                                              std::vector<double> &weightInRight)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getWeightPercentage] No trajectories are available";
+        return false;
+    }
+
+    m_dcmGenerator->getWeightPercentage(weightInLeft, weightInRight);
+    return true;
+}
+
 void TrajectoryGenerator::reset()
 {
     // the mutex is automatically released when lock_guard goes out of its scope

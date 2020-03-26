@@ -217,6 +217,17 @@ namespace WalkingControllers
         bool getMergePoints(std::vector<size_t>& mergePoints);
 
         /**
+         * Get the weight percentage for the left and right foot
+         * @param weightInLeft vector containing the weight on the left foot (0 in case in case of
+         * stance foot during SS, 1 in case of swing foot)
+         * @param weightInRight vector containing the weight on the right foot (0 in case in case of
+         * stance foot during SS, 1 in case of swing foot)
+         * @return true/false in case of success/failure.
+         */
+        bool getWeightPercentage(std::vector<double> &weightInLeft, std::vector<double> &weightInRight);
+
+
+        /**
          * Reset the planner
          */
         void reset();
