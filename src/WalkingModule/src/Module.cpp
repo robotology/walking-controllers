@@ -147,8 +147,6 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
 bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 {
 
-        m_leftAdaptedStepParameters.zero();
-        m_errorOfLastDCMPushDetection.zero();
         m_pushRecoveryActiveIndex=0;
         m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
         // TODO REMOVE ME
@@ -179,9 +177,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_adaptatedFootRightTransform.setRotation(tempRot);
         m_smoothedFootRightTransform.setRotation(tempRot);
 
-        m_nominalValuesLeft.zero();
-        m_nominalValuesRight.zero();
-        m_currentValues.zero();
         m_DCMPositionSmoothed.zero();
         m_DCMPositionAdjusted.push_back(m_DCMPositionSmoothed);
         m_DCMVelocityAdjusted.push_back(m_DCMPositionSmoothed);

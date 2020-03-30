@@ -176,9 +176,12 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGeneratorStepAdj.setTerminalHalfSwitchTime(lastStepSwitchTime);
     ok = ok && m_trajectoryGeneratorStepAdj.setPauseConditions(maxStepDuration, nominalDuration);
 
-    if (m_useMinimumJerk) {
+    if (m_useMinimumJerk)
+    {
         m_feetGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addFeetMinimumJerkGenerator();
-    } else {
+    }
+    else
+    {
         m_feetGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addFeetCubicSplineGenerator();
     }
     ok = ok && m_feetGeneratorStepAdj->setStepHeight(stepHeight);
@@ -732,8 +735,8 @@ bool TrajectoryGenerator::getLeftFootprint(std::shared_ptr<FootPrint>& leftFootP
         yError() << "[getLeftFootprint] No trajectories are available";
         return false;
     }
-    leftFootPrint=m_trajectoryGenerator.getLeftFootPrint();
 
+    leftFootPrint=m_trajectoryGenerator.getLeftFootPrint();
     return true;
 }
 
@@ -744,8 +747,8 @@ bool TrajectoryGenerator::getRightFootprint(std::shared_ptr<FootPrint>& rightFoo
         yError() << "[getRightFootprint] No trajectories are available";
         return false;
     }
-    rightFootPrint=m_trajectoryGenerator.getRightFootPrint();
 
+    rightFootPrint=m_trajectoryGenerator.getRightFootPrint();
     return true;
 }
 

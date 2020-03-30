@@ -25,15 +25,15 @@ namespace WalkingControllers
     {
         double m_omega; /**< Inverted time constant of the 3D-LIPM. */
         double m_mass; /**< Mass of the robot. */
-        iDynTree::Vector2 m_dcmEstimatedPosition; /**< Position of the DCM. */
+        iDynTree::Vector2 m_dcmEstimatedPosition; /**< Position of the estimated DCM. */
         iDynTree::Vector2 m_dcmPosition; /**< Position of the DCM. */
         iDynTree::Vector2 m_dcmVelocity; /**< Velocity of the dcm. */
 
     public:
 
         /**
-         * Initialize the DCMEstimator.
-         * @param config config of the 3D-LIPM;
+         * Config the DCMEstimator.
+         * @param config config of the simple DCM estimator;
          * @return true on success, false otherwise.
          */
         bool configure(const yarp::os::Searchable& config);
