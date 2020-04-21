@@ -23,6 +23,9 @@
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
+#include <iDynTree/Core/Transform.h>
+#include <iDynTree/Core/Twist.h>
+#include <iDynTree/Core/SpatialAcc.h>
 
 // WalkingControllers library
 #include <WalkingControllers/RobotInterface/Helper.h>
@@ -100,10 +103,10 @@ namespace WalkingControllers
         int m_pushRecoveryActiveIndex;/**< The number of control cycles that push recovery is active? */
         double m_kDCMSmoother;/**< The gain for smoothing of the DCM trajectories */
         double m_kFootSmoother;/**< The gain for smoothing of the feet trajectories */
-        int m_indexSmoother;/**< The gain for smoothing of the feet trajectories */
-        int m_indexFootSmoother;/**< The index for smoothing of the feet trajectories */
-        int m_timeIndexAfterPushDetection;
-        int m_FootTimeIndexAfterPushDetection;
+        int m_indexSmoother;/**< The index for the control cycle number of the  DCM trajectories smoothing */
+        int m_indexFootSmoother;/**< The index for the control cycle number of the  feet trajectories smoothing */
+        int m_timeIndexAfterPushDetection;/**< The index for the control cycle number after detecting the push that is used for DCM smoothing*/
+        int m_FootTimeIndexAfterPushDetection;/**< The index for the control cycle number after detecting the push that is used for feet trajectory smoothing*/
 
         iDynTree::Transform m_smoothedFootLeftTransform;/**< The smoothed transform of left foot after adaptation. */
         iDynTree::Transform m_smoothedFootRightTransform;/**< The smoothed transform of right foot after adaptation. */
@@ -286,6 +289,11 @@ namespace WalkingControllers
          */
         void reset();
 
+        bool dcmSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
+
+        bool feetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory,
+                                    iDynTree::Transform &smoothedFootTrajectory, const iDynTree::Twist adaptedFeetTwist,
+                                    const iDynTree::Twist desiredFootTwist, iDynTree::Twist &smoothedFootTwist);
     public:
 
         /**
@@ -344,12 +352,6 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         virtual bool stopWalking() override;
-
-        bool DCMSmoother(const iDynTree::Vector2 adaptedDCM, const iDynTree::Vector2 desiredDCM, iDynTree::Vector2 &smoothedDCM);
-
-        bool FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform, const iDynTree::Transform desiredFootTrajectory,
-                                    iDynTree::Transform &smoothedFootTrajectory, const iDynTree::Twist adaptedFeetTwist,
-                                    const iDynTree::Twist desiredFootTwist, iDynTree::Twist &smoothedFootTwist);
 
     };
 };

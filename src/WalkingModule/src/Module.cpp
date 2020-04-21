@@ -746,14 +746,14 @@ bool WalkingModule::updateModule()
             if (!m_leftInContact.front() || !m_rightInContact.front())
             {
                 if(!m_leftInContact.front()){
-                    if (!FeetTrajectorySmoother(m_adaptatedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform,m_adaptatedFootLeftTwist,m_leftTwistTrajectory.front(),m_smoothedFootLeftTwist)) {
+                    if (!feetTrajectorySmoother(m_adaptatedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform,m_adaptatedFootLeftTwist,m_leftTwistTrajectory.front(),m_smoothedFootLeftTwist)) {
                         yError()<<"the Left Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
                     }
                 }
 
                 if(!m_rightInContact.front())
                 {
-                    if (!FeetTrajectorySmoother(m_adaptatedFootRightTransform,m_rightTrajectory.front(),m_smoothedFootRightTransform,m_adaptatedFootRightTwist,m_rightTwistTrajectory.front(),m_smoothedFootRightTwist)) {
+                    if (!feetTrajectorySmoother(m_adaptatedFootRightTransform,m_rightTrajectory.front(),m_smoothedFootRightTransform,m_adaptatedFootRightTwist,m_rightTwistTrajectory.front(),m_smoothedFootRightTwist)) {
                         yError()<<"the Right Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
                     }
                 }
@@ -767,7 +767,7 @@ bool WalkingModule::updateModule()
                 m_smoothedFootRightTwist=m_adaptatedFootRightTwist;
             }
 
-            if (!DCMSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed))
+            if (!dcmSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed))
             {
                 yError()<<"the DCM smoother can not evaluate the smoothed DCM!";
             }
@@ -1018,7 +1018,6 @@ bool WalkingModule::updateModule()
                 {
                     double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +m_stepAdapter->getDesiredImpactTime()-(m_time - timeOffset);
                     m_indexSmoother=timeOfSmoothing/m_dT;
-                    m_indexSmoother=m_indexSmoother;
                     m_kDCMSmoother=0;
                 }
                 if(m_pushRecoveryActiveIndex==(5+1))
@@ -2008,7 +2007,7 @@ bool WalkingModule::stopWalking()
     return true;
 }
 
-bool WalkingModule::FeetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform,const iDynTree::Transform desiredFootTransform,iDynTree::Transform& smoothedFootTransform ,
+bool WalkingModule::feetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform,const iDynTree::Transform desiredFootTransform,iDynTree::Transform& smoothedFootTransform ,
                                            const iDynTree::Twist adaptedFeetTwist,const iDynTree::Twist desiredFootTwist,iDynTree::Twist& smoothedFootTwist)
 {
 
@@ -2045,7 +2044,7 @@ bool WalkingModule::FeetTrajectorySmoother(const iDynTree::Transform adaptedFeet
     return true;
 }
 
-bool WalkingModule::DCMSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM )
+bool WalkingModule::dcmSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM )
 {
     if(m_pushRecoveryActiveIndex<6 )
     {
