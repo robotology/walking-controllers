@@ -24,14 +24,14 @@ bool DCMSimpleEstimator::configure(const yarp::os::Searchable& config)
 {
     if(config.isNull())
     {
-        yError() << "[initialize] Empty configuration for Step Adaptation Utils.";
+        yError() << "[DCMSimpleEstimator::configure] Empty configuration.";
         return false;
     }
 
     double comHeight;
     if(!YarpUtilities::getNumberFromSearchable(config, "com_height", comHeight))
     {
-        yError() << "[initialize] Unable to get a double from a searchable.";
+        yError() << "[DCMSimpleEstimator::configure] Unable to get CoM height from configuration file. ";
         return false;
     }
     double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
@@ -40,7 +40,7 @@ bool DCMSimpleEstimator::configure(const yarp::os::Searchable& config)
     return true;
 }
 
-bool DCMSimpleEstimator::pendulumEstimator(iDynTree::Rotation footOrientation,iDynTree::Vector3 zmp,iDynTree::Vector3 com,iDynTree::LinVelocity CoMVelocity3d)
+bool DCMSimpleEstimator::update(const iDynTree::Rotation& footOrientation,const iDynTree::Vector3& zmp,const iDynTree::Vector3& com,const iDynTree::LinVelocity& CoMVelocity3d)
 {
     iDynTree::Vector3 CoMPositionEstimated;
     iDynTree::toEigen(CoMPositionEstimated)=iDynTree::toEigen(zmp)+iDynTree::toEigen(footOrientation)*(iDynTree::toEigen(com)-iDynTree::toEigen(zmp));

@@ -890,7 +890,7 @@ bool WalkingModule::updateModule()
             CoMVelocity3d(1)=m_stableDCMModel->getCoMVelocity()(1);
             CoMVelocity3d(2)=0;
 
-            if(!m_DCMEstimator->pendulumEstimator(StanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
+            if(!m_DCMEstimator->update(StanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
             {
                 yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
                 return false;
@@ -1132,8 +1132,8 @@ bool WalkingModule::updateModule()
 
                 std::vector<iDynTree::Vector2> DCMPositionAdjusted;
                 std::vector<iDynTree::Vector2> DCMVelocityAdjusted;
-                m_trajectoryGenerator->getDCMPositionTrajectoryAdj(DCMPositionAdjusted);
-                m_trajectoryGenerator->getDCMVelocityTrajectoryAdj(DCMVelocityAdjusted);
+                m_trajectoryGenerator->getDCMPositionTrajectoryAdjusted(DCMPositionAdjusted);
+                m_trajectoryGenerator->getDCMVelocityTrajectoryAdjusted(DCMVelocityAdjusted);
 
                 size_t startIndexOfDCMAdjusted = (size_t)round((m_time - timeOffset) / m_dT);
 
@@ -1783,7 +1783,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     if (m_useStepAdaptation)
     {
         m_DCMSubTrajectories.clear();
-        m_trajectoryGenerator->getDCMSubTrajectory(m_DCMSubTrajectories);
+        m_trajectoryGenerator->getDCMSubTrajectories(m_DCMSubTrajectories);
 
         std::shared_ptr<FootPrint> tempLeft;
         m_trajectoryGenerator->getLeftFootprint(tempLeft);

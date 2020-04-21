@@ -234,14 +234,14 @@ namespace WalkingControllers
         * @param DCMPositionTrajectory desired trajectory of the DCM adjustment.
         * @return true/false in case of success/failure.
         */
-        bool getDCMPositionTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMPositionTrajectory);
+        bool getDCMPositionTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMPositionTrajectory);
 
         /**
          * Get the desired 2D-DCM velocity trajectory
          * @param DCMVelocityTrajectory desired trajectory of the DCM adjustment Velocity.
          * @return true/false in case of success/failure.
          */
-        bool getDCMVelocityTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory);
+        bool getDCMVelocityTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory);
 
         /**
         * Get the desired 2D-ZMP position trajectory
@@ -255,7 +255,7 @@ namespace WalkingControllers
          * @param dcmSubTrajectories desired trajectories.
          * @return true/false in case of success/failure.
          */
-        bool getDCMSubTrajectory(std::vector<std::shared_ptr<GeneralSupportTrajectory>>& dcmSubTrajectories);
+        bool getDCMSubTrajectories(std::vector<std::shared_ptr<GeneralSupportTrajectory>>& dcmSubTrajectories);
 
         /**
          * Get the weight on the left on the right foot is a number that goes from 0 to 1
@@ -288,7 +288,6 @@ namespace WalkingControllers
          * @param rightPhases vector containing all the phases that right foot experience.
          * @return true/false in case of success/failure.
          */
-
         bool getStepPhases(std::vector<StepPhase> &leftPhases, std::vector<StepPhase> &rightPhases);
 
         /**

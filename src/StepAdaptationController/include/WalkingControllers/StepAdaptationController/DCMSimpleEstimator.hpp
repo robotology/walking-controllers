@@ -52,7 +52,7 @@ namespace WalkingControllers
          * @param CoMVelocity3d the vector of com velocity.
          * @return true/false in case of success/failure
          */
-        bool pendulumEstimator(iDynTree::Rotation footOrientation, iDynTree::Vector3 zmp, iDynTree::Vector3 com, iDynTree::LinVelocity CoMVelocity3d);
+        bool update(const iDynTree::Rotation& footOrientation,const iDynTree::Vector3& zmp,const iDynTree::Vector3& com,const iDynTree::LinVelocity& CoMVelocity3d);
     };
 };
 

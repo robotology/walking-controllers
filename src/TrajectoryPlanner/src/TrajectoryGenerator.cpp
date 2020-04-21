@@ -570,13 +570,13 @@ bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2
     return true;
 }
 
-bool TrajectoryGenerator::getDCMPositionTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
+bool TrajectoryGenerator::getDCMPositionTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
 {
     DCMPositionTrajectory = m_dcmGeneratorStepAdj->getDCMPosition();
     return true;
 }
 
-bool TrajectoryGenerator::getDCMVelocityTrajectoryAdj(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory)
+bool TrajectoryGenerator::getDCMVelocityTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory)
 {
     DCMVelocityTrajectory = m_dcmGeneratorStepAdj->getDCMVelocity();
     return true;
@@ -607,7 +607,7 @@ bool TrajectoryGenerator::getDCMVelocityTrajectory(std::vector<iDynTree::Vector2
     return true;
 }
 
-bool TrajectoryGenerator::getDCMSubTrajectory(std::vector<std::shared_ptr<GeneralSupportTrajectory>> & dcmSubTrajectories)
+bool TrajectoryGenerator::getDCMSubTrajectories(std::vector<std::shared_ptr<GeneralSupportTrajectory>> & dcmSubTrajectories)
 {
     dcmSubTrajectories= m_dcmGenerator->getDCMSubTrajectories();
 }
