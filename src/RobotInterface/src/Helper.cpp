@@ -32,7 +32,7 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
     {
         currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
         absoluteJointErrorRad = std::fabs(iDynTreeUtilities::shortestAngularDistance(currentJointPositionRad,
-                                                                                  desiredJointPositionsRad(i)));
+                                                                                     desiredJointPositionsRad(i)));
         if(m_currentModeofJoints.at(i)==yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF)
         {
             if(absoluteJointErrorRad > worstError.second)
@@ -295,8 +295,8 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
 
     if(!m_robotDevice.view(m_InteractionInterface) || !m_InteractionInterface)
     {
-             yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
-            return false;
+        yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+        return false;
     }
 
     // resize the buffers
@@ -385,25 +385,25 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     }
 
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
-        if(m_useExternalRobotBase)
+    if(m_useExternalRobotBase)
+    {
+        m_robotBasePort.open("/" + name + "/robotBase:i");
+        // connect port
+
+        std::string floatingBasePortName;
+        if(!YarpUtilities::getStringFromSearchable(config, "floating_base_port_name", floatingBasePortName))
         {
-            m_robotBasePort.open("/" + name + "/robotBase:i");
-            // connect port
-
-            std::string floatingBasePortName;
-            if(!YarpUtilities::getStringFromSearchable(config, "floating_base_port_name", floatingBasePortName))
-            {
-                yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
-                return false;
-            }
-
-            if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
-            {
-                yError() << "Unable to connect to port " << "/" + name + "/robotBase:i";
-                return false;
-            }
+            yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
+            return false;
         }
-        m_heightOffset = 0;
+
+        if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/robotBase:i";
+            return false;
+        }
+    }
+    m_heightOffset = 0;
 
     return true;
 }
@@ -431,9 +431,9 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
     // open and connect left foot wrench
     if(!YarpUtilities::getStringFromSearchable(config, "leftFootWrenchInputPort_name", portInput))
     {
-      yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get "
-                  "the string from searchable.";
-      return false;
+        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get "
+            "the string from searchable.";
+        return false;
     }
     if(!YarpUtilities::getStringFromSearchable(config, "leftFootWrenchOutputPort_name", portOutput))
     {
@@ -570,7 +570,7 @@ bool RobotInterface::switchToControlMode(const int& controlMode)
 }
 
 bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                                        const double& positioningTimeSec)
+                                           const double& positioningTimeSec)
 {
     if(m_controlMode != VOCAB_CM_POSITION)
     {
@@ -591,10 +591,10 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
     }
 
     if(m_InteractionInterface == nullptr)
-        {
-            yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
-            return false;
-        }
+    {
+        yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
+        return false;
+    }
 
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
@@ -632,7 +632,7 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
     {
         currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
         absoluteJointErrorRad = std::fabs(iDynTreeUtilities::shortestAngularDistance(currentJointPositionRad,
-                                                                                  desiredJointPositionsRad(i)));
+                                                                                     desiredJointPositionsRad(i)));
         refSpeeds[i] = std::max(3.0, iDynTree::rad2deg(absoluteJointErrorRad) / positioningTimeSec);
     }
 
@@ -884,7 +884,7 @@ bool RobotInterface::setInteractionMode()
         return false;
     }
 
-        m_currentModeofJoints = m_isJointModeStiffVector;
+    m_currentModeofJoints = m_isJointModeStiffVector;
 
     return true;
 }

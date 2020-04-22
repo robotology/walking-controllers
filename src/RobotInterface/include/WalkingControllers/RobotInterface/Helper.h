@@ -67,9 +67,9 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
         iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
         iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
-         std::vector<yarp::dev::InteractionModeEnum> m_isJointModeStiffVector;/**< Joint is in the stiff or compliance mode */
-         std::vector<yarp::dev::InteractionModeEnum> m_JointModeStiffVectorDefult;/**< All the joints are in the stiff  mode */
-         std::vector<yarp::dev::InteractionModeEnum> m_currentModeofJoints;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
+        std::vector<yarp::dev::InteractionModeEnum> m_isJointModeStiffVector;/**< Joint is in the stiff or compliance mode */
+        std::vector<yarp::dev::InteractionModeEnum> m_JointModeStiffVectorDefult;/**< All the joints are in the stiff  mode */
+        std::vector<yarp::dev::InteractionModeEnum> m_currentModeofJoints;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
 
         // yarp::sig::Vector m_positionFeedbackDegFiltered;
         yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
@@ -242,9 +242,9 @@ namespace WalkingControllers
         const iDynTree::Twist& getBaseTwist() const;
 
         /**
-       * Set the height of the offset coming from the base estimation
+         * Set the height of the offset coming from the base estimation
          * @param offset of the height of the base in meters
-        */
+         */
         void setHeightOffset(const double& offset);
 
         /**
