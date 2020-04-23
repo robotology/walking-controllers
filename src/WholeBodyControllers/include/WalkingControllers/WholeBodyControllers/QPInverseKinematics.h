@@ -93,7 +93,7 @@ namespace WalkingControllers
 
         int m_numberOfVariables; /**<Number of variables in the QP problem (# of joints + 6) */
         int m_numberOfConstraints; /**<Number of constraints in the QP problem (# of joints + 12) */
-        int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
+        unsigned int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
 
         iDynTree::VectorDynSize m_jointRegularizationGains;  /**< Gain related to the joint regularization. */
         iDynTree::VectorDynSize m_jointRetargetingGains;  /**< Gain related to the joint regularization. */
@@ -113,6 +113,8 @@ namespace WalkingControllers
                                                            in the gradient evaluation ($-\lambda H'$). */
         double m_kJointLimitsUpperBound; /**< Gain related to the the joint upper bound */
         double m_kJointLimitsLowerBound; /**< Gain related to the the joint lower bound */
+        double m_maxHandLinearVelocity{-1.0}; /**< Upperbound for the linear hand velocity defined by the controller and used as reference in the QP-IK. Negative value to disable the check */
+        double m_maxHandAngularVelocity{-1.0}; /**< Upperbound for the angular hand velocity defined by the controller and used as reference in the QP-IK. Negative value to disable the check */
         iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Bounds on the joint velocities*/
         iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Upper Bounds on the joint position*/
         iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Lower Bounds on the joint position*/

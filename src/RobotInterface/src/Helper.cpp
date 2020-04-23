@@ -33,10 +33,13 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
         currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
         absoluteJointErrorRad = std::fabs(iDynTreeUtilities::shortestAngularDistance(currentJointPositionRad,
                                                                                   desiredJointPositionsRad(i)));
-        if(absoluteJointErrorRad > worstError.second)
+        if(m_currentModeofJoints.at(i)==yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF)
         {
-            worstError.first = i;
-            worstError.second = absoluteJointErrorRad;
+            if(absoluteJointErrorRad > worstError.second)
+            {
+                worstError.first =i;
+                worstError.second = absoluteJointErrorRad;
+            }
         }
     }
     return true;
@@ -55,6 +58,8 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
     bool okLeftWrench = false;
     bool okRightWrench = false;
+
+    bool okBaseEstimation = !m_useExternalRobotBase;
 
     unsigned int attempt = 0;
     do
@@ -87,7 +92,27 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             }
         }
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench)
+        if(!okBaseEstimation)
+        {
+            yarp::sig::Vector *base = NULL;
+            base = m_robotBasePort.read(false);
+            if(base != NULL)
+            {
+                m_robotBaseTransform.setPosition(iDynTree::Position((*base)(0),
+                                                                    (*base)(1),
+                                                                    (*base)(2) - m_heightOffset));
+
+                m_robotBaseTransform.setRotation(iDynTree::Rotation::RPY((*base)(3),
+                                                                         (*base)(4),
+                                                                         (*base)(5)));
+
+                m_robotBaseTwist.setLinearVec3(iDynTree::Vector3(base->data() + 6, 3));
+                m_robotBaseTwist.setAngularVec3(iDynTree::Vector3(base->data() + 6 + 3, 3));
+                okBaseEstimation = true;
+            }
+        }
+
+        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation)
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -123,6 +148,9 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
     if(!okRightWrench)
         yError() << "\t - Right wrench";
+
+    if(!okBaseEstimation)
+        yError() << "\t - Base estimation";
 
     return false;
 }
@@ -198,6 +226,29 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    m_isJointModeStiffVector.resize(m_actuatedDOFs);
+    m_JointModeStiffVectorDefult.resize(m_actuatedDOFs);
+    m_jointModes.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorOfBooleanFromSearchable(config,"joint_is_stiff_mode",m_jointModes))
+    {
+        yError() << "[RobotInterface::configureRobot] Unable to find joint_is_stiff_mode into config file.";
+        return false;
+    }
+
+    for (unsigned int i=0;i<m_actuatedDOFs;i++)
+    {
+        m_JointModeStiffVectorDefult.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+        if(m_jointModes[i])
+        {
+            m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+        }
+        else
+        {
+            m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT;
+        }
+    }
+    m_currentModeofJoints=m_JointModeStiffVectorDefult;
+
     // open the device
     if(!m_robotDevice.open(options))
     {
@@ -240,6 +291,12 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     {
         yError() << "[configureRobot] Cannot obtain IControlMode interface";
         return false;
+    }
+
+    if(!m_robotDevice.view(m_InteractionInterface) || !m_InteractionInterface)
+    {
+             yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+            return false;
     }
 
     // resize the buffers
@@ -326,6 +383,28 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
         m_jointPositionsLowerBounds(i) = iDynTree::deg2rad(minAngle);
 
     }
+
+    m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
+        if(m_useExternalRobotBase)
+        {
+            m_robotBasePort.open("/" + name + "/robotBase:i");
+            // connect port
+
+            std::string floatingBasePortName;
+            if(!YarpUtilities::getStringFromSearchable(config, "floating_base_port_name", floatingBasePortName))
+            {
+                yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
+                return false;
+            }
+
+            if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
+            {
+                yError() << "Unable to connect to port " << "/" + name + "/robotBase:i";
+                return false;
+            }
+        }
+        m_heightOffset = 0;
+
     return true;
 }
 
@@ -419,7 +498,7 @@ bool RobotInterface::configurePIDHandler(const yarp::os::Bottle& config)
 
 bool RobotInterface::resetFilters()
 {
-    if(!getFeedbacksRaw())
+    if(!getFeedbacksRaw(100))
     {
         yError() << "[RobotInterface::resetFilters] Unable to get the feedback from the robot";
         return false;
@@ -510,6 +589,12 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
         yError() << "[RobotInterface::setPositionReferences] Position I/F is not ready.";
         return false;
     }
+
+    if(m_InteractionInterface == nullptr)
+        {
+            yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
+            return false;
+        }
 
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
@@ -712,6 +797,7 @@ bool RobotInterface::close()
     m_leftWrenchPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
+    m_InteractionInterface->setInteractionModes(m_JointModeStiffVectorDefult.data());
     if(!m_robotDevice.close())
     {
         yError() << "[RobotInterface::close] Unable to close the device.";
@@ -769,3 +855,37 @@ WalkingPIDHandler& RobotInterface::getPIDHandler()
 {
     return *m_PIDHandler;
 }
+
+const iDynTree::Transform& RobotInterface::getBaseTransform() const
+{
+    return m_robotBaseTransform;
+}
+
+const iDynTree::Twist& RobotInterface::getBaseTwist() const
+{
+    return m_robotBaseTwist;
+}
+
+void RobotInterface::setHeightOffset(const double& offset)
+{
+    m_heightOffset = offset;
+}
+
+bool RobotInterface::isExternalRobotBaseUsed()
+{
+    return m_useExternalRobotBase;
+}
+
+bool RobotInterface::setInteractionMode()
+{
+    if(!m_InteractionInterface->setInteractionModes(m_isJointModeStiffVector.data()))
+    {
+        yError() << "[RobotInterface::setInteractionMode] Error while setting the interaction modes of the joints";
+        return false;
+    }
+
+        m_currentModeofJoints = m_isJointModeStiffVector;
+
+    return true;
+}
+

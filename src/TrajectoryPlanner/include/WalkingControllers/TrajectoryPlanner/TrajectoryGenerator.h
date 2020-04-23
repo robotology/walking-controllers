@@ -97,9 +97,10 @@ namespace WalkingControllers
         /**
          * Generate the first trajectory.
          * This method has to be called before updateTrajectories() method
+         * @param initialPosition Intitial position of the base that will be recicved form gazebo base data
          * @return true/false in case of success/failure.
          */
-        bool generateFirstTrajectories();
+        bool generateFirstTrajectories(const iDynTree::Position& initialBasePosition = iDynTree::Position::Zero());
 
         /**
          * Generate the first trajectory.
@@ -214,6 +215,17 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool getMergePoints(std::vector<size_t>& mergePoints);
+
+        /**
+         * Get the weight percentage for the left and right foot
+         * @param weightInLeft vector containing the weight on the left foot (0 in case in case of
+         * stance foot during SS, 1 in case of swing foot)
+         * @param weightInRight vector containing the weight on the right foot (0 in case in case of
+         * stance foot during SS, 1 in case of swing foot)
+         * @return true/false in case of success/failure.
+         */
+        bool getWeightPercentage(std::vector<double> &weightInLeft, std::vector<double> &weightInRight);
+
 
         /**
          * Reset the planner

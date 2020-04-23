@@ -8,6 +8,7 @@
 
 #include <ctime>
 #include <iostream>
+#include <string>
 
 #include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
