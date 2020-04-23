@@ -322,14 +322,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
-    // TODO please remove me. Counters are evil
-    double stancePhaseTimeOutSeconds = rf.check("stance_phase_time_out",yarp::os::Value(0.5)).asDouble();
-
-    m_stancePhaseMaxCounter = (int) std::round(stancePhaseTimeOutSeconds/m_dT);
-
-    yInfo() << "m_stancePhaseMaxCounter " << m_stancePhaseMaxCounter
-            << " stancePhaseTimeOutSeconds " << stancePhaseTimeOutSeconds;
-
     yInfo() << "[WalkingModule::configure] Ready to play!";
 
     return true;
@@ -386,7 +378,7 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
                               iDynTree::VectorDynSize &output)
 {
     bool ok = true;
-    solver->setPhase(m_isStancePhase);
+    solver->setPhase(m_isStancePhase.front());
 
     ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
                                 m_FKSolver->getLeftFootToWorldTransform(),
@@ -601,22 +593,6 @@ bool WalkingModule::updateModule()
             }
         }
 
-        // check if the stance phase is started
-        double treshold = 0.01;
-        if(m_isStancePhaseStarting &&
-           iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < treshold)
-        {
-            m_stancePhaseCounter--;
-            if(m_stancePhaseCounter == 0)
-            {
-                m_isStancePhase = true;
-                m_isStancePhaseStarting = false;
-            }
-        }
-
-        // TODO remove me
-        yInfo() << "m_isStancePhase " << m_isStancePhase << " isStancePhaseStarting " << m_isStancePhaseStarting << " m_stancePhaseCounter " << m_stancePhaseCounter;
-
         // get feedbacks and evaluate useful quantities
         if(!m_robotControlHelper->getFeedbacks(100))
         {
@@ -624,7 +600,7 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        m_retargetingClient->setPhase(m_isStancePhase);
+        m_retargetingClient->setPhase(m_isStancePhase.front());
         m_retargetingClient->getFeedback();
 
         if(!updateFKSolver())
@@ -695,7 +671,7 @@ bool WalkingModule::updateModule()
         // inner COM-ZMP controller
         // if the the norm of desired DCM velocity is lower than a threshold then the robot
         // is stopped
-        m_walkingZMPController->setPhase(m_isStancePhase);
+        m_walkingZMPController->setPhase(m_isStancePhase.front());
 
         iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
@@ -1143,6 +1119,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<double> comHeightVelocity;
     std::vector<size_t> mergePoints;
     std::vector<bool> isLeftFixedFrame;
+    std::vector<bool> isStancePhase;
 
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
@@ -1161,6 +1138,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get merge points
     m_trajectoryGenerator->getMergePoints(mergePoints);
 
+    // get stance phase flags
+    m_trajectoryGenerator->getIsStancePhase(isStancePhase);
+
     // append vectors to deques
     StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
@@ -1176,6 +1156,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
     StdUtilities::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
+
+    StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 
@@ -1335,20 +1317,6 @@ bool WalkingModule::setPlannerInput(double x, double y)
     m_newTrajectoryRequired = true;
 
     double treshold = 0.01;
-    // the robot is about to move
-    if(iDynTree::toEigen(m_desiredPosition).norm() > treshold)
-    {
-        m_isStancePhase = false;
-        m_isStancePhaseStarting = false;
-    }
-    else
-    {
-        // if the stance phase has not started reset the counter
-        if(!m_isStancePhaseStarting)
-            m_stancePhaseCounter = m_stancePhaseMaxCounter;
-
-        m_isStancePhaseStarting = true;
-    }
 
     return true;
 }

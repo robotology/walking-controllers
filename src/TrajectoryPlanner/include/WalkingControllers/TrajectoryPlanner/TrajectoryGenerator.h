@@ -46,6 +46,7 @@ namespace WalkingControllers
 
         double m_dT; /**< Sampling time of the planner. */
         double m_plannerHorizon; /**< Horizon of the planner. */
+        std::size_t m_stancePhaseDelay; /**< Delay in ticks of the beginning of the stance phase. */
 
         double m_nominalWidth; /**< Nominal width between two feet. */
         double m_initTime; /**< Init time of the current trajectory. */
@@ -226,6 +227,15 @@ namespace WalkingControllers
          */
         bool getWeightPercentage(std::vector<double> &weightInLeft, std::vector<double> &weightInRight);
 
+        /**
+         * Get the weight percentage for the left and right foot
+         * @param weightInLeft vector containing the weight on the left foot (0 in case in case of
+         * stance foot during SS, 1 in case of swing foot)
+         * @param weightInRight vector containing the weight on the right foot (0 in case in case of
+         * stance foot during SS, 1 in case of swing foot)
+         * @return true/false in case of success/failure.
+         */
+        bool getIsStancePhase(std::vector<bool>& isStancePhase);
 
         /**
          * Reset the planner
