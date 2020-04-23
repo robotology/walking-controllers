@@ -36,14 +36,14 @@ namespace WalkingControllers
     {
     private:
 
-        typedef struct
+        struct RetargetingElement
         {
             yarp::sig::Vector yarpVector;
             std::unique_ptr<iCub::ctrl::minJerkTrajGen> smoother;
             yarp::os::BufferedPort<yarp::sig::Vector> port;
             double smoothingTimeInApproaching;
             double smoothingTimeInWalking;
-        } retargetingElement;
+        };
 
         bool m_useHandRetargeting; /**< True if the hand retargeting is used */
         bool m_useVirtualizer; /**< True if the virtualizer is used */
@@ -51,20 +51,20 @@ namespace WalkingControllers
         bool m_useCoMHeightRetargeting; /**< True if the com retargeting is used */
 
         iDynTree::Transform m_leftHandTransform; /**< Desired left hand transform */
-        retargetingElement m_leftHand; /**< Left hand retargeting element */
+        RetargetingElement m_leftHand; /**< Left hand retargeting element */
 
         iDynTree::Transform m_rightHandTransform; /**< Desired right hand transform */
-        retargetingElement m_rightHand; /**< Right hand retargeting element */
+        RetargetingElement m_rightHand; /**< Right hand retargeting element */
 
         double m_comHeightValue;
         double m_comHeightInputZero;
         double m_comHeightVelocity;
         double m_comConstantHeight;
-        retargetingElement m_comHeight;
+        RetargetingElement m_comHeight;
 
         std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
         iDynTree::VectorDynSize m_jointRetargetingValue; /**< Values of the retarget Joints. */
-        retargetingElement m_jointRetargeting; /**< Joint retargeting element */
+        RetargetingElement m_jointRetargeting; /**< Joint retargeting element */
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
