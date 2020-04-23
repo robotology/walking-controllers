@@ -38,7 +38,11 @@ namespace WalkingControllers
     {
         yarp::dev::PolyDriver m_robotDevice; /**< Main robot device. */
         std::vector<std::string> m_axesList; /**< Vector containing the name of the controlled joints. */
-        std::vector<bool> m_dangerousJoints; /**< Vector containing the the information related to the importance of the joint. */
+
+        std::vector<yarp::dev::InteractionModeEnum> m_jointInteractionMode;/**< Joint is in the stiff or compliance mode */
+        std::vector<yarp::dev::InteractionModeEnum> m_currentJointInteractionMode;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
+
+        std::vector<bool> m_isGoodTrackingRequired; /**< Vector containing the the information related to the importance of the joint. */
         unsigned int m_actuatedDOFs; /**< Number of the actuated DoFs. */
 
         // YARP Interfaces exposed by the remotecontrolboardremapper
@@ -48,7 +52,7 @@ namespace WalkingControllers
         yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
         yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
         yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
-        yarp::dev::IInteractionMode *m_InteractionInterface{nullptr}; /**< Stiff/compliant mode interface. */
+        yarp::dev::IInteractionMode *m_interactionInterface{nullptr}; /**< Stiff/compliant mode interface. */
 
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
@@ -67,10 +71,6 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
         iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
         iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
-        std::vector<yarp::dev::InteractionModeEnum> m_isJointModeStiffVector;/**< Joint is in the stiff or compliance mode */
-        std::vector<yarp::dev::InteractionModeEnum> m_JointModeStiffVectorDefult;/**< All the joints are in the stiff  mode */
-        std::vector<yarp::dev::InteractionModeEnum> m_currentModeofJoints;/**< Joint is in the stiff or compliance mode based on the walking architecture phases */
-
         // yarp::sig::Vector m_positionFeedbackDegFiltered;
         yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
@@ -88,8 +88,6 @@ namespace WalkingControllers
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_leftWrenchFilter; /**< Left wrench low pass filter.*/
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
         bool m_useWrenchFilter; /**< True if the wrench filter is used. */
-
-        std::vector<bool>  m_jointModes; /**< True if the joint is in the stiff mode */
 
         double m_startingPositionControlTime;
         bool m_positionMoveSkipped;
@@ -118,6 +116,10 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool switchToControlMode(const int& controlMode);
+
+        bool setInteractionMode(yarp::dev::InteractionModeEnum interactionMode);
+
+        bool setInteractionMode(std::vector<yarp::dev::InteractionModeEnum>& interactionModes);
     public:
 
         /**
@@ -224,10 +226,10 @@ namespace WalkingControllers
         WalkingPIDHandler& getPIDHandler();
 
         /**
-         * Set the intraction mode of the joints(stiff/compliant).
+         * Set the intraction mode stored in the configuration
          * @return true in case of success and false otherwise.
          */
-        bool setInteractionMode();
+        bool loadCustomInteractionMode();
 
         /**
          * Get the base Transform from external software.

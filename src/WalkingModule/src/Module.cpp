@@ -1272,7 +1272,7 @@ bool WalkingModule::startWalking()
 
      }
 
-    if (!m_robotControlHelper->setInteractionMode())
+    if (!m_robotControlHelper->loadCustomInteractionMode())
     {
         yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
         return false;
