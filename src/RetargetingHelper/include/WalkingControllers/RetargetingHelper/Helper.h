@@ -36,6 +36,7 @@ namespace WalkingControllers
     {
     private:
 
+        template <class Data>
         struct RetargetingElement
         {
             yarp::sig::Vector yarpVector;
@@ -43,6 +44,7 @@ namespace WalkingControllers
             yarp::os::BufferedPort<yarp::sig::Vector> port;
             double smoothingTimeInApproaching;
             double smoothingTimeInWalking;
+            Data data;
         };
 
         bool m_useHandRetargeting; /**< True if the hand retargeting is used */
@@ -50,21 +52,20 @@ namespace WalkingControllers
         bool m_useJointRetargeting; /**< True if the joint retargeting is used */
         bool m_useCoMHeightRetargeting; /**< True if the com retargeting is used */
 
-        iDynTree::Transform m_leftHandTransform; /**< Desired left hand transform */
-        RetargetingElement m_leftHand; /**< Left hand retargeting element */
+        RetargetingElement<iDynTree::Transform> m_leftHand; /**< Left hand retargeting element */
+        RetargetingElement<iDynTree::Transform> m_rightHand; /**< Right hand retargeting element */
 
-        iDynTree::Transform m_rightHandTransform; /**< Desired right hand transform */
-        RetargetingElement m_rightHand; /**< Right hand retargeting element */
-
-        double m_comHeightValue;
         double m_comHeightInputZero;
-        double m_comHeightVelocity;
         double m_comConstantHeight;
-        RetargetingElement m_comHeight;
+        struct SecondOrder
+        {
+            double position;
+            double velocity;
+        };
+        RetargetingElement<SecondOrder> m_comHeight;
 
         std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
-        iDynTree::VectorDynSize m_jointRetargetingValue; /**< Values of the retarget Joints. */
-        RetargetingElement m_jointRetargeting; /**< Joint retargeting element */
+        RetargetingElement<iDynTree::VectorDynSize> m_jointRetargeting; /**< Joint retargeting element */
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 

@@ -53,7 +53,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         return false;
     }
 
-    m_jointRetargetingValue.resize(controlledJointsName.size());
+    m_jointRetargeting.data.resize(controlledJointsName.size());
     m_jointRetargeting.yarpVector.resize(controlledJointsName.size());
 
     if(!m_useHandRetargeting && !m_useVirtualizer &&
@@ -70,52 +70,48 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     }
 
     std::string portName;
+    double smoothingTimeApproching;
+    double smoothingTimeWalking;
     if(m_useHandRetargeting)
     {
         const yarp::os::Bottle& option = config.findGroup("HAND_RETARGETING");
 
-        // open left hand port
-        if(!YarpUtilities::getStringFromSearchable(option, "left_hand_transform_port_name",
-                                                   portName))
+        auto initializeHand = [&](auto& hand, const std::string& portNameLabel) -> bool
         {
-            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+            // open left hand port
+            if(!YarpUtilities::getStringFromSearchable(config, portNameLabel,
+                                                       portName))
+            {
+                yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
+                return false;
+            }
+            hand.port.open("/" + name + portName);
+
+
+            if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time_approaching", smoothingTimeApproching))
+            {
+                yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+                return false;
+            }
+            hand.smoothingTimeInApproaching = smoothingTimeApproching;
+
+
+            if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time_walking", smoothingTimeWalking))
+            {
+                yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+                return false;
+            }
+            hand.smoothingTimeInWalking = smoothingTimeWalking;
+
+            hand.yarpVector.resize(6);
+            hand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, hand.smoothingTimeInApproaching);
+
+            return true;
+        };
+
+        if(!initializeHand(m_leftHand, "left_hand_transform_port_name")
+           || !initializeHand(m_rightHand, "right_hand_transform_port_name"))
             return false;
-        }
-        m_leftHand.port.open("/" + name + portName);
-
-        // open right hand port
-        if(!YarpUtilities::getStringFromSearchable(option, "right_hand_transform_port_name",
-                                                   portName))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
-            return false;
-        }
-        m_rightHand.port.open("/" + name + portName);
-
-        m_leftHand.yarpVector.resize(6);
-        m_rightHand.yarpVector.resize(6);
-
-        double smoothingTimeApproching;
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching", smoothingTimeApproching))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-            return false;
-        }
-        m_leftHand.smoothingTimeInApproaching = smoothingTimeApproching;
-        m_rightHand.smoothingTimeInApproaching = smoothingTimeApproching;
-
-
-        double smoothingTimeWalking;
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", smoothingTimeWalking))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-            return false;
-        }
-        m_leftHand.smoothingTimeInWalking = smoothingTimeWalking;
-        m_rightHand.smoothingTimeInWalking = smoothingTimeWalking;
-
-        m_leftHand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, m_leftHand.smoothingTimeInApproaching);
-        m_rightHand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, m_rightHand.smoothingTimeInApproaching);
     }
 
     if(m_useJointRetargeting)
@@ -219,35 +215,34 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
                               const iDynTree::VectorDynSize& jointValues,
                               const double& comHeight)
 {
-    m_leftHandTransform = leftHandTransform;
-    m_rightHandTransform = rightHandTransform;
+    m_leftHand.data = leftHandTransform;
+    m_rightHand.data = rightHandTransform;
 
     if(m_useHandRetargeting)
     {
-        iDynTree::toEigen(m_leftHand.yarpVector).segment<3>(0) =
-            iDynTree::toEigen(m_leftHandTransform.getPosition());
+        auto resetHandSmoother = [](auto& hand)
+        {
+            iDynTree::toEigen(hand.yarpVector).template segment<3>(0) =
+            iDynTree::toEigen(hand.data.getPosition());
 
-        iDynTree::toEigen(m_leftHand.yarpVector).segment<3>(3) =
-            iDynTree::toEigen(m_leftHandTransform.getRotation().asRPY());
+            iDynTree::toEigen(hand.yarpVector).template segment<3>(3) =
+            iDynTree::toEigen(hand.data.getRotation().asRPY());
 
-        iDynTree::toEigen(m_rightHand.yarpVector).segment<3>(0) =
-            iDynTree::toEigen(m_rightHandTransform.getPosition());
+            hand.smoother->init(hand.yarpVector);
+        };
 
-        iDynTree::toEigen(m_rightHand.yarpVector).segment<3>(3) =
-            iDynTree::toEigen(m_rightHandTransform.getRotation().asRPY());
-
-        m_leftHand.smoother->init(m_leftHand.yarpVector);
-        m_rightHand.smoother->init(m_rightHand.yarpVector);
+        resetHandSmoother(m_leftHand);
+        resetHandSmoother(m_rightHand);
     }
 
     // joint retargeting
-    m_jointRetargetingValue = jointValues;
+    m_jointRetargeting.data = jointValues;
     iDynTree::toEigen(m_jointRetargeting.yarpVector) = iDynTree::toEigen(jointValues);
     if (m_useJointRetargeting)
         m_jointRetargeting.smoother->init(m_jointRetargeting.yarpVector);
 
-    m_comHeightValue = comHeight;
-    m_comHeightVelocity = 0;
+    m_comHeight.data.position = comHeight;
+    m_comHeight.data.velocity = 0;
     m_comConstantHeight = comHeight;
 
     if(m_useCoMHeightRetargeting)
@@ -289,19 +284,18 @@ void RetargetingClient::getFeedback()
 {
     if(m_useHandRetargeting)
     {
-        auto desiredLeftHandPose = m_leftHand.port.read(false);
-        if(desiredLeftHandPose != nullptr)
-            m_leftHand.yarpVector = *desiredLeftHandPose;
+        auto getHandFeedback = [this](auto& hand)
+        {
+            auto desiredHandPose = hand.port.read(false);
+            if(desiredHandPose != nullptr)
+                hand.yarpVector = *desiredHandPose;
 
-        m_leftHand.smoother->computeNextValues(m_leftHand.yarpVector);
-        convertYarpVectorPoseIntoTransform(m_leftHand.smoother->getPos(), m_leftHandTransform);
+            hand.smoother->computeNextValues(hand.yarpVector);
+            convertYarpVectorPoseIntoTransform(hand.smoother->getPos(), hand.data);
+        };
 
-        auto desiredRightHandPose = m_rightHand.port.read(false);
-        if(desiredRightHandPose != nullptr)
-            m_rightHand.yarpVector = *desiredRightHandPose;
-
-        m_rightHand.smoother->computeNextValues(m_rightHand.yarpVector);
-        convertYarpVectorPoseIntoTransform(m_rightHand.smoother->getPos(), m_rightHandTransform);
+        getHandFeedback(m_leftHand);
+        getHandFeedback(m_rightHand);
     }
 
     if(m_useJointRetargeting)
@@ -314,7 +308,7 @@ void RetargetingClient::getFeedback()
         }
 
         m_jointRetargeting.smoother->computeNextValues(m_jointRetargeting.yarpVector);
-        iDynTree::toEigen(m_jointRetargetingValue) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
+        iDynTree::toEigen(m_jointRetargeting.data) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
     }
 
 
@@ -332,8 +326,8 @@ void RetargetingClient::getFeedback()
         }
 
         m_comHeight.smoother->computeNextValues(m_comHeight.yarpVector);
-        m_comHeightValue = m_comHeight.smoother->getPos()(0);
-        m_comHeightVelocity = m_comHeight.smoother->getVel()(0);
+        m_comHeight.data.position = m_comHeight.smoother->getPos()(0);
+        m_comHeight.data.velocity = m_comHeight.smoother->getVel()(0);
     }
 
     // check if the approaching phase is finished
@@ -349,27 +343,27 @@ void RetargetingClient::getFeedback()
 
 const iDynTree::Transform& RetargetingClient::leftHandTransform() const
 {
-    return m_leftHandTransform;
+    return m_leftHand.data;
 }
 
 const iDynTree::Transform& RetargetingClient::rightHandTransform() const
 {
-    return m_rightHandTransform;
+    return m_rightHand.data;
 }
 
 const iDynTree::VectorDynSize& RetargetingClient::jointValues() const
 {
-    return m_jointRetargetingValue;
+    return m_jointRetargeting.data;
 }
 
 double RetargetingClient::comHeight() const
 {
-    return m_comHeightValue;
+    return m_comHeight.data.position;
 }
 
 double RetargetingClient::comHeightVelocity() const
 {
-    return m_comHeightVelocity;
+    return m_comHeight.data.velocity;
 }
 
 void RetargetingClient::close()
