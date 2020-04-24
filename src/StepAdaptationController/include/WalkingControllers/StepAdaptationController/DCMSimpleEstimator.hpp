@@ -21,6 +21,10 @@
 
 namespace WalkingControllers
 {
+/**
+ * The theory related to this simple estimator has been discussed in the following github issue:
+ *https://github.com/robotology/walking-controllers/issues/61
+*/
     class DCMSimpleEstimator
     {
         double m_omega; /**< Inverted time constant of the 3D-LIPM. */
@@ -47,9 +51,9 @@ namespace WalkingControllers
         /**
          * run the pendulum estimator
          * @param footOrientation the orientation of stance foot.
-         * @param zmp the vector of zmp position.
-         * @param com the vector of com position.
-         * @param CoMVelocity3d the vector of com velocity.
+         * @param zmp the vector of zmp position with respect to the inertial frame.
+         * @param com the vector of com position with respect to the inertial frame.
+         * @param CoMVelocity3d the vector of com velocity that is simple time derivative of the com position.
          * @return true/false in case of success/failure
          */
         bool update(const iDynTree::Rotation& footOrientation,const iDynTree::Vector3& zmp,const iDynTree::Vector3& com,const iDynTree::LinVelocity& CoMVelocity3d);
