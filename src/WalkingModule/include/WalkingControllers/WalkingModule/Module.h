@@ -127,6 +127,7 @@ namespace WalkingControllers
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
+        std::unique_ptr<TrajectoryGenerator> m_trajectoryGeneratorStepAdjustment; /**< Pointer to the trajectory generator object. */
         std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
         std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */

@@ -152,51 +152,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
     m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
 
-    // step adjustment
-    std::shared_ptr<UnicyclePlanner> unicyclePlannerStepAdj = m_trajectoryGeneratorStepAdj.unicyclePlanner();
-    ok = ok && unicyclePlannerStepAdj->setDesiredPersonDistance(m_referencePointDistance(0),
-                                                                m_referencePointDistance(1));
-    ok = ok && unicyclePlannerStepAdj->setControllerGain(unicycleGain);
-    ok = ok && unicyclePlannerStepAdj->setMaximumIntegratorStepSize(m_dT);
-    ok = ok && unicyclePlannerStepAdj->setMaxStepLength(maxStepLength);
-    ok = ok && unicyclePlannerStepAdj->setWidthSetting(minWidth, m_nominalWidth);
-    ok = ok && unicyclePlannerStepAdj->setMaxAngleVariation(maxAngleVariation);
-    ok = ok && unicyclePlannerStepAdj->setCostWeights(positionWeight, timeWeight);
-    ok = ok && unicyclePlannerStepAdj->setStepTimings(minStepDuration,
-                                               maxStepDuration, nominalDuration);
-    ok = ok && unicyclePlannerStepAdj->setPlannerPeriod(m_dT);
-    ok = ok && unicyclePlannerStepAdj->setMinimumAngleForNewSteps(minAngleVariation);
-    ok = ok && unicyclePlannerStepAdj->setMinimumStepLength(minStepLength);
-    ok = ok && unicyclePlannerStepAdj->setSlowWhenTurnGain(slowWhenTurningGain);
-    unicyclePlannerStepAdj->addTerminalStep(true);
-    unicyclePlannerStepAdj->startWithLeft(m_swingLeft);
-    unicyclePlannerStepAdj->resetStartingFootIfStill(startWithSameFoot);
-
-    ok = ok && m_trajectoryGeneratorStepAdj.setSwitchOverSwingRatio(switchOverSwingRatio);
-    ok = ok && m_trajectoryGeneratorStepAdj.setTerminalHalfSwitchTime(lastStepSwitchTime);
-    ok = ok && m_trajectoryGeneratorStepAdj.setPauseConditions(maxStepDuration, nominalDuration);
-
-    if (m_useMinimumJerk)
-    {
-        m_feetGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addFeetMinimumJerkGenerator();
-    }
-    else
-    {
-        m_feetGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addFeetCubicSplineGenerator();
-    }
-    ok = ok && m_feetGeneratorStepAdj->setStepHeight(stepHeight);
-    ok = ok && m_feetGeneratorStepAdj->setFootLandingVelocity(landingVelocity);
-    ok = ok && m_feetGeneratorStepAdj->setFootApexTime(apexTime);
-    ok = ok && m_feetGeneratorStepAdj->setPitchDelta(pitchDelta);
-
-    m_heightGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addCoMHeightTrajectoryGenerator();
-    ok = ok && m_heightGeneratorStepAdj->setCoMHeightSettings(comHeight, comHeightDelta);
-    ok = ok && m_trajectoryGeneratorStepAdj.setMergePointRatio(mergePointRatio);
-
-    m_dcmGeneratorStepAdj = m_trajectoryGeneratorStepAdj.addDCMTrajectoryGenerator();
-    m_dcmGeneratorStepAdj->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
-    m_dcmGeneratorStepAdj->setOmega(sqrt(9.81/comHeight));
-
     m_correctLeft = true;
 
     if(ok)
@@ -542,20 +497,16 @@ bool TrajectoryGenerator::isTrajectoryAsked()
     return m_generatorState == GeneratorState::Called;
 }
 
-bool TrajectoryGenerator::generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
-                                                             const double &initTime)
+bool TrajectoryGenerator::generateTrajectoriesFromFootprintsStepAdjustment(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
+                                                             const double &initTime,DCMInitialState initialState)
 {
-    DCMInitialState initialState;
-    initialState.initialPosition = m_DCMBoundaryConditionAtMergePointPosition;
-    initialState.initialVelocity = m_DCMBoundaryConditionAtMergePointVelocity;
-
-    if (!m_dcmGeneratorStepAdj->setDCMInitialState(initialState))
+    if (!m_dcmGenerator->setDCMInitialState(initialState))
     {
         yError() << "[TrajectoryGenerator_Thread] Failed to set the initial state.";
         return  false;
     }
 
-    return m_trajectoryGeneratorStepAdj.generateFromFootPrints(left, right, initTime, m_dT);
+    return m_trajectoryGenerator.generateFromFootPrints(left, right, initTime, m_dT);
 }
 
 bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
@@ -572,13 +523,13 @@ bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2
 
 bool TrajectoryGenerator::getDCMPositionTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
 {
-    DCMPositionTrajectory = m_dcmGeneratorStepAdj->getDCMPosition();
+    DCMPositionTrajectory = m_dcmGenerator->getDCMPosition();
     return true;
 }
 
 bool TrajectoryGenerator::getDCMVelocityTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory)
 {
-    DCMVelocityTrajectory = m_dcmGeneratorStepAdj->getDCMVelocity();
+    DCMVelocityTrajectory = m_dcmGenerator->getDCMVelocity();
     return true;
 }
 
@@ -774,6 +725,15 @@ bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
     }
 
     m_trajectoryGenerator.getMergePoints(mergePoints);
+    return true;
+}
+
+bool TrajectoryGenerator::getDCMBoundaryConditionAtMergePoint(DCMInitialState DCMBoundryConditionAtMergePoint)
+{
+
+    DCMBoundryConditionAtMergePoint.initialPosition = m_DCMBoundaryConditionAtMergePointPosition;
+    DCMBoundryConditionAtMergePoint.initialVelocity = m_DCMBoundaryConditionAtMergePointVelocity;
+
     return true;
 }
 

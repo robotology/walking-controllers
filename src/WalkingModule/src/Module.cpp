@@ -245,9 +245,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
+    m_trajectoryGeneratorStepAdjustment = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
     trajectoryPlannerOptions.append(generalOptions);
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
+    {
+        yError() << "[configure] Unable to initialize the planner.";
+        return false;
+    }
+
+    if(!m_trajectoryGeneratorStepAdjustment->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
         return false;
@@ -421,6 +428,8 @@ void WalkingModule::reset()
 
     m_trajectoryGenerator->reset();
 
+    m_trajectoryGeneratorStepAdjustment->reset();
+
     if(m_dumpData)
         m_walkingLogger->quit();
 }
@@ -449,6 +458,7 @@ bool WalkingModule::close()
 
     // clear all the pointer
     m_trajectoryGenerator.reset(nullptr);
+    m_trajectoryGeneratorStepAdjustment.reset(nullptr);
     m_walkingController.reset(nullptr);
     m_walkingZMPController.reset(nullptr);
     m_IKSolver.reset(nullptr);
@@ -1121,18 +1131,19 @@ bool WalkingModule::updateModule()
 
                     rightTemp->addStep(position, m_jRightFootprints->getSteps()[i].angle, m_jRightFootprints->getSteps()[i].impactTime + adaptedTimeOffset);
                 }
-
+                DCMInitialState tempDCMInitialState;
+                m_trajectoryGenerator->getDCMBoundaryConditionAtMergePoint(tempDCMInitialState);
                 // generate the DCM trajectory
-                if(!m_trajectoryGenerator->generateTrajectoriesFromFootprints(leftTemp, rightTemp, timeOffset))
+                if(!m_trajectoryGeneratorStepAdjustment->generateTrajectoriesFromFootprintsStepAdjustment(leftTemp, rightTemp, timeOffset,tempDCMInitialState))
                 {
-                    yError() << "[WalkingModule::updateModule] unable to generate new trajectorie after step adjustment.";
+                    yError() << "[WalkingModule::updateModule] unable to generatempDCMInitialStatete new trajectorie after step adjustment.";
                     return false;
                 }
 
                 std::vector<iDynTree::Vector2> DCMPositionAdjusted;
                 std::vector<iDynTree::Vector2> DCMVelocityAdjusted;
-                m_trajectoryGenerator->getDCMPositionTrajectoryAdjusted(DCMPositionAdjusted);
-                m_trajectoryGenerator->getDCMVelocityTrajectoryAdjusted(DCMVelocityAdjusted);
+                m_trajectoryGeneratorStepAdjustment->getDCMPositionTrajectoryAdjusted(DCMPositionAdjusted);
+                m_trajectoryGeneratorStepAdjustment->getDCMVelocityTrajectoryAdjusted(DCMVelocityAdjusted);
 
                 size_t startIndexOfDCMAdjusted = (size_t)round((m_time - timeOffset) / m_dT);
 

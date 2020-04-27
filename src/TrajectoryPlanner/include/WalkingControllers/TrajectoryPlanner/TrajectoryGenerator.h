@@ -42,11 +42,6 @@ namespace WalkingControllers
         std::shared_ptr<FeetGenerator> m_feetGenerator;
         bool m_useMinimumJerk;
 
-        UnicycleGenerator m_trajectoryGeneratorStepAdj; /**< UnicycleTrajectoryGenerator object for replanning the dcm after step adaptation */
-        std::shared_ptr<DCMTrajectoryGenerator> m_dcmGeneratorStepAdj;
-        std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGeneratorStepAdj;
-        std::shared_ptr<FeetGenerator> m_feetGeneratorStepAdj;
-
         bool m_swingLeft; /**< True if the first swing foot is the left. */
 
         double m_dT; /**< Sampling time of the planner. */
@@ -278,9 +273,10 @@ namespace WalkingControllers
          * @param left the left foot footprint;
          * @param right the right foot footprint;
          * @param initTime
+         * @param initialState
          * @return true/false in case of success/failure.
          */
-        bool generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime);
+        bool generateTrajectoriesFromFootprintsStepAdjustment(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime, DCMInitialState initialState);
 
         /**
          * Get the phases of each foot during walking from unicycle
@@ -318,6 +314,12 @@ namespace WalkingControllers
           */
          bool getSwitchOverSwingRatio(double &switchOverSwingRatio);
 
+         /**
+          * Get the DCM boundary condition at merge point
+          * @param DCMBoundryConditionAtMergePoint is DCM boundary condition at merge point
+          * @return true/false in case of success/failure.
+          */
+         bool getDCMBoundaryConditionAtMergePoint(DCMInitialState DCMBoundryConditionAtMergePoint);
     };
 };
 
