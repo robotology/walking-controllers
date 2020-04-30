@@ -44,7 +44,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
     m_useCoMHeightRetargeting = config.check("use_com_retargeting", yarp::os::Value(false)).asBool();
 
-    // The approaching phase is set only if the startApproacingPhase method is called
+    // The approaching phase is set only if the startApproachingPhase method is called
     m_isApproachingPhase = false;
 
     if(m_useJointRetargeting && m_useHandRetargeting)
