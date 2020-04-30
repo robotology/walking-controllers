@@ -55,8 +55,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     m_plannerHorizon = config.check("plannerHorizon", yarp::os::Value(20.0)).asDouble();
     double unicycleGain = config.check("unicycleGain", yarp::os::Value(10.0)).asDouble();
-
-    // TODO please remove me. Counters are evil
     double stancePhaseDelaySeconds = config.check("stance_phase_delay",yarp::os::Value(0.0)).asDouble();
 
     m_stancePhaseDelay = (std::size_t) std::round(stancePhaseDelaySeconds / m_dT);
