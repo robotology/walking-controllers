@@ -246,6 +246,16 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
         }
     }
 
+    for (unsigned int i = 0; i < m_actuatedDOFs; i++)
+    {
+        if(m_jointInteractionMode[i] == yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT
+           && m_isGoodTrackingRequired[i])
+        {
+            yWarning() << "[configureRobot] The control mode of the the joint " << m_axesList[i]
+                       << " is set to COMPLIANT. It is not possible to guarantee a good tracking.";
+        }
+    }
+
     // open the device
     if(!m_robotDevice.open(options))
     {
@@ -911,4 +921,3 @@ bool RobotInterface::loadCustomInteractionMode()
 {
     return setInteractionMode(m_jointInteractionMode);
 }
-
