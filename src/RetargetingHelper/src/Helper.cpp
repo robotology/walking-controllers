@@ -217,13 +217,10 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     return true;
 }
 
-bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
-                              const iDynTree::Transform& rightHandTransform,
-                              const iDynTree::VectorDynSize& jointValues,
-                              const double& comHeight)
+bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
 {
-    m_leftHand.data = leftHandTransform;
-    m_rightHand.data = rightHandTransform;
+    m_leftHand.data = kinDynWrapper.getLeftHandToWorldTransform();
+    m_rightHand.data = kinDynWrapper.getRightHandToWorldTransform();
 
     if(m_useHandRetargeting)
     {
@@ -243,18 +240,18 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
     }
 
     // joint retargeting
-    m_jointRetargeting.data = jointValues;
-    iDynTree::toEigen(m_jointRetargeting.yarpReadBuffer) = iDynTree::toEigen(jointValues);
+    m_jointRetargeting.data = kinDynWrapper.getJointPos();
+    iDynTree::toEigen(m_jointRetargeting.yarpReadBuffer) = iDynTree::toEigen(m_jointRetargeting.data);
     if (m_useJointRetargeting)
         m_jointRetargeting.smoother->init(m_jointRetargeting.yarpReadBuffer);
 
-    m_comHeight.data.position = comHeight;
+    m_comHeight.data.position = kinDynWrapper.getCoMPosition()(2);
     m_comHeight.data.velocity = 0;
-    m_comConstantHeight = comHeight;
+    m_comConstantHeight = m_comHeight.data.position;
 
     if(m_useCoMHeightRetargeting)
     {
-        m_comHeight.yarpReadBuffer(0) = comHeight;
+        m_comHeight.yarpReadBuffer(0) = m_comHeight.data.position;
         m_comHeight.smoother->init(m_comHeight.yarpReadBuffer);
 
         // let's read the port to reset the comHeightInput

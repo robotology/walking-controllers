@@ -895,4 +895,3 @@ const iDynTree::VectorDynSize& WalkingQPIK::getGradient() const
 {
     return m_gradient;
 }
-

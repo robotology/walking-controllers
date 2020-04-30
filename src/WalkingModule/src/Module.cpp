@@ -509,12 +509,7 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(!m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
-                                          * m_FKSolver->getLeftHandToWorldTransform(),
-                                          m_FKSolver->getHeadToWorldTransform().inverse()
-                                          * m_FKSolver->getRightHandToWorldTransform(),
-                                          m_robotControlHelper->getJointPosition(),
-                                          m_comHeightTrajectory.front()))
+            if(!m_retargetingClient->reset(*m_FKSolver))
             {
                 yError() << "[WalkingModule::updateModule] Unable to reset the retargeting client.";
                 return false;
@@ -1358,4 +1353,3 @@ bool WalkingModule::stopWalking()
     m_robotState = WalkingFSM::Stopped;
     return true;
 }
-

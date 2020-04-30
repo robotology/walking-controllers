@@ -26,6 +26,8 @@
 // iCub-ctrl
 #include <iCub/ctrl/minJerkCtrl.h>
 
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
+
 namespace WalkingControllers
 {
 
@@ -114,16 +116,11 @@ namespace WalkingControllers
 
         /**
          * Reset the client
-         * @param leftHandTransform head_T_leftHand transform
-         * @param rightHandTransform head_T_rightHand transform
-         * @param jointValues joint values [rad]
-         * @param comHeight height of the CoM
+         * @param kinDynWrapper a wrapper of KinDynComputations useful to get some
+         * informations of the current status of the robot
          * @return true/false in case of success/failure
          */
-        bool reset(const iDynTree::Transform& leftHandTransform,
-                   const iDynTree::Transform& rightHandTransform,
-                   const iDynTree::VectorDynSize& jointValues,
-                   const double& comHeight);
+        bool reset(WalkingFK& kinDynWrapper);
 
         /**
          * Close the client
