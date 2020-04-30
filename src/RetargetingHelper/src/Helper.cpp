@@ -27,7 +27,7 @@ void RetargetingClient::convertYarpVectorPoseIntoTransform(const yarp::sig::Vect
 bool RetargetingClient::initialize(const yarp::os::Searchable &config,
                                    const std::string &name,
                                    const double &period,
-                                   const std::vector<std::string>& controlledJointsName)
+                                   const std::vector<std::string>& controlledJointNames)
 {
     if(config.isNull())
     {
@@ -53,8 +53,8 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         return false;
     }
 
-    m_jointRetargeting.data.resize(controlledJointsName.size());
-    m_jointRetargeting.yarpVector.resize(controlledJointsName.size());
+    m_jointRetargeting.data.resize(controlledJointNames.size());
+    m_jointRetargeting.yarpReadBuffer.resize(controlledJointNames.size());
 
     if(!m_useHandRetargeting && !m_useVirtualizer &&
        !m_useJointRetargeting && !m_useCoMHeightRetargeting)
@@ -103,7 +103,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             }
             hand.smoothingTimeInWalking = smoothingTimeWalking;
 
-            hand.yarpVector.resize(6);
+            hand.yarpReadBuffer.resize(6);
             hand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, hand.smoothingTimeInApproaching);
 
             return true;
@@ -134,8 +134,8 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         // find the indices
         for(const std::string& joint : retargetJointNames)
         {
-            int index = std::distance(controlledJointsName.begin(), std::find(controlledJointsName.begin(),
-                                                                              controlledJointsName.end(),
+            int index = std::distance(controlledJointNames.begin(), std::find(controlledJointNames.begin(),
+                                                                              controlledJointNames.end(),
                                                                               joint));
             m_retargetJointsIndex.push_back(index);
         }
@@ -161,7 +161,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             return false;
         }
 
-        m_jointRetargeting.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointsName.size(), period,
+        m_jointRetargeting.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointNames.size(), period,
                                                                                    m_jointRetargeting.smoothingTimeInApproaching);
 
     }
@@ -183,7 +183,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     {
         const yarp::os::Bottle& option = config.findGroup("COM_RETARGETING");
 
-        m_comHeight.yarpVector.resize(1);
+        m_comHeight.yarpReadBuffer.resize(1);
 
         if(!YarpUtilities::getStringFromSearchable(option, "com_height_retargeting_port_name", portName))
         {
@@ -205,6 +205,13 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         }
 
         m_comHeight.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, period, m_comHeight.smoothingTimeInApproaching);
+
+        if(!YarpUtilities::getNumberFromSearchable(option, "com_height_scaling_factor",
+                                                   m_comHeightScalingFactor))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
     }
 
     return true;
@@ -222,13 +229,13 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
     {
         auto resetHandSmoother = [](auto& hand)
         {
-            iDynTree::toEigen(hand.yarpVector).template segment<3>(0) =
+            iDynTree::toEigen(hand.yarpReadBuffer).template segment<3>(0) =
             iDynTree::toEigen(hand.data.getPosition());
 
-            iDynTree::toEigen(hand.yarpVector).template segment<3>(3) =
+            iDynTree::toEigen(hand.yarpReadBuffer).template segment<3>(3) =
             iDynTree::toEigen(hand.data.getRotation().asRPY());
 
-            hand.smoother->init(hand.yarpVector);
+            hand.smoother->init(hand.yarpReadBuffer);
         };
 
         resetHandSmoother(m_leftHand);
@@ -237,9 +244,9 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
 
     // joint retargeting
     m_jointRetargeting.data = jointValues;
-    iDynTree::toEigen(m_jointRetargeting.yarpVector) = iDynTree::toEigen(jointValues);
+    iDynTree::toEigen(m_jointRetargeting.yarpReadBuffer) = iDynTree::toEigen(jointValues);
     if (m_useJointRetargeting)
-        m_jointRetargeting.smoother->init(m_jointRetargeting.yarpVector);
+        m_jointRetargeting.smoother->init(m_jointRetargeting.yarpReadBuffer);
 
     m_comHeight.data.position = comHeight;
     m_comHeight.data.velocity = 0;
@@ -247,8 +254,8 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
 
     if(m_useCoMHeightRetargeting)
     {
-        m_comHeight.yarpVector(0) = comHeight;
-        m_comHeight.smoother->init(m_comHeight.yarpVector);
+        m_comHeight.yarpReadBuffer(0) = comHeight;
+        m_comHeight.smoother->init(m_comHeight.yarpReadBuffer);
 
         // let's read the port to reset the comHeightInput
         bool okCoMHeight = false;
@@ -260,7 +267,7 @@ bool RetargetingClient::reset(const iDynTree::Transform& leftHandTransform,
                 auto desiredCoMHeight = m_comHeight.port.read(false);
                 if(desiredCoMHeight != nullptr)
                 {
-                    m_comHeightInputZero = (*desiredCoMHeight)(2);
+                    m_comHeightInputOffset = (*desiredCoMHeight)(2);
                     okCoMHeight = true;
                 }
             }
@@ -288,9 +295,9 @@ void RetargetingClient::getFeedback()
         {
             auto desiredHandPose = hand.port.read(false);
             if(desiredHandPose != nullptr)
-                hand.yarpVector = *desiredHandPose;
+                hand.yarpReadBuffer = *desiredHandPose;
 
-            hand.smoother->computeNextValues(hand.yarpVector);
+            hand.smoother->computeNextValues(hand.yarpReadBuffer);
             convertYarpVectorPoseIntoTransform(hand.smoother->getPos(), hand.data);
         };
 
@@ -304,10 +311,10 @@ void RetargetingClient::getFeedback()
         if(desiredJoint != nullptr)
         {
             for(int i =0; i < desiredJoint->size(); i++)
-                m_jointRetargeting.yarpVector(m_retargetJointsIndex[i]) = (*desiredJoint)(i);
+                m_jointRetargeting.yarpReadBuffer(m_retargetJointsIndex[i]) = (*desiredJoint)(i);
         }
 
-        m_jointRetargeting.smoother->computeNextValues(m_jointRetargeting.yarpVector);
+        m_jointRetargeting.smoother->computeNextValues(m_jointRetargeting.yarpReadBuffer);
         iDynTree::toEigen(m_jointRetargeting.data) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
     }
 
@@ -315,17 +322,17 @@ void RetargetingClient::getFeedback()
     if(m_useCoMHeightRetargeting)
     {
         if(!m_isStancePhase)
-            m_comHeight.yarpVector(0) = m_comConstantHeight;
+            m_comHeight.yarpReadBuffer(0) = m_comConstantHeight;
         else
         {
             auto desiredCoMHeight = m_comHeight.port.read(false);
             if(desiredCoMHeight != nullptr)
 
-                m_comHeight.yarpVector(0) = ((*desiredCoMHeight)(2) - m_comHeightInputZero) * 0.5
-                    + m_comConstantHeight;
+                m_comHeight.yarpReadBuffer(0) = ((*desiredCoMHeight)(2) - m_comHeightInputOffset)
+                    * m_comHeightScalingFactor + m_comConstantHeight;
         }
 
-        m_comHeight.smoother->computeNextValues(m_comHeight.yarpVector);
+        m_comHeight.smoother->computeNextValues(m_comHeight.yarpReadBuffer);
         m_comHeight.data.position = m_comHeight.smoother->getPos()(0);
         m_comHeight.data.velocity = m_comHeight.smoother->getVel()(0);
     }

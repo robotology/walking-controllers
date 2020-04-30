@@ -39,7 +39,7 @@ namespace WalkingControllers
         template <class Data>
         struct RetargetingElement
         {
-            yarp::sig::Vector yarpVector;
+            yarp::sig::Vector yarpReadBuffer;
             std::unique_ptr<iCub::ctrl::minJerkTrajGen> smoother;
             yarp::os::BufferedPort<yarp::sig::Vector> port;
             double smoothingTimeInApproaching;
@@ -55,14 +55,23 @@ namespace WalkingControllers
         RetargetingElement<iDynTree::Transform> m_leftHand; /**< Left hand retargeting element */
         RetargetingElement<iDynTree::Transform> m_rightHand; /**< Right hand retargeting element */
 
-        double m_comHeightInputZero;
+        /** Offset of the CoM Height coming from the user. It is required given the different size
+         *  between the human and the robot */
+        double m_comHeightInputOffset;
+
+        /** Desired value of the CoM height used during walking. The simplified model used for
+         * the locomotion is based on the assumption of a constant CoM height */
         double m_comConstantHeight;
-        struct SecondOrder
+
+        /** Factor required to scale the human CoM displacement to a desired robot CoM displacement */
+        double m_comHeightScalingFactor;
+
+        struct KinematicState
         {
             double position;
             double velocity;
         };
-        RetargetingElement<SecondOrder> m_comHeight;
+        RetargetingElement<KinematicState> m_comHeight;
 
         std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retargeted joints. */
         RetargetingElement<iDynTree::VectorDynSize> m_jointRetargeting; /**< Joint retargeting element */
@@ -101,7 +110,7 @@ namespace WalkingControllers
         bool initialize(const yarp::os::Searchable &config,
                         const std::string &name,
                         const double &period,
-                        const std::vector<std::string>& controlledJointsName);
+                        const std::vector<std::string>& controlledJointNames);
 
         /**
          * Reset the client
