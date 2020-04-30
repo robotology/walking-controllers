@@ -692,10 +692,12 @@ void WalkingQPIK::evaluateGradientVector()
         // g = Weight * K_p * (regularizationTerm - jointPosition)
         // Weight  and K_p are two diagonal matrices so their product can be also evaluated multiplying component-wise
         // the elements of the vectors and then generating the diagonal matrix
-        gradient.tail(m_actuatedDOFs) += (-jointRegularizationGains.cwiseProduct(
-                                              iDynTree::toEigen(m_jointRegularizationWeightSmoother->getPos()))).asDiagonal()
-            * (regularizationTerm - jointPosition)
-            + (-jointRetargetingGains.cwiseProduct(iDynTree::toEigen(m_jointRetargetingWeightSmoother->getPos()))).asDiagonal()
+        const auto& jointRegularizationWeight = m_jointRegularizationWeightSmoother->getPos();
+        gradient.tail(m_actuatedDOFs) += (-jointRegularizationGains.cwiseProduct(iDynTree::toEigen(jointRegularizationWeight))).asDiagonal()
+            * (regularizationTerm - jointPosition);
+
+        const auto& jointRetargetingWeight = m_jointRetargetingWeightSmoother->getPos();
+        gradient.tail(m_actuatedDOFs) += (-jointRetargetingGains.cwiseProduct(iDynTree::toEigen(jointRetargetingWeight))).asDiagonal()
             * (jointRetargetingValues - jointPosition);
     }
 
