@@ -225,20 +225,6 @@ namespace WalkingControllers
         void reset();
 
         /**
-        * Get the desired 2D-DCM position trajectory
-        * @param DCMPositionTrajectory desired trajectory of the DCM adjustment.
-        * @return true/false in case of success/failure.
-        */
-        bool getDCMPositionTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMPositionTrajectory);
-
-        /**
-         * Get the desired 2D-DCM velocity trajectory
-         * @param DCMVelocityTrajectory desired trajectory of the DCM adjustment Velocity.
-         * @return true/false in case of success/failure.
-         */
-        bool getDCMVelocityTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory);
-
-        /**
         * Get the desired 2D-ZMP position trajectory
         * @param ZMPPositionTrajectory desired trajectory of the ZMP.
         * @return true/false in case of success/failure.
@@ -276,7 +262,7 @@ namespace WalkingControllers
          * @param initialState
          * @return true/false in case of success/failure.
          */
-        bool generateTrajectoriesFromFootprintsStepAdjustment(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime, DCMInitialState initialState);
+        bool generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime, DCMInitialState initialState);
 
         /**
          * Get the phases of each foot during walking from unicycle

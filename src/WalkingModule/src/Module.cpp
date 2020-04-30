@@ -28,14 +28,7 @@
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/StdUtilities/Helper.h>
 
-
 using namespace WalkingControllers;
-
-//timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step)
-double timeOffset;
-double impactTimeNominal, impactTimeAdjusted;
-iDynTree::Vector2 zmpNominal, zmpAdjusted;
-int indexPush;
 
 void WalkingModule::propagateTime()
 {
@@ -150,32 +143,20 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_pushRecoveryActiveIndex=0;
         m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
         // TODO REMOVE ME
-        impactTimeNominal = 0;
-        impactTimeAdjusted = 0;
+        m_impactTimeNominal = 0;
+        m_impactTimeAdjusted = 0;
 
-        zmpNominal.zero();
-        zmpAdjusted.zero();
+        m_zmpNominal.zero();
+        m_zmpAdjusted.zero();
         m_isPushActive=0;
 
-        iDynTree::Position tempTemp;
-        iDynTree::Rotation tempRot;
-        tempRot.Identity();
-        //    tempRot.
-        tempTemp.zero();
-        m_adaptatedFootLeftTransform.setPosition(tempTemp);
-        m_currentFootLeftTransform.setPosition(tempTemp);
-        m_smoothedFootLeftTransform.setPosition(tempTemp);
+        m_adaptatedFootLeftTransform=iDynTree::Transform::Identity();
+        m_currentFootLeftTransform=iDynTree::Transform::Identity();
+        m_smoothedFootLeftTransform=iDynTree::Transform::Identity();
 
-        m_adaptatedFootRightTransform.setPosition(tempTemp);
-        m_currentFootRightTransform.setPosition(tempTemp);
-        m_smoothedFootRightTransform.setPosition(tempTemp);
-
-        m_currentFootLeftTransform.setRotation(tempRot);
-        m_adaptatedFootLeftTransform.setRotation(tempRot);
-        m_smoothedFootLeftTransform.setRotation(tempRot);
-        m_currentFootRightTransform.setRotation(tempRot);
-        m_adaptatedFootRightTransform.setRotation(tempRot);
-        m_smoothedFootRightTransform.setRotation(tempRot);
+        m_adaptatedFootRightTransform=iDynTree::Transform::Identity();
+        m_currentFootRightTransform=iDynTree::Transform::Identity();
+        m_smoothedFootRightTransform=iDynTree::Transform::Identity();
 
         m_DCMPositionSmoothed.zero();
         m_DCMPositionAdjusted.push_back(m_DCMPositionSmoothed);
@@ -923,7 +904,7 @@ bool WalkingModule::updateModule()
 
             if (!m_leftInContact.front() || !m_rightInContact.front())
             {
-                indexPush++;
+                m_indexPush++;
 
                 int numberOfSubTrajectories = m_DCMSubTrajectories.size();
                 auto firstSS = m_DCMSubTrajectories[numberOfSubTrajectories-2];
@@ -1004,7 +985,7 @@ bool WalkingModule::updateModule()
                 m_stepAdapter->setNominalDcmOffset(nominalDcmOffset);
 
                 //timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step )
-                m_stepAdapter->setTimings(omega, m_time - timeOffset, firstSS->getTrajectoryDomain().second,
+                m_stepAdapter->setTimings(omega, m_time - m_timeOffset, firstSS->getTrajectoryDomain().second,
                                             secondDS->getTrajectoryDomain().second - secondDS->getTrajectoryDomain().first);
 
                 SwingFoot swingFoot;
@@ -1023,23 +1004,23 @@ bool WalkingModule::updateModule()
                     return false;
                 }
 
-                impactTimeNominal = firstSS->getTrajectoryDomain().second + timeOffset;
+                m_impactTimeNominal = firstSS->getTrajectoryDomain().second + m_timeOffset;
                 if(m_pushRecoveryActiveIndex==(5+1))
                 {
-                    double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +m_stepAdapter->getDesiredImpactTime()-(m_time - timeOffset);
+                    double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +m_stepAdapter->getDesiredImpactTime()-(m_time - m_timeOffset);
                     m_indexSmoother=timeOfSmoothing/m_dT;
                     m_kDCMSmoother=0;
                 }
                 if(m_pushRecoveryActiveIndex==(5+1))
                 {
-                    double timeOfSmoothing=m_stepAdapter->getDesiredImpactTime()-(m_time - timeOffset);
+                    double timeOfSmoothing=m_stepAdapter->getDesiredImpactTime()-(m_time - m_timeOffset);
                     m_indexFootSmoother=timeOfSmoothing/m_dT;
                     m_kFootSmoother=0;
                 }
-                impactTimeAdjusted = m_stepAdapter->getDesiredImpactTime() + timeOffset;
+                m_impactTimeAdjusted = m_stepAdapter->getDesiredImpactTime() + m_timeOffset;
 
-                zmpNominal = nextZmpPosition;
-                zmpAdjusted = m_stepAdapter->getDesiredZmp();
+                m_zmpNominal = nextZmpPosition;
+                m_zmpAdjusted = m_stepAdapter->getDesiredZmp();
 
                 if (!m_leftInContact.front())
                 {
@@ -1134,7 +1115,7 @@ bool WalkingModule::updateModule()
                 DCMInitialState tempDCMInitialState;
                 m_trajectoryGenerator->getDCMBoundaryConditionAtMergePoint(tempDCMInitialState);
                 // generate the DCM trajectory
-                if(!m_trajectoryGeneratorStepAdjustment->generateTrajectoriesFromFootprintsStepAdjustment(leftTemp, rightTemp, timeOffset,tempDCMInitialState))
+                if(!m_trajectoryGeneratorStepAdjustment->generateTrajectoriesFromFootprints(leftTemp, rightTemp, m_timeOffset,tempDCMInitialState))
                 {
                     yError() << "[WalkingModule::updateModule] unable to generatempDCMInitialStatete new trajectorie after step adjustment.";
                     return false;
@@ -1142,10 +1123,10 @@ bool WalkingModule::updateModule()
 
                 std::vector<iDynTree::Vector2> DCMPositionAdjusted;
                 std::vector<iDynTree::Vector2> DCMVelocityAdjusted;
-                m_trajectoryGeneratorStepAdjustment->getDCMPositionTrajectoryAdjusted(DCMPositionAdjusted);
-                m_trajectoryGeneratorStepAdjustment->getDCMVelocityTrajectoryAdjusted(DCMVelocityAdjusted);
+                m_trajectoryGeneratorStepAdjustment->getDCMPositionTrajectory(DCMPositionAdjusted);
+                m_trajectoryGeneratorStepAdjustment->getDCMVelocityTrajectory(DCMVelocityAdjusted);
 
-                size_t startIndexOfDCMAdjusted = (size_t)round((m_time - timeOffset) / m_dT);
+                size_t startIndexOfDCMAdjusted = (size_t)round((m_time - m_timeOffset) / m_dT);
 
                 m_DCMPositionAdjusted.resize(DCMPositionAdjusted.size() - startIndexOfDCMAdjusted);
                 for(int i = 0; i < m_DCMPositionAdjusted.size(); i++)
@@ -1395,7 +1376,7 @@ bool WalkingModule::updateModule()
 
             if (m_useStepAdaptation)
             {
-                m_isPushActiveVec(3)= m_stepAdapter->getDesiredImpactTime()-(m_time - timeOffset);
+                m_isPushActiveVec(3)= m_stepAdapter->getDesiredImpactTime()-(m_time - m_timeOffset);
             }
             else
             {
@@ -1745,7 +1726,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<bool> isLeftFixedFrame;
     std::vector<iDynTree::Vector2> ZMPPositionDesired;
 
-    timeOffset = m_time + mergePoint * m_dT;
+    m_timeOffset = m_time + mergePoint * m_dT;
 
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);

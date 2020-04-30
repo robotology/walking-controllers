@@ -73,6 +73,13 @@ namespace WalkingControllers
         double m_stepHeight; /**< maximum height of step. */
         double m_startOfWalkingTime;  /**< The time that the robot starts walking. */
 
+        double m_timeOffset;/**< timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step)*/
+        double m_impactTimeNominal;/**< Nominal absolute time of the impact */
+        double m_impactTimeAdjusted;/**< Adjusted absolute time of the impact */
+        iDynTree::Vector2 m_zmpNominal;/**< Nominal 2D zmp position */
+        iDynTree::Vector2 m_zmpAdjusted;/**< Absolute 2D zmp position */
+        int m_indexPush;/**< Number of control cycle that step adjustment is active */
+
         iDynTree::Vector2 m_dcmEstimatedI; /**< The estimated DCM. */
 
         std::vector<std::shared_ptr<GeneralSupportTrajectory>> m_DCMSubTrajectories;/**< The different trajectories that are output of DCM motion planing. */

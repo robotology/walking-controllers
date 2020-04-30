@@ -52,7 +52,7 @@ namespace WalkingControllers
          * run the pendulum estimator
          * @param footOrientation the orientation of stance foot.
          * @param zmp the vector of zmp position with respect to the inertial frame.
-         * @param com the vector of com position with respect to the inertial frame.
+         * @param com com the com position obtained as if the foot is not rotated.
          * @param CoMVelocity3d the vector of com velocity that is simple time derivative of the com position.
          * @return true/false in case of success/failure
          */

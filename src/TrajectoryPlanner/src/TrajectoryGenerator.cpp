@@ -497,7 +497,7 @@ bool TrajectoryGenerator::isTrajectoryAsked()
     return m_generatorState == GeneratorState::Called;
 }
 
-bool TrajectoryGenerator::generateTrajectoriesFromFootprintsStepAdjustment(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
+bool TrajectoryGenerator::generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
                                                              const double &initTime,DCMInitialState initialState)
 {
     if (!m_dcmGenerator->setDCMInitialState(initialState))
@@ -506,7 +506,15 @@ bool TrajectoryGenerator::generateTrajectoriesFromFootprintsStepAdjustment(std::
         return  false;
     }
 
-    return m_trajectoryGenerator.generateFromFootPrints(left, right, initTime, m_dT);
+    if(!m_trajectoryGenerator.generateFromFootPrints(left, right, initTime, m_dT))
+    {
+        yError() << "[generateTrajectoriesFromFootprints] Failed to generate trajectory from foot-prints";
+        m_generatorState = GeneratorState::Configured;
+        return false;
+    }
+
+    m_generatorState = GeneratorState::Returned;
+    return true;
 }
 
 bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
@@ -520,19 +528,6 @@ bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2
     DCMPositionTrajectory = m_dcmGenerator->getDCMPosition();
     return true;
 }
-
-bool TrajectoryGenerator::getDCMPositionTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
-{
-    DCMPositionTrajectory = m_dcmGenerator->getDCMPosition();
-    return true;
-}
-
-bool TrajectoryGenerator::getDCMVelocityTrajectoryAdjusted(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory)
-{
-    DCMVelocityTrajectory = m_dcmGenerator->getDCMVelocity();
-    return true;
-}
-
 
 bool TrajectoryGenerator::getZMPPositionTrajectory(std::vector<iDynTree::Vector2>& ZMPPositionTrajectory)
 {
@@ -560,7 +555,15 @@ bool TrajectoryGenerator::getDCMVelocityTrajectory(std::vector<iDynTree::Vector2
 
 bool TrajectoryGenerator::getDCMSubTrajectories(std::vector<std::shared_ptr<GeneralSupportTrajectory>> & dcmSubTrajectories)
 {
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getDCMSubTrajectories] No trajectories are available";
+        return false;
+    }
+
     dcmSubTrajectories= m_dcmGenerator->getDCMSubTrajectories();
+
+    return true;
 }
 
 bool TrajectoryGenerator::getFeetTrajectories(std::vector<iDynTree::Transform>& lFootTrajectory,
