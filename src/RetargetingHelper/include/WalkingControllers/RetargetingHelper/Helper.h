@@ -64,7 +64,7 @@ namespace WalkingControllers
         };
         RetargetingElement<SecondOrder> m_comHeight;
 
-        std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retarget joints. */
+        std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retargeted joints. */
         RetargetingElement<iDynTree::VectorDynSize> m_jointRetargeting; /**< Joint retargeting element */
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/

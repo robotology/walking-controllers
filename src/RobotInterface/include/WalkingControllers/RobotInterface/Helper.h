@@ -226,7 +226,7 @@ namespace WalkingControllers
         WalkingPIDHandler& getPIDHandler();
 
         /**
-         * Set the intraction mode stored in the configuration
+         * Set the interaction mode stored in the configuration file
          * @return true in case of success and false otherwise.
          */
         bool loadCustomInteractionMode();
