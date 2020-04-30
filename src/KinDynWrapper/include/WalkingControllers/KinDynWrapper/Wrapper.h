@@ -258,6 +258,12 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool getCoMJacobian(iDynTree::MatrixDynSize &jacobian);
+
+        /**
+         * Get the joint position
+         * @return the joint position expressed in radians
+         */
+        iDynTree::VectorDynSize getJointPos();
     };
 };
 #endif

@@ -517,3 +517,13 @@ bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getCenterOfMassJacobian(jacobian);
 }
+
+iDynTree::VectorDynSize WalkingFK::getJointPos()
+{
+    iDynTree::VectorDynSize jointPos;
+    bool ok = m_kinDyn.getJointPos(jointPos);
+
+    assert(ok);
+
+    return jointPos;
+}
