@@ -24,6 +24,7 @@
 #include <iCub/ctrl/minJerkCtrl.h>
 
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
 
 namespace WalkingControllers
 {
@@ -239,22 +240,11 @@ namespace WalkingControllers
 
         /**
          * Set the robot state.
-         * @param jointPosition vector of joint positions (in rad);
-         * @param leftFootToWorldTransform transformation between the inertial frame and the left foot;
-         * @param rightFootToWorldTransform transformation between the inertial frame and the right foot;
-         * @param leftHandToWorldTransform transformation between the inertial frame and the left foot;
-         * @param rightHandToWorldTransform transformation between the inertial frame and the right foot;
-         * @param neckOrientation rotation between the inertial frame and the neck;
-         * @param comPosition position of the CoM
+         * @param kinDynWrapper wrapper required to retrieve information related to the forward
+         * kinematics
          * @return true/false in case of success/failure.
          */
-        bool setRobotState(const iDynTree::VectorDynSize& jointPosition,
-                           const iDynTree::Transform& leftFootToWorldTransform,
-                           const iDynTree::Transform& rightFootToWorldTransform,
-                           const iDynTree::Transform& leftHandToWorldTransform,
-                           const iDynTree::Transform& rightHandToWorldTransform,
-                           const iDynTree::Rotation& neckOrientation,
-                           const iDynTree::Position& comPosition);
+        bool setRobotState(WalkingFK& kinDynWrapper);
 
         /**
          * Set the Jacobian of the CoM

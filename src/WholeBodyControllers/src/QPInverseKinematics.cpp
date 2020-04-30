@@ -184,7 +184,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 
     m_jointRegularizationGains.resize(m_actuatedDOFs);
     if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_gains",
-                                            m_jointRegularizationGains))
+                                               m_jointRegularizationGains))
     {
         yError() << "Initialization failed while reading jointRegularizationGains vector.";
         return false;
@@ -373,33 +373,20 @@ bool WalkingQPIK::initializeJointRetargeting(const yarp::os::Searchable& config)
     return true;
 }
 
-bool WalkingQPIK::setRobotState(const iDynTree::VectorDynSize& jointPosition,
-                                const iDynTree::Transform& leftFootToWorldTransform,
-                                const iDynTree::Transform& rightFootToWorldTransform,
-                                const iDynTree::Transform& leftHandToWorldTransform,
-                                const iDynTree::Transform& rightHandToWorldTransform,
-                                const iDynTree::Rotation& neckOrientation,
-                                const iDynTree::Position& comPosition)
+bool WalkingQPIK::setRobotState(WalkingFK& kinDynWrapper)
 {
-    if(jointPosition.size() != m_actuatedDOFs)
-    {
-        yError() << "[setRobotState] The size of the jointPosition vector is not coherent with the "
-                 << "number of the actuated Joint";
-        return false;
-    }
-
     // avoid to copy the vector if the application is not ran in retargeting mode
     if(m_enableHandRetargeting)
     {
-        m_leftHandToWorldTransform = leftHandToWorldTransform;
-        m_rightHandToWorldTransform = rightHandToWorldTransform;
+        m_leftHandToWorldTransform = kinDynWrapper.getLeftHandToWorldTransform();
+        m_rightHandToWorldTransform = kinDynWrapper.getRightHandToWorldTransform();
     }
 
-    m_jointPosition = jointPosition;
-    m_leftFootToWorldTransform = leftFootToWorldTransform;
-    m_rightFootToWorldTransform = rightFootToWorldTransform;
-    m_neckOrientation = neckOrientation;
-    m_comPosition = comPosition;
+    m_jointPosition = kinDynWrapper.getJointPos();
+    m_leftFootToWorldTransform = kinDynWrapper.getLeftFootToWorldTransform();
+    m_rightFootToWorldTransform = kinDynWrapper.getRightFootToWorldTransform();
+    m_neckOrientation = kinDynWrapper.getNeckOrientation();
+    m_comPosition = kinDynWrapper.getCoMPosition();
 
     return true;
 }
