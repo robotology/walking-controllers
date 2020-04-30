@@ -623,7 +623,7 @@ bool WalkingModule::updateModule()
         {
             if(desiredUnicyclePosition != nullptr)
             {
-                if(!setPlannerInput((*desiredUnicyclePosition)(0), 0.0))
+                if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                     return false;
@@ -634,7 +634,7 @@ bool WalkingModule::updateModule()
             {
                 if(!setPlannerInput(m_desiredPosition(0) ,m_desiredPosition(1)))
                 {
-                    yError() << "[updateModule] Unable to recall the setplannerInput (when terminal (SetGoal) instead of JoyStick is used)";
+                    yError() << "[updateModule] Unable to recall the setplannerInput(Step adjustment is active)";
                     return false;
                 }
             }
@@ -738,14 +738,14 @@ bool WalkingModule::updateModule()
             {
                 if(!m_leftInContact.front()){
                     if (!feetTrajectorySmoother(m_adaptatedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform,m_adaptatedFootLeftTwist,m_leftTwistTrajectory.front(),m_smoothedFootLeftTwist)) {
-                        yError()<<"the Left Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
+                        yError()<<"[WalkingModule::updateModule] The left foot trajectory smoother can not evaluate the smoothed trajectory!";
                     }
                 }
 
                 if(!m_rightInContact.front())
                 {
                     if (!feetTrajectorySmoother(m_adaptatedFootRightTransform,m_rightTrajectory.front(),m_smoothedFootRightTransform,m_adaptatedFootRightTwist,m_rightTwistTrajectory.front(),m_smoothedFootRightTwist)) {
-                        yError()<<"the Right Foot trajectory smoother can not evaluate the smoothed Trajectoy!";
+                        yError()<<"[WalkingModule::updateModule] The right foot trajectory smoother can not evaluate the smoothed trajectory!";
                     }
                 }
             }
