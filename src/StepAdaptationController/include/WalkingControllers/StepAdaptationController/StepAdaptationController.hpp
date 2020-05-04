@@ -96,11 +96,11 @@ namespace WalkingControllers
         double m_currentTime;/**< The  current time.*/
         double m_nextDoubleSupportDuration;/**< The timing of next double support.*/
 
-        bool m_isPitchActive=0;
-        bool m_isRollActive=0;
+        bool m_isPitchActive=0;/**< The  boolean that shows whether push is detected with pitch arm joints or no.*/
+        bool m_isRollActive=0;/**< The  boolean that shows whether push is detected with roll arm joints or no.*/
 
-        double m_armRollError;
-        double m_armPitchError;
+        double m_armRollError;/**< The  error related to the roll joints position of the arm .*/
+        double m_armPitchError;/**< The  error related to the pitch joints position of the arm .*/
 
         /**
          *The buffered vectors for the interpolation of the foot trajectory
@@ -161,6 +161,15 @@ namespace WalkingControllers
          */
         bool solve(SwingFoot swingFoot);
 
+        /**
+         * Trigger the step adaptation by detecting the push by the arm joints in compliant mode.
+         * @param numberOfActuatedDof The  number of the joints that is actuated.
+         * @param qDesired The vector of th desired positions of the joints.
+         * @param qActual The vector of th actual positions of the joints.
+         * @param leftInContact The deque of boolean that shows left foot is in contact or no.
+         * @param rightInContact The deque of boolean that shows right foot is in contact or no.
+         * @return true/false in case of success/failure.
+         */
         bool triggerStepAdapterByArmCompliant(const double& numberOfActuatedDof, const iDynTree::VectorDynSize& qDesired,const iDynTree::VectorDynSize& qActual,
                                               const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact);
 
