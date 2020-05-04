@@ -147,7 +147,6 @@ namespace WalkingControllers
         std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
         std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
         std::unique_ptr<StepAdaptationController> m_stepAdapter; /**< Pointer to the step adaptation object. */
-        std::unique_ptr<DCMSimpleEstimator> m_DCMEstimator; /**< Pointer to the step adaptation Utils object. */
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
         double m_desiredJointsWeight; /**< Desired joint weight matrix. */

@@ -331,14 +331,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
-    //initialize the DCM simple estimator
-    m_DCMEstimator=std::make_unique<DCMSimpleEstimator>();
-    if(!m_DCMEstimator->configure(generalOptions))
-    {
-        yError() << "[WalkingModule::configure] Failed to configure the DCM estimator.";
-        return false;
-    }
-
     // initialize the linear inverted pendulum model
     m_stableDCMModel = std::make_unique<StableDCMModel>();
     if(!m_stableDCMModel->initialize(generalOptions))
@@ -446,7 +438,7 @@ bool WalkingModule::close()
     m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
-    m_DCMEstimator.reset(nullptr);
+    m_stepAdapter.reset(nullptr);
 
     return true;
 }
@@ -774,120 +766,20 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        iDynTree::Rotation imuRotation;
-        iDynTree::Vector3 imuRPY;
-        iDynTree::Rotation StanceFootOrientation;
-        StanceFootOrientation=iDynTree::Rotation::Identity();
-        double TempPitch=0;
-        double TempRoll=0;
-        double leftArmPitchError=0;
-        double rightArmPitchError=0;
-        double leftArmRollError=0;
-        double rightArmRollError=0;
-
         if (m_useStepAdaptation)
         {
             m_isPitchActive=0;
             m_isRollActive=0;
-
-            for (int var = 0; var < m_robotControlHelper->getActuatedDoFs(); var++)
-            {
-                if(var==3 || var==6)
-                {
-                    leftArmPitchError=leftArmPitchError+ abs(m_qDesired(var)-m_robotControlHelper->getJointPosition()(var));
-                }
-                if(var==4 || var==5)
-                {
-                    leftArmRollError=leftArmRollError+ abs(m_qDesired(var)-m_robotControlHelper->getJointPosition()(var));
-                }
-                if(var==7 || var==10)
-                {
-                    rightArmPitchError=rightArmPitchError+ abs(m_qDesired(var)-m_robotControlHelper->getJointPosition()(var));
-                }
-                if(var==8 || var==9)
-                {
-                    rightArmRollError=rightArmRollError+ abs(m_qDesired(var)-m_robotControlHelper->getJointPosition()(var));
-                }
-            }
-
-            leftArmPitchError=leftArmPitchError+0.1;
-            leftArmRollError=leftArmRollError+0.1;
-            rightArmRollError=rightArmRollError+0.1;
-            rightArmPitchError=rightArmPitchError+0.1;
-
-            if (m_useStepAdaptation)
-            {
-                if (leftArmPitchError>m_stepAdapter->getRollPitchErrorThreshold()(1) )
-                {
-                    TempPitch=leftArmPitchError;
-                    m_isPitchActive=1;
-                }
-                else if( rightArmPitchError>m_stepAdapter->getRollPitchErrorThreshold()(1))
-                {
-                    TempPitch=rightArmPitchError;
-                    m_isPitchActive=1;
-                }
-                else
-                {
-                    TempPitch=0;
-                }
-
-                if (leftArmRollError>m_stepAdapter->getRollPitchErrorThreshold()(0) )
-                {
-                    if (m_leftInContact.front())
-                    {
-                        TempRoll=1*leftArmRollError;
-                    }
-                    if (m_rightInContact.front())
-                    {
-                        TempRoll=-1*leftArmRollError;
-                    }
-                    m_isRollActive=1;
-                }
-                else if( rightArmRollError>m_stepAdapter->getRollPitchErrorThreshold()(0) )
-                {
-                    if (m_rightInContact.front())
-                    {
-                        TempRoll=-1*rightArmRollError;
-                    }
-                    if (m_leftInContact.front())
-                    {
-                        TempRoll=+1*rightArmRollError;
-                    }
-                    m_isRollActive=1;
-                }
-                else
-                {
-                    TempRoll=0;
-                }
-            }
-
-            StanceFootOrientation=iDynTree::Rotation::RPY (TempRoll,TempPitch,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
-
-            iDynTree::Vector3 ZMP3d;
-            ZMP3d(0)=measuredZMP(0);
-            ZMP3d(1)=measuredZMP(1);
-            ZMP3d(2)=0;
-
-            iDynTree::Vector3 CoM3d;
-            //iDynTree::Vector3 ZMP3d;
-            CoM3d(0)=m_stableDCMModel->getCoMPosition()(0);
-            CoM3d(1)=m_stableDCMModel->getCoMPosition()(1);
-            CoM3d(2)=m_comHeightTrajectory.front();
-
-            iDynTree::Vector3 CoMVelocity3d;
-            //iDynTree::Vector3 ZMP3d;
-            CoMVelocity3d(0)=m_stableDCMModel->getCoMVelocity()(0);
-            CoMVelocity3d(1)=m_stableDCMModel->getCoMVelocity()(1);
-            CoMVelocity3d(2)=0;
-
-            if(!m_DCMEstimator->update(StanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
+            m_stepAdapter->triggerStepAdapterByArmCompliant(m_robotControlHelper->getActuatedDoFs(),m_qDesired,m_robotControlHelper->getJointPosition(),
+                                                            m_leftInContact,m_rightInContact);
+            m_isRollActive=m_stepAdapter->isArmRollActive();
+            m_isPitchActive=m_stepAdapter->isArmPitchActive();
+            if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front()))
             {
                 yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
                 return false;
             }
-
-            m_dcmEstimatedI= m_DCMEstimator->getDCMPosition();
+            m_dcmEstimatedI= m_stepAdapter->getEstimatedDCM();
         }
 
         if(m_useStepAdaptation)
@@ -927,7 +819,7 @@ bool WalkingModule::updateModule()
                 dcmMeasured2D(1) = m_FKSolver->getDCM()(1);
                 m_isPushActive=0;
 
-                if((abs(m_DCMPositionSmoothed(0) - m_DCMEstimator->getDCMPosition()(0))) > m_stepAdapter->getDCMErrorThreshold()(0) ||(abs(m_DCMPositionSmoothed(1) - m_DCMEstimator->getDCMPosition()(1)))> m_stepAdapter->getDCMErrorThreshold()(1) )
+                if((abs(m_DCMPositionSmoothed(0) - m_stepAdapter->getEstimatedDCM()(0))) > m_stepAdapter->getDCMErrorThreshold()(0) ||(abs(m_DCMPositionSmoothed(1) - m_stepAdapter->getEstimatedDCM()(1)))> m_stepAdapter->getDCMErrorThreshold()(1) )
                 {
                     if (m_pushRecoveryActiveIndex==5 )
                     {
@@ -937,17 +829,13 @@ bool WalkingModule::updateModule()
                         tempDCMError(0)=0.00;
                         m_pushRecoveryActiveIndex++;
                         yInfo()<<"triggering the push recovery";
-                        if((abs(m_DCMPositionSmoothed(0) - m_DCMEstimator->getDCMPosition()(0))) > m_stepAdapter->getDCMErrorThreshold()(0))
+                        if((abs(m_DCMPositionSmoothed(0) - m_stepAdapter->getEstimatedDCM()(0))) > m_stepAdapter->getDCMErrorThreshold()(0))
                         {
-                            // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-
-                            tempDCMError(0)=m_DCMEstimator->getDCMPosition()(0);
+                            tempDCMError(0)=m_stepAdapter->getEstimatedDCM()(0);
                         }
-                        if((abs(m_DCMPositionSmoothed(1) - m_DCMEstimator->getDCMPosition()(1))) > m_stepAdapter->getDCMErrorThreshold()(1))
+                        if((abs(m_DCMPositionSmoothed(1) - m_stepAdapter->getEstimatedDCM()(1))) > m_stepAdapter->getDCMErrorThreshold()(1))
                         {
-                            // std::cerr << "adj " << (iDynTree::toEigen(m_DCMPositionAdjusted.front()) - iDynTree::toEigen(dcmMeasured2D)).norm() << std::endl;
-
-                            tempDCMError(1)=m_DCMEstimator->getDCMPosition()(1);
+                            tempDCMError(1)=m_stepAdapter->getEstimatedDCM()(1);
                         }
                         m_stepAdapter->setCurrentDcmPosition(tempDCMError);
                     }
@@ -1395,15 +1283,15 @@ bool WalkingModule::updateModule()
             leftArmJointsError(1)=m_robotControlHelper->getJointPosition()(4)-m_qDesired(4);
             leftArmJointsError(2)=m_robotControlHelper->getJointPosition()(5)-m_qDesired(5);
             leftArmJointsError(3)=m_robotControlHelper->getJointPosition()(6)-m_qDesired(6);
-            leftArmJointsError(4)=leftArmRollError;
-            leftArmJointsError(5)=leftArmPitchError;
+            leftArmJointsError(4)=leftArmJointsError(2)+leftArmJointsError(1);
+            leftArmJointsError(5)=leftArmJointsError(0)+leftArmJointsError(3);
 
             rightArmJointsError(0)=m_robotControlHelper->getJointPosition()(7)-m_qDesired(7);
             rightArmJointsError(1)=m_robotControlHelper->getJointPosition()(8)-m_qDesired(8);
             rightArmJointsError(2)=m_robotControlHelper->getJointPosition()(9)-m_qDesired(9);
             rightArmJointsError(3)=m_robotControlHelper->getJointPosition()(10)-m_qDesired(10);
-            rightArmJointsError(4)=rightArmRollError;
-            rightArmJointsError(5)=rightArmPitchError;
+            rightArmJointsError(4)=rightArmJointsError(1)+rightArmJointsError(2);
+            rightArmJointsError(5)=rightArmJointsError(0)+rightArmJointsError(3);
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),DCMError, m_DCMVelocityDesired.front(),m_DCMPositionAdjusted.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),

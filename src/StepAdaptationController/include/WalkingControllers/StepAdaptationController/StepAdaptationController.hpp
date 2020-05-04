@@ -29,6 +29,7 @@
 
 #include <qpOASES.hpp>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
+#include <WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp>
 
 struct footTrajectoryGenerationInput{
     double maxFootHeight;
@@ -64,7 +65,7 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_gradient;/**< Gradient vector. */
         iDynTree::VectorDynSize m_lowerBound; /**< Lower bound vector. */
         iDynTree::VectorDynSize m_upperBound; /**< Upper bound vector. */
-
+        std::unique_ptr<DCMSimpleEstimator> m_DCMEstimator; /**< Pointer to the simple pendulum estimator. */
         iDynTree::VectorDynSize m_solution;  /**< solution vector of the optimization. */
 
         int m_inputSize; /**< Size of the controlled input vector . */
@@ -94,6 +95,12 @@ namespace WalkingControllers
 
         double m_currentTime;/**< The  current time.*/
         double m_nextDoubleSupportDuration;/**< The timing of next double support.*/
+
+        bool m_isPitchActive=0;
+        bool m_isRollActive=0;
+
+        double m_armRollError;
+        double m_armPitchError;
 
         /**
          *The buffered vectors for the interpolation of the foot trajectory
@@ -153,6 +160,9 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool solve(SwingFoot swingFoot);
+
+        bool triggerStepAdapterByArmCompliant(const double& numberOfActuatedDof, const iDynTree::VectorDynSize& qDesired,const iDynTree::VectorDynSize& qActual,
+                                              const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact);
 
         /**
          * Reset the controller
@@ -237,6 +247,46 @@ namespace WalkingControllers
          */
         bool getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input, iDynTree::Transform& adaptatedFootTransform,
                                         iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration);
+
+        /**
+         * Get the Value of the arm joints roll error ..
+         * @return Value of the arm joints roll error .
+         */
+        const double& getArmRollError()const;
+
+        /**
+         * Get the Value of the arm joints pitch error ..
+         * @return Value of the arm joints pitch error .
+         */
+        const double& getArmPitchError()const;
+
+        /**
+         * Get the boolean to specify that the push in forward direction has been detected ..
+         * @return True in case that the pitch joints of the arm detect the push .
+         */
+        bool isArmPitchActive();
+
+        /**
+         * Get the boolean to specify that the push in lateral direction has been detected ..
+         * @return True in a case that the roll+yaw joints of the arm detect the push .
+         */
+        bool isArmRollActive();
+
+        /**
+         * Get the estimated position of the DCM.
+         * @return ertimated position of the DCM.
+         */
+        const iDynTree::Vector2& getEstimatedDCM() const;
+
+        /**
+         * update the pendulum estimator
+         * @param CoM2DPosition CoM2DPosition the 2D com position obtained as if the foot is not rotated.
+         * @param CoMVelocity the vector of com velocity that is simple time derivative of the com position.
+         * @param measuredZMP the vector of measured zmp position with respect to the inertial frame.
+         * @param CoMHeight the CoM height.
+         * @return true/false in case of success/failure
+         */
+        bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
     };
 };
 

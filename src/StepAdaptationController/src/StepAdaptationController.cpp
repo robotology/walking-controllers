@@ -132,6 +132,14 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
         return false;
     }
 
+    //initialize the DCM simple estimator
+    m_DCMEstimator=std::make_unique<DCMSimpleEstimator>();
+    if(!m_DCMEstimator->configure(config))
+    {
+        yError() << "[StepAdaptationController::Configure] Failed to configure the DCM pendulum estimator.";
+        return false;
+    }
+
     // reset the solver
     reset();
 
@@ -484,6 +492,145 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGe
     adaptedFootAcceleration.setAngularVec3(vector);
 
     return true;
+}
+
+bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &numberOfActuatedDof, const iDynTree::VectorDynSize &qDesired, const iDynTree::VectorDynSize &qActual,
+                                                                const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact)
+{
+    double leftArmPitchError=0;
+    double rightArmPitchError=0;
+    double leftArmRollError=0;
+    double rightArmRollError=0;
+
+    for (int var = 0; var < numberOfActuatedDof; var++)
+    {
+        if(var==3 || var==6)
+        {
+            leftArmPitchError= abs(qDesired(var)-qActual(var));
+        }
+        if(var==4 || var==5)
+        {
+            leftArmRollError= abs(qDesired(var)-qActual(var));
+        }
+        if(var==7 || var==10)
+        {
+            rightArmPitchError= abs(qDesired(var)-qActual(var));
+        }
+        if(var==8 || var==9)
+        {
+            rightArmRollError= abs(qDesired(var)-qActual(var));
+        }
+    }
+
+    leftArmPitchError=leftArmPitchError+0.1;
+    leftArmRollError=leftArmRollError+0.1;
+    rightArmRollError=rightArmRollError+0.1;
+    rightArmPitchError=rightArmPitchError+0.1;
+
+    if (leftArmPitchError>getRollPitchErrorThreshold()(1) )
+    {
+        m_armPitchError=leftArmPitchError;
+        m_isPitchActive=1;
+    }
+    else if( rightArmPitchError>getRollPitchErrorThreshold()(1))
+    {
+        m_armPitchError=rightArmPitchError;
+        m_isPitchActive=1;
+    }
+    else
+    {
+        m_armPitchError=0;
+    }
+
+    if (leftArmRollError>getRollPitchErrorThreshold()(0) )
+    {
+        if (leftInContact.front())
+        {
+            m_armRollError=1*leftArmRollError;
+        }
+        if (rightInContact.front())
+        {
+            m_armRollError=-1*leftArmRollError;
+        }
+        m_isRollActive=1;
+    }
+    else if( rightArmRollError>getRollPitchErrorThreshold()(0) )
+    {
+        if (rightInContact.front())
+        {
+            m_armRollError=-1*rightArmRollError;
+        }
+        if (leftInContact.front())
+        {
+            m_armRollError=+1*rightArmRollError;
+        }
+        m_isRollActive=1;
+    }
+    else
+    {
+        m_armRollError=0;
+    }
+
+    return true;
+}
+
+const double& StepAdaptationController::getArmRollError() const
+{
+    return m_armRollError;
+}
+
+const double& StepAdaptationController::getArmPitchError() const
+{
+    return m_armPitchError;
+}
+
+bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2DPosition,const iDynTree::Vector2& CoMVelocity,const iDynTree::Vector2& measuredZMP,const double& CoMHeight)
+{
+    iDynTree::Rotation imuRotation;
+    iDynTree::Vector3 imuRPY;
+    iDynTree::Rotation StanceFootOrientation;
+    StanceFootOrientation=iDynTree::Rotation::Identity();
+    StanceFootOrientation=iDynTree::Rotation::RPY (m_armRollError,m_armPitchError,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
+
+    iDynTree::Vector3 ZMP3d;
+    ZMP3d(0)=measuredZMP(0);
+    ZMP3d(1)=measuredZMP(1);
+    ZMP3d(2)=0;
+
+    iDynTree::Vector3 CoM3d;
+    //iDynTree::Vector3 ZMP3d;
+    CoM3d(0)=CoM2DPosition(0);
+    CoM3d(1)=CoM2DPosition(1);
+    CoM3d(2)=CoMHeight;
+
+    iDynTree::Vector3 CoMVelocity3d;
+    //iDynTree::Vector3 ZMP3d;
+    CoMVelocity3d(0)=CoMVelocity(0);
+    CoMVelocity3d(1)=CoMVelocity(1);
+    CoMVelocity3d(2)=0;
+
+    if(!m_DCMEstimator->update(StanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
+    {
+        yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
+        return false;
+    }
+
+    return true;
+}
+
+const iDynTree::Vector2& StepAdaptationController::getEstimatedDCM() const
+{
+    return m_DCMEstimator->getDCMPosition();
+}
+
+bool StepAdaptationController::isArmRollActive()
+{
+    return m_isRollActive;
+}
+
+bool StepAdaptationController::isArmPitchActive()
+{
+    return m_isPitchActive;
 }
 
 iDynTree::Vector2 StepAdaptationController::getDCMErrorThreshold(){
