@@ -30,8 +30,10 @@
 #include <qpOASES.hpp>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
 #include <WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp>
+#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 
-struct footTrajectoryGenerationInput{
+struct footTrajectoryGenerationInput
+{
     double maxFootHeight;
     double discretizationTime ;
     double takeOffTime;
@@ -41,7 +43,53 @@ struct footTrajectoryGenerationInput{
     iDynTree::Twist currentFootTwist;
 };
 
+struct runningStepAdapterInput
+{
+    double time;
+    double timeOffset;
+    double dT;
+    std::deque<bool> leftInContact;
+    std::deque<bool> rightInContact;
+    std::vector<std::shared_ptr<GeneralSupportTrajectory>> dcmSubTrajectories;
+    std::shared_ptr<FootPrint> leftFootprints;
+    std::shared_ptr<FootPrint> rightFootprints;
+    iDynTree::Vector2 dcmPositionSmoothed;
+    StepList rightStepList;
+    StepList leftStepList;
+};
 
+struct runStepAdapterOutput
+{
+    iDynTree::Transform adaptedFootLeftTransform;
+    iDynTree::Transform adaptedFootRightTransform;
+    iDynTree::Twist adaptedFootRightTwist;
+    iDynTree::Twist adaptedFootLeftTwist;
+    iDynTree::SpatialAcc adaptedFootLeftAcceleration;
+    iDynTree::SpatialAcc adaptedFootRightAcceleration;
+    iDynTree::Transform currentFootLeftTransform;
+    iDynTree::Transform currentFootRightTransform;
+    iDynTree::Twist currentFootLeftTwist;
+    iDynTree::Twist currentFootRightTwist;
+    iDynTree::SpatialAcc currentFootLeftAcceleration;
+    iDynTree::SpatialAcc currentFootRightAcceleration;
+    std::deque<iDynTree::Vector2> dcmPositionAdjusted;
+    std::deque<iDynTree::Vector2> dcmVelocityAdjusted;
+    iDynTree::Vector2 zmpNominal;
+    iDynTree::Vector2 zmpAdjusted;
+    double isPushActive;
+    double isRollActive;
+    double isPitchActive;
+    int pushRecoveryActiveIndex;
+    double kDCMSmoother;
+    double kFootSmoother;
+    int indexSmoother;
+    int indexFootSmoother;
+    int timeIndexAfterPushDetection;
+    int FootTimeIndexAfterPushDetection;
+    int indexPush;
+    double impactTimeNominal;
+    double impactTimeAdjusted;
+};
 /**
  * StepAdaptationController class contains the controller instances.
  */
@@ -77,6 +125,9 @@ namespace WalkingControllers
         iDynTree::Vector2 m_dcmOffsetNominal; /**< The next desired dcm offset*/
         double m_sigmaNominal; /**< The exponential function of step duration multplied by the natural frequency of the LIPM.*/
 
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionLeft;
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionRight;
+
         iDynTree::Vector2 m_zmpPositionWeight; /**< The wight of next step position term in the cost function.*/
         iDynTree::Vector2 m_dcmOffsetWeight;/**< The wight of dcm offset term in the cost function.*/
         double m_sigmaWeight;/**< The wight of step timing term in the cost function.*/
@@ -90,6 +141,7 @@ namespace WalkingControllers
         double m_remainingSingleSupportDuration;/**< The remained single support duration.*/
         double m_stepTiming; /**< The remanined single support duration+(next double support duration)/2  that is used for optimization.*/
         double m_stepDurationTolerance;/**< The tolerance of step timing with respect to the nominal value.*/
+        double m_stepHeight;/**< The maximum height of swing foot.*/
 
         double m_omega;/**< The natural frequency of LIPM.*/
 
@@ -296,6 +348,9 @@ namespace WalkingControllers
          * @return true/false in case of success/failure
          */
         bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
+
+        bool runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output, std::unique_ptr<TrajectoryGenerator> trajectoryGeneratorStepAdjustment, std::unique_ptr<TrajectoryGenerator> trajectoryGenerator);
+
     };
 };
 

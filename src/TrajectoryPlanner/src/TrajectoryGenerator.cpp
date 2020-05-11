@@ -708,6 +708,7 @@ bool TrajectoryGenerator::getRightFootprint(std::shared_ptr<FootPrint>& rightFoo
 
 bool TrajectoryGenerator::getNominalCoMHeight(double& nominalCoMHeight)
 {
+    std::cout<<m_nominalCoMHeight<<"hamin";
     nominalCoMHeight=m_nominalCoMHeight;
     return true;
 }

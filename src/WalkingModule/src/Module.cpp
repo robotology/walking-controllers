@@ -249,6 +249,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_stepAdapter = std::make_unique<StepAdaptationController>();
         yarp::os::Bottle& stepAdaptatorOptions = rf.findGroup("STEP_ADAPTATOR");
         stepAdaptatorOptions.append(generalOptions);
+        stepAdaptatorOptions.append(trajectoryPlannerOptions);
         if(!m_stepAdapter->configure(stepAdaptatorOptions))
         {
             yError() << "[configure] Unable to initialize the step adaptator!";
@@ -766,276 +767,7 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        if (m_useStepAdaptation)
-        {
-            m_isPitchActive=0;
-            m_isRollActive=0;
-            m_stepAdapter->triggerStepAdapterByArmCompliant(m_robotControlHelper->getActuatedDoFs(),m_qDesired,m_robotControlHelper->getJointPosition(),
-                                                            m_leftInContact,m_rightInContact);
-            m_isRollActive=m_stepAdapter->isArmRollActive();
-            m_isPitchActive=m_stepAdapter->isArmPitchActive();
-            if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front()))
-            {
-                yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
-                return false;
-            }
-            m_dcmEstimatedI= m_stepAdapter->getEstimatedDCM();
-        }
-
-        if(m_useStepAdaptation)
-        {
-            //step adjustment
-            double comHeight;
-            double omega;
-
-            if(!m_trajectoryGenerator->getNominalCoMHeight(comHeight)){
-                yError() << "[updateModule] Unable to get the nominal CoM height!";
-                return false;
-            }
-            omega = sqrt(9.81/comHeight);
-
-            if (!m_leftInContact.front() || !m_rightInContact.front())
-            {
-                m_indexPush++;
-
-                int numberOfSubTrajectories = m_DCMSubTrajectories.size();
-                auto firstSS = m_DCMSubTrajectories[numberOfSubTrajectories-2];
-                auto secondSS = m_DCMSubTrajectories[numberOfSubTrajectories-4];
-
-                auto secondDS = m_DCMSubTrajectories[numberOfSubTrajectories-3];
-                auto firstDS = m_DCMSubTrajectories[numberOfSubTrajectories-1];
-
-                iDynTree::Vector2 nextZmpPosition, currentZmpPosition;
-                bool checkFeasibility = false;
-                secondSS->getZMPPosition(0, nextZmpPosition, checkFeasibility);
-                double angle = !m_leftInContact.front()? m_jleftFootprints->getSteps()[1].angle : m_jRightFootprints->getSteps()[1].angle;
-                m_stepAdapter->setNominalNextStepPosition(nextZmpPosition, angle);
-
-                firstSS->getZMPPosition(0, currentZmpPosition, checkFeasibility);
-                m_stepAdapter->setCurrentZmpPosition(currentZmpPosition);
-
-                iDynTree::Vector2 dcmMeasured2D;
-                dcmMeasured2D(0) = m_FKSolver->getDCM()(0);
-                dcmMeasured2D(1) = m_FKSolver->getDCM()(1);
-                m_isPushActive=0;
-
-                if((abs(m_DCMPositionSmoothed(0) - m_stepAdapter->getEstimatedDCM()(0))) > m_stepAdapter->getDCMErrorThreshold()(0) ||(abs(m_DCMPositionSmoothed(1) - m_stepAdapter->getEstimatedDCM()(1)))> m_stepAdapter->getDCMErrorThreshold()(1) )
-                {
-                    if (m_pushRecoveryActiveIndex==5 )
-                    {
-                        m_isPushActive=1;
-                        iDynTree::Vector2 tempDCMError;
-                        tempDCMError(1)=0.00;
-                        tempDCMError(0)=0.00;
-                        m_pushRecoveryActiveIndex++;
-                        yInfo()<<"triggering the push recovery";
-                        if((abs(m_DCMPositionSmoothed(0) - m_stepAdapter->getEstimatedDCM()(0))) > m_stepAdapter->getDCMErrorThreshold()(0))
-                        {
-                            tempDCMError(0)=m_stepAdapter->getEstimatedDCM()(0);
-                        }
-                        if((abs(m_DCMPositionSmoothed(1) - m_stepAdapter->getEstimatedDCM()(1))) > m_stepAdapter->getDCMErrorThreshold()(1))
-                        {
-                            tempDCMError(1)=m_stepAdapter->getEstimatedDCM()(1);
-                        }
-                        m_stepAdapter->setCurrentDcmPosition(tempDCMError);
-                    }
-                    else
-                    {
-                        m_pushRecoveryActiveIndex++;
-                        m_stepAdapter->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
-                    }
-
-                }
-                else
-                {
-                    if (m_pushRecoveryActiveIndex<=5)
-                    {
-                        m_pushRecoveryActiveIndex=0;
-                        m_stepAdapter->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
-                    }
-                    else if(m_pushRecoveryActiveIndex==(5+1))
-                    {
-                        m_stepAdapter->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
-                        m_pushRecoveryActiveIndex++;
-                    }
-                    else
-                    {
-                        m_stepAdapter->setCurrentDcmPosition(m_DCMPositionAdjusted.front());
-                    }
-                }
-
-                iDynTree::Vector2 dcmAtTimeAlpha;
-                double timeAlpha = (secondDS->getTrajectoryDomain().second + secondDS->getTrajectoryDomain().first) / 2;
-                m_DCMSubTrajectories[numberOfSubTrajectories-2]->getDCMPosition(timeAlpha, dcmAtTimeAlpha, checkFeasibility);
-
-                iDynTree::Vector2 nominalDcmOffset;
-                iDynTree::toEigen(nominalDcmOffset) = iDynTree::toEigen(dcmAtTimeAlpha) - iDynTree::toEigen(nextZmpPosition);
-                m_stepAdapter->setNominalDcmOffset(nominalDcmOffset);
-
-                //timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step )
-                m_stepAdapter->setTimings(omega, m_time - m_timeOffset, firstSS->getTrajectoryDomain().second,
-                                            secondDS->getTrajectoryDomain().second - secondDS->getTrajectoryDomain().first);
-
-                SwingFoot swingFoot;
-                if (!m_leftInContact.front())
-                {
-                swingFoot=SwingFoot::Left;
-                }
-                else
-                {
-                swingFoot=SwingFoot::Right;
-                }
-
-                if(!m_stepAdapter->solve(swingFoot))
-                {
-                    yError() << "unable to solve the problem step adjustment";
-                    return false;
-                }
-
-                m_impactTimeNominal = firstSS->getTrajectoryDomain().second + m_timeOffset;
-                if(m_pushRecoveryActiveIndex==(5+1))
-                {
-                    double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +m_stepAdapter->getDesiredImpactTime()-(m_time - m_timeOffset);
-                    m_indexSmoother=timeOfSmoothing/m_dT;
-                    m_kDCMSmoother=0;
-                }
-                if(m_pushRecoveryActiveIndex==(5+1))
-                {
-                    double timeOfSmoothing=m_stepAdapter->getDesiredImpactTime()-(m_time - m_timeOffset);
-                    m_indexFootSmoother=timeOfSmoothing/m_dT;
-                    m_kFootSmoother=0;
-                }
-                m_impactTimeAdjusted = m_stepAdapter->getDesiredImpactTime() + m_timeOffset;
-
-                m_zmpNominal = nextZmpPosition;
-                m_zmpAdjusted = m_stepAdapter->getDesiredZmp();
-
-                if (!m_leftInContact.front())
-                {
-
-                    iDynTree::Vector2 zmpOffset;
-                    zmpOffset.zero();
-                    zmpOffset(0) = 0.03;
-
-                    m_currentFootLeftTransform = m_adaptatedFootLeftTransform;
-                    m_currentFootLeftTwist = m_adaptatedFootLeftTwist;
-                    m_currentFootLeftAcceleration = m_adaptatedFootLeftAcceleration;
-
-                    footTrajectoryGenerationInput inputLeftFootTrajectory;
-                    inputLeftFootTrajectory.maxFootHeight=m_stepHeight;
-                    inputLeftFootTrajectory.discretizationTime=m_dT;
-                    inputLeftFootTrajectory.takeOffTime =firstSS->getTrajectoryDomain().first;
-                    inputLeftFootTrajectory.yawAngleAtImpact=m_jLeftstepList.at(1).angle;
-                    inputLeftFootTrajectory.zmpToCenterOfFootPosition=zmpOffset;
-                    inputLeftFootTrajectory.currentFootTransform=m_currentFootLeftTransform;
-                    inputLeftFootTrajectory.currentFootTwist=m_currentFootLeftTwist;
-
-                    if(!m_stepAdapter->getAdaptatedFootTrajectory(inputLeftFootTrajectory,
-                                                                  m_adaptatedFootLeftTransform, m_adaptatedFootLeftTwist, m_adaptatedFootLeftAcceleration ))
-                    {
-                        yError() << "error write something usefull";
-                        return false;
-                    }
-                }
-                else
-                {
-                    iDynTree::Vector2 zmpOffset;
-                    zmpOffset.zero();
-                    zmpOffset(0) = 0.03;
-
-                    m_currentFootRightTransform = m_adaptatedFootRightTransform;
-                    m_currentFootRightTwist = m_adaptatedFootRightTwist;
-                    m_currentFootRightAcceleration = m_adaptatedFootRightAcceleration;
-
-                    footTrajectoryGenerationInput inputRightFootTrajectory;
-                    inputRightFootTrajectory.maxFootHeight=m_stepHeight;
-                    inputRightFootTrajectory.discretizationTime=m_dT;
-                    inputRightFootTrajectory.takeOffTime =firstSS->getTrajectoryDomain().first;
-                    inputRightFootTrajectory.yawAngleAtImpact=m_jRightstepList.at(1).angle;
-                    inputRightFootTrajectory.zmpToCenterOfFootPosition=zmpOffset;
-                    inputRightFootTrajectory.currentFootTransform=m_currentFootRightTransform;
-                    inputRightFootTrajectory.currentFootTwist=m_currentFootRightTwist;
-
-                    if(!m_stepAdapter->getAdaptatedFootTrajectory(inputRightFootTrajectory,
-                                                                    m_adaptatedFootRightTransform, m_adaptatedFootRightTwist, m_adaptatedFootRightAcceleration ))
-                    {
-                        yError() << "error write something usefull right";
-                        return false;
-                    }
-                }
-
-                // adapted dcm trajectory
-                // add the offset on the zmp evaluated by the step adjustment for each footprint in the trajectory
-                // the same approach is used also for the impact time since the step adjustment change the impact time
-                iDynTree::Vector2 adaptedZMPOffset;
-                iDynTree::toEigen(adaptedZMPOffset) = iDynTree::toEigen(m_stepAdapter->getDesiredZmp()) - iDynTree::toEigen(nextZmpPosition);
-                double adaptedTimeOffset;
-                adaptedTimeOffset = m_stepAdapter->getDesiredImpactTime() - firstSS->getTrajectoryDomain().second;
-
-                // TODO REMOVE MAGIC NUMBERS
-                iDynTree::Vector2 zmpOffset;
-                zmpOffset.zero();
-                zmpOffset(0) = 0.00;
-
-                std::shared_ptr<FootPrint> leftTemp = std::make_unique<FootPrint>();
-                leftTemp->setFootName("left");
-                leftTemp->addStep(m_jleftFootprints->getSteps()[0]);
-                for(int i = 1; i < m_jleftFootprints->getSteps().size(); i++)
-                {
-                    iDynTree::Vector2 position;
-                    iDynTree::toEigen(position) =  iDynTree::toEigen(m_jleftFootprints->getSteps()[i].position) + iDynTree::toEigen(adaptedZMPOffset)
-                            + iDynTree::toEigen(zmpOffset);
-
-                    leftTemp->addStep(position, m_jleftFootprints->getSteps()[i].angle, m_jleftFootprints->getSteps()[i].impactTime + adaptedTimeOffset);
-                }
-
-                std::shared_ptr<FootPrint> rightTemp = std::make_unique<FootPrint>();
-                rightTemp->setFootName("right");
-                rightTemp->addStep(m_jRightFootprints->getSteps()[0]);
-                for(int i = 1; i < m_jRightFootprints->getSteps().size(); i++)
-                {
-                    iDynTree::Vector2 position;
-                    iDynTree::toEigen(position) =  iDynTree::toEigen(m_jRightFootprints->getSteps()[i].position) + iDynTree::toEigen(adaptedZMPOffset)
-                            + iDynTree::toEigen(zmpOffset);
-
-                    rightTemp->addStep(position, m_jRightFootprints->getSteps()[i].angle, m_jRightFootprints->getSteps()[i].impactTime + adaptedTimeOffset);
-                }
-                DCMInitialState tempDCMInitialState;
-                m_trajectoryGenerator->getDCMBoundaryConditionAtMergePoint(tempDCMInitialState);
-                // generate the DCM trajectory
-                if(!m_trajectoryGeneratorStepAdjustment->generateTrajectoriesFromFootprints(leftTemp, rightTemp, m_timeOffset,tempDCMInitialState))
-                {
-                    yError() << "[WalkingModule::updateModule] unable to generatempDCMInitialStatete new trajectorie after step adjustment.";
-                    return false;
-                }
-
-                std::vector<iDynTree::Vector2> DCMPositionAdjusted;
-                std::vector<iDynTree::Vector2> DCMVelocityAdjusted;
-                m_trajectoryGeneratorStepAdjustment->getDCMPositionTrajectory(DCMPositionAdjusted);
-                m_trajectoryGeneratorStepAdjustment->getDCMVelocityTrajectory(DCMVelocityAdjusted);
-
-                size_t startIndexOfDCMAdjusted = (size_t)round((m_time - m_timeOffset) / m_dT);
-
-                m_DCMPositionAdjusted.resize(DCMPositionAdjusted.size() - startIndexOfDCMAdjusted);
-                for(int i = 0; i < m_DCMPositionAdjusted.size(); i++)
-                    m_DCMPositionAdjusted[i] = DCMPositionAdjusted[i + startIndexOfDCMAdjusted];
-
-                m_DCMVelocityAdjusted.resize(DCMVelocityAdjusted.size() - startIndexOfDCMAdjusted);
-                for(int i = 0; i < m_DCMVelocityAdjusted.size(); i++)
-                    m_DCMVelocityAdjusted[i] = DCMVelocityAdjusted[i + startIndexOfDCMAdjusted];
-            }
-
-            else
-            {
-                m_currentFootLeftAcceleration=m_adaptatedFootLeftAcceleration;
-                m_currentFootLeftTwist=m_adaptatedFootLeftTwist;
-                m_currentFootLeftTransform=m_adaptatedFootLeftTransform;
-
-                m_currentFootRightAcceleration=m_adaptatedFootRightAcceleration;
-                m_currentFootRightTwist=m_adaptatedFootRightTwist;
-                m_currentFootRightTransform=m_adaptatedFootRightTransform;
-            }
-        }
+runStepAdaptation( measuredZMP);
 
         // DCM controller
         if(m_useMPC)
@@ -1947,5 +1679,104 @@ bool WalkingModule::dcmSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
     }
 
     iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+m_kDCMSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
+    return true;
+}
+
+bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
+{
+    if (m_useStepAdaptation)
+    {
+        m_isPitchActive=0;
+        m_isRollActive=0;
+        m_stepAdapter->triggerStepAdapterByArmCompliant(m_robotControlHelper->getActuatedDoFs(),m_qDesired,m_robotControlHelper->getJointPosition(),
+                                                        m_leftInContact,m_rightInContact);
+        m_isRollActive=m_stepAdapter->isArmRollActive();
+        m_isPitchActive=m_stepAdapter->isArmPitchActive();
+        if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front()))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
+            return false;
+        }
+        m_dcmEstimatedI= m_stepAdapter->getEstimatedDCM();
+    }
+
+    if(m_useStepAdaptation)
+    {
+        runStepAdapterOutput output;
+        output.indexPush=m_indexPush;
+        output.zmpNominal=m_zmpNominal;
+        output.zmpAdjusted=m_zmpAdjusted;
+        output.isPushActive=m_isPushActive;
+        output.isRollActive=m_isRollActive;
+        output.kDCMSmoother=m_kDCMSmoother;
+        output.indexSmoother=m_indexSmoother;
+        output.impactTimeNominal=m_impactTimeNominal;
+        output.isPitchActive=m_isPitchActive;
+        output.kFootSmoother=m_kFootSmoother;
+        output.indexFootSmoother=m_indexFootSmoother;
+        output.impactTimeAdjusted=m_impactTimeAdjusted;
+        output.dcmPositionAdjusted=m_DCMPositionAdjusted;
+        output.dcmVelocityAdjusted=m_DCMVelocityAdjusted;
+        output.adaptedFootLeftTwist=m_adaptatedFootLeftTwist;
+        output.currentFootLeftTwist=m_currentFootLeftTwist;
+        output.pushRecoveryActiveIndex=m_pushRecoveryActiveIndex;
+        output.adaptedFootRightTwist=m_adaptatedFootRightTwist;
+        output.currentFootRightTwist=m_currentFootRightTwist;
+        output.adaptedFootLeftTransform=m_adaptatedFootLeftTransform;
+        output.currentFootLeftTransform=m_currentFootLeftTransform;
+        output.adaptedFootRightTransform=m_adaptatedFootRightTransform;
+        output.currentFootRightTransform=m_currentFootRightTransform;
+        output.adaptedFootLeftAcceleration=m_adaptatedFootLeftAcceleration;
+        output.currentFootLeftAcceleration=m_currentFootLeftAcceleration;
+        output.timeIndexAfterPushDetection=m_timeIndexAfterPushDetection;
+        output.adaptedFootRightAcceleration=m_adaptatedFootRightAcceleration;
+        output.currentFootRightAcceleration=m_currentFootRightAcceleration;
+        output.FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection;
+
+        runningStepAdapterInput input;
+        input.dT=m_dT;
+        input.time=m_time;
+        input.timeOffset=m_timeOffset;
+        input.leftStepList=m_jLeftstepList;
+        input.leftInContact=m_leftInContact;
+        input.leftFootprints=m_jleftFootprints;
+        input.rightStepList=m_jRightstepList;
+        input.rightInContact=m_rightInContact;
+        input.rightFootprints=m_jRightFootprints;
+        input.dcmSubTrajectories=m_DCMSubTrajectories;
+        input.dcmPositionSmoothed=m_DCMPositionSmoothed;
+
+        m_stepAdapter->runStepAdaptation(input,output,std::move(m_trajectoryGeneratorStepAdjustment),std::move(m_trajectoryGenerator));
+
+        m_indexPush=output.indexPush;
+        m_zmpNominal=output.zmpNominal;
+        m_zmpAdjusted=output.zmpAdjusted;
+        m_isPushActive=output.isPushActive;
+        m_isRollActive=output.isRollActive;
+        m_kDCMSmoother=output.kDCMSmoother;
+        m_indexSmoother=output.indexSmoother;
+        m_impactTimeNominal=output.impactTimeNominal;
+        m_isPitchActive=output.isPitchActive;
+        m_kFootSmoother=output.kFootSmoother;
+        m_indexFootSmoother=output.indexFootSmoother;
+        m_impactTimeAdjusted=output.impactTimeAdjusted;
+        m_DCMPositionAdjusted=output.dcmPositionAdjusted;
+        m_DCMVelocityAdjusted=output.dcmVelocityAdjusted;
+        m_adaptatedFootLeftTwist=output.adaptedFootLeftTwist;
+        m_currentFootLeftTwist=output.currentFootLeftTwist;
+        m_pushRecoveryActiveIndex=output.pushRecoveryActiveIndex;
+        m_adaptatedFootRightTwist=output.adaptedFootRightTwist;
+        m_currentFootRightTwist=output.currentFootRightTwist;
+        m_adaptatedFootLeftTransform=output.adaptedFootLeftTransform;
+        m_currentFootLeftTransform=output.currentFootLeftTransform;
+        m_adaptatedFootRightTransform=output.adaptedFootRightTransform;
+        m_currentFootRightTransform=output.currentFootRightTransform;
+        m_adaptatedFootLeftAcceleration=output.adaptedFootLeftAcceleration;
+        m_currentFootLeftAcceleration=output.currentFootLeftAcceleration;
+        m_timeIndexAfterPushDetection=output.timeIndexAfterPushDetection;
+        m_adaptatedFootRightAcceleration=output.adaptedFootRightAcceleration;
+        m_currentFootRightAcceleration=output.currentFootRightAcceleration;
+        m_FootTimeIndexAfterPushDetection=output.FootTimeIndexAfterPushDetection;
+    }
     return true;
 }

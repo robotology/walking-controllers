@@ -360,6 +360,7 @@ namespace WalkingControllers
          */
         virtual bool stopWalking() override;
 
+        bool runStepAdaptation(iDynTree::Vector2 measuredZMP);
     };
 };
 #endif
