@@ -64,18 +64,6 @@ StepAdaptationController::StepAdaptationController()
 
 bool StepAdaptationController::configure(const yarp::os::Searchable &config)
 {
-    if(!YarpUtilities::getVectorFromSearchable(config, "leftZMPDelta", m_zmpToCenterOfFootPositionLeft))
-    {
-        yError() << "[StepAdaptationController::Configure] Unable to get the vector of leftZMPDelta";
-        return false;
-    }
-
-    if(!YarpUtilities::getVectorFromSearchable(config, "rightZMPDelta", m_zmpToCenterOfFootPositionRight))
-    {
-        yError() << "[StepAdaptationController::Configure] Unable to get the vector of rightZMPDelta";
-        return false;
-    }
-
     if(!YarpUtilities::getNumberFromSearchable(config, "stepHeight", m_stepHeight))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the number";
@@ -635,20 +623,9 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     return true;
 }
 
-bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output, std::unique_ptr<TrajectoryGenerator> trajectoryGeneratorStepAdjustment,std::unique_ptr<TrajectoryGenerator> trajectoryGenerator)
+bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output)
 {
-    //step adjustment
-    double comHeight;
-    double omega;
-
-    if(!trajectoryGenerator->getNominalCoMHeight(comHeight))
-    {
-        yError() << "[updateModule] Unable to get the nominal CoM height!";
-        return false;
-    }
-    omega = sqrt(9.81/comHeight);
-
-        if (!input.leftInContact.front() || !input.rightInContact.front())
+    if (!input.leftInContact.front() || !input.rightInContact.front())
     {
         output.indexPush=output.indexPush+1;
 
@@ -725,7 +702,7 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput i
         setNominalDcmOffset(nominalDcmOffset);
 
         //timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step )
-        setTimings(omega, input.time - input.timeOffset, firstSS->getTrajectoryDomain().second,
+        setTimings(input.omega, input.time - input.timeOffset, firstSS->getTrajectoryDomain().second,
                                     secondDS->getTrajectoryDomain().second - secondDS->getTrajectoryDomain().first);
 
         SwingFoot swingFoot;
@@ -816,68 +793,7 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput i
             }
         }
 
-        // adapted dcm trajectory
-        // add the offset on the zmp evaluated by the step adjustment for each footprint in the trajectory
-        // the same approach is used also for the impact time since the step adjustment change the impact time
-        iDynTree::Vector2 adaptedZMPOffset;
-        iDynTree::toEigen(adaptedZMPOffset) = iDynTree::toEigen(getDesiredZmp()) - iDynTree::toEigen(nextZmpPosition);
-        double adaptedTimeOffset;
-        adaptedTimeOffset = getDesiredImpactTime() - firstSS->getTrajectoryDomain().second;
 
-        // TODO REMOVE MAGIC NUMBERS
-        iDynTree::Vector2 zmpOffset;
-        zmpOffset.zero();
-        zmpOffset(0) = 0.00;
-
-        std::shared_ptr<FootPrint> leftTemp = std::make_unique<FootPrint>();
-        leftTemp->setFootName("left");
-        leftTemp->addStep(input.leftFootprints->getSteps()[0]);
-
-        for(int i = 1; i < input.leftFootprints->getSteps().size(); i++)
-        {
-            iDynTree::Vector2 position;
-            iDynTree::toEigen(position) =  iDynTree::toEigen(input.leftFootprints->getSteps()[i].position) + iDynTree::toEigen(adaptedZMPOffset)
-                                         + iDynTree::toEigen(zmpOffset);
-            leftTemp->addStep(position, input.leftFootprints->getSteps()[i].angle, input.leftFootprints->getSteps()[i].impactTime + adaptedTimeOffset);
-        }
-
-        std::shared_ptr<FootPrint> rightTemp = std::make_unique<FootPrint>();
-        rightTemp->setFootName("right");
-        rightTemp->addStep(input.rightFootprints->getSteps()[0]);
-
-        for(int i = 1; i < input.rightFootprints->getSteps().size(); i++)
-        {
-            iDynTree::Vector2 position;
-            iDynTree::toEigen(position) =  iDynTree::toEigen(input.rightFootprints->getSteps()[i].position) + iDynTree::toEigen(adaptedZMPOffset)
-                    + iDynTree::toEigen(zmpOffset);
-
-            rightTemp->addStep(position, input.rightFootprints->getSteps()[i].angle, input.rightFootprints->getSteps()[i].impactTime + adaptedTimeOffset);
-        }
-        DCMInitialState tempDCMInitialState;
-        trajectoryGenerator->getDCMBoundaryConditionAtMergePoint(tempDCMInitialState);
-
-        // generate the DCM trajectory
-        if(!trajectoryGeneratorStepAdjustment->generateTrajectoriesFromFootprints(leftTemp, rightTemp, input.timeOffset,tempDCMInitialState))
-        {
-            yError() << "[WalkingModule::updateModule] unable to generatempDCMInitialStatete new trajectorie after step adjustment.";
-            return false;
-        }
-
-        std::vector<iDynTree::Vector2> DCMPositionAdjusted;
-        std::vector<iDynTree::Vector2> DCMVelocityAdjusted;
-        trajectoryGeneratorStepAdjustment->getDCMPositionTrajectory(DCMPositionAdjusted);
-        trajectoryGeneratorStepAdjustment->getDCMVelocityTrajectory(DCMVelocityAdjusted);
-
-        size_t startIndexOfDCMAdjusted = (size_t)round((input.time - input.timeOffset) /input.dT);
-
-        output.dcmPositionAdjusted.resize(DCMPositionAdjusted.size() - startIndexOfDCMAdjusted);
-
-        for(int i = 0; i < output.dcmPositionAdjusted.size(); i++)
-            output.dcmPositionAdjusted[i] = DCMPositionAdjusted[i + startIndexOfDCMAdjusted];
-
-        output.dcmVelocityAdjusted.resize(DCMVelocityAdjusted.size() - startIndexOfDCMAdjusted);
-        for(int i = 0; i < output.dcmVelocityAdjusted.size(); i++)
-            output.dcmVelocityAdjusted[i] = DCMVelocityAdjusted[i + startIndexOfDCMAdjusted];
     }
 
     else
@@ -911,6 +827,7 @@ bool StepAdaptationController::isArmPitchActive()
 iDynTree::Vector2 StepAdaptationController::getDCMErrorThreshold(){
     return m_dcmErrorThreshold;
 }
+
 iDynTree::Vector2 StepAdaptationController::getRollPitchErrorThreshold(){
     return m_rollPitchErrorThreshold;
 }

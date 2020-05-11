@@ -48,6 +48,7 @@ struct runningStepAdapterInput
     double time;
     double timeOffset;
     double dT;
+    double omega;
     std::deque<bool> leftInContact;
     std::deque<bool> rightInContact;
     std::vector<std::shared_ptr<GeneralSupportTrajectory>> dcmSubTrajectories;
@@ -124,9 +125,6 @@ namespace WalkingControllers
         iDynTree::Vector2 m_zmpPositionNominal; /**< The next desired step position(The zmp position for next single support) .. */
         iDynTree::Vector2 m_dcmOffsetNominal; /**< The next desired dcm offset*/
         double m_sigmaNominal; /**< The exponential function of step duration multplied by the natural frequency of the LIPM.*/
-
-        iDynTree::Vector2 m_zmpToCenterOfFootPositionLeft;
-        iDynTree::Vector2 m_zmpToCenterOfFootPositionRight;
 
         iDynTree::Vector2 m_zmpPositionWeight; /**< The wight of next step position term in the cost function.*/
         iDynTree::Vector2 m_dcmOffsetWeight;/**< The wight of dcm offset term in the cost function.*/
@@ -349,7 +347,7 @@ namespace WalkingControllers
          */
         bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
 
-        bool runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output, std::unique_ptr<TrajectoryGenerator> trajectoryGeneratorStepAdjustment, std::unique_ptr<TrajectoryGenerator> trajectoryGenerator);
+        bool runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output);
 
     };
 };

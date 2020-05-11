@@ -101,6 +101,9 @@ namespace WalkingControllers
         std::shared_ptr<FootPrint> m_jleftFootprints; /**< The left foot prints */
         std::shared_ptr<FootPrint> m_jRightFootprints;/**< The right foot prints */
 
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionLeft;
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionRight;
+
         StepList m_jLeftstepList; /**< The list of left foot steps */
         StepList m_jRightstepList;/**< The list of right foot steps */
 
