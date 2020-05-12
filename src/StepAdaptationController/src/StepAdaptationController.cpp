@@ -646,7 +646,7 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     return true;
 }
 
-bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output)
+bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& input, runStepAdapterOutput& output)
 {
     if (!input.leftInContact.front() || !input.rightInContact.front())
     {

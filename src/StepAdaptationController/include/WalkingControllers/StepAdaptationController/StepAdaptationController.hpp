@@ -351,7 +351,7 @@ namespace WalkingControllers
          */
         bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
 
-        bool runStepAdaptation(const runningStepAdapterInput input, runStepAdapterOutput& output);
+        bool runStepAdaptation(const runningStepAdapterInput &input, runStepAdapterOutput& output);
 
     };
 };
