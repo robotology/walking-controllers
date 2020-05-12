@@ -129,12 +129,16 @@ namespace WalkingControllers
         iDynTree::Vector2 m_zmpPositionWeight; /**< The wight of next step position term in the cost function.*/
         iDynTree::Vector2 m_dcmOffsetWeight;/**< The wight of dcm offset term in the cost function.*/
         double m_sigmaWeight;/**< The wight of step timing term in the cost function.*/
+        double m_pushRecoveryActivationIndex;/**< A threshold index for activation of push recovery.*/
 
         iDynTree::Vector2 m_dcmErrorThreshold; /**< The threshold for activating the push recovery based on DCM error.*/
         iDynTree::Vector2 m_rollPitchErrorThreshold; /**< The threshold for activating the pendulum estimator based on the foot orientation error.*/
 
         iDynTree::Vector2 m_currentZmpPosition; /**< The current step position(The zmp position of current stance foot). */
         iDynTree::Vector2 m_currentDcmPosition; /**< The current DCM position.*/
+
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionLeft;
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionRight;
 
         double m_remainingSingleSupportDuration;/**< The remained single support duration.*/
         double m_stepTiming; /**< The remanined single support duration+(next double support duration)/2  that is used for optimization.*/
