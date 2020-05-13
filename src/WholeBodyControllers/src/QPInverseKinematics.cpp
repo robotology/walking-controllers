@@ -171,6 +171,14 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
         }
     }
 
+    m_jointRegularizationGains.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_gains",
+                                               m_jointRegularizationGains))
+    {
+        yError() << "Initialization failed while reading jointRegularizationGains vector.";
+        return false;
+    }
+
      // if the joint retargeting is enabled the weights of the cost function are time-variant.
     if (m_retargetingType != RetargetingType::jointRetargeting)
     {
@@ -187,14 +195,11 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
             yError() << "Initialization failed while reading jointRegularizationWeights vector.";
             return false;
         }
-    }
 
-    m_jointRegularizationGains.resize(m_actuatedDOFs);
-    if(!YarpUtilities::getVectorFromSearchable(config, "joint_regularization_gains",
-                                               m_jointRegularizationGains))
-    {
-        yError() << "Initialization failed while reading jointRegularizationGains vector.";
-        return false;
+        // if the joint retargeting is NOT enabled both the jointRegularizationWeights and the
+        // jointRegularizationGains are constant. For this reason we can compute their product
+        m_jointRegularizationGainsTimeWeights.resize(m_actuatedDOFs);
+        iDynTree::toEigen(m_jointRegularizationGainsTimeWeights) = iDynTree::toEigen(m_jointRegularizationWeights).cwiseProduct(iDynTree::toEigen(m_jointRegularizationGains));
     }
 
     if(!YarpUtilities::getNumberFromSearchable(config, "k_posFoot", m_kPosFoot))
@@ -675,15 +680,14 @@ void WalkingQPIK::evaluateGradientVector()
     iDynTree::Matrix3x3 errorNeckAttitude = iDynTreeUtilities::Rotation::skewSymmetric(m_neckOrientation * m_desiredNeckOrientation.inverse());
     if(m_retargetingType != RetargetingType::jointRetargeting)
     {
-        auto jointRegularizationWeights(iDynTree::toEigen(m_jointRegularizationWeights));
+        auto jointRegularizationGainsTimeWeights(iDynTree::toEigen(m_jointRegularizationGainsTimeWeights));
 
         gradient = -neckJacobian.transpose() * m_neckWeight * (-m_kNeck * iDynTree::unskew(iDynTree::toEigen(errorNeckAttitude)));
 
         // g = Weight * K_p * (regularizationTerm - jointPosition)
         // Weight  and K_p are two diagonal matrices so their product can be also evaluated multiplying component-wise
         // the elements of the vectors and then generating the diagonal matrix
-        gradient.tail(m_actuatedDOFs) += (-jointRegularizationWeights.cwiseProduct(jointRegularizationGains)).asDiagonal()
-            * (regularizationTerm - jointPosition);
+        gradient.tail(m_actuatedDOFs) -= jointRegularizationGainsTimeWeights.asDiagonal() * (regularizationTerm - jointPosition);
     }
     else
     {

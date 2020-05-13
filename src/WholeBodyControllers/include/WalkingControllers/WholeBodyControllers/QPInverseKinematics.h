@@ -109,6 +109,12 @@ namespace WalkingControllers
         double m_kCom; /**< Gain related to the desired CoM position. */
 
         iDynTree::VectorDynSize m_jointRegularizationWeights; /**< Weight related to the the regularization term */
+
+        iDynTree::VectorDynSize m_jointRegularizationGainsTimeWeights; /**< Product between the jointRegularizationGains
+                                                                          and the jointRegularizationWeights.
+                                                                          This quantity is used only if the joint retargeting is
+                                                                          disabled*/
+
         iDynTree::Vector3 m_comWeight; /**< CoM weight. */
         double m_neckWeight; /**< Neck weight matrix. */
         iDynSparseMatrix m_jointRegularizationHessian; /**< Contains a constant matrix that can be useful
