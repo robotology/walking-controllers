@@ -36,6 +36,14 @@ namespace WalkingControllers
  */
     class RetargetingClient
     {
+    public:
+        enum class Phase
+        {
+            approacing,
+            stance,
+            walking
+        };
+
     private:
 
         template <class Data>
@@ -80,9 +88,7 @@ namespace WalkingControllers
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
-        bool m_isStancePhase{true}; /**< True if the robot is not walking */
-
-        bool m_isApproachingPhase; /**< True if the robot is in the approaching phase */
+        Phase m_phase{Phase::approacing};
         double m_startingApproachingPhaseTime; /**< Initial time of the approaching phase (seconds) */
         double m_approachPhaseDuration; /**< Duration of the approaching phase (seconds) */
 
@@ -165,7 +171,7 @@ namespace WalkingControllers
         void setRobotBaseOrientation(const iDynTree::Rotation& rotation);
 
 
-        void setPhase(bool isStancePhase);
+        void setPhase(Phase phase);
 
         /**
          * Start the approaching phase

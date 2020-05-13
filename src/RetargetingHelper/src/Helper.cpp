@@ -44,9 +44,6 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
     m_useCoMHeightRetargeting = config.check("use_com_retargeting", yarp::os::Value(false)).asBool();
 
-    // The approaching phase is set only if the startApproachingPhase method is called
-    m_isApproachingPhase = false;
-
     if(m_useJointRetargeting && m_useHandRetargeting)
     {
         yError() << "[RetargetingClient::initialize] You cannot enable the joint retargeting along with the hand retargeting.";
@@ -318,7 +315,7 @@ void RetargetingClient::getFeedback()
 
     if(m_useCoMHeightRetargeting)
     {
-        if(!m_isStancePhase)
+        if(m_phase == Phase::walking)
             m_comHeight.yarpReadBuffer(0) = m_comConstantHeight;
         else
         {
@@ -335,7 +332,7 @@ void RetargetingClient::getFeedback()
     }
 
     // check if the approaching phase is finished
-    if(m_isApproachingPhase)
+    if(m_phase == Phase::approacing)
     {
         double now = yarp::os::Time::now();
         if(now - m_startingApproachingPhaseTime > m_approachPhaseDuration)
@@ -399,9 +396,20 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
     m_robotOrientationPort.write(false);
 }
 
-void RetargetingClient::setPhase(bool isStancePhase)
+void RetargetingClient::setPhase(Phase phase)
 {
-    m_isStancePhase = isStancePhase;
+    if(phase == Phase::approacing)
+    {
+        startApproachingPhase();
+    }
+
+    if(m_phase == Phase::approacing && phase == Phase::walking)
+        stopApproachingPhase();
+
+    if(m_phase == Phase::approacing && phase == Phase::stance)
+        stopApproachingPhase();
+
+    m_phase = phase;
 }
 
 void RetargetingClient::stopApproachingPhase()
@@ -422,7 +430,7 @@ void RetargetingClient::stopApproachingPhase()
         m_comHeight.smoother->setT(m_comHeight.smoothingTimeInWalking);
     }
 
-    m_isApproachingPhase = false;
+    m_phase = Phase::stance;
 }
 
 void RetargetingClient::startApproachingPhase()
@@ -449,10 +457,9 @@ void RetargetingClient::startApproachingPhase()
         m_comHeight.smoother->setT(m_comHeight.smoothingTimeInApproaching);
     }
 
-    m_isApproachingPhase = true;
 }
 
 bool RetargetingClient::isApproachingPhase() const
 {
-    return m_isApproachingPhase;
+    return m_phase == Phase::approacing;
 }
