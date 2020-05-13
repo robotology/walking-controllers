@@ -37,12 +37,15 @@ namespace WalkingControllers
     class RetargetingClient
     {
     public:
-        enum class Phase
-        {
-            approacing,
-            stance,
-            walking
-        };
+      enum class Phase
+      {
+          /** In this phase the smoothing time of the minimum jerk trajectory is
+              increased. This will guarantee a smoother transition between the
+              initial joint configuration and the desired joint configuration. */
+          approacing,
+          stance,
+          walking
+      };
 
     private:
 
