@@ -1311,8 +1311,6 @@ bool WalkingModule::setPlannerInput(double x, double y)
 
     m_newTrajectoryRequired = true;
 
-    double treshold = 0.01;
-
     return true;
 }
 
