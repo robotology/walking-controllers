@@ -46,6 +46,7 @@ namespace WalkingControllers
 
         double m_dT; /**< Sampling time of the planner. */
         double m_plannerHorizon; /**< Horizon of the planner. */
+        std::size_t m_stancePhaseDelay; /**< Delay in ticks of the beginning of the stance phase. */
 
         double m_nominalWidth; /**< Nominal width between two feet. */
         double m_initTime; /**< Init time of the current trajectory. */
@@ -226,6 +227,14 @@ namespace WalkingControllers
          */
         bool getWeightPercentage(std::vector<double> &weightInLeft, std::vector<double> &weightInRight);
 
+        /**
+         * Get the desired current state of the robot. If the robot is not walking (i.e. the DCM
+         * velocity is almost zero), it is considered in "stance" phase.
+         * @param isStancePhase vector containing if the robot is in the stance phase during the
+         * entire horizon.
+         * @return true/false in case of success/failure.
+         */
+        bool getIsStancePhase(std::vector<bool>& isStancePhase);
 
         /**
          * Reset the planner

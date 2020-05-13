@@ -284,7 +284,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle retargetingOptions = rf.findGroup("RETARGETING");
     retargetingOptions.append(generalOptions);
     m_retargetingClient = std::make_unique<RetargetingClient>();
-    if (!m_retargetingClient->initialize(retargetingOptions, getName(), m_dT))
+    if (!m_retargetingClient->initialize(retargetingOptions, getName(), m_dT, m_robotControlHelper->getAxesList()))
     {
         yError() << "[WalkingModule::configure] Failed to configure the retargeting";
         return false;
@@ -378,18 +378,8 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
                               iDynTree::VectorDynSize &output)
 {
     bool ok = true;
-    double threshold = 0.001;
-    bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-    solver->setPhase(stancePhase);
-
-    ok &= solver->setRobotState(m_robotControlHelper->getJointPosition(),
-                                m_FKSolver->getLeftFootToWorldTransform(),
-                                m_FKSolver->getRightFootToWorldTransform(),
-                                m_FKSolver->getLeftHandToWorldTransform(),
-                                m_FKSolver->getRightHandToWorldTransform(),
-                                m_FKSolver->getNeckOrientation(),
-                                m_FKSolver->getCoMPosition());
-
+    solver->setPhase(m_isStancePhase.front());
+    ok &= solver->setRobotState(*m_FKSolver);
     solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
 
     solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
@@ -404,6 +394,8 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     // TODO probably the problem can be written locally w.r.t. the root or the base
     solver->setDesiredHandsTransformation(m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->leftHandTransform(),
                                           m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->rightHandTransform());
+
+    ok &= solver->setDesiredRetargetingJoint(m_retargetingClient->jointValues());
 
     // set jacobians
     iDynTree::MatrixDynSize jacobian, comJacobian;
@@ -469,6 +461,16 @@ bool WalkingModule::updateModule()
         }
         if(motionDone)
         {
+            // send the reference again in order to reduce error
+            if(!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            {
+                yError() << "[prepareRobot] Error while setting the initial position using "
+                         << "POSITION DIRECT mode.";
+                yInfo() << "[WalkingModule::updateModule] Try to prepare again";
+                reset();
+                m_robotState = WalkingFSM::Stopped;
+                return true;
+            }
 
             yarp::sig::Vector buffer(m_qDesired.size());
             iDynTree::toYarp(m_qDesired, buffer);
@@ -499,10 +501,12 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            m_retargetingClient->reset(m_FKSolver->getHeadToWorldTransform().inverse()
-                                       * m_FKSolver->getLeftHandToWorldTransform(),
-                                       m_FKSolver->getHeadToWorldTransform().inverse()
-                                       * m_FKSolver->getRightHandToWorldTransform());
+            if(!m_retargetingClient->reset(*m_FKSolver))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to reset the retargeting client.";
+                return false;
+
+            }
 
 
             m_robotState = WalkingFSM::Prepared;
@@ -583,6 +587,13 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+        // if the retargeting is not in the approaching phase we can set the stance/walking phase
+        if(!m_retargetingClient->isApproachingPhase())
+        {
+            auto retargetingPhase = m_isStancePhase.front() ? RetargetingClient::Phase::stance : RetargetingClient::Phase::walking;
+            m_retargetingClient->setPhase(retargetingPhase);
+        }
+
         m_retargetingClient->getFeedback();
 
         if(!updateFKSolver())
@@ -653,9 +664,7 @@ bool WalkingModule::updateModule()
         // inner COM-ZMP controller
         // if the the norm of desired DCM velocity is lower than a threshold then the robot
         // is stopped
-        double threshold = 0.001;
-        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-        m_walkingZMPController->setPhase(stancePhase);
+        m_walkingZMPController->setPhase(m_isStancePhase.front());
 
         iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
@@ -688,13 +697,13 @@ bool WalkingModule::updateModule()
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_comHeightTrajectory.front();
+        desiredCoMPosition(2) = m_retargetingClient->comHeight();
 
 
         iDynTree::Vector3 desiredCoMVelocity;
         desiredCoMVelocity(0) = outputZMPCoMControllerVelocity(0);
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
-        desiredCoMVelocity(2) = m_comHeightVelocity.front();
+        desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
 
         // evaluate desired neck transformation
         double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
@@ -798,19 +807,24 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-                                      m_stableDCMModel->getCoMPosition(),
-                                      m_stableDCMModel->getCoMVelocity(),
+                                      m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight()),
+                                      m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      errorL, errorR);
+                                      m_robotControlHelper->getJointPosition(),
+                                      m_retargetingClient->jointValues());
         }
 
-        propagateTime();
+        // in the approaching phase the robot should not move and the trajectories should not advance
+        if(!m_retargetingClient->isApproachingPhase())
+        {
+                propagateTime();
 
-        // advance all the signals
-        advanceReferenceSignals();
+                // advance all the signals
+                advanceReferenceSignals();
+        }
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
     }
@@ -1098,6 +1112,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<double> comHeightVelocity;
     std::vector<size_t> mergePoints;
     std::vector<bool> isLeftFixedFrame;
+    std::vector<bool> isStancePhase;
 
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
@@ -1116,6 +1131,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get merge points
     m_trajectoryGenerator->getMergePoints(mergePoints);
 
+    // get stance phase flags
+    m_trajectoryGenerator->getIsStancePhase(isStancePhase);
+
     // append vectors to deques
     StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
@@ -1131,6 +1149,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
     StdUtilities::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
+
+    StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 
@@ -1187,8 +1207,8 @@ bool WalkingModule::startWalking()
                     "zmp_x", "zmp_y",
                     "zmp_des_x", "zmp_des_y",
                     "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y",
-                    "com_des_dx", "com_des_dy",
+                    "com_des_x", "com_des_y", "com_des_z",
+                    "com_des_dx", "com_des_dy", "com_des_dz",
                     "lf_x", "lf_y", "lf_z",
                     "lf_roll", "lf_pitch", "lf_yaw",
                     "rf_x", "rf_y", "rf_z",
@@ -1197,10 +1217,18 @@ bool WalkingModule::startWalking()
                     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "lf_err_x", "lf_err_y", "lf_err_z",
-                    "lf_err_roll", "lf_err_pitch", "lf_err_yaw",
-                    "rf_err_x", "rf_err_y", "rf_err_z",
-                    "rf_err_roll", "rf_err_pitch", "rf_err_yaw"});
+                    "neck_pitch", "neck_roll", "neck_yaw",
+                    "torso_pitch", "torso_roll", "torso_yaw",
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup",
+                    "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
+                    "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
+                    "neck_pitch_des", "neck_roll_des", "neck_yaw_des",
+                    "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des",
+                    "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
+                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des"});
     }
 
     // if the robot was only prepared the filters has to be reseted
@@ -1219,12 +1247,15 @@ bool WalkingModule::startWalking()
 
      }
 
-    if (!m_robotControlHelper->setInteractionMode())
+    if (!m_robotControlHelper->loadCustomInteractionMode())
     {
         yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
         return false;
     }
 
+    // before running the controller the retargeting client goes in approaching phase this
+    // guarantees a smooth transition
+    m_retargetingClient->setPhase(RetargetingClient::Phase::approacing);
     m_robotState = WalkingFSM::Walking;
 
     return true;
@@ -1232,6 +1263,12 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(double x, double y)
 {
+    // in the approaching phase the robot should not move
+    // as soon as the approaching phase is finished the user
+    // can move the robot
+    if(m_retargetingClient->isApproachingPhase())
+        return true;
+
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
     {

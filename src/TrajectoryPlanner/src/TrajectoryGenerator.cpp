@@ -55,6 +55,9 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     m_plannerHorizon = config.check("plannerHorizon", yarp::os::Value(20.0)).asDouble();
     double unicycleGain = config.check("unicycleGain", yarp::os::Value(10.0)).asDouble();
+    double stancePhaseDelaySeconds = config.check("stance_phase_delay",yarp::os::Value(0.0)).asDouble();
+
+    m_stancePhaseDelay = (std::size_t) std::round(stancePhaseDelaySeconds / m_dT);
 
     if(!YarpUtilities::getVectorFromSearchable(config, "referencePosition", m_referencePointDistance))
     {
@@ -632,4 +635,46 @@ void TrajectoryGenerator::reset()
 
     // change the state of the generator
     m_generatorState = GeneratorState::FirstStep;
+}
+
+bool TrajectoryGenerator::getIsStancePhase(std::vector<bool>& isStancePhase)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getDCMVelocityTrajectory] No trajectories are available";
+        return false;
+    }
+
+    const auto & DCMVelocityTrajectory = m_dcmGenerator->getDCMVelocity();
+    isStancePhase.resize(DCMVelocityTrajectory.size());
+
+    double threshold = 0.001;
+
+    // here there is the assumption that each trajectory begins with a stance phase
+    std::size_t stancePhaseDelayCounter = 0;
+    for(std::size_t i = 0; i < DCMVelocityTrajectory.size(); i++)
+    {
+        // in this case the robot is moving
+        if(iDynTree::toEigen(DCMVelocityTrajectory[i]).norm() > threshold)
+        {
+            isStancePhase[i] = false;
+            // reset the counter for the beginning of the next stance phase.
+            // If m_stancePhaseDelay is equal to zero, the stance phase will not be delayed
+            stancePhaseDelayCounter = m_stancePhaseDelay;
+        }
+        else
+        {
+            // decreased the counter only if it is different from zero.
+            // it is required to add a delay in the beginning of the stance phase
+            stancePhaseDelayCounter = stancePhaseDelayCounter == 0 ? 0 : stancePhaseDelayCounter--;
+
+            // the delay expired the robot can be considered stance
+            if(stancePhaseDelayCounter == 0)
+                isStancePhase[i] = true;
+            else
+                isStancePhase[i] = false;
+        }
+    }
+
+    return true;
 }

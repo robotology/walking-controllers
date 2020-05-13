@@ -9,7 +9,7 @@
 using namespace WalkingControllers;
 
 bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                                std::pair<int, double>& worstError)
+                                   std::pair<int, double>& worstError)
 {
     if(!m_encodersInterface)
     {
@@ -30,14 +30,15 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
     double absoluteJointErrorRad;
     for(int i = 0; i < m_actuatedDOFs; i++)
     {
-        currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
-        absoluteJointErrorRad = std::fabs(iDynTreeUtilities::shortestAngularDistance(currentJointPositionRad,
-                                                                                  desiredJointPositionsRad(i)));
-        if(m_currentModeofJoints.at(i)==yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF)
+        if (m_currentJointInteractionMode[i] == yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF
+            && m_isGoodTrackingRequired[i])
         {
+            currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
+            absoluteJointErrorRad = std::abs(iDynTreeUtilities::shortestAngularDistance(currentJointPositionRad,
+                                                                                        desiredJointPositionsRad(i)));
             if(absoluteJointErrorRad > worstError.second)
             {
-                worstError.first =i;
+                worstError.first = i;
                 worstError.second = absoluteJointErrorRad;
             }
         }
@@ -157,7 +158,6 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
 bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
 {
-
     // robot name: used to connect to the robot
     std::string robot = config.check("robot", yarp::os::Value("icubSim")).asString();
 
@@ -213,32 +213,50 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     yarp::os::Property& remoteControlBoardsOpts = options.addGroup("REMOTE_CONTROLBOARD_OPTIONS");
     remoteControlBoardsOpts.put("writeStrict", "on");
 
+    // get the actuated DoFs
     m_actuatedDOFs = m_axesList.size();
 
-    m_isJointModeStiffVector.resize(m_actuatedDOFs);
-    m_JointModeStiffVectorDefult.resize(m_actuatedDOFs);
-    m_jointModes.resize(m_actuatedDOFs);
-    if(!YarpUtilities::getVectorOfBooleanFromSearchable(config,"joint_is_stiff_mode",m_jointModes))
+    m_isGoodTrackingRequired.resize(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorOfBooleanFromSearchable(config, "good_tracking_required",
+                                                        m_isGoodTrackingRequired))
+    {
+        yError() << "[RobotInterface::configureRobot] Unable to find is_good_tracking_required into config file.";
+        return false;
+    }
+
+    m_jointInteractionMode.resize(m_actuatedDOFs);
+    m_currentJointInteractionMode.resize(m_actuatedDOFs);
+    std::vector<bool> isJointInStiffMode(m_actuatedDOFs);
+    if(!YarpUtilities::getVectorOfBooleanFromSearchable(config, "joint_is_stiff_mode",
+                                                        isJointInStiffMode))
     {
         yError() << "[RobotInterface::configureRobot] Unable to find joint_is_stiff_mode into config file.";
         return false;
     }
 
-    for (unsigned int i=0;i<m_actuatedDOFs;i++)
+    for (unsigned int i = 0; i < m_actuatedDOFs; i++)
     {
-        m_JointModeStiffVectorDefult.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
-        if(m_jointModes[i])
+        if(isJointInStiffMode[i])
         {
-            m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
+            m_jointInteractionMode[i] = yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF;
         }
         else
         {
-            m_isJointModeStiffVector.at(i)=yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT;
+            m_jointInteractionMode[i] = yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT;
         }
     }
-    m_currentModeofJoints=m_JointModeStiffVectorDefult;
 
-     // open the device
+    for (unsigned int i = 0; i < m_actuatedDOFs; i++)
+    {
+        if(m_jointInteractionMode[i] == yarp::dev::InteractionModeEnum::VOCAB_IM_COMPLIANT
+           && m_isGoodTrackingRequired[i])
+        {
+            yWarning() << "[configureRobot] The control mode of the the joint " << m_axesList[i]
+                       << " is set to COMPLIANT. It is not possible to guarantee a good tracking.";
+        }
+    }
+
+    // open the device
     if(!m_robotDevice.open(options))
     {
         yError() << "[configureRobot] Could not open remotecontrolboardremapper object.";
@@ -282,10 +300,10 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
-    if(!m_robotDevice.view(m_InteractionInterface) || !m_InteractionInterface)
+    if(!m_robotDevice.view(m_interactionInterface) || !m_interactionInterface)
     {
-             yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
-            return false;
+        yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+        return false;
     }
 
     // resize the buffers
@@ -374,25 +392,38 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     }
 
     m_useExternalRobotBase = config.check("use_external_robot_base", yarp::os::Value("False")).asBool();
-        if(m_useExternalRobotBase)
+    if(m_useExternalRobotBase)
+    {
+        m_robotBasePort.open("/" + name + "/robotBase:i");
+        // connect port
+
+        std::string floatingBasePortName;
+        if(!YarpUtilities::getStringFromSearchable(config, "floating_base_port_name", floatingBasePortName))
         {
-            m_robotBasePort.open("/" + name + "/robotBase:i");
-            // connect port
-
-            std::string floatingBasePortName;
-            if(!YarpUtilities::getStringFromSearchable(config, "floating_base_port_name", floatingBasePortName))
-            {
-                yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
-                return false;
-            }
-
-            if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
-            {
-                yError() << "Unable to connect to port " << "/" + name + "/robotBase:i";
-                return false;
-            }
+            yError() << "[RobotHelper::configureForceTorqueSensors] Unable to get the string from searchable.";
+            return false;
         }
-        m_heightOffset = 0;
+
+        if(!yarp::os::Network::connect(floatingBasePortName, "/" + name + "/robotBase:i"))
+        {
+            yError() << "Unable to connect to port " << "/" + name + "/robotBase:i";
+            return false;
+        }
+    }
+    m_heightOffset = 0;
+
+
+    // set the default control mode
+    if(!m_interactionInterface->getInteractionModes(m_currentJointInteractionMode.data()))
+    {
+        yError() << "[RobotHelper::configure] Unable to get the interaction mode.";
+        return  false;
+    }
+    if(!setInteractionMode(yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF))
+    {
+        yError() << "[RobotInterface::configureRobot] Unable to set the stiff control mode for all joints.";
+        return false;
+    }
 
     return true;
 }
@@ -420,9 +451,9 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
     // open and connect left foot wrench
     if(!YarpUtilities::getStringFromSearchable(config, "leftFootWrenchInputPort_name", portInput))
     {
-      yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get "
-                  "the string from searchable.";
-      return false;
+        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get "
+            "the string from searchable.";
+        return false;
     }
     if(!YarpUtilities::getStringFromSearchable(config, "leftFootWrenchOutputPort_name", portOutput))
     {
@@ -558,8 +589,29 @@ bool RobotInterface::switchToControlMode(const int& controlMode)
     return true;
 }
 
+bool RobotInterface::setInteractionMode(yarp::dev::InteractionModeEnum interactionMode)
+{
+    std::vector<yarp::dev::InteractionModeEnum> interactionModes(m_actuatedDOFs, interactionMode);
+
+    return setInteractionMode(interactionModes);
+}
+
+bool RobotInterface::setInteractionMode(std::vector<yarp::dev::InteractionModeEnum>& interactionModes)
+{
+    if(m_currentJointInteractionMode != interactionModes)
+    {
+        bool ok = m_interactionInterface->setInteractionModes(interactionModes.data());
+        if (ok)
+            m_currentJointInteractionMode = interactionModes;
+
+        return ok;
+    }
+
+    return true;
+}
+
 bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desiredJointPositionsRad,
-                                        const double& positioningTimeSec)
+                                           const double& positioningTimeSec)
 {
     if(m_controlMode != VOCAB_CM_POSITION)
     {
@@ -579,11 +631,11 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
         return false;
     }
 
-    if(m_InteractionInterface == nullptr)
-        {
-            yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
-            return false;
-        }
+    if(m_interactionInterface == nullptr)
+    {
+        yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
+        return false;
+    }
 
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
@@ -614,13 +666,14 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
     }
 
     std::vector<double> refSpeeds(m_actuatedDOFs);
+
     double currentJointPositionRad;
     double absoluteJointErrorRad;
     for (int i = 0; i < m_actuatedDOFs; i++)
     {
         currentJointPositionRad = iDynTree::deg2rad(m_positionFeedbackDeg[i]);
         absoluteJointErrorRad = std::fabs(iDynTreeUtilities::shortestAngularDistance(currentJointPositionRad,
-                                                                                  desiredJointPositionsRad(i)));
+                                                                                     desiredJointPositionsRad(i)));
         refSpeeds[i] = std::max(3.0, iDynTree::rad2deg(absoluteJointErrorRad) / positioningTimeSec);
     }
 
@@ -719,8 +772,8 @@ bool RobotInterface::setDirectPositionReferences(const iDynTree::VectorDynSize& 
     if(worstError.second > 0.5)
     {
         yError() << "[RobotInterface::setDirectPositionReferences] The worst error between the current and the "
-                 << "desired position of the " << worstError.first
-                 << "-th joint is greater than 0.5 rad.";
+                 << "desired position of the " <<  m_axesList[worstError.first]
+                 << " joint is greater than 0.5 rad.";
         return false;
     }
 
@@ -785,7 +838,7 @@ bool RobotInterface::close()
     m_leftWrenchPort.close();
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
-    m_InteractionInterface->setInteractionModes(m_JointModeStiffVectorDefult.data());
+    setInteractionMode(yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF);
     if(!m_robotDevice.close())
     {
         yError() << "[RobotInterface::close] Unable to close the device.";
@@ -864,15 +917,7 @@ bool RobotInterface::isExternalRobotBaseUsed()
     return m_useExternalRobotBase;
 }
 
-bool RobotInterface::setInteractionMode()
+bool RobotInterface::loadCustomInteractionMode()
 {
-    if(!m_InteractionInterface->setInteractionModes(m_isJointModeStiffVector.data()))
-    {
-        yError() << "[RobotInterface::setInteractionMode] Error while setting the interaction modes of the joints";
-        return false;
-    }
-
-        m_currentModeofJoints = m_isJointModeStiffVector;
-
-    return true;
+    return setInteractionMode(m_jointInteractionMode);
 }

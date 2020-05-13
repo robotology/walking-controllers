@@ -38,6 +38,7 @@ if(WALKING_CONTROLLERS_COMPILE_WholeBodyControllers)
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC
     WalkingControllers::YarpUtilities
     WalkingControllers::iDynTreeUtilities
+    WalkingControllers::KinDynWrapper
     osqp::osqp
     OsqpEigen::OsqpEigen
     ${qpOASES_LIBRARIES}

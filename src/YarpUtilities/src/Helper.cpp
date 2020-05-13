@@ -77,6 +77,32 @@ bool YarpUtilities::getStringFromSearchable(const yarp::os::Searchable& config, 
     return true;
 }
 
+bool YarpUtilities::yarpListToBoolVector(yarp::os::Value*& input, std::vector<bool>& output)
+{
+    // clear the std::vector
+    output.clear();
+
+    // check if the yarp value is a list
+    if(!input->isList())
+    {
+        yError() << "[yarpListToBoolVector] The input is not a list.";
+        return false;
+    }
+
+    yarp::os::Bottle *bottle = input->asList();
+    for(int i = 0; i < bottle->size(); i++)
+    {
+        // check if the elements of the bottle are bool or integer
+        if(!bottle->get(i).isBool() && !bottle->get(i).isInt())
+        {
+            yError() << "[yarpListToBoolVector] There is a field that is not a bool.";
+            return false;
+        }
+        output.push_back(bottle->get(i).asBool());
+    }
+    return true;
+}
+
 bool YarpUtilities::getNumberFromSearchable(const yarp::os::Searchable& config, const std::string& key,
                                          double& number)
 {

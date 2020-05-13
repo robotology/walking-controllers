@@ -262,6 +262,10 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 
     m_useFilters = config.check("use_filters", yarp::os::Value(false)).asBool();
     m_firstStep = true;
+
+
+    // resize the joint positions
+    m_jointPositions.resize(model.getNrOfDOFs());
     return true;
 }
 
@@ -516,4 +520,14 @@ bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)
 bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
 {
     return m_kinDyn.getCenterOfMassJacobian(jacobian);
+}
+
+const iDynTree::VectorDynSize& WalkingFK::getJointPos()
+{
+
+    bool ok = m_kinDyn.getJointPos(m_jointPositions);
+
+    assert(ok);
+
+    return m_jointPositions;
 }
