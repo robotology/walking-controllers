@@ -42,6 +42,9 @@ namespace WalkingControllers
     {
     private:
 
+        enum class RetargetingType { handRetargeting, jointRetargeting, none };
+        RetargetingType m_retargetingType;
+
         /**
          * Set the joint positions and velocities bounds
          * @param jointVelocitiesBounds  joint velocities bounds in [rad/s]
@@ -149,8 +152,6 @@ namespace WalkingControllers
 
         bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
         bool m_useJointsLimitsConstraint; /**< True if the CoM is added as a constraint. */
-        bool m_enableHandRetargeting; /**< True if the hand retargeting is used */
-        bool m_enableJointRetargeting; /**< True if the joint retargeting is used */
 
         iDynTree::MatrixDynSize m_hessianDense; /**< Hessian matrix */
         iDynTree::VectorDynSize m_gradient; /**< Gradient vector */

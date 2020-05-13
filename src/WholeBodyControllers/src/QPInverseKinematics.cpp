@@ -47,14 +47,21 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
     }
 
     m_useCoMAsConstraint = config.check("use_com_as_constraint", yarp::os::Value(false)).asBool();
-    m_enableHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
-    m_enableJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
+    bool enableHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
+    bool enableJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
 
-    if(m_enableHandRetargeting && m_enableJointRetargeting)
+    if(enableHandRetargeting && enableJointRetargeting)
     {
         yError() << "[initialize] You cannot enable both hand and joint retargeting.";
         return false;
     }
+
+    if(enableJointRetargeting)
+        m_retargetingType = RetargetingType::jointRetargeting;
+    else if(enableHandRetargeting)
+        m_retargetingType = RetargetingType::handRetargeting;
+    else
+        m_retargetingType = RetargetingType::none;
 
     m_useJointsLimitsConstraint = config.check("use_joint_limits_constraint", yarp::os::Value(false)).asBool();
 
@@ -104,14 +111,14 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
 
     initializeSolverSpecificMatrices();
 
-    if(m_enableHandRetargeting)
+    if(m_retargetingType == RetargetingType::handRetargeting)
         if(!initializeHandRetargeting(config))
         {
             yError() << "[initialize] Unable to Initialize the hand retargeting.";
             return false;
         }
 
-    if(m_enableJointRetargeting)
+    if(m_retargetingType == RetargetingType::jointRetargeting)
         if(!initializeJointRetargeting(config))
         {
             yError() << "[initialize] Unable to Initialize the joint retargeting.";
@@ -165,7 +172,7 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
     }
 
      // if the joint retargeting is enabled the weights of the cost function are time-variant.
-    if(!m_enableJointRetargeting)
+    if (m_retargetingType != RetargetingType::jointRetargeting)
     {
         if(!YarpUtilities::getNumberFromSearchable(config, "neck_weight", m_neckWeight))
         {
@@ -375,12 +382,9 @@ bool WalkingQPIK::initializeJointRetargeting(const yarp::os::Searchable& config)
 
 bool WalkingQPIK::setRobotState(WalkingFK& kinDynWrapper)
 {
-    // avoid to copy the vector if the application is not ran in retargeting mode
-    if(m_enableHandRetargeting)
-    {
-        m_leftHandToWorldTransform = kinDynWrapper.getLeftHandToWorldTransform();
-        m_rightHandToWorldTransform = kinDynWrapper.getRightHandToWorldTransform();
-    }
+
+    m_leftHandToWorldTransform = kinDynWrapper.getLeftHandToWorldTransform();
+    m_rightHandToWorldTransform = kinDynWrapper.getRightHandToWorldTransform();
 
     m_jointPosition = kinDynWrapper.getJointPos();
     m_leftFootToWorldTransform = kinDynWrapper.getLeftFootToWorldTransform();
@@ -395,10 +399,10 @@ void WalkingQPIK::setPhase(const bool& isStancePhase)
 {
     if(isStancePhase)
     {
-        if(m_enableHandRetargeting)
+        if(m_retargetingType == RetargetingType::handRetargeting)
             m_handWeightSmoother->computeNextValues(m_handWeightStanceVector);
 
-        if(m_enableJointRetargeting)
+        else if(m_retargetingType == RetargetingType::jointRetargeting)
         {
             m_torsoWeightSmoother->computeNextValues(yarp::sig::Vector(1, m_torsoWeightStance));
             m_jointRetargetingWeightSmoother->computeNextValues(m_jointRetargetingWeightStance);
@@ -407,10 +411,10 @@ void WalkingQPIK::setPhase(const bool& isStancePhase)
     }
     else
     {
-        if(m_enableHandRetargeting)
+        if(m_retargetingType == RetargetingType::handRetargeting)
             m_handWeightSmoother->computeNextValues(m_handWeightWalkingVector);
 
-        if(m_enableJointRetargeting)
+        else if(m_retargetingType == RetargetingType::jointRetargeting)
         {
             m_torsoWeightSmoother->computeNextValues(yarp::sig::Vector(1, m_torsoWeightWalking));
             m_jointRetargetingWeightSmoother->computeNextValues(m_jointRetargetingWeightWalking);
@@ -479,7 +483,7 @@ bool WalkingQPIK::setRightFootJacobian(const iDynTree::MatrixDynSize& rightFootJ
 
 bool WalkingQPIK::setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJacobian)
 {
-    if(!m_enableHandRetargeting)
+    if(m_retargetingType != RetargetingType::handRetargeting)
         return true;
 
     if(leftHandJacobian.rows() != 6)
@@ -500,7 +504,7 @@ bool WalkingQPIK::setLeftHandJacobian(const iDynTree::MatrixDynSize& leftHandJac
 
 bool WalkingQPIK::setRightHandJacobian(const iDynTree::MatrixDynSize& rightHandJacobian)
 {
-    if(!m_enableHandRetargeting)
+    if(m_retargetingType != RetargetingType::handRetargeting)
         return true;
 
     if(rightHandJacobian.rows() != 6)
@@ -569,7 +573,7 @@ void WalkingQPIK::setDesiredFeetTwist(const iDynTree::Twist& leftFootTwist,
 void WalkingQPIK::setDesiredHandsTransformation(const iDynTree::Transform& desiredLeftHandToWorldTransform,
                                                 const iDynTree::Transform& desiredRightHandToWorldTransform)
 {
-    if(!m_enableHandRetargeting)
+    if(m_retargetingType != RetargetingType::handRetargeting)
         return;
 
     m_desiredLeftHandToWorldTransform = desiredLeftHandToWorldTransform;
@@ -579,7 +583,7 @@ void WalkingQPIK::setDesiredHandsTransformation(const iDynTree::Transform& desir
 bool WalkingQPIK::setDesiredRetargetingJoint(const iDynTree::VectorDynSize& jointPosition)
 {
     // if the joint retargeting is not used return
-    if(!m_enableJointRetargeting)
+    if(m_retargetingType != RetargetingType::jointRetargeting)
         return true;
 
     if(jointPosition.size() != m_actuatedDOFs)
@@ -618,7 +622,7 @@ void WalkingQPIK::evaluateHessianMatrix()
     auto hessianDense(iDynTree::toEigen(m_hessianDense));
 
     // if the joint retargeting is enable the weights of the cost function are time variant
-    if(!m_enableJointRetargeting)
+    if (m_retargetingType != RetargetingType::jointRetargeting)
     {
         hessianDense = iDynTree::toEigen(m_neckJacobian).transpose() * m_neckWeight * iDynTree::toEigen(m_neckJacobian);
         hessianDense.bottomRightCorner(m_actuatedDOFs, m_actuatedDOFs) += iDynTree::toEigen(m_jointRegularizationWeights).asDiagonal();
@@ -633,7 +637,7 @@ void WalkingQPIK::evaluateHessianMatrix()
              iDynTree::toEigen(m_jointRetargetingWeightSmoother->getPos())).asDiagonal();
     }
 
-    if(m_enableHandRetargeting)
+    if(m_retargetingType == RetargetingType::handRetargeting)
     {
         // think about the possibility to project in the null space the joint regularization
         hessianDense +=  iDynTree::toEigen(m_leftHandJacobian).transpose()
@@ -669,7 +673,7 @@ void WalkingQPIK::evaluateGradientVector()
 
     // Neck orientation
     iDynTree::Matrix3x3 errorNeckAttitude = iDynTreeUtilities::Rotation::skewSymmetric(m_neckOrientation * m_desiredNeckOrientation.inverse());
-    if(!m_enableJointRetargeting)
+    if(m_retargetingType != RetargetingType::jointRetargeting)
     {
         auto jointRegularizationWeights(iDynTree::toEigen(m_jointRegularizationWeights));
 
@@ -701,7 +705,7 @@ void WalkingQPIK::evaluateGradientVector()
             * (jointRetargetingValues - jointPosition);
     }
 
-    if(m_enableHandRetargeting)
+    if(m_retargetingType == RetargetingType::handRetargeting)
     {
         Eigen::Map<Eigen::Vector3d> leftHandCorrectionLinearVel(iDynTree::toEigen(m_leftHandCorrection.getLinearVec3()));
         Eigen::Map<Eigen::Vector3d> leftHandCorrectionAngularVel(iDynTree::toEigen(m_leftHandCorrection.getAngularVec3()));
