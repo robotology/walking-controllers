@@ -320,7 +320,7 @@ namespace WalkingControllers
                                   const iDynTree::Twist& rightHandTwist);
 
         /**
-         * Set the desired twist of both feet
+         * Set the desired joint positions in radians
          * @param jointPosition contain the desired joint position used in the retargeting.
          * @return true/false in case of success/failure.
          */
