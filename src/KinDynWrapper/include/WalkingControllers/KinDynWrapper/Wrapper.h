@@ -69,6 +69,8 @@ namespace WalkingControllers
 
         bool m_firstStep; /**< True only during the first step. */
 
+        iDynTree::VectorDynSize m_jointPositions; /**< joint positions in radians. */
+
         /**
          * Set the model of the robot.
          * @param model iDynTree model.
@@ -263,7 +265,7 @@ namespace WalkingControllers
          * Get the joint position
          * @return the joint position expressed in radians
          */
-        iDynTree::VectorDynSize getJointPos();
+        const iDynTree::VectorDynSize& getJointPos();
     };
 };
 #endif

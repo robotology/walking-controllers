@@ -262,6 +262,10 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 
     m_useFilters = config.check("use_filters", yarp::os::Value(false)).asBool();
     m_firstStep = true;
+
+
+    // resize the joint positions
+    m_jointPositions.resize(model.getNrOfDOFs());
     return true;
 }
 
@@ -518,12 +522,12 @@ bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
     return m_kinDyn.getCenterOfMassJacobian(jacobian);
 }
 
-iDynTree::VectorDynSize WalkingFK::getJointPos()
+const iDynTree::VectorDynSize& WalkingFK::getJointPos()
 {
-    iDynTree::VectorDynSize jointPos;
-    bool ok = m_kinDyn.getJointPos(jointPos);
+
+    bool ok = m_kinDyn.getJointPos(m_jointPositions);
 
     assert(ok);
 
-    return jointPos;
+    return m_jointPositions;
 }
