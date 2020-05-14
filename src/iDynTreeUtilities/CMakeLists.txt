@@ -20,7 +20,8 @@ if(WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities)
   # add an executable to the project using the specified source files.
   add_library(${LIBRARY_TARGET_NAME} SHARED ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR})
 
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${iDynTree_LIBRARIES} YARP::YARP_OS)
+  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC ${iDynTree_LIBRARIES} YARP::YARP_OS
+                                               PRIVATE Eigen3::Eigen)
 
   add_library(WalkingControllers::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
   set_target_properties(${LIBRARY_TARGET_NAME} PROPERTIES OUTPUT_NAME "${PROJECT_NAME}${LIBRARY_TARGET_NAME}")
