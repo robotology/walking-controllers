@@ -131,6 +131,9 @@ checkandset_dependency(ICUBcontrib)
 find_package(iDynTree QUIET)
 checkandset_dependency(iDynTree)
 
+find_package(Eigen3 3.2.92 QUIET)
+checkandset_dependency(Eigen3)
+
 find_package(UnicyclePlanner 0.1.102 QUIET)
 checkandset_dependency(UnicyclePlanner)
 
@@ -148,18 +151,18 @@ checkandset_dependency(Catch2)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_tests "Compile tests?" ON WALKING_CONTROLLERS_HAS_Catch2 OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_YarpUtilities "Compile YarpHelper library?" ON WALKING_CONTROLLERS_HAS_YARP OFF)
-walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities "Compile iDynTreeHelper library?" ON "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_HAS_YARP" OFF)
+walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities "Compile iDynTreeHelper library?" ON "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_HAS_YARP;WALKING_CONTROLLERS_HAS_Eigen3" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_SimplifiedModelControllers "Compile SimplifiedModelControllers library?" ON
                                     "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_RobotInterface "Compile RobotHelper library?" ON "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_WholeBodyControllers "Compile WholeBodyControllers library?" ON
                                     "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen;WALKING_CONTROLLERS_HAS_qpOASES;WALKING_CONTROLLERS_HAS_ICUB" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner "Compile TrajectoryPlanner library?" ON
-                                    "WALKING_CONTROLLERS_HAS_Threads;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_UnicyclePlanner" OFF)
+                                    "WALKING_CONTROLLERS_HAS_Threads;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_UnicyclePlanner;WALKING_CONTROLLERS_HAS_Eigen3" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_KinDynWrapper "Compile KinDynWrapper library?" ON
-                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB" OFF)
+                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_Eigen3" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_RetargetingHelper "Compile RetargetingHelper library?" ON
-                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB" OFF)
+                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_ICUB;WALKING_CONTROLLERS_HAS_Eigen3" OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_LoggerClient "Compile LoggerClient library?" ON WALKING_CONTROLLERS_COMPILE_YarpUtilities OFF)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_WalkingModule "Compile WalkingModule app?" ON
