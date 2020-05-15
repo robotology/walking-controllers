@@ -1702,7 +1702,7 @@ bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
         m_isPitchActive=0;
         m_isRollActive=0;
         m_stepAdapter->triggerStepAdapterByArmCompliant(m_robotControlHelper->getActuatedDoFs(),m_qDesired,m_robotControlHelper->getJointPosition(),
-                                                        m_leftInContact,m_rightInContact);
+                                                        m_leftInContact,m_rightInContact,m_robotControlHelper->getAxesList());
         m_isRollActive=m_stepAdapter->isArmRollActive();
         m_isPitchActive=m_stepAdapter->isArmPitchActive();
         if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front()))

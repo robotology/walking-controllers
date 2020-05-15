@@ -131,6 +131,11 @@ namespace WalkingControllers
         double m_sigmaWeight;/**< The wight of step timing term in the cost function.*/
         double m_pushRecoveryActivationIndex;/**< A threshold index for activation of push recovery.*/
 
+        std::vector<std::string> m_pushDetectionListRightArmX; /**< Vector containing the name of the right arm joints that will be used for push detection in X direction. */
+        std::vector<std::string> m_pushDetectionListLeftArmX;/**< Vector containing the name of the left arm joints that will be used for push detection in X direction. */
+        std::vector<std::string> m_pushDetectionListRightArmY;/**< Vector containing the name of the right arm joints that will be used for push detection in Y direction. */
+        std::vector<std::string> m_pushDetectionListLeftArmY;/**< Vector containing the name of the left arm joints that will be used for push detection in Y direction. */
+
         iDynTree::Vector2 m_dcmErrorThreshold; /**< The threshold for activating the push recovery based on DCM error.*/
         iDynTree::Vector2 m_rollPitchErrorThreshold; /**< The threshold for activating the pendulum estimator based on the foot orientation error.*/
         iDynTree::Vector2 m_armRollPitchErrorOffset; /**< The offset for arm joints error to generate DCM error inside the simple DCM estimator to use in step adaptation*/
@@ -225,8 +230,8 @@ namespace WalkingControllers
          * @param rightInContact The deque of boolean that shows right foot is in contact or no.
          * @return true/false in case of success/failure.
          */
-        bool triggerStepAdapterByArmCompliant(const double& numberOfActuatedDof, const iDynTree::VectorDynSize& qDesired,const iDynTree::VectorDynSize& qActual,
-                                              const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact);
+        bool triggerStepAdapterByArmCompliant(const double& numberOfActuatedDof, const iDynTree::VectorDynSize& qDesired, const iDynTree::VectorDynSize& qActual,
+                                              const std::deque<bool>& leftInContact, const std::deque<bool>& rightInContact, std::vector<std::string> jointsListVector);
 
         /**
          * Reset the controller
@@ -309,7 +314,7 @@ namespace WalkingControllers
          * @param adaptedFootAcceleration Adapted acceleration of the swing foot.
          * @return true/false in case of success/failure.
          */
-        bool getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input, iDynTree::Transform& adaptatedFootTransform,
+        bool getAdaptatedFootTrajectory(const FootTrajectoryGenerationInput &input, iDynTree::Transform& adaptatedFootTransform,
                                         iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration);
 
         /**
@@ -352,7 +357,7 @@ namespace WalkingControllers
          */
         bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
 
-        bool runStepAdaptation(const runningStepAdapterInput &input, runStepAdapterOutput& output);
+        bool runStepAdaptation(const StepAdapterInput &input, StepAdapterOutput& output);
 
     };
 };

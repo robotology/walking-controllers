@@ -112,6 +112,58 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
         return false;
     }
 
+    yarp::os::Value *jointsListForPushDetectionYarpRX;
+    if(!config.check("joints_list_push_detection_right_arm_x", jointsListForPushDetectionYarpRX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpRX, m_pushDetectionListRightArmX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpRY;
+    if(!config.check("joints_list_push_detection_right_arm_y", jointsListForPushDetectionYarpRY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpRY, m_pushDetectionListRightArmY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpLX;
+    if(!config.check("joints_list_push_detection_left_arm_x", jointsListForPushDetectionYarpLX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpLX, m_pushDetectionListLeftArmX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpLY;
+    if(!config.check("joints_list_push_detection_left_arm_y", jointsListForPushDetectionYarpLY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpLY, m_pushDetectionListLeftArmY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
     m_feetExtendedPolygon.resize(2);
     iDynTree::Polygon foot;
     iDynTree::Vector4 nextZmpConstraintBoundLeftFoot;
@@ -394,7 +446,7 @@ iDynTree::Vector2 StepAdaptationController::getDesiredDCMOffset()
     return desiredDCMOffset;
 }
 
-bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input,
+bool StepAdaptationController::getAdaptatedFootTrajectory(const FootTrajectoryGenerationInput& input,
                                                           iDynTree::Transform& adaptatedFootTransform, iDynTree::Twist& adaptedFootTwist,
                                                           iDynTree::SpatialAcc& adaptedFootAcceleration)
 {
@@ -524,31 +576,59 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGe
 }
 
 bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &numberOfActuatedDof, const iDynTree::VectorDynSize &qDesired, const iDynTree::VectorDynSize &qActual,
-                                                                const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact)
+                                                                const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact,std::vector<std::string> jointsListVector)
 {
     double leftArmPitchError=0;
     double rightArmPitchError=0;
     double leftArmRollError=0;
     double rightArmRollError=0;
 
-    for (int var = 0; var < numberOfActuatedDof; var++)
+    for (int var=0;var<m_pushDetectionListRightArmX.size();++var)
     {
-        if(var==3 || var==6)
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListRightArmX.at(var));
+        if(it == jointsListVector.end())
         {
-            leftArmPitchError= abs(qDesired(var)-qActual(var));
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListRightArmX.at(var)<<"inside the controlled joints of the robot";
+            return false;
         }
-        if(var==4 || var==5)
+
+        rightArmPitchError=rightArmPitchError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+    for (int var=0;var<m_pushDetectionListRightArmY.size();++var)
+    {
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListRightArmY.at(var));
+        if(it == jointsListVector.end())
         {
-            leftArmRollError= abs(qDesired(var)-qActual(var));
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListRightArmY.at(var)<<"inside the controlled joints of the robot";
+            return false;
         }
-        if(var==7 || var==10)
+
+        rightArmRollError=rightArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+    for (int var=0;var<m_pushDetectionListLeftArmX.size();++var)
+    {
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListLeftArmX.at(var));
+        if(it == jointsListVector.end())
         {
-            rightArmPitchError= abs(qDesired(var)-qActual(var));
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListLeftArmX.at(var)<<"inside the controlled joints of the robot";
+            return false;
         }
-        if(var==8 || var==9)
+
+        rightArmPitchError=rightArmPitchError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+    for (int var=0;var<m_pushDetectionListLeftArmY.size();++var)
+    {
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListLeftArmY.at(var));
+        if(it == jointsListVector.end())
         {
-            rightArmRollError= abs(qDesired(var)-qActual(var));
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListLeftArmY.at(var)<<"inside the controlled joints of the robot";
+            return false;
         }
+
+        leftArmRollError=leftArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     if (leftArmPitchError>getRollPitchErrorThreshold()(1) )
@@ -652,7 +732,7 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     return true;
 }
 
-bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& input, runStepAdapterOutput& output)
+bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, StepAdapterOutput &output)
 {
     if (!input.leftInContact.front() || !input.rightInContact.front())
     {
