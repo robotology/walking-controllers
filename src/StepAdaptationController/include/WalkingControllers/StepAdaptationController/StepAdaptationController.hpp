@@ -32,7 +32,7 @@
 #include <WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp>
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 
-struct footTrajectoryGenerationInput
+struct FootTrajectoryGenerationInput
 {
     double maxFootHeight;
     double discretizationTime ;
@@ -43,7 +43,7 @@ struct footTrajectoryGenerationInput
     iDynTree::Twist currentFootTwist;
 };
 
-struct runningStepAdapterInput
+struct StepAdapterInput
 {
     double time;
     double timeOffset;
@@ -59,7 +59,7 @@ struct runningStepAdapterInput
     StepList leftStepList;
 };
 
-struct runStepAdapterOutput
+struct StepAdapterOutput
 {
     iDynTree::Transform adaptedFootLeftTransform;
     iDynTree::Transform adaptedFootRightTransform;
@@ -133,6 +133,7 @@ namespace WalkingControllers
 
         iDynTree::Vector2 m_dcmErrorThreshold; /**< The threshold for activating the push recovery based on DCM error.*/
         iDynTree::Vector2 m_rollPitchErrorThreshold; /**< The threshold for activating the pendulum estimator based on the foot orientation error.*/
+        iDynTree::Vector2 m_armRollPitchErrorOffset; /**< The offset for arm joints error to generate DCM error inside the simple DCM estimator to use in step adaptation*/
 
         iDynTree::Vector2 m_currentZmpPosition; /**< The current step position(The zmp position of current stance foot). */
         iDynTree::Vector2 m_currentDcmPosition; /**< The current DCM position.*/

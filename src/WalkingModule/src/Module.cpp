@@ -1725,7 +1725,7 @@ bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
         }
         omega = sqrt(9.81/comHeight);
 
-        runStepAdapterOutput output;
+        StepAdapterOutput output;
         output.indexPush=m_indexPush;
         output.zmpNominal=m_zmpNominal;
         output.zmpAdjusted=m_zmpAdjusted;
@@ -1756,7 +1756,7 @@ bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
         output.currentFootRightAcceleration=m_currentFootRightAcceleration;
         output.FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection;
 
-        runningStepAdapterInput input;
+        StepAdapterInput input;
         input.dT=m_dT;
         input.omega=omega;
         input.time=m_time;

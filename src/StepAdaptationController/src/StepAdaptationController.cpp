@@ -106,6 +106,12 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
         return false;
     }
 
+    if(!YarpUtilities::getVectorFromSearchable(config, "offset_roll_pitch_arm_error", m_armRollPitchErrorOffset))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector of offset_roll_pitch_arm_error";
+        return false;
+    }
+
     m_feetExtendedPolygon.resize(2);
     iDynTree::Polygon foot;
     iDynTree::Vector4 nextZmpConstraintBoundLeftFoot;
@@ -611,11 +617,11 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
 
     if (m_isRollActive)
     {
-    m_armRollError= m_armRollError+0.1;
+        m_armRollError= m_armRollError+m_armRollPitchErrorOffset(0);
     }
     if (m_isPitchActive)
     {
-    m_armPitchError= m_armPitchError+0.1;
+        m_armPitchError= m_armPitchError+m_armRollPitchErrorOffset(1);
     }
 
     StanceFootOrientation=iDynTree::Rotation::RPY (m_armRollError,m_armPitchError,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
@@ -654,7 +660,7 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& 
 
         int numberOfSubTrajectories = input.dcmSubTrajectories.size();
 
-        if (numberOfSubTrajectories<4)
+        if(numberOfSubTrajectories<4)
         {
             yError() << "[StepAdaptationController::runStepAdaptation] the number of sub-trajectories should be equal or greater than 4";
             return false;
@@ -753,11 +759,11 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& 
         SwingFoot swingFoot;
         if (!input.leftInContact.front())
         {
-        swingFoot=SwingFoot::Left;
+            swingFoot=SwingFoot::Left;
         }
         else
         {
-        swingFoot=SwingFoot::Right;
+            swingFoot=SwingFoot::Right;
         }
 
         if(!solve(swingFoot))
@@ -767,13 +773,13 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& 
         }
 
         output.impactTimeNominal = firstSS->getTrajectoryDomain().second + input.timeOffset;
-        if(output.pushRecoveryActiveIndex==(5+1))
+        if(output.pushRecoveryActiveIndex==(m_pushRecoveryActivationIndex+1))
         {
             double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +getDesiredImpactTime()-(input.time - input.timeOffset);
             output.indexSmoother=timeOfSmoothing/input.dT;
             output.kDCMSmoother=0;
         }
-        if(output.pushRecoveryActiveIndex==(5+1))
+        if(output.pushRecoveryActiveIndex==(m_pushRecoveryActivationIndex+1))
         {
             double timeOfSmoothing=getDesiredImpactTime()-(input.time - input.timeOffset);
             output.indexFootSmoother=timeOfSmoothing/input.dT;
@@ -800,7 +806,7 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& 
             output.currentFootLeftTwist = output.adaptedFootLeftTwist;
             output.currentFootLeftAcceleration = output.adaptedFootLeftAcceleration;
 
-            footTrajectoryGenerationInput inputLeftFootTrajectory;
+            FootTrajectoryGenerationInput inputLeftFootTrajectory;
             inputLeftFootTrajectory.maxFootHeight=m_stepHeight;
             inputLeftFootTrajectory.discretizationTime=input.dT;
             inputLeftFootTrajectory.takeOffTime =firstSS->getTrajectoryDomain().first;
@@ -823,7 +829,7 @@ bool StepAdaptationController::runStepAdaptation(const runningStepAdapterInput& 
             output.currentFootRightTwist = output.adaptedFootRightTwist;
             output.currentFootRightAcceleration = output.adaptedFootRightAcceleration;
 
-            footTrajectoryGenerationInput inputRightFootTrajectory;
+            FootTrajectoryGenerationInput inputRightFootTrajectory;
             inputRightFootTrajectory.maxFootHeight=m_stepHeight;
             inputRightFootTrajectory.discretizationTime=input.dT;
             inputRightFootTrajectory.takeOffTime =firstSS->getTrajectoryDomain().first;
