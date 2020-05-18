@@ -306,8 +306,9 @@ namespace WalkingControllers
          * @return 2D vector of the DCM error threshold that will be used for push detection.
          */
         iDynTree::Vector2 getDCMErrorThreshold();
+
         /**
-         * Run the step adaptation and set constraints and gradient vector and solve the QP problem and find the adapted foot trajectory.
+         * Replan the swing foot trajectory.
          * @param input Structure that includes data that we need as input for function.
          * @param adaptatedFootTransform  Adapted transform of the swing foot.
          * @param adaptedFootTwist Adapted twist of the swing foot.
@@ -328,6 +329,12 @@ namespace WalkingControllers
          * @return Value of the arm joints pitch error .
          */
         const double& getArmPitchError()const;
+
+        /**
+         * Get the threshold of push recovery activation index .
+         * @return The integer threshold of push recovery activation index .
+         */
+        const int &getPushRecoveryActivationIndex() const;
 
         /**
          * Get the boolean to specify that the push in forward direction has been detected ..
@@ -357,6 +364,13 @@ namespace WalkingControllers
          */
         bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
 
+
+        /**
+         * Run the step adaptation.
+         * @param input Structure that includes data that we need as input for function.
+         * @param output Structure that includes data that is output of step adjustment.
+         * @return true/false in case of success/failure.
+         */
         bool runStepAdaptation(const StepAdapterInput &input, StepAdapterOutput& output);
 
     };

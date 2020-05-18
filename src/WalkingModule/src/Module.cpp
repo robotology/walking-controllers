@@ -1414,16 +1414,27 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
         m_jleftFootprints = std::make_shared<FootPrint>();
         m_jleftFootprints->setFootName("left");
         for(auto step: tempLeft->getSteps())
-            m_jleftFootprints->addStep(step);
-
-        // StepList jLeftstepList=jleftFootprints->getSteps();
+        {
+            if(!m_jleftFootprints->addStep(step))
+            {
+                yError() << "[updateTrajectories] unable to add left foot step";
+                return false;
+            }
+         }
         m_jLeftstepList=m_jleftFootprints->getSteps();
+
         std::shared_ptr<FootPrint> tempRight;
         m_trajectoryGenerator->getRightFootprint(tempRight);
         m_jRightFootprints = std::make_shared<FootPrint>();
         m_jRightFootprints->setFootName("right");
         for(auto step: tempRight->getSteps())
-        m_jRightFootprints->addStep(step);
+        {
+            if(!m_jRightFootprints->addStep(step))
+            {
+                yError() << "[updateTrajectories] unable to add right foot step";
+                return false;
+            }
+         }
         m_jRightstepList=m_jRightFootprints->getSteps();
     }
 
@@ -1440,7 +1451,6 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
         m_smoothedFootLeftTransform=leftTrajectory.front();
         m_adaptatedFootRightTransform = rightTrajectory.front();
         m_smoothedFootRightTransform=rightTrajectory.front();
-        m_adaptatedFootRightTwist.zero();
     }
 
     return true;
@@ -1636,12 +1646,12 @@ bool WalkingModule::feetTrajectorySmoother(const iDynTree::Transform adaptedFeet
                                            const iDynTree::Twist adaptedFeetTwist,const iDynTree::Twist desiredFootTwist,iDynTree::Twist& smoothedFootTwist)
 {
 
-    if(m_pushRecoveryActiveIndex<6 )
+    if(m_pushRecoveryActiveIndex<(m_stepAdapter->getPushRecoveryActivationIndex()+1) )
     {
         m_kFootSmoother=0;
         m_FootTimeIndexAfterPushDetection=0;
     }
-    else if (m_pushRecoveryActiveIndex>=6 && m_FootTimeIndexAfterPushDetection<(m_indexFootSmoother))
+    else if (m_pushRecoveryActiveIndex>=(m_stepAdapter->getPushRecoveryActivationIndex()+1) && m_FootTimeIndexAfterPushDetection<(m_indexFootSmoother))
     {
         m_FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection+1;
 
@@ -1671,12 +1681,12 @@ bool WalkingModule::feetTrajectorySmoother(const iDynTree::Transform adaptedFeet
 
 bool WalkingModule::dcmSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM )
 {
-    if(m_pushRecoveryActiveIndex<6 )
+    if(m_pushRecoveryActiveIndex<(m_stepAdapter->getPushRecoveryActivationIndex()+1) )
     {
         m_kDCMSmoother=0;
         m_timeIndexAfterPushDetection=0;
     }
-    else if (m_pushRecoveryActiveIndex>=6 && m_timeIndexAfterPushDetection<(m_indexSmoother))
+    else if (m_pushRecoveryActiveIndex>=(m_stepAdapter->getPushRecoveryActivationIndex()+1) && m_timeIndexAfterPushDetection<(m_indexSmoother))
     {
         m_timeIndexAfterPushDetection=m_timeIndexAfterPushDetection+1;
 

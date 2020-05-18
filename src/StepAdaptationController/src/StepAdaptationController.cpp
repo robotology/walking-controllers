@@ -688,6 +688,11 @@ const double& StepAdaptationController::getArmPitchError() const
     return m_armPitchError;
 }
 
+const int& StepAdaptationController::getPushRecoveryActivationIndex() const
+{
+    return m_pushRecoveryActivationIndex;
+}
+
 bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2DPosition,const iDynTree::Vector2& CoMVelocity,const iDynTree::Vector2& measuredZMP,const double& CoMHeight)
 {
     iDynTree::Rotation imuRotation;
