@@ -142,7 +142,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
         m_pushRecoveryActiveIndex=0;
         m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
-        // TODO REMOVE ME
         m_impactTimeNominal = 0;
         m_impactTimeAdjusted = 0;
 
@@ -780,7 +779,7 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-runStepAdaptation( measuredZMP);
+        runStepAdaptation(measuredZMP);
 
         // DCM controller
         if(m_useMPC)

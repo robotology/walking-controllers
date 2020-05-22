@@ -129,7 +129,7 @@ namespace WalkingControllers
         iDynTree::Vector2 m_zmpPositionWeight; /**< The wight of next step position term in the cost function.*/
         iDynTree::Vector2 m_dcmOffsetWeight;/**< The wight of dcm offset term in the cost function.*/
         double m_sigmaWeight;/**< The wight of step timing term in the cost function.*/
-        double m_pushRecoveryActivationIndex;/**< A threshold index for activation of push recovery.*/
+        int m_pushRecoveryActivationIndex;/**< A threshold index for activation of push recovery.*/
 
         std::vector<std::string> m_pushDetectionListRightArmX; /**< Vector containing the name of the right arm joints that will be used for push detection in X direction. */
         std::vector<std::string> m_pushDetectionListLeftArmX;/**< Vector containing the name of the left arm joints that will be used for push detection in X direction. */
