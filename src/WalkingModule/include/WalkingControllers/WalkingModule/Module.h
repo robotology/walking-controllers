@@ -107,6 +107,9 @@ namespace WalkingControllers
         StepList m_jLeftstepList; /**< The list of left foot steps */
         StepList m_jRightstepList;/**< The list of right foot steps */
 
+        StepAdapterOutput m_outputStepAdaptation;/**< The structure of outputs of step adaptation */
+        StepAdapterInput m_inputStepAdaptation;/**< The structure of inputs of step adaptation */
+
         double m_isPushActive;/**< Is push recovery active? */
         double m_isRollActive;/**< Is the threshold of roll angles of arm active? */
         double m_isPitchActive;/**< Is the threshold of pitch angles of arm active? */
