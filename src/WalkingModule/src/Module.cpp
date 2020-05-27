@@ -1797,7 +1797,7 @@ bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
             yError() << "[WalkingModule::runningStepAdaptation] the size of dcm subtrajectories should be equal or greater than 2";
             return false;
         }
-            auto firstSS = m_inputStepAdaptation.dcmSubTrajectories[numberOfSubTrajectories-2];
+        auto firstSS = m_inputStepAdaptation.dcmSubTrajectories[numberOfSubTrajectories-2];
 
         adaptedTimeOffset = m_stepAdapter->getDesiredImpactTime() - firstSS->getTrajectoryDomain().second;
 

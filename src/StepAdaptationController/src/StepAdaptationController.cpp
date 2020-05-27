@@ -616,7 +616,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             return false;
         }
 
-        rightArmPitchError=rightArmPitchError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+        leftArmPitchError=leftArmPitchError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     for (int var=0;var<m_pushDetectionListLeftArmY.size();++var)
