@@ -163,7 +163,7 @@ walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_RetargetingHelp
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_LoggerClient "Compile LoggerClient library?" ON WALKING_CONTROLLERS_COMPILE_YarpUtilities OFF)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_StepAdaptationController "Compile StepAdaptationController library?" ON
-                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen" OFF)
+                                    "WALKING_CONTROLLERS_HAS_iDynTree;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner;WALKING_CONTROLLERS_HAS_osqp;WALKING_CONTROLLERS_HAS_OsqpEigen" OFF)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_WalkingModule "Compile WalkingModule app?" ON
   "WALKING_CONTROLLERS_COMPILE_YarpUtilities;WALKING_CONTROLLERS_COMPILE_iDynTreeUtilities;WALKING_CONTROLLERS_COMPILE_RobotInterface;WALKING_CONTROLLERS_COMPILE_KinDynWrapper;WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner;WALKING_CONTROLLERS_COMPILE_SimplifiedModelControllers;WALKING_CONTROLLERS_COMPILE_WholeBodyControllers;WALKING_CONTROLLERS_COMPILE_RetargetingHelper;WALKING_CONTROLLERS_COMPILE_LoggerClient;WALKING_CONTROLLERS_HAS_ICUBcontrib;WALKING_CONTROLLERS_COMPILE_StepAdaptationController" OFF)
