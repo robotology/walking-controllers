@@ -84,12 +84,12 @@ namespace WalkingControllers
 
         std::vector<std::shared_ptr<GeneralSupportTrajectory>> m_DCMSubTrajectories;/**< The different trajectories that are output of DCM motion planing. */
 
-        iDynTree::Transform m_adaptatedFootLeftTransform;/**< The adapted transform of left foot. */
-        iDynTree::Transform m_adaptatedFootRightTransform;/**< The adapted transform of right foot. */
-        iDynTree::Twist m_adaptatedFootRightTwist;/**< The adapted twist of right foot. */
-        iDynTree::Twist m_adaptatedFootLeftTwist;/**< The adapted twist of left foot. */
-        iDynTree::SpatialAcc m_adaptatedFootLeftAcceleration;/**< The adapted acceleration of the left foot. */
-        iDynTree::SpatialAcc m_adaptatedFootRightAcceleration;/**< The adapted acceleration of the right foot. */
+        iDynTree::Transform m_adaptedFootLeftTransform;/**< The adapted transform of left foot. */
+        iDynTree::Transform m_adaptedFootRightTransform;/**< The adapted transform of right foot. */
+        iDynTree::Twist m_adaptedFootRightTwist;/**< The adapted twist of right foot. */
+        iDynTree::Twist m_adaptedFootLeftTwist;/**< The adapted twist of left foot. */
+        iDynTree::SpatialAcc m_adaptedFootLeftAcceleration;/**< The adapted acceleration of the left foot. */
+        iDynTree::SpatialAcc m_adaptedFootRightAcceleration;/**< The adapted acceleration of the right foot. */
 
         iDynTree::Transform m_currentFootLeftTransform;/**< The current adapted transform of the left foot that has been found in previous control cycle. */
         iDynTree::Transform m_currentFootRightTransform;/**< The current adapted transform of the right foot that has been found in previous control cycle. */
