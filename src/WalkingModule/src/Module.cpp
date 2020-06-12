@@ -628,7 +628,7 @@ bool WalkingModule::updateModule()
         {
             if(desiredUnicyclePosition != nullptr)
             {
-                if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
+                if(!setPlannerInput((*desiredUnicyclePosition)(0), 0))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                     return false;
@@ -1023,17 +1023,17 @@ bool WalkingModule::updateModule()
             m_isRollPitchActiveVec(1)=m_isPitchActive;
             iDynTree::Vector6 leftArmJointsError;
             iDynTree::Vector6 rightArmJointsError;
-            leftArmJointsError(0)=m_robotControlHelper->getJointPosition()(3)-m_qDesired(3);
-            leftArmJointsError(1)=m_robotControlHelper->getJointPosition()(4)-m_qDesired(4);
-            leftArmJointsError(2)=m_robotControlHelper->getJointPosition()(5)-m_qDesired(5);
-            leftArmJointsError(3)=m_robotControlHelper->getJointPosition()(6)-m_qDesired(6);
+            leftArmJointsError(0)=abs(m_robotControlHelper->getJointPosition()(3)-m_qDesired(3));
+            leftArmJointsError(1)=abs(m_robotControlHelper->getJointPosition()(4)-m_qDesired(4));
+            leftArmJointsError(2)=abs(m_robotControlHelper->getJointPosition()(5)-m_qDesired(5));
+            leftArmJointsError(3)=abs(m_robotControlHelper->getJointPosition()(6)-m_qDesired(6));
             leftArmJointsError(4)=leftArmJointsError(2)+leftArmJointsError(1);
             leftArmJointsError(5)=leftArmJointsError(0)+leftArmJointsError(3);
 
-            rightArmJointsError(0)=m_robotControlHelper->getJointPosition()(7)-m_qDesired(7);
-            rightArmJointsError(1)=m_robotControlHelper->getJointPosition()(8)-m_qDesired(8);
-            rightArmJointsError(2)=m_robotControlHelper->getJointPosition()(9)-m_qDesired(9);
-            rightArmJointsError(3)=m_robotControlHelper->getJointPosition()(10)-m_qDesired(10);
+            rightArmJointsError(0)=abs(m_robotControlHelper->getJointPosition()(7)-m_qDesired(7));
+            rightArmJointsError(1)=abs(m_robotControlHelper->getJointPosition()(8)-m_qDesired(8));
+            rightArmJointsError(2)=abs(m_robotControlHelper->getJointPosition()(9)-m_qDesired(9));
+            rightArmJointsError(3)=abs(m_robotControlHelper->getJointPosition()(10)-m_qDesired(10));
             rightArmJointsError(4)=rightArmJointsError(1)+rightArmJointsError(2);
             rightArmJointsError(5)=rightArmJointsError(0)+rightArmJointsError(3);
 

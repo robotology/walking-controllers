@@ -582,6 +582,8 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
     double rightArmPitchError=0;
     double leftArmRollError=0;
     double rightArmRollError=0;
+    m_isRollActive=0;
+    m_isPitchActive=0;
 
     for (int var=0;var<m_pushDetectionListRightArmX.size();++var)
     {
@@ -666,7 +668,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
         }
         if (leftInContact.front())
         {
-            m_armRollError=+1*rightArmRollError;
+            m_armRollError=1*rightArmRollError;
         }
         m_isRollActive=1;
     }
@@ -795,7 +797,14 @@ bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, 
                 }
                 if((abs(input.dcmPositionSmoothed(1) - getEstimatedDCM()(1))) > getDCMErrorThreshold()(1))
                 {
-                    tempDCMError(1)=getEstimatedDCM()(1);
+                    if (!input.leftInContact.front())
+                    {
+                        tempDCMError(1)=getEstimatedDCM()(1)+0.15;
+                    }
+                    else
+                    {
+                         tempDCMError(1)=getEstimatedDCM()(1);
+                    }
                 }
                 setCurrentDcmPosition(tempDCMError);
             }

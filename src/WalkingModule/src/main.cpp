@@ -28,7 +28,7 @@ int main(int argc, char * argv[])
     // prepare and configure the resource finder
     yarp::os::ResourceFinder& rf = yarp::os::ResourceFinder::getResourceFinderSingleton();
 
-    rf.setDefaultConfigFile("dcm_walking_with_joypad.ini");
+    rf.setDefaultConfigFile("dcm_walking_step_adaptation.ini");
 
     rf.configure(argc, argv);
 
