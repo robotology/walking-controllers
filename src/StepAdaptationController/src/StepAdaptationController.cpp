@@ -594,7 +594,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             return false;
         }
 
-        rightArmPitchError=rightArmPitchError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+        rightArmPitchError=rightArmPitchError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     for (int var=0;var<m_pushDetectionListRightArmY.size();++var)
@@ -606,7 +606,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             return false;
         }
 
-        rightArmRollError=rightArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+        rightArmRollError=rightArmRollError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     for (int var=0;var<m_pushDetectionListLeftArmX.size();++var)
@@ -618,7 +618,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             return false;
         }
 
-        leftArmPitchError=leftArmPitchError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+        leftArmPitchError=leftArmPitchError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     for (int var=0;var<m_pushDetectionListLeftArmY.size();++var)
@@ -630,15 +630,15 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             return false;
         }
 
-        leftArmRollError=leftArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+        leftArmRollError=leftArmRollError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
-    if (leftArmPitchError>getRollPitchErrorThreshold()(1) )
+    if (leftArmPitchError>getRollPitchErrorThreshold()(1))
     {
         m_armPitchError=leftArmPitchError;
         m_isPitchActive=1;
     }
-    else if( rightArmPitchError>getRollPitchErrorThreshold()(1))
+    else if(rightArmPitchError>getRollPitchErrorThreshold()(1))
     {
         m_armPitchError=rightArmPitchError;
         m_isPitchActive=1;
@@ -799,7 +799,7 @@ bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, 
                 {
                     if (!input.leftInContact.front())
                     {
-                        tempDCMError(1)=getEstimatedDCM()(1)+0.15;
+                        tempDCMError(1)=getEstimatedDCM()(1);
                     }
                     else
                     {
