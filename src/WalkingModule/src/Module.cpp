@@ -628,7 +628,7 @@ bool WalkingModule::updateModule()
         {
             if(desiredUnicyclePosition != nullptr)
             {
-                if(!setPlannerInput((*desiredUnicyclePosition)(0), 0))
+                if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                     return false;
@@ -779,7 +779,11 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        runStepAdaptation(measuredZMP);
+        if(!runStepAdaptation(measuredZMP))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to run step adjustment";
+            return false;
+        }
 
         // DCM controller
         if(m_useMPC)
