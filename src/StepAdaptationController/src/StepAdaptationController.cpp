@@ -655,8 +655,16 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
         {
             m_armRollError=1*leftArmRollError;
         }
+        if ( m_isRollActive==1)
+        {
+            m_armRollError=0;
+        m_isRollActive=0;
+        }
+        else
+        {
+         m_isRollActive=1;
+        }
 
-        m_isRollActive=1;
     }
     else if(abs(rightArmRollError)>getRollPitchErrorThreshold()(0) && abs(rightArmRollError)>abs(leftArmRollError))
     {
@@ -665,8 +673,15 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             m_armRollError=-1*rightArmRollError;
         }
 
-        m_isRollActive=1;
-//yError() << " hereeee nooooo   [StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<<22222;
+        if(m_isRollActive==1)
+        {
+            m_armRollError=0;
+        m_isRollActive=0;
+        }
+        else
+        {
+         m_isRollActive=1;
+        }
     }
     else
     {
