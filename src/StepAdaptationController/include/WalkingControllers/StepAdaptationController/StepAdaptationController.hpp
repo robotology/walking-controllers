@@ -121,6 +121,9 @@ namespace WalkingControllers
         int m_numberOfConstraints; /**< Size of the constraint vector . */
 
         bool m_isFirstTime;/**< boolean  that indicates whether the solver has been already initilized? . */
+        bool m_numberOfStepFlag;
+        int m_stepCounter;
+        int m_pushStepNumber;
 
         iDynTree::Vector2 m_zmpPositionNominal; /**< The next desired step position(The zmp position for next single support) .. */
         iDynTree::Vector2 m_dcmOffsetNominal; /**< The next desired dcm offset*/

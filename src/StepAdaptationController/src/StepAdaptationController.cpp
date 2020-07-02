@@ -583,7 +583,8 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
     double rightArmPitchError=0;
     double leftArmRollError=0;
     double rightArmRollError=0;
-
+    m_isRollActive=0;
+    m_isPitchActive=0;
     m_armRollError=0;
 
     for (int var=0;var<m_pushDetectionListRightArmX.size();++var)
@@ -651,37 +652,53 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
 
     if (abs(leftArmRollError)>getRollPitchErrorThreshold()(0) && abs(leftArmRollError)>abs(rightArmRollError))
     {
-        if (leftInContact.front())
+        if(!((m_pushStepNumber+1)==(m_stepCounter))){
+        if (leftInContact.front() )
         {
             m_armRollError=1*leftArmRollError;
+                     m_isRollActive=1;
+                                 m_pushStepNumber=m_stepCounter;
         }
-        if ( m_isRollActive==1)
-        {
-            m_armRollError=0;
-        m_isRollActive=0;
         }
-        else
-        {
-         m_isRollActive=1;
+        else {
+                    m_isRollActive=0;
+                                    m_armRollError=0;
         }
+
+//        if ( m_isRollActive==1)
+//        {
+//            m_armRollError=0;
+//        m_isRollActive=0;
+//        }
+//        else
+//        {
+//         m_isRollActive=1;
+//        }
 
     }
     else if(abs(rightArmRollError)>getRollPitchErrorThreshold()(0) && abs(rightArmRollError)>abs(leftArmRollError))
     {
-        if (rightInContact.front())
+        if(!((m_pushStepNumber+1)==(m_stepCounter))){
+        {if (rightInContact.front())
         {
             m_armRollError=-1*rightArmRollError;
+            m_isRollActive=1;
+            m_pushStepNumber=m_stepCounter;
         }
-
-        if(m_isRollActive==1)
-        {
-            m_armRollError=0;
-        m_isRollActive=0;
-        }
-        else
-        {
-         m_isRollActive=1;
-        }
+    }}
+    else {
+                m_isRollActive=0;
+                m_armRollError=0;
+    }
+//        if(m_isRollActive==1)
+//        {
+//            m_armRollError=0;
+//        m_isRollActive=0;
+//        }
+//        else
+//        {
+//         m_isRollActive=1;
+//        }
     }
     else
     {
@@ -716,6 +733,10 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     if (m_isRollActive)
     {
         m_armRollError= m_armRollError+m_armRollPitchErrorOffset(0);
+    }
+    else
+    {
+        m_armRollError=0;
     }
     if (m_isPitchActive)
     {
@@ -752,8 +773,14 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
 
 bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, StepAdapterOutput &output)
 {
-    if (!input.leftInContact.front() || !input.rightInContact.front())
+    if((input.leftInContact.front() && input.rightInContact.front()) && m_numberOfStepFlag)
     {
+        m_stepCounter=m_stepCounter+1;
+        m_numberOfStepFlag=false;
+    }
+    yError()<<"ajab ajab ajab"<<m_stepCounter;
+    if (!input.leftInContact.front() || !input.rightInContact.front())
+    {        m_numberOfStepFlag=true;
         output.indexPush=output.indexPush+1;
 
         int numberOfSubTrajectories = input.dcmSubTrajectories.size();
