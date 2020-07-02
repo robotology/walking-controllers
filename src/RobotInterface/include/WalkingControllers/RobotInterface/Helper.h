@@ -21,6 +21,8 @@
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
 #include <yarp/dev/IInteractionMode.h>
+#include <yarp/dev/IImpedanceControl.h>
+
 #include <yarp/sig/Vector.h>
 #include <yarp/os/Timer.h>
 
@@ -48,7 +50,7 @@ namespace WalkingControllers
         yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
         yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
         yarp::dev::IInteractionMode *m_InteractionInterface{nullptr}; /**< Stiff/compliant mode interface. */
-
+        yarp::dev::IImpedanceControl *m_impedanceControlInterface{nullptr};
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
         yarp::os::Bottle m_remoteControlBoards; /**< Contain all the name of the controlled joints. */
@@ -87,6 +89,8 @@ namespace WalkingControllers
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
         bool m_useWrenchFilter; /**< True if the wrench filter is used. */
 
+        iDynTree::VectorDynSize  m_stiffnessGainVector; /**< the vector of stifness gains for the joint */
+        iDynTree::VectorDynSize  m_dampingGainVector; /**< the vector of damping gains for the joint */
         std::vector<bool>  m_jointModes; /**< True if the joint is in the stiff mode */
         double m_startingPositionControlTime;
         bool m_positionMoveSkipped;
@@ -250,6 +254,11 @@ namespace WalkingControllers
          */
         bool isExternalRobotBaseUsed();
 
+        /**
+         * Set the impedance control gains of the joints(stiffness/damping).
+         * @return true in case of success and false otherwise.
+         */
+        bool setImpedanceControlGain();
     };
 };
 #endif

@@ -1555,6 +1555,13 @@ bool WalkingModule::startWalking()
         return false;
     }
 
+    if (!m_robotControlHelper->setImpedanceControlGain())
+    {
+        yError() << "[WalkingModule::startWalking] Unable to set the set Impedance Control gains of the joints";
+        return false;
+    }
+
+
     m_robotState = WalkingFSM::Walking;
 
     return true;
