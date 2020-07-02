@@ -220,7 +220,8 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
         yError() << "[StepAdaptationController::Configure] Failed to configure the DCM pendulum estimator.";
         return false;
     }
-
+    m_isRollActive=0;
+    m_isPitchActive=0;
     // reset the solver
     reset();
 
@@ -582,8 +583,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
     double rightArmPitchError=0;
     double leftArmRollError=0;
     double rightArmRollError=0;
-    m_isRollActive=0;
-    m_isPitchActive=0;
+
     m_armRollError=0;
 
     for (int var=0;var<m_pushDetectionListRightArmX.size();++var)
