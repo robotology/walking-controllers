@@ -584,6 +584,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
     double rightArmRollError=0;
     m_isRollActive=0;
     m_isPitchActive=0;
+    m_armRollError=0;
 
     for (int var=0;var<m_pushDetectionListRightArmX.size();++var)
     {
@@ -606,7 +607,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
             return false;
         }
 
-        rightArmRollError=rightArmRollError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+        rightArmRollError=rightArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     for (int var=0;var<m_pushDetectionListLeftArmX.size();++var)
@@ -621,16 +622,16 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
         leftArmPitchError=leftArmPitchError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
-    for (int var=0;var<m_pushDetectionListLeftArmY.size();++var)
-    {
-        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListLeftArmY.at(var));
-        if(it == jointsListVector.end())
-        {
-            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListLeftArmY.at(var)<<"inside the controlled joints of the robot";
-            return false;
-        }
+   for (int var=0;var<m_pushDetectionListLeftArmY.size();++var)
+   {
+       std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListLeftArmY.at(var));
+       if(it == jointsListVector.end())
+       {
+           yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListLeftArmY.at(var)<<"inside the controlled joints of the robot";
+           return false;
+       }
 
-        leftArmRollError=leftArmRollError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+       leftArmRollError=leftArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
     if (leftArmPitchError>getRollPitchErrorThreshold()(1))
@@ -648,29 +649,24 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
         m_armPitchError=0;
     }
 
-    if (leftArmRollError>getRollPitchErrorThreshold()(0) )
+    if (abs(leftArmRollError)>getRollPitchErrorThreshold()(0) && abs(leftArmRollError)>abs(rightArmRollError))
     {
         if (leftInContact.front())
         {
             m_armRollError=1*leftArmRollError;
         }
-        if (rightInContact.front())
-        {
-            m_armRollError=-1*leftArmRollError;
-        }
+
         m_isRollActive=1;
     }
-    else if( rightArmRollError>getRollPitchErrorThreshold()(0) )
+    else if(abs(rightArmRollError)>getRollPitchErrorThreshold()(0) && abs(rightArmRollError)>abs(leftArmRollError))
     {
         if (rightInContact.front())
         {
             m_armRollError=-1*rightArmRollError;
         }
-        if (leftInContact.front())
-        {
-            m_armRollError=1*rightArmRollError;
-        }
+
         m_isRollActive=1;
+//yError() << " hereeee nooooo   [StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<<22222;
     }
     else
     {
