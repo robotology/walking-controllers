@@ -628,7 +628,7 @@ bool WalkingModule::updateModule()
         {
             if(desiredUnicyclePosition != nullptr)
             {
-                if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
+                if(!setPlannerInput((*desiredUnicyclePosition)(0), 0))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                     return false;
@@ -1707,7 +1707,8 @@ bool WalkingModule::dcmSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTre
             m_pushRecoveryActiveIndex=0;
         }
     }
-    else {
+    else
+    {
         m_kDCMSmoother=1;
     }
 

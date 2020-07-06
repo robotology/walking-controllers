@@ -635,7 +635,7 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
        leftArmRollError=leftArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
     }
 
-    if (leftArmPitchError>getRollPitchErrorThreshold()(1))
+    if(leftArmPitchError>getRollPitchErrorThreshold()(1))
     {
         m_armPitchError=leftArmPitchError;
         m_isPitchActive=1;
@@ -650,55 +650,39 @@ bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &nu
         m_armPitchError=0;
     }
 
-    if (abs(leftArmRollError)>getRollPitchErrorThreshold()(0) && abs(leftArmRollError)>abs(rightArmRollError))
+    if(abs(leftArmRollError)>getRollPitchErrorThreshold()(0) && abs(leftArmRollError)>abs(rightArmRollError))
     {
-        if(!((m_pushStepNumber+1)==(m_stepCounter))){
-        if (leftInContact.front() )
+        if(!((m_pushStepNumber+1)==(m_stepCounter)))
         {
-            m_armRollError=1*leftArmRollError;
-                     m_isRollActive=1;
-                                 m_pushStepNumber=m_stepCounter;
+            if (leftInContact.front() )
+            {
+                m_armRollError=1*leftArmRollError;
+                m_isRollActive=1;
+                m_pushStepNumber=m_stepCounter;
+            }
         }
+        else
+        {
+            m_isRollActive=0;
+            m_armRollError=0;
         }
-        else {
-                    m_isRollActive=0;
-                                    m_armRollError=0;
-        }
-
-//        if ( m_isRollActive==1)
-//        {
-//            m_armRollError=0;
-//        m_isRollActive=0;
-//        }
-//        else
-//        {
-//         m_isRollActive=1;
-//        }
-
     }
     else if(abs(rightArmRollError)>getRollPitchErrorThreshold()(0) && abs(rightArmRollError)>abs(leftArmRollError))
     {
-        if(!((m_pushStepNumber+1)==(m_stepCounter))){
-        {if (rightInContact.front())
+        if(!((m_pushStepNumber+1)==(m_stepCounter)))
         {
-            m_armRollError=-1*rightArmRollError;
-            m_isRollActive=1;
-            m_pushStepNumber=m_stepCounter;
+            if (rightInContact.front())
+            {
+                m_armRollError=-1*rightArmRollError;
+                m_isRollActive=1;
+                m_pushStepNumber=m_stepCounter;
+            }
         }
-    }}
-    else {
-                m_isRollActive=0;
-                m_armRollError=0;
-    }
-//        if(m_isRollActive==1)
-//        {
-//            m_armRollError=0;
-//        m_isRollActive=0;
-//        }
-//        else
-//        {
-//         m_isRollActive=1;
-//        }
+        else
+        {
+            m_isRollActive=0;
+            m_armRollError=0;
+        }
     }
     else
     {
