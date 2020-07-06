@@ -762,7 +762,6 @@ bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, 
         m_stepCounter=m_stepCounter+1;
         m_numberOfStepFlag=false;
     }
-    yError()<<"ajab ajab ajab"<<m_stepCounter;
     if (!input.leftInContact.front() || !input.rightInContact.front())
     {        m_numberOfStepFlag=true;
         output.indexPush=output.indexPush+1;
