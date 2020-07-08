@@ -508,7 +508,11 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const FootTrajectoryGe
     m_xPositionsBuffer(0)= input.currentFootTransform.getPosition()(0);
     m_yPositionsBuffer(0)= input.currentFootTransform.getPosition()(1);
 
-    m_yawsBuffer(0) = input.currentFootTransform.getRotation().asRPY()(2);
+
+    iDynTree::Rotation initialRotation = iDynTree::Rotation::RotZ(input.currentFootTransform.getRotation().asRPY()(2));
+    iDynTree::Rotation finalRotation = iDynTree::Rotation::RotZ(input.yawAngleAtImpact);
+
+    m_yawsBuffer(0) = input.yawAngleAtImpact - (initialRotation.inverse()*finalRotation).asRPY()(2);
 
     m_xPositionsBuffer(1)= getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0) - sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1));
     m_yPositionsBuffer(1)= getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1) + sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0));
@@ -782,7 +786,6 @@ bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, 
 
         iDynTree::Vector2 nextZmpPosition, currentZmpPosition;
         bool checkFeasibility = false;
-
         if(!secondSS->getZMPPosition(0, nextZmpPosition, checkFeasibility))
         {
             yError() << "[StepAdaptationController::runStepAdaptation] unable to get ZMP Position for second single support";
@@ -791,7 +794,6 @@ bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, 
 
         double angle = !input.leftInContact.front()? input.leftFootprints->getSteps()[1].angle : input.rightFootprints->getSteps()[1].angle;
         setNominalNextStepPosition(nextZmpPosition, angle);
-
         if(!firstSS->getZMPPosition(0, currentZmpPosition, checkFeasibility))
         {
             yError() << "[StepAdaptationController::runStepAdaptation] unable to get ZMP Position for first single support";
