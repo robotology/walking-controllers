@@ -995,7 +995,7 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
             iDynTree::Vector2 DCMError;
-            iDynTree::toEigen( DCMError)=iDynTree::toEigen(m_FKSolver->getDCM())- iDynTree::toEigen( m_DCMPositionDesired.front());
+            iDynTree::toEigen( DCMError)=iDynTree::toEigen(m_DCMPositionSmoothed)- iDynTree::toEigen( m_dcmEstimatedI);
 
             iDynTree::Vector2 LfootAdaptedX;
             LfootAdaptedX(0)=m_adaptedFootLeftTransform.getPosition()(0);
@@ -1501,7 +1501,7 @@ bool WalkingModule::startWalking()
     if(m_dumpData)
     {
         m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                                      "dcm_des_x", "dcm_des_y","errorx","errory",
+                                      "dcm_des_x", "dcm_des_y","dcm_error_x","dcm_error_y",
                                       "dcm_des_dx", "dcm_des_dy","dcm_adj_x", "dcm_adj_y",
                                       "zmp_x", "zmp_y",
                                       "zmp_des_x", "zmp_des_y",
@@ -1726,6 +1726,7 @@ bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
                                                         m_leftInContact,m_rightInContact,m_robotControlHelper->getAxesList());
         m_isRollActive=m_stepAdapter->isArmRollActive();
         m_isPitchActive=m_stepAdapter->isArmPitchActive();
+
         if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front()))
         {
             yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
