@@ -711,16 +711,28 @@ const int& StepAdaptationController::getPushRecoveryActivationIndex() const
     return m_pushRecoveryActivationIndex;
 }
 
-bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2DPosition,const iDynTree::Vector2& CoMVelocity,const iDynTree::Vector2& measuredZMP,const double& CoMHeight)
+bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2DPosition,const iDynTree::Vector2& CoMVelocity,const iDynTree::Vector2& measuredZMP,const double& CoMHeight,const double & yaw)
 {
     iDynTree::Rotation imuRotation;
     iDynTree::Vector3 imuRPY;
-    iDynTree::Rotation StanceFootOrientation;
-    StanceFootOrientation=iDynTree::Rotation::Identity();
-
+    iDynTree::Rotation relativeStanceFootOrientation;
+    iDynTree::Rotation stanceFootOrientation;
+    stanceFootOrientation=iDynTree::Rotation::Identity();
+    relativeStanceFootOrientation=iDynTree::Rotation::Identity();
+    int sign;
+    double Yaw=0;
     if (m_isRollActive)
     {
-        m_armRollError= m_armRollError+m_armRollPitchErrorOffset(0);
+        if(m_armRollError>0)
+        {
+            sign=1;
+        }
+        else
+        {
+            sign=-1;
+        }
+        Yaw=yaw;
+        m_armRollError= (m_armRollError+sign*m_armRollPitchErrorOffset(0));
     }
     else
     {
@@ -728,11 +740,24 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     }
     if (m_isPitchActive)
     {
-        m_armPitchError= m_armPitchError+m_armRollPitchErrorOffset(1);
+        if(m_armPitchError>0)
+        {
+            sign=1;
+        }
+        else
+        {
+            sign=-1;
+        }
+        Yaw=yaw;
+        m_armPitchError= m_armPitchError+sign*m_armRollPitchErrorOffset(1);
+    }
+    else
+    {
+        m_armPitchError=0;
     }
 
-    StanceFootOrientation=iDynTree::Rotation::RPY (m_armRollError,m_armPitchError,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
-
+    relativeStanceFootOrientation=iDynTree::Rotation::RPY (m_armRollError,m_armPitchError,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
+    iDynTree::toEigen(stanceFootOrientation)=iDynTree::toEigen(iDynTree::Rotation::RotZ(Yaw))*iDynTree::toEigen(relativeStanceFootOrientation);
     iDynTree::Vector3 ZMP3d;
     ZMP3d(0)=measuredZMP(0);
     ZMP3d(1)=measuredZMP(1);
@@ -750,7 +775,7 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     CoMVelocity3d(1)=CoMVelocity(1);
     CoMVelocity3d(2)=0;
 
-    if(!m_DCMEstimator->update(StanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
+    if(!m_DCMEstimator->update(stanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
     {
         yError() << "[StepAdaptationController::UpdateDCMEstimator] Unable to to recieve DCM from pendulumEstimator";
         return false;
@@ -810,8 +835,7 @@ bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, 
             {
                 output.isPushActive=1;
                 iDynTree::Vector2 tempDCMError;
-                tempDCMError(1)=0.00;
-                tempDCMError(0)=0.00;
+                tempDCMError=output.dcmPositionAdjusted.front();
                 output.pushRecoveryActiveIndex++;
                 yInfo()<<"triggering the push recovery";
                 if((abs(input.dcmPositionSmoothed(0) - getEstimatedDCM()(0))) > getDCMErrorThreshold()(0))

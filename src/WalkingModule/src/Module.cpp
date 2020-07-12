@@ -1726,8 +1726,8 @@ bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
                                                         m_leftInContact,m_rightInContact,m_robotControlHelper->getAxesList());
         m_isRollActive=m_stepAdapter->isArmRollActive();
         m_isPitchActive=m_stepAdapter->isArmPitchActive();
-
-        if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front()))
+        double yawAngle = m_leftInContact.front()? m_jleftFootprints->getSteps()[1].angle : m_jRightFootprints->getSteps()[1].angle;
+        if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front(),yawAngle))
         {
             yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
             return false;

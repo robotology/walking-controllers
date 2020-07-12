@@ -365,7 +365,7 @@ namespace WalkingControllers
          * @param CoMHeight the CoM height.
          * @return true/false in case of success/failure
          */
-        bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight);
+        bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight, const double &yaw);
 
 
         /**
