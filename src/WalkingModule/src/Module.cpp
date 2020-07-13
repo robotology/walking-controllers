@@ -628,7 +628,7 @@ bool WalkingModule::updateModule()
         {
             if(desiredUnicyclePosition != nullptr)
             {
-                if(!setPlannerInput((*desiredUnicyclePosition)(0), 0))
+                if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                     return false;
