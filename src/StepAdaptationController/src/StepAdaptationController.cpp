@@ -719,7 +719,7 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
     iDynTree::Rotation stanceFootOrientation;
     stanceFootOrientation=iDynTree::Rotation::Identity();
     relativeStanceFootOrientation=iDynTree::Rotation::Identity();
-    int sign;
+    int sign=0;
     double Yaw=0;
     if (m_isRollActive)
     {
@@ -727,9 +727,13 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
         {
             sign=1;
         }
-        else
+        else if(m_armRollError<0)
         {
             sign=-1;
+        }
+        else
+        {
+            sign=0;
         }
         Yaw=yaw;
         m_armRollError= (m_armRollError+sign*m_armRollPitchErrorOffset(0));
@@ -744,9 +748,13 @@ bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2D
         {
             sign=1;
         }
-        else
+        else if(m_armPitchError<0)
         {
             sign=-1;
+        }
+        else
+        {
+            sign=0;
         }
         Yaw=yaw;
         m_armPitchError= m_armPitchError+sign*m_armRollPitchErrorOffset(1);
