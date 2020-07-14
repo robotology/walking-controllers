@@ -624,17 +624,15 @@ bool WalkingModule::updateModule()
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
-        if(desiredUnicyclePosition == nullptr)
+        if(m_DCMSubTrajectories.size()<4)
         {
             m_useStepAdaptation=false;
         }
-        else if(desiredUnicyclePosition != nullptr && m_mergePoints.front() == 11 )
+        else
         {
             m_useStepAdaptation=true;
         }
 
-        if(m_useStepAdaptation)
-        {
             if(desiredUnicyclePosition != nullptr)
             {
                 if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
@@ -643,26 +641,6 @@ bool WalkingModule::updateModule()
                     return false;
                 }
             }
-            if (m_mergePoints.front() == 11 && desiredUnicyclePosition == nullptr)
-            {
-                if(!setPlannerInput(m_desiredPosition(0) ,m_desiredPosition(1)))
-                {
-                    yError() << "[updateModule] Unable to recall the setplannerInput(Step adjustment is active)";
-                    return false;
-                }
-            }
-        }
-        else
-        {
-            if(desiredUnicyclePosition != nullptr)
-            {
-                if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
-                {
-                    yError() << "[WalkingModule::updateModule] Unable to set the planner input";
-                    return false;
-                }
-            }
-        }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
         // the time to attach new one
