@@ -624,6 +624,15 @@ bool WalkingModule::updateModule()
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
+        if(desiredUnicyclePosition == nullptr)
+        {
+            m_useStepAdaptation=false;
+        }
+        else if(desiredUnicyclePosition != nullptr && m_mergePoints.front() == 11 )
+        {
+            m_useStepAdaptation=true;
+        }
+
         if(m_useStepAdaptation)
         {
             if(desiredUnicyclePosition != nullptr)
@@ -634,7 +643,6 @@ bool WalkingModule::updateModule()
                     return false;
                 }
             }
-
             if (m_mergePoints.front() == 11 && desiredUnicyclePosition == nullptr)
             {
                 if(!setPlannerInput(m_desiredPosition(0) ,m_desiredPosition(1)))
