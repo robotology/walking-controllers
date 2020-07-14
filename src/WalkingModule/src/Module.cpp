@@ -624,11 +624,11 @@ bool WalkingModule::updateModule()
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
-        if(m_DCMSubTrajectories.size()<4)
+        if(m_DCMSubTrajectories.size()<4 && desiredUnicyclePosition == nullptr)
         {
             m_useStepAdaptation=false;
         }
-        else
+        else if(m_DCMSubTrajectories.size()>4)
         {
             m_useStepAdaptation=true;
         }
