@@ -93,6 +93,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double landingVelocity = config.check("stepLandingVelocity", yarp::os::Value(0.0)).asDouble();
     double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asDouble();
     double comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
+    m_nominalCoMHeight=comHeight;
     double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
     double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asDouble();
     double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asDouble();
@@ -125,7 +126,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
-    unicyclePlanner->addTerminalStep(false);
+    unicyclePlanner->addTerminalStep(true);
     unicyclePlanner->startWithLeft(m_swingLeft);
     unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
 
@@ -496,6 +497,26 @@ bool TrajectoryGenerator::isTrajectoryAsked()
     return m_generatorState == GeneratorState::Called;
 }
 
+bool TrajectoryGenerator::generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
+                                                             const double &initTime,DCMInitialState initialState)
+{
+    if (!m_dcmGenerator->setDCMInitialState(initialState))
+    {
+        yError() << "[TrajectoryGenerator_Thread] Failed to set the initial state.";
+        return  false;
+    }
+
+    if(!m_trajectoryGenerator.generateFromFootPrints(left, right, initTime, m_dT))
+    {
+        yError() << "[generateTrajectoriesFromFootprints] Failed to generate trajectory from foot-prints";
+        m_generatorState = GeneratorState::Configured;
+        return false;
+    }
+
+    m_generatorState = GeneratorState::Returned;
+    return true;
+}
+
 bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2>& DCMPositionTrajectory)
 {
     if(!isTrajectoryComputed())
@@ -508,6 +529,18 @@ bool TrajectoryGenerator::getDCMPositionTrajectory(std::vector<iDynTree::Vector2
     return true;
 }
 
+bool TrajectoryGenerator::getZMPPositionTrajectory(std::vector<iDynTree::Vector2>& ZMPPositionTrajectory)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getZMPPositionTrajectory] No trajectories are available";
+        return false;
+    }
+
+    ZMPPositionTrajectory = m_dcmGenerator->getZMPPosition();
+    return true;
+}
+
 bool TrajectoryGenerator::getDCMVelocityTrajectory(std::vector<iDynTree::Vector2>& DCMVelocityTrajectory)
 {
     if(!isTrajectoryComputed())
@@ -517,6 +550,19 @@ bool TrajectoryGenerator::getDCMVelocityTrajectory(std::vector<iDynTree::Vector2
     }
 
     DCMVelocityTrajectory = m_dcmGenerator->getDCMVelocity();
+    return true;
+}
+
+bool TrajectoryGenerator::getDCMSubTrajectories(std::vector<std::shared_ptr<GeneralSupportTrajectory>> & dcmSubTrajectories)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getDCMSubTrajectories] No trajectories are available";
+        return false;
+    }
+
+    dcmSubTrajectories= m_dcmGenerator->getDCMSubTrajectories();
+
     return true;
 }
 
@@ -545,6 +591,19 @@ bool TrajectoryGenerator::getFeetTwist(std::vector<iDynTree::Twist>& lFootTwist,
 
     m_feetGenerator->getFeetTwistsInMixedRepresentation(lFootTwist, rFootTwist);
 
+    return true;
+}
+
+bool TrajectoryGenerator::getFeetAcceleration(std::vector<iDynTree::SpatialAcc>& lFootAcceleration,
+                                              std::vector<iDynTree::SpatialAcc>& rFootAcceleration)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getFeetAcceleration] No trajectories are available";
+        return false;
+    }
+
+    m_feetGenerator->getFeetAccelerationInMixedRepresentation(lFootAcceleration, rFootAcceleration);
     return true;
 }
 
@@ -598,6 +657,68 @@ bool TrajectoryGenerator::getCoMHeightVelocity(std::vector<double>& CoMHeightVel
     return true;
 }
 
+bool TrajectoryGenerator::getWeightPercentage(std::vector<double> &weightInLeft,
+                                              std::vector<double> &weightInRight)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getWeightPercentage] No trajectories are available";
+        return false;
+    }
+
+    m_dcmGenerator->getWeightPercentage(weightInLeft, weightInRight);
+    return true;
+}
+
+bool TrajectoryGenerator::getStepPhases(std::vector<StepPhase> &leftPhases, std::vector<StepPhase> &rightPhases)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getStepPhases] No trajectories are available";
+        return false;
+    }
+
+    m_trajectoryGenerator.getStepPhases(leftPhases,rightPhases);
+        return true;
+}
+
+bool TrajectoryGenerator::getLeftFootprint(std::shared_ptr<FootPrint>& leftFootPrint)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getLeftFootprint] No trajectories are available";
+        return false;
+    }
+
+    leftFootPrint=m_trajectoryGenerator.getLeftFootPrint();
+    return true;
+}
+
+bool TrajectoryGenerator::getRightFootprint(std::shared_ptr<FootPrint>& rightFootPrint)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getRightFootprint] No trajectories are available";
+        return false;
+    }
+
+    rightFootPrint=m_trajectoryGenerator.getRightFootPrint();
+    return true;
+}
+
+bool TrajectoryGenerator::getNominalCoMHeight(double& nominalCoMHeight)
+{
+    nominalCoMHeight=m_nominalCoMHeight;
+    return true;
+}
+
+
+bool TrajectoryGenerator::getSwitchOverSwingRatio(double& switchOverSwingRatio)
+{
+    switchOverSwingRatio=m_switchOverSwingRatio;
+    return true;
+}
+
 bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
 {
     if(!isTrajectoryComputed())
@@ -607,6 +728,15 @@ bool TrajectoryGenerator::getMergePoints(std::vector<size_t>& mergePoints)
     }
 
     m_trajectoryGenerator.getMergePoints(mergePoints);
+    return true;
+}
+
+bool TrajectoryGenerator::getDCMBoundaryConditionAtMergePoint(DCMInitialState DCMBoundryConditionAtMergePoint)
+{
+
+    DCMBoundryConditionAtMergePoint.initialPosition = m_DCMBoundaryConditionAtMergePointPosition;
+    DCMBoundryConditionAtMergePoint.initialVelocity = m_DCMBoundaryConditionAtMergePointVelocity;
+
     return true;
 }
 

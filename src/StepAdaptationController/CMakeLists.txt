@@ -10,11 +10,13 @@ if(WALKING_CONTROLLERS_COMPILE_StepAdaptationController)
   # set cpp files
   set(${LIBRARY_TARGET_NAME}_SRC
     src/StepAdaptationController.cpp
+    src/DCMSimpleEstimator.cpp
     )
 
   # set hpp files
   set(${LIBRARY_TARGET_NAME}_HDR
     include/WalkingControllers/StepAdaptationController/StepAdaptationController.hpp
+    include/WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp
     )
 
   # add an executable to the project using the specified source files.
@@ -24,6 +26,7 @@ if(WALKING_CONTROLLERS_COMPILE_StepAdaptationController)
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC
     WalkingControllers::YarpUtilities
     WalkingControllers::iDynTreeUtilities
+    WalkingControllers::TrajectoryPlanner
     osqp::osqp
     OsqpEigen::OsqpEigen
     ${qpOASES_LIBRARIES})

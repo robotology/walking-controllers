@@ -218,9 +218,23 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     m_isJointModeStiffVector.resize(m_actuatedDOFs);
     m_JointModeStiffVectorDefult.resize(m_actuatedDOFs);
     m_jointModes.resize(m_actuatedDOFs);
+    m_stiffnessGainVector.resize(m_actuatedDOFs);
+    m_dampingGainVector.resize(m_actuatedDOFs);
     if(!YarpUtilities::getVectorOfBooleanFromSearchable(config,"joint_is_stiff_mode",m_jointModes))
     {
         yError() << "[RobotInterface::configureRobot] Unable to find joint_is_stiff_mode into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::getVectorFromSearchable(config,"joint_stiffness_gain",m_stiffnessGainVector))
+    {
+        yError() << "[RobotInterface::configureRobot] Unable to find joint_stiffness_gain into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::getVectorFromSearchable(config,"joint_damping_gain",m_dampingGainVector))
+    {
+        yError() << "[RobotInterface::configureRobot] Unable to find joint_damping_gain into config file.";
         return false;
     }
 
@@ -285,6 +299,12 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     if(!m_robotDevice.view(m_InteractionInterface) || !m_InteractionInterface)
     {
              yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+            return false;
+    }
+
+    if(!m_robotDevice.view(m_impedanceControlInterface) || !m_impedanceControlInterface)
+    {
+             yError() << "[configureRobot] Cannot obtain ImpedanceControl interface";
             return false;
     }
 
@@ -585,6 +605,12 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
             return false;
         }
 
+    if(m_impedanceControlInterface == nullptr)
+        {
+            yError() << "[RobotInterface::setPositionReferences] IImpedanceControlInterface interface is not ready.";
+            return false;
+        }
+
     m_desiredJointPositionRad = desiredJointPositionsRad;
 
     std::pair<int, double> worstError(0, 0.0);
@@ -873,6 +899,20 @@ bool RobotInterface::setInteractionMode()
     }
 
         m_currentModeofJoints = m_isJointModeStiffVector;
+
+    return true;
+}
+
+bool RobotInterface::setImpedanceControlGain()
+{
+    for (unsigned i = 0; i < m_actuatedDOFs; i++)
+    {
+        if(!m_impedanceControlInterface->setImpedance(i,m_stiffnessGainVector(i),m_dampingGainVector(i)))
+        {
+            yError() << "[RobotInterface::setImpedanceControlGain] Error while setting the impedance control gains";
+            return false;
+        }
+    }
 
     return true;
 }

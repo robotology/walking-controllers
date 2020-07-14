@@ -1,4 +1,3 @@
-
 // std
 #define NOMINMAX
 #include <algorithm>
@@ -52,7 +51,7 @@ StepAdaptationController::StepAdaptationController()
     m_constraintsMatrix(1, 4) = 1;
     m_constraintsMatrix(6, 2) = 1;
 
-    m_hessianMatrix.resize(m_inputSize, m_numberOfConstraints);
+    m_hessianMatrix.resize(m_inputSize, m_inputSize);
     m_solution.resize(m_inputSize);
 
     // qpoases
@@ -65,14 +64,19 @@ StepAdaptationController::StepAdaptationController()
 
 bool StepAdaptationController::configure(const yarp::os::Searchable &config)
 {
+    if(!YarpUtilities::getNumberFromSearchable(config, "stepHeight", m_stepHeight))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to get the number";
+        return false;
+    }
 
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight",  m_zmpPositionWeight))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_position_weight", m_zmpPositionWeight))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
     }
 
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_dcm_offset_weight",  m_dcmOffsetWeight))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_dcm_offset_weight", m_dcmOffsetWeight))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
@@ -84,10 +88,86 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
         return false;
     }
 
+    if(!YarpUtilities::getNumberFromSearchable(config, "push_recovery_activation_index", m_pushRecoveryActivationIndex))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to get the number";
+        return false;
+    }
+
+    if(!YarpUtilities::getVectorFromSearchable(config, "leftZMPDelta", m_zmpToCenterOfFootPositionLeft))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector of leftZMPDelta";
+        return false;
+    }
+
+    if(!YarpUtilities::getVectorFromSearchable(config, "rightZMPDelta", m_zmpToCenterOfFootPositionRight))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector of rightZMPDelta";
+        return false;
+    }
+
+    if(!YarpUtilities::getVectorFromSearchable(config, "offset_roll_pitch_arm_error", m_armRollPitchErrorOffset))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to get the vector of offset_roll_pitch_arm_error";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpRX;
+    if(!config.check("joints_list_push_detection_right_arm_x", jointsListForPushDetectionYarpRX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpRX, m_pushDetectionListRightArmX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpRY;
+    if(!config.check("joints_list_push_detection_right_arm_y", jointsListForPushDetectionYarpRY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpRY, m_pushDetectionListRightArmY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpLX;
+    if(!config.check("joints_list_push_detection_left_arm_x", jointsListForPushDetectionYarpLX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpLX, m_pushDetectionListLeftArmX))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
+    yarp::os::Value *jointsListForPushDetectionYarpLY;
+    if(!config.check("joints_list_push_detection_left_arm_y", jointsListForPushDetectionYarpLY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to find joints_list into config file.";
+        return false;
+    }
+
+    if(!YarpUtilities::yarpListToStringVector(jointsListForPushDetectionYarpLY, m_pushDetectionListLeftArmY))
+    {
+        yError() << "[StepAdaptationController::Configure] Unable to convert yarp list into a vector of strings.";
+        return false;
+    }
+
     m_feetExtendedPolygon.resize(2);
     iDynTree::Polygon foot;
     iDynTree::Vector4 nextZmpConstraintBoundLeftFoot;
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_left_foot  ",  nextZmpConstraintBoundLeftFoot))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_left_foot", nextZmpConstraintBoundLeftFoot))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
@@ -110,7 +190,7 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
     m_feetExtendedPolygon[0] = foot;
 
     iDynTree::Vector4 nextZmpConstraintBoundRightFoot;
-    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_right_foot  ", nextZmpConstraintBoundRightFoot))
+    if(!YarpUtilities::getVectorFromSearchable(config, "next_zmp_constraint_bound_right_foot", nextZmpConstraintBoundRightFoot))
     {
         yError() << "[StepAdaptationController::Configure] Unable to get the vector";
         return false;
@@ -133,6 +213,15 @@ bool StepAdaptationController::configure(const yarp::os::Searchable &config)
         return false;
     }
 
+    //initialize the DCM simple estimator
+    m_DCMEstimator=std::make_unique<DCMSimpleEstimator>();
+    if(!m_DCMEstimator->configure(config))
+    {
+        yError() << "[StepAdaptationController::Configure] Failed to configure the DCM pendulum estimator.";
+        return false;
+    }
+    m_isRollActive=0;
+    m_isPitchActive=0;
     // reset the solver
     reset();
 
@@ -358,7 +447,7 @@ iDynTree::Vector2 StepAdaptationController::getDesiredDCMOffset()
     return desiredDCMOffset;
 }
 
-bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input,
+bool StepAdaptationController::getAdaptatedFootTrajectory(const FootTrajectoryGenerationInput& input,
                                                           iDynTree::Transform& adaptatedFootTransform, iDynTree::Twist& adaptedFootTwist,
                                                           iDynTree::SpatialAcc& adaptedFootAcceleration)
 {
@@ -419,7 +508,11 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGe
     m_xPositionsBuffer(0)= input.currentFootTransform.getPosition()(0);
     m_yPositionsBuffer(0)= input.currentFootTransform.getPosition()(1);
 
-    m_yawsBuffer(0) = input.currentFootTransform.getRotation().asRPY()(2);
+
+    iDynTree::Rotation initialRotation = iDynTree::Rotation::RotZ(input.currentFootTransform.getRotation().asRPY()(2));
+    iDynTree::Rotation finalRotation = iDynTree::Rotation::RotZ(input.yawAngleAtImpact);
+
+    m_yawsBuffer(0) = input.yawAngleAtImpact - (initialRotation.inverse()*finalRotation).asRPY()(2);
 
     m_xPositionsBuffer(1)= getDesiredZmp()(0) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0) - sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1));
     m_yPositionsBuffer(1)= getDesiredZmp()(1) - (cos(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(1) + sin(input.yawAngleAtImpact) * input.zmpToCenterOfFootPosition(0));
@@ -487,9 +580,456 @@ bool StepAdaptationController::getAdaptatedFootTrajectory(const footTrajectoryGe
     return true;
 }
 
+bool StepAdaptationController::triggerStepAdapterByArmCompliant(const double &numberOfActuatedDof, const iDynTree::VectorDynSize &qDesired, const iDynTree::VectorDynSize &qActual,
+                                                                const std::deque<bool>& leftInContact,const std::deque<bool>& rightInContact,std::vector<std::string> jointsListVector)
+{
+    double leftArmPitchError=0;
+    double rightArmPitchError=0;
+    double leftArmRollError=0;
+    double rightArmRollError=0;
+    m_isRollActive=0;
+    m_isPitchActive=0;
+    m_armRollError=0;
+
+    for (int var=0;var<m_pushDetectionListRightArmX.size();++var)
+    {
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListRightArmX.at(var));
+        if(it == jointsListVector.end())
+        {
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListRightArmX.at(var)<<"inside the controlled joints of the robot";
+            return false;
+        }
+
+        rightArmPitchError=rightArmPitchError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+    for (int var=0;var<m_pushDetectionListRightArmY.size();++var)
+    {
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListRightArmY.at(var));
+        if(it == jointsListVector.end())
+        {
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListRightArmY.at(var)<<"inside the controlled joints of the robot";
+            return false;
+        }
+
+        rightArmRollError=rightArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+    for (int var=0;var<m_pushDetectionListLeftArmX.size();++var)
+    {
+        std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListLeftArmX.at(var));
+        if(it == jointsListVector.end())
+        {
+            yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListLeftArmX.at(var)<<"inside the controlled joints of the robot";
+            return false;
+        }
+
+        leftArmPitchError=leftArmPitchError+(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+   for (int var=0;var<m_pushDetectionListLeftArmY.size();++var)
+   {
+       std::vector<std::string>::iterator it = std::find(jointsListVector.begin(), jointsListVector.end(), m_pushDetectionListLeftArmY.at(var));
+       if(it == jointsListVector.end())
+       {
+           yError() << "[StepAdaptationController::triggerStepAdapterByArmCompliant] Unable to to find"<< m_pushDetectionListLeftArmY.at(var)<<"inside the controlled joints of the robot";
+           return false;
+       }
+
+       leftArmRollError=leftArmRollError+abs(qDesired(std::distance(jointsListVector.begin(), it))-qActual(std::distance(jointsListVector.begin(), it)));
+    }
+
+    if(leftArmPitchError>getRollPitchErrorThreshold()(1))
+    {
+        m_armPitchError=leftArmPitchError;
+        m_isPitchActive=1;
+    }
+    else if(rightArmPitchError>getRollPitchErrorThreshold()(1))
+    {
+        m_armPitchError=rightArmPitchError;
+        m_isPitchActive=1;
+    }
+    else
+    {
+        m_armPitchError=0;
+    }
+
+    if(abs(leftArmRollError)>getRollPitchErrorThreshold()(0) && abs(leftArmRollError)>abs(rightArmRollError))
+    {
+        if(!((m_pushStepNumber+1)==(m_stepCounter)))
+        {
+            if (leftInContact.front() )
+            {
+                m_armRollError=1*leftArmRollError;
+                m_isRollActive=1;
+                m_pushStepNumber=m_stepCounter;
+            }
+        }
+        else
+        {
+            m_isRollActive=0;
+            m_armRollError=0;
+        }
+    }
+    else if(abs(rightArmRollError)>getRollPitchErrorThreshold()(0) && abs(rightArmRollError)>abs(leftArmRollError))
+    {
+        if(!((m_pushStepNumber+1)==(m_stepCounter)))
+        {
+            if (rightInContact.front())
+            {
+                m_armRollError=-1*rightArmRollError;
+                m_isRollActive=1;
+                m_pushStepNumber=m_stepCounter;
+            }
+        }
+        else
+        {
+            m_isRollActive=0;
+            m_armRollError=0;
+        }
+    }
+    else
+    {
+        m_armRollError=0;
+    }
+
+    return true;
+}
+
+const double& StepAdaptationController::getArmRollError() const
+{
+    return m_armRollError;
+}
+
+const double& StepAdaptationController::getArmPitchError() const
+{
+    return m_armPitchError;
+}
+
+const int& StepAdaptationController::getPushRecoveryActivationIndex() const
+{
+    return m_pushRecoveryActivationIndex;
+}
+
+bool StepAdaptationController::UpdateDCMEstimator(const iDynTree::Vector2& CoM2DPosition,const iDynTree::Vector2& CoMVelocity,const iDynTree::Vector2& measuredZMP,const double& CoMHeight,const double & yaw)
+{
+    iDynTree::Rotation imuRotation;
+    iDynTree::Vector3 imuRPY;
+    iDynTree::Rotation relativeStanceFootOrientation;
+    iDynTree::Rotation stanceFootOrientation;
+    stanceFootOrientation=iDynTree::Rotation::Identity();
+    relativeStanceFootOrientation=iDynTree::Rotation::Identity();
+    int sign=0;
+    double Yaw=0;
+    if (m_isRollActive)
+    {
+        if(m_armRollError>0)
+        {
+            sign=1;
+        }
+        else if(m_armRollError<0)
+        {
+            sign=-1;
+        }
+        else
+        {
+            sign=0;
+        }
+        Yaw=yaw;
+        m_armRollError= (m_armRollError+sign*m_armRollPitchErrorOffset(0));
+    }
+    else
+    {
+        m_armRollError=0;
+    }
+    if (m_isPitchActive)
+    {
+        if(m_armPitchError>0)
+        {
+            sign=1;
+        }
+        else if(m_armPitchError<0)
+        {
+            sign=-1;
+        }
+        else
+        {
+            sign=0;
+        }
+        Yaw=yaw;
+        m_armPitchError= m_armPitchError+sign*m_armRollPitchErrorOffset(1);
+    }
+    else
+    {
+        m_armPitchError=0;
+    }
+
+    relativeStanceFootOrientation=iDynTree::Rotation::RPY (m_armRollError,m_armPitchError,0); 	//=m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY();
+    iDynTree::toEigen(stanceFootOrientation)=iDynTree::toEigen(iDynTree::Rotation::RotZ(Yaw))*iDynTree::toEigen(relativeStanceFootOrientation);
+    iDynTree::Vector3 ZMP3d;
+    ZMP3d(0)=measuredZMP(0);
+    ZMP3d(1)=measuredZMP(1);
+    ZMP3d(2)=0;
+
+    iDynTree::Vector3 CoM3d;
+    //iDynTree::Vector3 ZMP3d;
+    CoM3d(0)=CoM2DPosition(0);
+    CoM3d(1)=CoM2DPosition(1);
+    CoM3d(2)=CoMHeight;
+
+    iDynTree::Vector3 CoMVelocity3d;
+    //iDynTree::Vector3 ZMP3d;
+    CoMVelocity3d(0)=CoMVelocity(0);
+    CoMVelocity3d(1)=CoMVelocity(1);
+    CoMVelocity3d(2)=0;
+
+    if(!m_DCMEstimator->update(stanceFootOrientation,ZMP3d,CoM3d,CoMVelocity3d))
+    {
+        yError() << "[StepAdaptationController::UpdateDCMEstimator] Unable to to recieve DCM from pendulumEstimator";
+        return false;
+    }
+
+    return true;
+}
+
+bool StepAdaptationController::runStepAdaptation(const StepAdapterInput &input, StepAdapterOutput &output)
+{
+    if((input.leftInContact.front() && input.rightInContact.front()) && m_numberOfStepFlag)
+    {
+        m_stepCounter=m_stepCounter+1;
+        m_numberOfStepFlag=false;
+    }
+    if (!input.leftInContact.front() || !input.rightInContact.front())
+    {        m_numberOfStepFlag=true;
+        output.indexPush=output.indexPush+1;
+
+        int numberOfSubTrajectories = input.dcmSubTrajectories.size();
+
+        if(numberOfSubTrajectories<4)
+        {
+            yError() << "[StepAdaptationController::runStepAdaptation] the number of sub-trajectories should be equal or greater than 4";
+            return false;
+        }
+
+        auto firstSS = input.dcmSubTrajectories[numberOfSubTrajectories-2];
+        auto secondSS = input.dcmSubTrajectories[numberOfSubTrajectories-4];
+
+        auto secondDS = input.dcmSubTrajectories[numberOfSubTrajectories-3];
+        auto firstDS = input.dcmSubTrajectories[numberOfSubTrajectories-1];
+
+        iDynTree::Vector2 nextZmpPosition, currentZmpPosition;
+        bool checkFeasibility = false;
+        if(!secondSS->getZMPPosition(0, nextZmpPosition, checkFeasibility))
+        {
+            yError() << "[StepAdaptationController::runStepAdaptation] unable to get ZMP Position for second single support";
+            return false;
+        }
+
+        double angle = !input.leftInContact.front()? input.leftFootprints->getSteps()[1].angle : input.rightFootprints->getSteps()[1].angle;
+        setNominalNextStepPosition(nextZmpPosition, angle);
+        if(!firstSS->getZMPPosition(0, currentZmpPosition, checkFeasibility))
+        {
+            yError() << "[StepAdaptationController::runStepAdaptation] unable to get ZMP Position for first single support";
+            return false;
+        }
+
+        setCurrentZmpPosition(currentZmpPosition);
+
+        output.isPushActive=0;
+
+        if((abs(input.dcmPositionSmoothed(0) - getEstimatedDCM()(0))) > getDCMErrorThreshold()(0) ||(abs(input.dcmPositionSmoothed(1) - getEstimatedDCM()(1)))> getDCMErrorThreshold()(1) )
+        {
+            if (output.pushRecoveryActiveIndex==m_pushRecoveryActivationIndex )
+            {
+                output.isPushActive=1;
+                iDynTree::Vector2 tempDCMError;
+                tempDCMError=output.dcmPositionAdjusted.front();
+                output.pushRecoveryActiveIndex++;
+                yInfo()<<"triggering the push recovery";
+                if((abs(input.dcmPositionSmoothed(0) - getEstimatedDCM()(0))) > getDCMErrorThreshold()(0))
+                {
+                    tempDCMError(0)=getEstimatedDCM()(0);
+                }
+                if((abs(input.dcmPositionSmoothed(1) - getEstimatedDCM()(1))) > getDCMErrorThreshold()(1))
+                {
+                    if (!input.leftInContact.front())
+                    {
+                        tempDCMError(1)=getEstimatedDCM()(1);
+                    }
+                    else
+                    {
+                         tempDCMError(1)=getEstimatedDCM()(1);
+                    }
+                }
+                setCurrentDcmPosition(tempDCMError);
+            }
+            else
+            {
+                output.pushRecoveryActiveIndex++;
+                setCurrentDcmPosition(output.dcmPositionAdjusted.front());
+            }
+
+        }
+        else
+        {
+            if (output.pushRecoveryActiveIndex<=m_pushRecoveryActivationIndex)
+            {
+                output.pushRecoveryActiveIndex=0;
+                setCurrentDcmPosition(output.dcmPositionAdjusted.front());
+            }
+            else if(output.pushRecoveryActiveIndex==(m_pushRecoveryActivationIndex+1))
+            {
+                setCurrentDcmPosition(output.dcmPositionAdjusted.front());
+                output.pushRecoveryActiveIndex++;
+            }
+            else
+            {
+                setCurrentDcmPosition(output.dcmPositionAdjusted.front());
+            }
+        }
+
+        iDynTree::Vector2 dcmAtTimeAlpha;
+        double timeAlpha = (secondDS->getTrajectoryDomain().second + secondDS->getTrajectoryDomain().first) / 2;
+
+        if(!input.dcmSubTrajectories[numberOfSubTrajectories-2]->getDCMPosition(timeAlpha, dcmAtTimeAlpha, checkFeasibility))
+        {
+            yError() << "[StepAdaptationController::runStepAdaptation] unable to get DCM Position ";
+            return false;
+        }
+
+        iDynTree::Vector2 nominalDcmOffset;
+        iDynTree::toEigen(nominalDcmOffset) = iDynTree::toEigen(dcmAtTimeAlpha) - iDynTree::toEigen(nextZmpPosition);
+        setNominalDcmOffset(nominalDcmOffset);
+
+        //timeOffset is the time of start of this step(that will be updated in updateTrajectory function at starting point of each step )
+        setTimings(input.omega, input.time - input.timeOffset, firstSS->getTrajectoryDomain().second,
+                                    secondDS->getTrajectoryDomain().second - secondDS->getTrajectoryDomain().first);
+
+        SwingFoot swingFoot;
+        if (!input.leftInContact.front())
+        {
+            swingFoot=SwingFoot::Left;
+        }
+        else
+        {
+            swingFoot=SwingFoot::Right;
+        }
+
+        if(!solve(swingFoot))
+        {
+            yError() << "[StepAdaptationController::runStepAdaptation] unable to solve the step adjustment optimization problem";
+            return false;
+        }
+
+        output.impactTimeNominal = firstSS->getTrajectoryDomain().second + input.timeOffset;
+        if(output.pushRecoveryActiveIndex==(m_pushRecoveryActivationIndex+1))
+        {
+            double timeOfSmoothing=(secondDS->getTrajectoryDomain().second-secondDS->getTrajectoryDomain().first)/2 +getDesiredImpactTime()-(input.time - input.timeOffset);
+            output.indexSmoother=timeOfSmoothing/input.dT;
+            output.kDCMSmoother=0;
+        }
+        if(output.pushRecoveryActiveIndex==(m_pushRecoveryActivationIndex+1))
+        {
+            double timeOfSmoothing=getDesiredImpactTime()-(input.time - input.timeOffset);
+            output.indexFootSmoother=timeOfSmoothing/input.dT;
+            output.kFootSmoother=0;
+        }
+        output.impactTimeAdjusted = getDesiredImpactTime() + input.timeOffset;
+
+        output.zmpNominal = nextZmpPosition;
+        output.zmpAdjusted = getDesiredZmp();
+
+        iDynTree::Vector2 zmpOffset;
+        if (!input.leftInContact.front())
+        {
+            zmpOffset=m_zmpToCenterOfFootPositionLeft;
+        }
+        if (!input.rightInContact.front())
+        {
+            zmpOffset=m_zmpToCenterOfFootPositionRight;
+        }
+
+        if (!input.leftInContact.front())
+        {
+            output.currentFootLeftTransform = output.adaptedFootLeftTransform;
+            output.currentFootLeftTwist = output.adaptedFootLeftTwist;
+            output.currentFootLeftAcceleration = output.adaptedFootLeftAcceleration;
+
+            FootTrajectoryGenerationInput inputLeftFootTrajectory;
+            inputLeftFootTrajectory.maxFootHeight=m_stepHeight;
+            inputLeftFootTrajectory.discretizationTime=input.dT;
+            inputLeftFootTrajectory.takeOffTime =firstSS->getTrajectoryDomain().first;
+            inputLeftFootTrajectory.yawAngleAtImpact=input.leftStepList.at(1).angle;
+            inputLeftFootTrajectory.zmpToCenterOfFootPosition=zmpOffset;
+            inputLeftFootTrajectory.currentFootTransform=output.currentFootLeftTransform;
+            inputLeftFootTrajectory.currentFootTwist=output.currentFootLeftTwist;
+
+            if(!getAdaptatedFootTrajectory(inputLeftFootTrajectory,
+                                                          output.adaptedFootLeftTransform, output.adaptedFootLeftTwist, output.adaptedFootLeftAcceleration ))
+            {
+                yError() << "[StepAdaptationController::runStepAdaptation] unable to get get adaptated left foot trajectory";
+                return false;
+            }
+        }
+        else
+        {
+
+            output.currentFootRightTransform = output.adaptedFootRightTransform;
+            output.currentFootRightTwist = output.adaptedFootRightTwist;
+            output.currentFootRightAcceleration = output.adaptedFootRightAcceleration;
+
+            FootTrajectoryGenerationInput inputRightFootTrajectory;
+            inputRightFootTrajectory.maxFootHeight=m_stepHeight;
+            inputRightFootTrajectory.discretizationTime=input.dT;
+            inputRightFootTrajectory.takeOffTime =firstSS->getTrajectoryDomain().first;
+            inputRightFootTrajectory.yawAngleAtImpact=input.rightStepList.at(1).angle;
+            inputRightFootTrajectory.zmpToCenterOfFootPosition=zmpOffset;
+            inputRightFootTrajectory.currentFootTransform=output.currentFootRightTransform;
+            inputRightFootTrajectory.currentFootTwist=output.currentFootRightTwist;
+
+            if(!getAdaptatedFootTrajectory(inputRightFootTrajectory,
+                                                            output.adaptedFootRightTransform, output.adaptedFootRightTwist, output.adaptedFootRightAcceleration ))
+            {
+                yError() << "[StepAdaptationController::runStepAdaptation] unable to get the adaptated right foot trajectory";
+                return false;
+            }
+        }
+
+
+    }
+
+    else
+    {
+        output.currentFootLeftAcceleration=output.adaptedFootLeftAcceleration;
+        output.currentFootLeftTwist=output.adaptedFootLeftTwist;
+        output.currentFootLeftTransform=output.adaptedFootLeftTransform;
+
+        output.currentFootRightAcceleration=output.adaptedFootRightAcceleration;
+        output.currentFootRightTwist=output.adaptedFootRightTwist;
+        output.currentFootRightTransform=output.adaptedFootRightTransform;
+    }
+    return true;
+}
+
+const iDynTree::Vector2& StepAdaptationController::getEstimatedDCM() const
+{
+    return m_DCMEstimator->getDCMPosition();
+}
+
+bool StepAdaptationController::isArmRollActive()
+{
+    return m_isRollActive;
+}
+
+bool StepAdaptationController::isArmPitchActive()
+{
+    return m_isPitchActive;
+}
+
 iDynTree::Vector2 StepAdaptationController::getDCMErrorThreshold(){
     return m_dcmErrorThreshold;
 }
+
 iDynTree::Vector2 StepAdaptationController::getRollPitchErrorThreshold(){
     return m_rollPitchErrorThreshold;
 }

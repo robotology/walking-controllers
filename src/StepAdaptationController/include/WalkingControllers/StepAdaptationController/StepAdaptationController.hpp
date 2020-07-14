@@ -29,8 +29,11 @@
 
 #include <qpOASES.hpp>
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
+#include <WalkingControllers/StepAdaptationController/DCMSimpleEstimator.hpp>
+#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 
-struct footTrajectoryGenerationInput{
+struct FootTrajectoryGenerationInput
+{
     double maxFootHeight;
     double discretizationTime ;
     double takeOffTime;
@@ -40,7 +43,54 @@ struct footTrajectoryGenerationInput{
     iDynTree::Twist currentFootTwist;
 };
 
+struct StepAdapterInput
+{
+    double time;
+    double timeOffset;
+    double dT;
+    double omega;
+    std::deque<bool> leftInContact;
+    std::deque<bool> rightInContact;
+    std::vector<std::shared_ptr<GeneralSupportTrajectory>> dcmSubTrajectories;
+    std::shared_ptr<FootPrint> leftFootprints;
+    std::shared_ptr<FootPrint> rightFootprints;
+    iDynTree::Vector2 dcmPositionSmoothed;
+    StepList rightStepList;
+    StepList leftStepList;
+};
 
+struct StepAdapterOutput
+{
+    iDynTree::Transform adaptedFootLeftTransform;
+    iDynTree::Transform adaptedFootRightTransform;
+    iDynTree::Twist adaptedFootRightTwist;
+    iDynTree::Twist adaptedFootLeftTwist;
+    iDynTree::SpatialAcc adaptedFootLeftAcceleration;
+    iDynTree::SpatialAcc adaptedFootRightAcceleration;
+    iDynTree::Transform currentFootLeftTransform;
+    iDynTree::Transform currentFootRightTransform;
+    iDynTree::Twist currentFootLeftTwist;
+    iDynTree::Twist currentFootRightTwist;
+    iDynTree::SpatialAcc currentFootLeftAcceleration;
+    iDynTree::SpatialAcc currentFootRightAcceleration;
+    std::deque<iDynTree::Vector2> dcmPositionAdjusted;
+    std::deque<iDynTree::Vector2> dcmVelocityAdjusted;
+    iDynTree::Vector2 zmpNominal;
+    iDynTree::Vector2 zmpAdjusted;
+    double isPushActive;
+    double isRollActive;
+    double isPitchActive;
+    int pushRecoveryActiveIndex;
+    double kDCMSmoother;
+    double kFootSmoother;
+    int indexSmoother;
+    int indexFootSmoother;
+    int timeIndexAfterPushDetection;
+    int FootTimeIndexAfterPushDetection;
+    int indexPush;
+    double impactTimeNominal;
+    double impactTimeAdjusted;
+};
 /**
  * StepAdaptationController class contains the controller instances.
  */
@@ -64,13 +114,16 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_gradient;/**< Gradient vector. */
         iDynTree::VectorDynSize m_lowerBound; /**< Lower bound vector. */
         iDynTree::VectorDynSize m_upperBound; /**< Upper bound vector. */
-
+        std::unique_ptr<DCMSimpleEstimator> m_DCMEstimator; /**< Pointer to the simple pendulum estimator. */
         iDynTree::VectorDynSize m_solution;  /**< solution vector of the optimization. */
 
         int m_inputSize; /**< Size of the controlled input vector . */
         int m_numberOfConstraints; /**< Size of the constraint vector . */
 
         bool m_isFirstTime;/**< boolean  that indicates whether the solver has been already initilized? . */
+        bool m_numberOfStepFlag;
+        int m_stepCounter;
+        int m_pushStepNumber;
 
         iDynTree::Vector2 m_zmpPositionNominal; /**< The next desired step position(The zmp position for next single support) .. */
         iDynTree::Vector2 m_dcmOffsetNominal; /**< The next desired dcm offset*/
@@ -79,21 +132,38 @@ namespace WalkingControllers
         iDynTree::Vector2 m_zmpPositionWeight; /**< The wight of next step position term in the cost function.*/
         iDynTree::Vector2 m_dcmOffsetWeight;/**< The wight of dcm offset term in the cost function.*/
         double m_sigmaWeight;/**< The wight of step timing term in the cost function.*/
+        int m_pushRecoveryActivationIndex;/**< A threshold index for activation of push recovery.*/
+
+        std::vector<std::string> m_pushDetectionListRightArmX; /**< Vector containing the name of the right arm joints that will be used for push detection in X direction. */
+        std::vector<std::string> m_pushDetectionListLeftArmX;/**< Vector containing the name of the left arm joints that will be used for push detection in X direction. */
+        std::vector<std::string> m_pushDetectionListRightArmY;/**< Vector containing the name of the right arm joints that will be used for push detection in Y direction. */
+        std::vector<std::string> m_pushDetectionListLeftArmY;/**< Vector containing the name of the left arm joints that will be used for push detection in Y direction. */
 
         iDynTree::Vector2 m_dcmErrorThreshold; /**< The threshold for activating the push recovery based on DCM error.*/
         iDynTree::Vector2 m_rollPitchErrorThreshold; /**< The threshold for activating the pendulum estimator based on the foot orientation error.*/
+        iDynTree::Vector2 m_armRollPitchErrorOffset; /**< The offset for arm joints error to generate DCM error inside the simple DCM estimator to use in step adaptation*/
 
         iDynTree::Vector2 m_currentZmpPosition; /**< The current step position(The zmp position of current stance foot). */
         iDynTree::Vector2 m_currentDcmPosition; /**< The current DCM position.*/
 
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionLeft;
+        iDynTree::Vector2 m_zmpToCenterOfFootPositionRight;
+
         double m_remainingSingleSupportDuration;/**< The remained single support duration.*/
         double m_stepTiming; /**< The remanined single support duration+(next double support duration)/2  that is used for optimization.*/
         double m_stepDurationTolerance;/**< The tolerance of step timing with respect to the nominal value.*/
+        double m_stepHeight;/**< The maximum height of swing foot.*/
 
         double m_omega;/**< The natural frequency of LIPM.*/
 
         double m_currentTime;/**< The  current time.*/
         double m_nextDoubleSupportDuration;/**< The timing of next double support.*/
+
+        bool m_isPitchActive=0;/**< The  boolean that shows whether push is detected with pitch arm joints or no.*/
+        bool m_isRollActive=0;/**< The  boolean that shows whether push is detected with roll arm joints or no.*/
+
+        double m_armRollError;/**< The  error related to the roll joints position of the arm .*/
+        double m_armPitchError;/**< The  error related to the pitch joints position of the arm .*/
 
         /**
          *The buffered vectors for the interpolation of the foot trajectory
@@ -137,8 +207,6 @@ namespace WalkingControllers
     public:
         /**
          * Constructor of step adaptation controller.
-         * @param inputSize size of the controlled input vector;
-         * @param numberOfAllConstraints number of equality and inequality constraints!
          */
         StepAdaptationController();
 
@@ -155,6 +223,18 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool solve(SwingFoot swingFoot);
+
+        /**
+         * Trigger the step adaptation by detecting the push by the arm joints in compliant mode.
+         * @param numberOfActuatedDof The  number of the joints that is actuated.
+         * @param qDesired The vector of th desired positions of the joints.
+         * @param qActual The vector of th actual positions of the joints.
+         * @param leftInContact The deque of boolean that shows left foot is in contact or no.
+         * @param rightInContact The deque of boolean that shows right foot is in contact or no.
+         * @return true/false in case of success/failure.
+         */
+        bool triggerStepAdapterByArmCompliant(const double& numberOfActuatedDof, const iDynTree::VectorDynSize& qDesired, const iDynTree::VectorDynSize& qActual,
+                                              const std::deque<bool>& leftInContact, const std::deque<bool>& rightInContact, std::vector<std::string> jointsListVector);
 
         /**
          * Reset the controller
@@ -229,16 +309,73 @@ namespace WalkingControllers
          * @return 2D vector of the DCM error threshold that will be used for push detection.
          */
         iDynTree::Vector2 getDCMErrorThreshold();
+
         /**
-         * Run the step adaptation and set constraints and gradient vector and solve the QP problem and find the adapted foot trajectory.
+         * Replan the swing foot trajectory.
          * @param input Structure that includes data that we need as input for function.
          * @param adaptatedFootTransform  Adapted transform of the swing foot.
          * @param adaptedFootTwist Adapted twist of the swing foot.
          * @param adaptedFootAcceleration Adapted acceleration of the swing foot.
          * @return true/false in case of success/failure.
          */
-        bool getAdaptatedFootTrajectory(const footTrajectoryGenerationInput& input, iDynTree::Transform& adaptatedFootTransform,
+        bool getAdaptatedFootTrajectory(const FootTrajectoryGenerationInput &input, iDynTree::Transform& adaptatedFootTransform,
                                         iDynTree::Twist& adaptedFootTwist, iDynTree::SpatialAcc& adaptedFootAcceleration);
+
+        /**
+         * Get the Value of the arm joints roll error ..
+         * @return Value of the arm joints roll error .
+         */
+        const double& getArmRollError()const;
+
+        /**
+         * Get the Value of the arm joints pitch error ..
+         * @return Value of the arm joints pitch error .
+         */
+        const double& getArmPitchError()const;
+
+        /**
+         * Get the threshold of push recovery activation index .
+         * @return The integer threshold of push recovery activation index .
+         */
+        const int &getPushRecoveryActivationIndex() const;
+
+        /**
+         * Get the boolean to specify that the push in forward direction has been detected ..
+         * @return True in case that the pitch joints of the arm detect the push .
+         */
+        bool isArmPitchActive();
+
+        /**
+         * Get the boolean to specify that the push in lateral direction has been detected ..
+         * @return True in a case that the roll+yaw joints of the arm detect the push .
+         */
+        bool isArmRollActive();
+
+        /**
+         * Get the estimated position of the DCM.
+         * @return ertimated position of the DCM.
+         */
+        const iDynTree::Vector2& getEstimatedDCM() const;
+
+        /**
+         * update the pendulum estimator
+         * @param CoM2DPosition CoM2DPosition the 2D com position obtained as if the foot is not rotated.
+         * @param CoMVelocity the vector of com velocity that is simple time derivative of the com position.
+         * @param measuredZMP the vector of measured zmp position with respect to the inertial frame.
+         * @param CoMHeight the CoM height.
+         * @return true/false in case of success/failure
+         */
+        bool UpdateDCMEstimator(const iDynTree::Vector2 &CoM2DPosition, const iDynTree::Vector2 &CoMVelocity, const iDynTree::Vector2 &measuredZMP, const double &CoMHeight, const double &yaw);
+
+
+        /**
+         * Run the step adaptation.
+         * @param input Structure that includes data that we need as input for function.
+         * @param output Structure that includes data that is output of step adjustment.
+         * @return true/false in case of success/failure.
+         */
+        bool runStepAdaptation(const StepAdapterInput &input, StepAdapterOutput& output);
+
     };
 };
 
