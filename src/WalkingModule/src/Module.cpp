@@ -873,8 +873,10 @@ bool WalkingModule::updateModule()
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
         desiredCoMPosition(2) = m_comHeightTrajectory.front();
-
-
+        if(abs(desiredCoMPosition(0) - m_FKSolver->getCoMPosition()(0))>0.001 ||abs(desiredCoMPosition(1)-m_FKSolver->getCoMPosition()(1))>0.001)
+        {
+        return false;
+        }
         iDynTree::Vector3 desiredCoMVelocity;
         desiredCoMVelocity(0) = outputZMPCoMControllerVelocity(0);
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
