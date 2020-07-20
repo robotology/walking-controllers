@@ -93,7 +93,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double landingVelocity = config.check("stepLandingVelocity", yarp::os::Value(0.0)).asDouble();
     double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asDouble();
     double comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
-    m_nominalCoMHeight=comHeight;
+    m_nominalCoMHeight = comHeight;
     double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
     double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asDouble();
     double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asDouble();
@@ -127,7 +127,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
-    unicyclePlanner->addTerminalStep(true);
+    unicyclePlanner->addTerminalStep(false);
     unicyclePlanner->startWithLeft(m_swingLeft);
     unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
 
@@ -499,8 +499,7 @@ bool TrajectoryGenerator::isTrajectoryAsked()
     return m_generatorState == GeneratorState::Called;
 }
 
-bool TrajectoryGenerator::generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right,
-                                                             const double &initTime,DCMInitialState initialState)
+bool TrajectoryGenerator::generateTrajectoriesFromFootprints(std::shared_ptr<FootPrint> left, std::shared_ptr<FootPrint> right, const double &initTime,DCMInitialState initialState)
 {
     if (!m_dcmGenerator->setDCMInitialState(initialState))
     {
@@ -563,7 +562,7 @@ bool TrajectoryGenerator::getDCMSubTrajectories(std::vector<std::shared_ptr<Gene
         return false;
     }
 
-    dcmSubTrajectories= m_dcmGenerator->getDCMSubTrajectories();
+    dcmSubTrajectories = m_dcmGenerator->getDCMSubTrajectories();
 
     return true;
 }
@@ -681,7 +680,7 @@ bool TrajectoryGenerator::getStepPhases(std::vector<StepPhase> &leftPhases, std:
     }
 
     m_trajectoryGenerator.getStepPhases(leftPhases,rightPhases);
-        return true;
+    return true;
 }
 
 bool TrajectoryGenerator::getLeftFootprint(std::shared_ptr<FootPrint>& leftFootPrint)
@@ -692,7 +691,7 @@ bool TrajectoryGenerator::getLeftFootprint(std::shared_ptr<FootPrint>& leftFootP
         return false;
     }
 
-    leftFootPrint=m_trajectoryGenerator.getLeftFootPrint();
+    leftFootPrint = m_trajectoryGenerator.getLeftFootPrint();
     return true;
 }
 
@@ -704,20 +703,20 @@ bool TrajectoryGenerator::getRightFootprint(std::shared_ptr<FootPrint>& rightFoo
         return false;
     }
 
-    rightFootPrint=m_trajectoryGenerator.getRightFootPrint();
+    rightFootPrint = m_trajectoryGenerator.getRightFootPrint();
     return true;
 }
 
 bool TrajectoryGenerator::getNominalCoMHeight(double& nominalCoMHeight)
 {
-    nominalCoMHeight=m_nominalCoMHeight;
+    nominalCoMHeight = m_nominalCoMHeight;
     return true;
 }
 
 
 bool TrajectoryGenerator::getSwitchOverSwingRatio(double& switchOverSwingRatio)
 {
-    switchOverSwingRatio=m_switchOverSwingRatio;
+    switchOverSwingRatio = m_switchOverSwingRatio;
     return true;
 }
 

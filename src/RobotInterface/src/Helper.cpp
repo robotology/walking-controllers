@@ -600,16 +600,16 @@ bool RobotInterface::setPositionReferences(const iDynTree::VectorDynSize& desire
     }
 
     if(m_InteractionInterface == nullptr)
-        {
-            yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
-            return false;
-        }
+    {
+        yError() << "[RobotInterface::setPositionReferences] IInteractionMode interface is not ready.";
+        return false;
+    }
 
     if(m_impedanceControlInterface == nullptr)
-        {
-            yError() << "[RobotInterface::setPositionReferences] IImpedanceControlInterface interface is not ready.";
-            return false;
-        }
+    {
+        yError() << "[RobotInterface::setPositionReferences] IImpedanceControlInterface interface is not ready.";
+        return false;
+    }
 
     m_desiredJointPositionRad = desiredJointPositionsRad;
 

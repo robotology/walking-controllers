@@ -728,7 +728,8 @@ bool WalkingModule::updateModule()
         {
             if (!m_leftInContact.front() || !m_rightInContact.front())
             {
-                if(!m_leftInContact.front()){
+                if(!m_leftInContact.front())
+                {
                     if (!feetTrajectorySmoother(m_adaptedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform,m_adaptedFootLeftTwist,m_leftTwistTrajectory.front(),m_smoothedFootLeftTwist)) {
                         yError()<<"[WalkingModule::updateModule] The left foot trajectory smoother can not evaluate the smoothed trajectory!";
                     }
@@ -756,7 +757,8 @@ bool WalkingModule::updateModule()
             }
             m_stableDCMModel->setInput(m_DCMPositionSmoothed);
         }
-        else {
+        else
+        {
             m_stableDCMModel->setInput(m_DCMPositionDesired.front());
         }
 
@@ -985,20 +987,20 @@ bool WalkingModule::updateModule()
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
             iDynTree::Vector2 DCMError;
-            iDynTree::toEigen( DCMError)=iDynTree::toEigen(m_DCMPositionSmoothed)- iDynTree::toEigen( m_dcmEstimatedI);
+            iDynTree::toEigen(DCMError) = iDynTree::toEigen(m_DCMPositionSmoothed) - iDynTree::toEigen(m_dcmEstimatedI);
 
             iDynTree::Vector2 LfootAdaptedX;
-            LfootAdaptedX(0)=m_adaptedFootLeftTransform.getPosition()(0);
-            LfootAdaptedX(1)=m_adaptedFootLeftTransform.getPosition()(1);
+            LfootAdaptedX(0) = m_adaptedFootLeftTransform.getPosition()(0);
+            LfootAdaptedX(1) = m_adaptedFootLeftTransform.getPosition()(1);
 
             iDynTree::Vector2 RfootAdaptedX;
-            RfootAdaptedX(0)=m_adaptedFootRightTransform.getPosition()(0);
-            RfootAdaptedX(1)=m_adaptedFootRightTransform.getPosition()(1);
+            RfootAdaptedX(0) = m_adaptedFootRightTransform.getPosition()(0);
+            RfootAdaptedX(1) = m_adaptedFootRightTransform.getPosition()(1);
             //iDynTree::Lfoot_adaptedX=
             iDynTree::Vector6 m_isPushActiveVec;
-            m_isPushActiveVec(0)=m_isPushActive;
-            m_isPushActiveVec(1)=m_indexSmoother;
-            m_isPushActiveVec(2)= m_kDCMSmoother;
+            m_isPushActiveVec(0) = m_isPushActive;
+            m_isPushActiveVec(1) = m_indexSmoother;
+            m_isPushActiveVec(2) = m_kDCMSmoother;
 
             if (m_useStepAdaptation)
             {
@@ -1009,27 +1011,27 @@ bool WalkingModule::updateModule()
                 m_isPushActiveVec(3)=0;
             }
 
-            m_isPushActiveVec(4)=m_timeIndexAfterPushDetection;
-            m_isPushActiveVec(5)=m_pushRecoveryActiveIndex;
+            m_isPushActiveVec(4) = m_timeIndexAfterPushDetection;
+            m_isPushActiveVec(5) = m_pushRecoveryActiveIndex;
 
             iDynTree::Vector2 m_isRollPitchActiveVec;
-            m_isRollPitchActiveVec(0)=m_isRollActive;
-            m_isRollPitchActiveVec(1)=m_isPitchActive;
+            m_isRollPitchActiveVec(0) = m_isRollActive;
+            m_isRollPitchActiveVec(1) = m_isPitchActive;
             iDynTree::Vector6 leftArmJointsError;
             iDynTree::Vector6 rightArmJointsError;
-            leftArmJointsError(0)=abs(m_robotControlHelper->getJointPosition()(3)-m_qDesired(3));
-            leftArmJointsError(1)=abs(m_robotControlHelper->getJointPosition()(4)-m_qDesired(4));
-            leftArmJointsError(2)=abs(m_robotControlHelper->getJointPosition()(5)-m_qDesired(5));
-            leftArmJointsError(3)=abs(m_robotControlHelper->getJointPosition()(6)-m_qDesired(6));
-            leftArmJointsError(4)=leftArmJointsError(2)+leftArmJointsError(1);
-            leftArmJointsError(5)=leftArmJointsError(0)+leftArmJointsError(3);
+            leftArmJointsError(0) = abs(m_robotControlHelper->getJointPosition()(3)-m_qDesired(3));
+            leftArmJointsError(1) = abs(m_robotControlHelper->getJointPosition()(4)-m_qDesired(4));
+            leftArmJointsError(2) = abs(m_robotControlHelper->getJointPosition()(5)-m_qDesired(5));
+            leftArmJointsError(3) = abs(m_robotControlHelper->getJointPosition()(6)-m_qDesired(6));
+            leftArmJointsError(4) = leftArmJointsError(2)+leftArmJointsError(1);
+            leftArmJointsError(5) = leftArmJointsError(0)+leftArmJointsError(3);
 
-            rightArmJointsError(0)=abs(m_robotControlHelper->getJointPosition()(7)-m_qDesired(7));
-            rightArmJointsError(1)=abs(m_robotControlHelper->getJointPosition()(8)-m_qDesired(8));
-            rightArmJointsError(2)=abs(m_robotControlHelper->getJointPosition()(9)-m_qDesired(9));
-            rightArmJointsError(3)=abs(m_robotControlHelper->getJointPosition()(10)-m_qDesired(10));
-            rightArmJointsError(4)=rightArmJointsError(1)+rightArmJointsError(2);
-            rightArmJointsError(5)=rightArmJointsError(0)+rightArmJointsError(3);
+            rightArmJointsError(0) = abs(m_robotControlHelper->getJointPosition()(7)-m_qDesired(7));
+            rightArmJointsError(1) = abs(m_robotControlHelper->getJointPosition()(8)-m_qDesired(8));
+            rightArmJointsError(2) = abs(m_robotControlHelper->getJointPosition()(9)-m_qDesired(9));
+            rightArmJointsError(3) = abs(m_robotControlHelper->getJointPosition()(10)-m_qDesired(10));
+            rightArmJointsError(4) = rightArmJointsError(1)+rightArmJointsError(2);
+            rightArmJointsError(5) = rightArmJointsError(0)+rightArmJointsError(3);
 
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(),DCMError, m_DCMVelocityDesired.front(),m_DCMPositionAdjusted.front(),
                                       measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
