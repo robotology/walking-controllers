@@ -715,6 +715,13 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+        // if the retargeting is not in the approaching phase we can set the stance/walking phase
+        if(!m_retargetingClient->isApproachingPhase())
+        {
+            auto retargetingPhase = m_isStancePhase.front() ? RetargetingClient::Phase::stance : RetargetingClient::Phase::walking;
+            m_retargetingClient->setPhase(retargetingPhase);
+        }
+
         m_retargetingClient->getFeedback();
 
         if(!updateFKSolver())
@@ -845,9 +852,7 @@ bool WalkingModule::updateModule()
         // inner COM-ZMP controller
         // if the the norm of desired DCM velocity is lower than a threshold then the robot
         // is stopped
-        double threshold = 0.001;
-        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-        m_walkingZMPController->setPhase(stancePhase);
+        m_walkingZMPController->setPhase(m_isStancePhase.front());
 
         iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
@@ -1003,10 +1008,14 @@ bool WalkingModule::updateModule()
                                       m_retargetingClient->jointValues());
         }
 
-        propagateTime();
+        // in the approaching phase the robot should not move and the trajectories should not advance
+        if(!m_retargetingClient->isApproachingPhase())
+        {
+                propagateTime();
 
-        // advance all the signals
-        advanceReferenceSignals();
+                // advance all the signals
+                advanceReferenceSignals();
+        }
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
     }
@@ -1524,6 +1533,12 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(double x, double y)
 {
+    // in the approaching phase the robot should not move
+    // as soon as the approaching phase is finished the user
+    // can move the robot
+    if(m_retargetingClient->isApproachingPhase())
+        return true;
+
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if(m_mergePoints.empty())
     {
