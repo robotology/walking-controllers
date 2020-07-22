@@ -145,6 +145,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
         m_pushRecoveryActiveIndex=0;
         m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
+        m_useStepAdaptationConfigurationFileValue = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
+
         m_impactTimeNominal = 0;
         m_impactTimeAdjusted = 0;
 
@@ -636,7 +638,7 @@ bool WalkingModule::updateModule()
         {
             m_useStepAdaptation=false;
         }
-        else if(desiredUnicyclePosition != nullptr && m_newTrajectoryMergeCounter == 2)
+        else if(desiredUnicyclePosition != nullptr && m_newTrajectoryMergeCounter == 2 && m_useStepAdaptationConfigurationFileValue)
         {
             m_useStepAdaptation=true;
         }
@@ -1510,9 +1512,17 @@ bool WalkingModule::startWalking()
 
      }
 
+
     if (!m_robotControlHelper->loadCustomInteractionMode())
     {
         yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
+        return false;
+    }
+
+
+    if (!m_robotControlHelper->setImpedanceControlGain())
+    {
+        yError() << "[WalkingModule::startWalking] Unable to set the set Impedance Control gains of the joints";
         return false;
     }
 

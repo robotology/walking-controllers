@@ -133,6 +133,7 @@ namespace WalkingControllers
 
        bool m_firstStep; /**< True if this is the first step. */
        bool m_useStepAdaptation; /**< True if the step adaptation is used. */
+       bool m_useStepAdaptationConfigurationFileValue; /**< True if the step adaptation is used. */
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
