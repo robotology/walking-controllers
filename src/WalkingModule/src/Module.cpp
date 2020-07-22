@@ -887,7 +887,7 @@ bool WalkingModule::updateModule()
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_comHeightTrajectory.front();
+        desiredCoMPosition(2) = m_retargetingClient->comHeight();
         if(abs(desiredCoMPosition(0) - m_FKSolver->getCoMPosition()(0))>0.07 || abs(desiredCoMPosition(1) - m_FKSolver->getCoMPosition()(1))>0.07)
         {
             yError() << "[WalkingModule::updateModule] The error of com tracking is not small";
