@@ -852,9 +852,7 @@ bool WalkingModule::updateModule()
         // inner COM-ZMP controller
         // if the the norm of desired DCM velocity is lower than a threshold then the robot
         // is stopped
-        double threshold = 0.001;
-        bool stancePhase = iDynTree::toEigen(m_DCMVelocityDesired.front()).norm() < threshold;
-        m_walkingZMPController->setPhase(stancePhase);
+        m_walkingZMPController->setPhase(m_isStancePhase.front());
 
         iDynTree::Vector2 desiredZMP;
         if(m_useMPC)
