@@ -76,7 +76,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         auto initializeHand = [&](auto& hand, const std::string& portNameLabel) -> bool
         {
             // open left hand port
-            if(!YarpUtilities::getStringFromSearchable(config, portNameLabel,
+            if(!YarpUtilities::getStringFromSearchable(option, portNameLabel,
                                                        portName))
             {
                 yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
@@ -85,7 +85,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             hand.port.open("/" + name + portName);
 
 
-            if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time_approaching", smoothingTimeApproching))
+            if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching", smoothingTimeApproching))
             {
                 yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
                 return false;
@@ -93,7 +93,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             hand.smoothingTimeInApproaching = smoothingTimeApproching;
 
 
-            if(!YarpUtilities::getNumberFromSearchable(config, "smoothing_time_walking", smoothingTimeWalking))
+            if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", smoothingTimeWalking))
             {
                 yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
                 return false;
