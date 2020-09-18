@@ -666,7 +666,9 @@ bool TrajectoryGenerator::getIsStancePhase(std::vector<bool>& isStancePhase)
         {
             // decreased the counter only if it is different from zero.
             // it is required to add a delay in the beginning of the stance phase
-            stancePhaseDelayCounter = stancePhaseDelayCounter == 0 ? 0 : stancePhaseDelayCounter--;
+            stancePhaseDelayCounter = (stancePhaseDelayCounter == 0)
+                                          ? 0
+                                          : (stancePhaseDelayCounter - 1);
 
             // the delay expired the robot can be considered stance
             if(stancePhaseDelayCounter == 0)

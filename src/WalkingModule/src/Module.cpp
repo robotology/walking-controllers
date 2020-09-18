@@ -84,6 +84,9 @@ bool WalkingModule::advanceReferenceSignals()
     m_comHeightVelocity.pop_front();
     m_comHeightVelocity.push_back(m_comHeightVelocity.back());
 
+    m_isStancePhase.pop_front();
+    m_isStancePhase.push_back(m_isStancePhase.back());
+
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
     // A new trajectory will be merged at the first merge point or if the deque is empty
