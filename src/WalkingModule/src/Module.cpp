@@ -44,6 +44,9 @@ bool WalkingModule::advanceReferenceSignals()
        || m_leftInContact.empty()
        || m_rightInContact.empty()
        || m_DCMPositionDesired.empty()
+       || m_ZMPPositionDesired.empty()
+       || m_DCMPositionAdjusted.empty()
+       || m_DCMVelocityAdjusted.empty()
        || m_DCMVelocityDesired.empty()
        || m_comHeightTrajectory.empty())
     {
@@ -87,6 +90,18 @@ bool WalkingModule::advanceReferenceSignals()
     m_isStancePhase.pop_front();
     m_isStancePhase.push_back(m_isStancePhase.back());
 
+    m_ZMPPositionDesired.pop_front();
+    m_ZMPPositionDesired.push_back(m_ZMPPositionDesired.back());
+
+    if (m_useStepAdaptation)
+    {
+        m_DCMPositionAdjusted.pop_front();
+        m_DCMPositionAdjusted.push_back(m_DCMPositionAdjusted.back());
+
+        m_DCMVelocityAdjusted.pop_front();
+        m_DCMVelocityAdjusted.push_back(m_DCMVelocityAdjusted.back());
+    }
+
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
     // A new trajectory will be merged at the first merge point or if the deque is empty
@@ -127,6 +142,37 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
 
 bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 {
+
+        m_pushRecoveryActiveIndex=0;
+        m_useStepAdaptation = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
+        m_useStepAdaptationConfigurationFileValue = rf.check("use_step_adaptation", yarp::os::Value(false)).asBool();
+
+        m_impactTimeNominal = 0;
+        m_impactTimeAdjusted = 0;
+
+        m_zmpNominal.zero();
+        m_zmpAdjusted.zero();
+        m_isPushActive=0;
+
+        m_adaptedFootLeftTransform=iDynTree::Transform::Identity();
+        m_currentFootLeftTransform=iDynTree::Transform::Identity();
+        m_smoothedFootLeftTransform=iDynTree::Transform::Identity();
+
+        m_adaptedFootRightTransform=iDynTree::Transform::Identity();
+        m_currentFootRightTransform=iDynTree::Transform::Identity();
+        m_smoothedFootRightTransform=iDynTree::Transform::Identity();
+
+        m_DCMPositionSmoothed.zero();
+        m_DCMPositionAdjusted.push_back(m_DCMPositionSmoothed);
+        m_DCMVelocityAdjusted.push_back(m_DCMPositionSmoothed);
+        m_adaptedFootLeftTwist.zero();
+        m_adaptedFootRightTwist.zero();
+        m_smoothedFootLeftTwist.zero();
+        m_smoothedFootRightTwist.zero();
+        m_currentFootLeftTwist.zero();
+        m_currentFootRightTwist.zero();
+
+
     // module name (used as prefix for opened ports)
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
@@ -184,12 +230,48 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
+    m_trajectoryGeneratorStepAdjustment = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
     trajectoryPlannerOptions.append(generalOptions);
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
         return false;
+    }
+
+    if(!m_trajectoryGeneratorStepAdjustment->initialize(trajectoryPlannerOptions))
+    {
+        yError() << "[configure] Unable to initialize the planner.";
+        return false;
+    }
+
+    m_stepHeight = trajectoryPlannerOptions.check("stepHeight", yarp::os::Value(0.005)).asDouble();
+
+    if(m_useStepAdaptation)
+    {
+        // initialize the step adaptation
+        m_stepAdapter = std::make_unique<StepAdaptationController>();
+        yarp::os::Bottle& stepAdaptatorOptions = rf.findGroup("STEP_ADAPTATOR");
+        stepAdaptatorOptions.append(generalOptions);
+        stepAdaptatorOptions.append(trajectoryPlannerOptions);
+        if(!m_stepAdapter->configure(stepAdaptatorOptions))
+        {
+            yError() << "[configure] Unable to initialize the step adaptator!";
+            return false;
+        }
+
+        if(!YarpUtilities::getVectorFromSearchable(stepAdaptatorOptions, "leftZMPDelta", m_zmpToCenterOfFootPositionLeft))
+        {
+            yError() << "[configure] Unable to get the vector of leftZMPDelta";
+            return false;
+        }
+
+        if(!YarpUtilities::getVectorFromSearchable(stepAdaptatorOptions, "rightZMPDelta", m_zmpToCenterOfFootPositionRight))
+        {
+            yError() << "[configure] Unable to get the vector of rightZMPDelta";
+            return false;
+        }
+
     }
 
     if(m_useMPC)
@@ -337,6 +419,8 @@ void WalkingModule::reset()
 
     m_trajectoryGenerator->reset();
 
+    m_trajectoryGeneratorStepAdjustment->reset();
+
     if(m_dumpData)
         m_walkingLogger->quit();
 }
@@ -365,12 +449,14 @@ bool WalkingModule::close()
 
     // clear all the pointer
     m_trajectoryGenerator.reset(nullptr);
+    m_trajectoryGeneratorStepAdjustment.reset(nullptr);
     m_walkingController.reset(nullptr);
     m_walkingZMPController.reset(nullptr);
     m_IKSolver.reset(nullptr);
     m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
+    m_stepAdapter.reset(nullptr);
 
     return true;
 }
@@ -385,11 +471,22 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     ok &= solver->setRobotState(*m_FKSolver);
     solver->setDesiredNeckOrientation(desiredNeckOrientation.inverse());
 
-    solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
-                                         m_rightTrajectory.front());
+    if (m_useStepAdaptation)
+    {
+        solver->setDesiredFeetTransformation(m_smoothedFootLeftTransform,
+                                             m_smoothedFootRightTransform);
 
-    solver->setDesiredFeetTwist(m_leftTwistTrajectory.front(),
-                                m_rightTwistTrajectory.front());
+        solver->setDesiredFeetTwist(m_smoothedFootLeftTwist,
+                                    m_smoothedFootRightTwist);
+    }
+    else
+    {
+        solver->setDesiredFeetTransformation(m_leftTrajectory.front(),
+                                             m_rightTrajectory.front());
+
+        solver->setDesiredFeetTwist(m_leftTwistTrajectory.front(),
+                                    m_rightTwistTrajectory.front());
+    }
 
     solver->setDesiredCoMVelocity(desiredCoMVelocity);
     solver->setDesiredCoMPosition(desiredCoMPosition);
@@ -488,8 +585,16 @@ bool WalkingModule::updateModule()
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
 
             // reset the models
-            m_walkingZMPController->reset(m_DCMPositionDesired.front());
-            m_stableDCMModel->reset(m_DCMPositionDesired.front());
+            if (m_useStepAdaptation)
+            {
+                m_walkingZMPController->reset(m_DCMPositionAdjusted.front());
+                m_stableDCMModel->reset(m_DCMPositionAdjusted.front());
+            }
+            else
+            {
+                m_walkingZMPController->reset(m_DCMPositionDesired.front());
+                m_stableDCMModel->reset(m_DCMPositionDesired.front());
+            }
 
             // reset the retargeting
             if(!m_robotControlHelper->getFeedbacks(100))
@@ -528,27 +633,50 @@ bool WalkingModule::updateModule()
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
+
+        if(m_DCMSubTrajectories.size()<4 && desiredUnicyclePosition == nullptr)
+        {
+            m_useStepAdaptation=false;
+        }
+        else if(desiredUnicyclePosition != nullptr && m_newTrajectoryMergeCounter == 2 && m_useStepAdaptationConfigurationFileValue)
+        {
+            m_useStepAdaptation=true;
+        }
+
         if(desiredUnicyclePosition != nullptr)
+        {
             if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
-            }
+             }
+        }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
         // the time to attach new one
         if(m_newTrajectoryRequired)
         {
             // when we are near to the merge point the new trajectory is evaluated
-            if(m_newTrajectoryMergeCounter == 20)
+            if(m_newTrajectoryMergeCounter == 10)
             {
 
                 double initTimeTrajectory;
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
-                iDynTree::Transform measuredTransform = m_isLeftFixedFrame.front() ?
-                    m_rightTrajectory[m_newTrajectoryMergeCounter] :
-                    m_leftTrajectory[m_newTrajectoryMergeCounter];
+                m_startOfWalkingTime=initTimeTrajectory;
+
+                iDynTree::Transform TempRightFoot;
+                iDynTree::Transform TempLeftFoot;
+                iDynTree::Transform measuredTransform ;
+
+                if(!m_useStepAdaptation){
+                    measuredTransform = m_isLeftFixedFrame.front() ?
+                                        m_rightTrajectory[m_newTrajectoryMergeCounter] : m_leftTrajectory[m_newTrajectoryMergeCounter];
+                }
+                else {
+                    measuredTransform = m_isLeftFixedFrame.front() ?
+                                        m_currentFootRightTransform : m_currentFootLeftTransform;
+                }
 
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
@@ -612,10 +740,53 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate 3D-LIPM reference signal
-        m_stableDCMModel->setInput(m_DCMPositionDesired.front());
+        if(m_useStepAdaptation)
+        {
+            if (!m_leftInContact.front() || !m_rightInContact.front())
+            {
+                if(!m_leftInContact.front())
+                {
+                    if (!feetTrajectorySmoother(m_adaptedFootLeftTransform,m_leftTrajectory.front(),m_smoothedFootLeftTransform,m_adaptedFootLeftTwist,m_leftTwistTrajectory.front(),m_smoothedFootLeftTwist)) {
+                        yError()<<"[WalkingModule::updateModule] The left foot trajectory smoother can not evaluate the smoothed trajectory!";
+                    }
+                }
+
+                if(!m_rightInContact.front())
+                {
+                    if (!feetTrajectorySmoother(m_adaptedFootRightTransform,m_rightTrajectory.front(),m_smoothedFootRightTransform,m_adaptedFootRightTwist,m_rightTwistTrajectory.front(),m_smoothedFootRightTwist)) {
+                        yError()<<"[WalkingModule::updateModule] The right foot trajectory smoother can not evaluate the smoothed trajectory!";
+                    }
+                }
+            }
+            else
+            {
+                m_smoothedFootLeftTransform=m_adaptedFootLeftTransform;
+                m_smoothedFootLeftTwist=m_adaptedFootLeftTwist;
+
+                m_smoothedFootRightTransform=m_adaptedFootRightTransform;
+                m_smoothedFootRightTwist=m_adaptedFootRightTwist;
+            }
+
+            if (!dcmSmoother(m_DCMPositionAdjusted.front(),m_DCMPositionDesired.front(),m_DCMPositionSmoothed))
+            {
+                yError()<<"the DCM smoother can not evaluate the smoothed DCM!";
+            }
+            m_stableDCMModel->setInput(m_DCMPositionSmoothed);
+        }
+        else
+        {
+            m_stableDCMModel->setInput(m_DCMPositionDesired.front());
+        }
+
         if(!m_stableDCMModel->integrateModel())
         {
             yError() << "[WalkingModule::updateModule] Unable to propagate the 3D-LIPM.";
+            return false;
+        }
+
+        if(!runStepAdaptation(measuredZMP))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to run step adjustment";
             return false;
         }
 
@@ -653,9 +824,26 @@ bool WalkingModule::updateModule()
         }
         else
         {
-            m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
-            m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(),
-                                                               m_DCMVelocityDesired.front());
+            if (!m_useStepAdaptation)
+            {
+                m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
+                m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionDesired.front(),
+                                                                   m_DCMVelocityDesired.front());
+            }
+            else
+            {
+                iDynTree::Vector2 DCMPositionDesiredAdjusted;
+                DCMPositionDesiredAdjusted(0) = m_DCMPositionAdjusted.front()(0);
+                DCMPositionDesiredAdjusted(1) = m_DCMPositionAdjusted.front()(1);
+
+                iDynTree::Vector2 DCMVelocityDesiredAdjusted;
+                DCMVelocityDesiredAdjusted(0) = m_DCMVelocityAdjusted.front()(0);
+                DCMVelocityDesiredAdjusted(1) = m_DCMVelocityAdjusted.front()(1);
+
+                m_walkingDCMReactiveController->setFeedback(m_FKSolver->getDCM());
+                m_walkingDCMReactiveController->setReferenceSignal(m_DCMPositionSmoothed,
+                                                                   DCMVelocityDesiredAdjusted);
+            }
 
             if(!m_walkingDCMReactiveController->evaluateControl())
             {
@@ -701,12 +889,15 @@ bool WalkingModule::updateModule()
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
         desiredCoMPosition(2) = m_retargetingClient->comHeight();
-
-
+        if(abs(desiredCoMPosition(0) - m_FKSolver->getCoMPosition()(0))>0.07 || abs(desiredCoMPosition(1) - m_FKSolver->getCoMPosition()(1))>0.07)
+        {
+            yError() << "[WalkingModule::updateModule] The error of com tracking is not small";
+           return false;
+        }
         iDynTree::Vector3 desiredCoMVelocity;
         desiredCoMVelocity(0) = outputZMPCoMControllerVelocity(0);
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
-        desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
+        desiredCoMVelocity(2) = m_comHeightVelocity.front();
 
         // evaluate desired neck transformation
         double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
@@ -1085,13 +1276,27 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         return false;
     }
 
-    if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
-                                                  m_DCMVelocityDesired[mergePoint], isLeftSwinging,
-                                                  measuredTransform, desiredPosition))
+    if (!m_useStepAdaptation)
     {
-        yError() << "[WalkingModule::askNewTrajectories] Unable to update the trajectory.";
-        return false;
+        if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
+                                                      m_DCMVelocityDesired[mergePoint], isLeftSwinging,
+                                                      measuredTransform, desiredPosition))
+        {
+            yError() << "[WalkingModule::askNewTrajectories] Unable to update the trajectory.";
+            return false;
+        }
     }
+    else
+    {
+        if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionAdjusted[mergePoint],
+                                                      m_DCMVelocityAdjusted[mergePoint], isLeftSwinging,
+                                                      measuredTransform, desiredPosition))
+        {
+            yError() << "[WalkingModule::askNewTrajectories] Unable to update the trajectory.";
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -1116,10 +1321,14 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<size_t> mergePoints;
     std::vector<bool> isLeftFixedFrame;
     std::vector<bool> isStancePhase;
+    std::vector<iDynTree::Vector2> ZMPPositionDesired;
+
+    m_timeOffset = m_time + mergePoint * m_dT;
 
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
     m_trajectoryGenerator->getDCMVelocityTrajectory(DCMVelocityDesired);
+    m_trajectoryGenerator->getZMPPositionTrajectory(ZMPPositionDesired);
 
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
@@ -1152,13 +1361,66 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
 
     StdUtilities::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
+    StdUtilities::appendVectorToDeque(ZMPPositionDesired, m_ZMPPositionDesired, mergePoint);
+
+    if (m_useStepAdaptation)
+    {
+        StdUtilities::appendVectorToDeque(DCMPositionDesired, m_DCMPositionAdjusted, mergePoint);
+        StdUtilities::appendVectorToDeque(DCMVelocityDesired, m_DCMVelocityAdjusted, mergePoint);
+    }
 
     StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 
+    if (m_useStepAdaptation)
+    {
+        m_DCMSubTrajectories.clear();
+        m_trajectoryGenerator->getDCMSubTrajectories(m_DCMSubTrajectories);
+
+        std::shared_ptr<FootPrint> tempLeft;
+        m_trajectoryGenerator->getLeftFootprint(tempLeft);
+        m_jleftFootprints = std::make_shared<FootPrint>();
+        m_jleftFootprints->setFootName("left");
+        for(auto step: tempLeft->getSteps())
+        {
+            if(!m_jleftFootprints->addStep(step))
+            {
+                yError() << "[updateTrajectories] unable to add left foot step";
+                return false;
+            }
+         }
+        m_jLeftstepList=m_jleftFootprints->getSteps();
+
+        std::shared_ptr<FootPrint> tempRight;
+        m_trajectoryGenerator->getRightFootprint(tempRight);
+        m_jRightFootprints = std::make_shared<FootPrint>();
+        m_jRightFootprints->setFootName("right");
+        for(auto step: tempRight->getSteps())
+        {
+            if(!m_jRightFootprints->addStep(step))
+            {
+                yError() << "[updateTrajectories] unable to add right foot step";
+                return false;
+            }
+         }
+        m_jRightstepList=m_jRightFootprints->getSteps();
+    }
+
     // the first merge point is always equal to 0
     m_mergePoints.pop_front();
+    if (m_useStepAdaptation)
+    {
+        m_adaptedFootLeftTwist.zero();
+        m_adaptedFootRightTwist.zero();
+        m_adaptedFootLeftAcceleration.zero();
+        m_adaptedFootRightAcceleration.zero();
+
+        m_adaptedFootLeftTransform = leftTrajectory.front();
+        m_smoothedFootLeftTransform=leftTrajectory.front();
+        m_adaptedFootRightTransform = rightTrajectory.front();
+        m_smoothedFootRightTransform=rightTrajectory.front();
+    }
 
     return true;
 }
@@ -1250,9 +1512,17 @@ bool WalkingModule::startWalking()
 
      }
 
+
     if (!m_robotControlHelper->loadCustomInteractionMode())
     {
         yError() << "[WalkingModule::startWalking] Unable to set the intraction mode of the joints";
+        return false;
+    }
+
+
+    if (!m_robotControlHelper->setImpedanceControlGain())
+    {
+        yError() << "[WalkingModule::startWalking] Unable to set the set Impedance Control gains of the joints";
         return false;
     }
 
@@ -1285,13 +1555,13 @@ bool WalkingModule::setPlannerInput(double x, double y)
             return true;
 
         // Since the evaluation of a new trajectory takes time the new trajectory will be merged after x cycles
-        m_newTrajectoryMergeCounter = 20;
+        m_newTrajectoryMergeCounter = 10;
     }
 
     // the trajectory was not finished the new trajectory will be attached at the next merge point
     else
     {
-        if(m_mergePoints.front() > 20)
+        if(m_mergePoints.front() > 10)
             m_newTrajectoryMergeCounter = m_mergePoints.front();
         else if(m_mergePoints.size() > 1)
         {
@@ -1305,7 +1575,7 @@ bool WalkingModule::setPlannerInput(double x, double y)
             if(m_newTrajectoryRequired)
                 return true;
 
-            m_newTrajectoryMergeCounter = 20;
+            m_newTrajectoryMergeCounter = 10;
         }
     }
 
@@ -1352,5 +1622,279 @@ bool WalkingModule::stopWalking()
     reset();
 
     m_robotState = WalkingFSM::Stopped;
+    return true;
+}
+
+bool WalkingModule::feetTrajectorySmoother(const iDynTree::Transform adaptedFeetTransform,const iDynTree::Transform desiredFootTransform,iDynTree::Transform& smoothedFootTransform ,
+                                           const iDynTree::Twist adaptedFeetTwist,const iDynTree::Twist desiredFootTwist,iDynTree::Twist& smoothedFootTwist)
+{
+
+    if(m_pushRecoveryActiveIndex<(m_stepAdapter->getPushRecoveryActivationIndex()+1) )
+    {
+        m_kFootSmoother=0;
+        m_FootTimeIndexAfterPushDetection=0;
+    }
+    else if (m_pushRecoveryActiveIndex>=(m_stepAdapter->getPushRecoveryActivationIndex()+1) && m_FootTimeIndexAfterPushDetection<(m_indexFootSmoother))
+    {
+        m_FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection+1;
+
+        m_kFootSmoother=((double)(m_FootTimeIndexAfterPushDetection)/((double)(m_indexFootSmoother)));
+
+        if(m_FootTimeIndexAfterPushDetection==m_indexFootSmoother)
+        {
+            m_indexFootSmoother=0;
+        }
+    }
+    else
+    {
+        m_kFootSmoother=1;
+    }
+
+    smoothedFootTransform.setRotation(adaptedFeetTransform.getRotation());
+    smoothedFootTwist.setAngularVec3(adaptedFeetTwist.getAngularVec3());
+
+    iDynTree::Position tempPosition;
+    iDynTree::LinVelocity tempVel;
+    iDynTree::toEigen(tempPosition)=iDynTree::toEigen(desiredFootTransform.getPosition())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTransform.getPosition())-iDynTree::toEigen(desiredFootTransform.getPosition()));
+    iDynTree::toEigen(tempVel)=iDynTree::toEigen(desiredFootTwist.getLinearVec3())+m_kFootSmoother*(iDynTree::toEigen(adaptedFeetTwist.getLinearVec3())-iDynTree::toEigen(desiredFootTwist.getLinearVec3()));
+    smoothedFootTransform.setPosition(tempPosition);
+    smoothedFootTwist.setLinearVec3(tempVel);
+    return true;
+}
+
+bool WalkingModule::dcmSmoother(const iDynTree::Vector2 adaptedDCM,const iDynTree::Vector2 desiredDCM,iDynTree::Vector2& smoothedDCM )
+{
+    if(m_pushRecoveryActiveIndex<(m_stepAdapter->getPushRecoveryActivationIndex()+1) )
+    {
+        m_kDCMSmoother=0;
+        m_timeIndexAfterPushDetection=0;
+    }
+    else if (m_pushRecoveryActiveIndex>=(m_stepAdapter->getPushRecoveryActivationIndex()+1) && m_timeIndexAfterPushDetection<(m_indexSmoother))
+    {
+        m_timeIndexAfterPushDetection=m_timeIndexAfterPushDetection+1;
+
+        m_kDCMSmoother=((double)(m_timeIndexAfterPushDetection)/((double)(m_indexSmoother)));
+        if(m_timeIndexAfterPushDetection==m_indexSmoother)
+        {
+            m_indexSmoother=0;
+            m_pushRecoveryActiveIndex=0;
+        }
+    }
+    else
+    {
+        m_kDCMSmoother=1;
+    }
+
+    iDynTree::toEigen(smoothedDCM)=iDynTree::toEigen(desiredDCM)+m_kDCMSmoother*(iDynTree::toEigen(adaptedDCM)-iDynTree::toEigen(desiredDCM));
+    return true;
+}
+
+bool WalkingModule::runStepAdaptation(iDynTree::Vector2 measuredZMP)
+{
+    if (m_useStepAdaptation)
+    {
+        m_isPitchActive=0;
+        m_isRollActive=0;
+        m_stepAdapter->triggerStepAdapterByArmCompliant(m_robotControlHelper->getActuatedDoFs(),m_qDesired,m_robotControlHelper->getJointPosition(),
+                                                        m_leftInContact,m_rightInContact,m_robotControlHelper->getAxesList());
+        m_isRollActive=m_stepAdapter->isArmRollActive();
+        m_isPitchActive=m_stepAdapter->isArmPitchActive();
+        double yawAngle = m_leftInContact.front()? m_jleftFootprints->getSteps()[1].angle : m_jRightFootprints->getSteps()[1].angle;
+        if(!m_stepAdapter->UpdateDCMEstimator(m_stableDCMModel->getCoMPosition(),m_stableDCMModel->getCoMVelocity(),measuredZMP,m_comHeightTrajectory.front(),yawAngle))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to to recieve DCM from pendulumEstimator";
+            return false;
+        }
+        m_dcmEstimatedI= m_stepAdapter->getEstimatedDCM();
+    }
+
+    if(m_useStepAdaptation)
+    {
+        //step adjustment
+        double comHeight;
+        double omega;
+        if(!m_trajectoryGenerator->getNominalCoMHeight(comHeight))
+        {
+            yError() << "[updateModule] Unable to get the nominal CoM height!";
+            return false;
+        }
+        omega = sqrt(9.81/comHeight);
+
+        m_outputStepAdaptation.indexPush=m_indexPush;
+        m_outputStepAdaptation.zmpNominal=m_zmpNominal;
+        m_outputStepAdaptation.zmpAdjusted=m_zmpAdjusted;
+        m_outputStepAdaptation.isPushActive=m_isPushActive;
+        m_outputStepAdaptation.isRollActive=m_isRollActive;
+        m_outputStepAdaptation.kDCMSmoother=m_kDCMSmoother;
+        m_outputStepAdaptation.indexSmoother=m_indexSmoother;
+        m_outputStepAdaptation.impactTimeNominal=m_impactTimeNominal;
+        m_outputStepAdaptation.isPitchActive=m_isPitchActive;
+        m_outputStepAdaptation.kFootSmoother=m_kFootSmoother;
+        m_outputStepAdaptation.indexFootSmoother=m_indexFootSmoother;
+        m_outputStepAdaptation.impactTimeAdjusted=m_impactTimeAdjusted;
+        m_outputStepAdaptation.dcmPositionAdjusted=m_DCMPositionAdjusted;
+        m_outputStepAdaptation.dcmVelocityAdjusted=m_DCMVelocityAdjusted;
+        m_outputStepAdaptation.adaptedFootLeftTwist=m_adaptedFootLeftTwist;
+        m_outputStepAdaptation.currentFootLeftTwist=m_currentFootLeftTwist;
+        m_outputStepAdaptation.pushRecoveryActiveIndex=m_pushRecoveryActiveIndex;
+        m_outputStepAdaptation.adaptedFootRightTwist=m_adaptedFootRightTwist;
+        m_outputStepAdaptation.currentFootRightTwist=m_currentFootRightTwist;
+        m_outputStepAdaptation.adaptedFootLeftTransform=m_adaptedFootLeftTransform;
+        m_outputStepAdaptation.currentFootLeftTransform=m_currentFootLeftTransform;
+        m_outputStepAdaptation.adaptedFootRightTransform=m_adaptedFootRightTransform;
+        m_outputStepAdaptation.currentFootRightTransform=m_currentFootRightTransform;
+        m_outputStepAdaptation.adaptedFootLeftAcceleration=m_adaptedFootLeftAcceleration;
+        m_outputStepAdaptation.currentFootLeftAcceleration=m_currentFootLeftAcceleration;
+        m_outputStepAdaptation.timeIndexAfterPushDetection=m_timeIndexAfterPushDetection;
+        m_outputStepAdaptation.adaptedFootRightAcceleration=m_adaptedFootRightAcceleration;
+        m_outputStepAdaptation.currentFootRightAcceleration=m_currentFootRightAcceleration;
+        m_outputStepAdaptation.FootTimeIndexAfterPushDetection=m_FootTimeIndexAfterPushDetection;
+
+        m_inputStepAdaptation.dT=m_dT;
+        m_inputStepAdaptation.omega=omega;
+        m_inputStepAdaptation.time=m_time;
+        m_inputStepAdaptation.timeOffset=m_timeOffset;
+        m_inputStepAdaptation.leftStepList=m_jLeftstepList;
+        m_inputStepAdaptation.leftInContact=m_leftInContact;
+        m_inputStepAdaptation.leftFootprints=m_jleftFootprints;
+        m_inputStepAdaptation.rightStepList=m_jRightstepList;
+        m_inputStepAdaptation.rightInContact=m_rightInContact;
+        m_inputStepAdaptation.rightFootprints=m_jRightFootprints;
+        m_inputStepAdaptation.dcmSubTrajectories=m_DCMSubTrajectories;
+        m_inputStepAdaptation.dcmPositionSmoothed=m_DCMPositionSmoothed;
+
+        if(!m_stepAdapter->runStepAdaptation(m_inputStepAdaptation,m_outputStepAdaptation))
+        {
+            yError() << "[WalkingModule::runStepAdaptation] unable to run step adaptation";
+            return false;
+        }
+
+        // adapted dcm trajectory
+        // add the offset on the zmp evaluated by the step adjustment for each footprint in the trajectory
+        // the same approach is used also for the impact time since the step adjustment change the impact time
+        if (!m_inputStepAdaptation.leftInContact.front() || !m_inputStepAdaptation.rightInContact.front())
+        {
+        iDynTree::Vector2 adaptedZMPOffset;
+        iDynTree::toEigen(adaptedZMPOffset) = iDynTree::toEigen(m_stepAdapter->getDesiredZmp()) - iDynTree::toEigen(m_outputStepAdaptation.zmpNominal);
+        double adaptedTimeOffset;
+        int numberOfSubTrajectories = m_inputStepAdaptation.dcmSubTrajectories.size();
+        if (numberOfSubTrajectories<2)
+        {
+            yError() << "[WalkingModule::runningStepAdaptation] the size of dcm subtrajectories should be equal or greater than 2";
+            return false;
+        }
+        auto firstSS = m_inputStepAdaptation.dcmSubTrajectories[numberOfSubTrajectories-2];
+
+        adaptedTimeOffset = m_stepAdapter->getDesiredImpactTime() - firstSS->getTrajectoryDomain().second;
+
+        std::shared_ptr<FootPrint> leftTemp = std::make_unique<FootPrint>();
+        leftTemp->setFootName("left");
+        leftTemp->addStep(m_inputStepAdaptation.leftFootprints->getSteps()[0]);
+        for(int i = 1; i < m_inputStepAdaptation.leftFootprints->getSteps().size(); i++)
+        {
+            iDynTree::Vector2 position;
+            iDynTree::toEigen(position) =  iDynTree::toEigen(m_inputStepAdaptation.leftFootprints->getSteps()[i].position) + iDynTree::toEigen(adaptedZMPOffset);
+            if(!leftTemp->addStep(position, m_inputStepAdaptation.leftFootprints->getSteps()[i].angle, m_inputStepAdaptation.leftFootprints->getSteps()[i].impactTime + adaptedTimeOffset))
+            {
+                yError() << "[WalkingModule::runStepAdaptation] unable to add left step";
+                return false;
+            }
+        }
+
+        std::shared_ptr<FootPrint> rightTemp = std::make_unique<FootPrint>();
+        rightTemp->setFootName("right");
+        rightTemp->addStep(m_inputStepAdaptation.rightFootprints->getSteps()[0]);
+        for(int i = 1; i < m_inputStepAdaptation.rightFootprints->getSteps().size(); i++)
+        {
+            iDynTree::Vector2 position;
+            iDynTree::toEigen(position) =  iDynTree::toEigen(m_inputStepAdaptation.rightFootprints->getSteps()[i].position) + iDynTree::toEigen(adaptedZMPOffset);
+
+            if(!rightTemp->addStep(position, m_inputStepAdaptation.rightFootprints->getSteps()[i].angle, m_inputStepAdaptation.rightFootprints->getSteps()[i].impactTime + adaptedTimeOffset))
+            {
+                yError() << "[WalkingModule::runStepAdaptation] unable to add right foot step";
+                return false;
+            }
+        }
+
+        DCMInitialState tempDCMInitialState;
+        if(!m_trajectoryGenerator->getDCMBoundaryConditionAtMergePoint(tempDCMInitialState))
+        {
+            yError() << "[WalkingModule::runStepAdaptation] unable to get get DCM boundary condition at merge point";
+            return false;
+        }
+
+        // generate the DCM trajectory
+        if(!m_trajectoryGeneratorStepAdjustment->generateTrajectoriesFromFootprints(leftTemp, rightTemp, m_inputStepAdaptation.timeOffset,tempDCMInitialState))
+        {
+            yError() << "[WalkingModule::updateModule] unable to generatempDCMInitialStatete new trajectorie after step adjustment.";
+            return false;
+        }
+
+        std::vector<iDynTree::Vector2> DCMPositionAdjusted;
+        std::vector<iDynTree::Vector2> DCMVelocityAdjusted;
+
+        if(!m_trajectoryGeneratorStepAdjustment->getDCMPositionTrajectory(DCMPositionAdjusted))
+        {
+            yError() << "[WalkingModule::runStepAdaptation] unable to get DCM Position Trajectory";
+            return false;
+        }
+
+        if(!m_trajectoryGeneratorStepAdjustment->getDCMVelocityTrajectory(DCMVelocityAdjusted))
+        {
+            yError() << "[WalkingModule::runStepAdaptation] unable to get DCM Velocity Trajectory";
+            return false;
+        }
+
+        size_t startIndexOfDCMAdjusted = (size_t)round((m_inputStepAdaptation.time - m_inputStepAdaptation.timeOffset) /m_inputStepAdaptation.dT);
+
+        if ((DCMPositionAdjusted.size() - startIndexOfDCMAdjusted)<1)
+        {
+            yError() << "[WalkingModule::runningStepAdaptation] the size of dcmPositionAdjusted should be greater than 0";
+            return false;
+        }
+        m_outputStepAdaptation.dcmPositionAdjusted.resize(DCMPositionAdjusted.size() - startIndexOfDCMAdjusted);
+        for(int i = 0; i < m_outputStepAdaptation.dcmPositionAdjusted.size(); i++)
+            m_outputStepAdaptation.dcmPositionAdjusted[i] = DCMPositionAdjusted[i + startIndexOfDCMAdjusted];
+
+        if ((DCMVelocityAdjusted.size() - startIndexOfDCMAdjusted)<1)
+        {
+            yError() << "[WalkingModule::runningStepAdaptation] the size of dcmVelocityAdjusted should be greater than 0";
+            return false;
+        }
+        m_outputStepAdaptation.dcmVelocityAdjusted.resize(DCMVelocityAdjusted.size() - startIndexOfDCMAdjusted);
+        for(int i = 0; i < m_outputStepAdaptation.dcmVelocityAdjusted.size(); i++)
+            m_outputStepAdaptation.dcmVelocityAdjusted[i] = DCMVelocityAdjusted[i + startIndexOfDCMAdjusted];
+        }
+
+        m_indexPush=m_outputStepAdaptation.indexPush;
+        m_zmpNominal=m_outputStepAdaptation.zmpNominal;
+        m_zmpAdjusted=m_outputStepAdaptation.zmpAdjusted;
+        m_isPushActive=m_outputStepAdaptation.isPushActive;
+        m_isRollActive=m_outputStepAdaptation.isRollActive;
+        m_kDCMSmoother=m_outputStepAdaptation.kDCMSmoother;
+        m_indexSmoother=m_outputStepAdaptation.indexSmoother;
+        m_impactTimeNominal=m_outputStepAdaptation.impactTimeNominal;
+        m_isPitchActive=m_outputStepAdaptation.isPitchActive;
+        m_kFootSmoother=m_outputStepAdaptation.kFootSmoother;
+        m_indexFootSmoother=m_outputStepAdaptation.indexFootSmoother;
+        m_impactTimeAdjusted=m_outputStepAdaptation.impactTimeAdjusted;
+        m_DCMPositionAdjusted=m_outputStepAdaptation.dcmPositionAdjusted;
+        m_DCMVelocityAdjusted=m_outputStepAdaptation.dcmVelocityAdjusted;
+        m_adaptedFootLeftTwist=m_outputStepAdaptation.adaptedFootLeftTwist;
+        m_currentFootLeftTwist=m_outputStepAdaptation.currentFootLeftTwist;
+        m_pushRecoveryActiveIndex=m_outputStepAdaptation.pushRecoveryActiveIndex;
+        m_adaptedFootRightTwist=m_outputStepAdaptation.adaptedFootRightTwist;
+        m_currentFootRightTwist=m_outputStepAdaptation.currentFootRightTwist;
+        m_adaptedFootLeftTransform=m_outputStepAdaptation.adaptedFootLeftTransform;
+        m_currentFootLeftTransform=m_outputStepAdaptation.currentFootLeftTransform;
+        m_adaptedFootRightTransform=m_outputStepAdaptation.adaptedFootRightTransform;
+        m_currentFootRightTransform=m_outputStepAdaptation.currentFootRightTransform;
+        m_adaptedFootLeftAcceleration=m_outputStepAdaptation.adaptedFootLeftAcceleration;
+        m_currentFootLeftAcceleration=m_outputStepAdaptation.currentFootLeftAcceleration;
+        m_timeIndexAfterPushDetection=m_outputStepAdaptation.timeIndexAfterPushDetection;
+        m_adaptedFootRightAcceleration=m_outputStepAdaptation.adaptedFootRightAcceleration;
+        m_currentFootRightAcceleration=m_outputStepAdaptation.currentFootRightAcceleration;
+        m_FootTimeIndexAfterPushDetection=m_outputStepAdaptation.FootTimeIndexAfterPushDetection;
+    }
     return true;
 }
