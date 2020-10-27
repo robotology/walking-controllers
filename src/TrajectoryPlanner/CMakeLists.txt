@@ -29,7 +29,8 @@ if(WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner)
     Threads::Threads
     WalkingControllers::YarpUtilities
     UnicyclePlanner
-    ctrlLib)
+    ctrlLib
+    PRIVATE Eigen3::Eigen)
 
   add_library(WalkingControllers::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
 
