@@ -77,17 +77,21 @@ namespace WalkingControllers
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_velocityFilter; /**< Joint velocity low pass filter .*/
         bool m_useVelocityFilter; /**< True if the joint velocity filter is used. */
 
-        yarp::os::BufferedPort<yarp::sig::Vector> m_leftWrenchPort; /**< Left foot wrench port. */
-        yarp::os::BufferedPort<yarp::sig::Vector> m_rightWrenchPort; /**< Right foot wrench port. */
-        yarp::sig::Vector m_leftWrenchInput; /**< YARP vector that contains left foot wrench. */
-        yarp::sig::Vector m_rightWrenchInput; /**< YARP vector that contains right foot wrench. */
-        yarp::sig::Vector m_leftWrenchInputFiltered; /**< YARP vector that contains left foot filtered wrench. */
-        yarp::sig::Vector m_rightWrenchInputFiltered; /**< YARP vector that contains right foot filtered wrench. */
+        struct MeasuredWrench
+        {
+            std::unique_ptr<yarp::os::BufferedPort<yarp::sig::Vector>> port; /**< yarp port. */
+            yarp::sig::Vector wrenchInput; /**< YARP vector that contains foot wrench. */
+            yarp::sig::Vector wrenchInputFiltered; /**< YARP vector that contains foot filtered wrench. */
+            std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> lowPassFilter; /**< Low pass filter.*/
+            bool useFilter;
+            bool isUpdated;
+        };
+
+        std::vector<MeasuredWrench> m_leftFootMeasuredWrench;
+        std::vector<MeasuredWrench> m_rightFootMeasuredWrench;
+
         iDynTree::Wrench m_leftWrench; /**< iDynTree vector that contains left foot wrench. */
         iDynTree::Wrench m_rightWrench; /**< iDynTree vector that contains right foot wrench. */
-        std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_leftWrenchFilter; /**< Left wrench low pass filter.*/
-        std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_rightWrenchFilter; /**< Right wrench low pass filter.*/
-        bool m_useWrenchFilter; /**< True if the wrench filter is used. */
 
         double m_startingPositionControlTime;
         bool m_positionMoveSkipped;
@@ -120,6 +124,14 @@ namespace WalkingControllers
         bool setInteractionMode(yarp::dev::InteractionModeEnum interactionMode);
 
         bool setInteractionMode(std::vector<yarp::dev::InteractionModeEnum>& interactionModes);
+
+        bool configureForceTorqueSensor(const std::string& portPrefix,
+                                        const std::string& portInputName,
+                                        const std::string& wholeBodyDynamicsPortName,
+                                        const double& samplingTime,
+                                        bool useWrenchFilter,
+                                        double cutFrequency,
+                                        MeasuredWrench& measuredWrench);
     public:
 
         /**
