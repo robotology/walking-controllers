@@ -605,11 +605,13 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        if(!evaluateZMP(measuredZMP))
-        {
-            yError() << "[WalkingModule::updateModule] Unable to evaluate the ZMP.";
-            return false;
-        }
+        measuredZMP.zero();
+
+        // if(!evaluateZMP(measuredZMP))
+        // {
+        //     yError() << "[WalkingModule::updateModule] Unable to evaluate the ZMP.";
+        //     return false;
+        // }
 
         // evaluate 3D-LIPM reference signal
         m_stableDCMModel->setInput(m_DCMPositionDesired.front());
