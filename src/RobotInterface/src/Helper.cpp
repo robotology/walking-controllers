@@ -60,10 +60,10 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
     // reset the measured wrenches
     for(auto& wrench : m_leftFootMeasuredWrench)
-        wrench.isUpdated = false;
+        wrench.isUpdated = true;
 
     for(auto& wrench : m_rightFootMeasuredWrench)
-        wrench.isUpdated = false;
+        wrench.isUpdated = true;
 
     bool okLeftWrenches = false;
     bool okRightWrenches = false;
@@ -149,41 +149,45 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             // let's sum all the wrenches together. Notice here we assume that
             // the wrenches on the foot are computed with the same pole.
 
-            // left foot
-            // copy the first wrench
-            auto leftWrenchIt = m_leftFootMeasuredWrench.begin();
-            if(!iDynTree::toiDynTree(leftWrenchIt->wrenchInput, m_leftWrench))
-            {
-                yError() << "[RobotInterface::getFeedbacksRaw] Unable to convert left foot wrench.";
-                return false;
-            }
+            // // left foot
+            // // copy the first wrench
+            // auto leftWrenchIt = m_leftFootMeasuredWrench.begin();
+            // if(!iDynTree::toiDynTree(leftWrenchIt->wrenchInput, m_leftWrench))
+            // {
+            //     yError() << "[RobotInterface::getFeedbacksRaw] Unable to convert left foot wrench.";
+            //     return false;
+            // }
 
-            // sum all the other wrenches
-            std::advance(leftWrenchIt, 1);
-            for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
-            {
-                // the idyntree wrench raw data  is not a consecutive array
-                iDynTree::toEigen(m_leftWrench.getLinearVec3()) = yarp::eigen::toEigen(leftWrenchIt->wrenchInput).head<3>();
-                iDynTree::toEigen(m_leftWrench.getAngularVec3()) = yarp::eigen::toEigen(leftWrenchIt->wrenchInput).tail<3>();
-            }
+            // // sum all the other wrenches
+            // std::advance(leftWrenchIt, 1);
+            // for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
+            // {
+            //     // the idyntree wrench raw data  is not a consecutive array
+            //     iDynTree::toEigen(m_leftWrench.getLinearVec3()) = yarp::eigen::toEigen(leftWrenchIt->wrenchInput).head<3>();
+            //     iDynTree::toEigen(m_leftWrench.getAngularVec3()) = yarp::eigen::toEigen(leftWrenchIt->wrenchInput).tail<3>();
+            // }
 
-            // right foot
-            // copy the first wrench
-            auto rightWrenchIt = m_rightFootMeasuredWrench.begin();
-            if(!iDynTree::toiDynTree(rightWrenchIt->wrenchInput, m_rightWrench))
-            {
-                yError() << "[RobotInterface::getFeedbacksRaw] Unable to convert right foot wrench.";
-                return false;
-            }
+            // // right foot
+            // // copy the first wrench
+            // auto rightWrenchIt = m_rightFootMeasuredWrench.begin();
+            // if(!iDynTree::toiDynTree(rightWrenchIt->wrenchInput, m_rightWrench))
+            // {
+            //     yError() << "[RobotInterface::getFeedbacksRaw] Unable to convert right foot wrench.";
+            //     return false;
+            // }
 
-            // sum all the other wrenches
-            std::advance(rightWrenchIt, 1);
-            for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
-            {
-                // the idyntree wrench raw data  is not a consecutive array
-                iDynTree::toEigen(m_rightWrench.getLinearVec3()) = yarp::eigen::toEigen(rightWrenchIt->wrenchInput).head<3>();
-                iDynTree::toEigen(m_rightWrench.getAngularVec3()) = yarp::eigen::toEigen(rightWrenchIt->wrenchInput).tail<3>();
-            }
+            // // sum all the other wrenches
+            // std::advance(rightWrenchIt, 1);
+            // for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
+            // {
+            //     // the idyntree wrench raw data  is not a consecutive array
+            //     iDynTree::toEigen(m_rightWrench.getLinearVec3()) = yarp::eigen::toEigen(rightWrenchIt->wrenchInput).head<3>();
+            //     iDynTree::toEigen(m_rightWrench.getAngularVec3()) = yarp::eigen::toEigen(rightWrenchIt->wrenchInput).tail<3>();
+            // }
+
+
+            m_leftWrench.zero();
+            m_rightWrench.zero();
 
             return true;
         }
@@ -493,13 +497,15 @@ bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
 
     measuredWrench.port = std::make_unique<yarp::os::BufferedPort<yarp::sig::Vector>>();
     measuredWrench.port->open("/" + portPrefix + portInputName);
+
+    // TODO remove me
     // connect port
-    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
-    {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
-                 << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;
-        return false;
-    }
+    // if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
+    // {
+    //     yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
+    //              << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;
+    //     return false;
+    // }
 
     if(useWrenchFilter)
     {
@@ -676,35 +682,35 @@ bool RobotInterface::resetFilters()
     if(m_useVelocityFilter)
         m_velocityFilter->init(m_velocityFeedbackDeg);
 
-    for(auto& wrench : m_leftFootMeasuredWrench)
-    {
-        if(wrench.useFilter)
-        {
-            if(!wrench.isUpdated)
-            {
-                yError() << "[RobotInterface::resetFilters] The left wrench is not updated. I cannot reset the filter.";
-                return false;
-            }
+    // for(auto& wrench : m_leftFootMeasuredWrench)
+    // {
+    //     if(wrench.useFilter)
+    //     {
+    //         if(!wrench.isUpdated)
+    //         {
+    //             yError() << "[RobotInterface::resetFilters] The left wrench is not updated. I cannot reset the filter.";
+    //             return false;
+    //         }
 
-            // reset the filter
-            wrench.lowPassFilter->init(wrench.wrenchInput);
-        }
-    }
+    //         // reset the filter
+    //         wrench.lowPassFilter->init(wrench.wrenchInput);
+    //     }
+    // }
 
-    for(auto& wrench : m_rightFootMeasuredWrench)
-    {
-        if(wrench.useFilter)
-        {
-            if(!wrench.isUpdated)
-            {
-                yError() << "[RobotInterface::resetFilters] The right wrench is not updated. I cannot reset the filter.";
-                return false;
-            }
+    // for(auto& wrench : m_rightFootMeasuredWrench)
+    // {
+    //     if(wrench.useFilter)
+    //     {
+    //         if(!wrench.isUpdated)
+    //         {
+    //             yError() << "[RobotInterface::resetFilters] The right wrench is not updated. I cannot reset the filter.";
+    //             return false;
+    //         }
 
-            // reset the filter
-            wrench.lowPassFilter->init(wrench.wrenchInput);
-        }
-    }
+    //         // reset the filter
+    //         wrench.lowPassFilter->init(wrench.wrenchInput);
+    //     }
+    // }
 
 
     return true;
@@ -757,65 +763,65 @@ bool RobotInterface::getFeedbacks(unsigned int maxAttempts)
         }
     }
 
-    // left foot
-    // copy the first wrench
-    auto leftWrenchIt = m_leftFootMeasuredWrench.begin();
-    const yarp::sig::Vector* leftWrenchVectorPtr = &(leftWrenchIt->wrenchInput);
-    if(leftWrenchIt->useFilter)
-    {
-        leftWrenchVectorPtr = &(leftWrenchIt->wrenchInputFiltered);
-    }
+    // // left foot
+    // // copy the first wrench
+    // auto leftWrenchIt = m_leftFootMeasuredWrench.begin();
+    // const yarp::sig::Vector* leftWrenchVectorPtr = &(leftWrenchIt->wrenchInput);
+    // if(leftWrenchIt->useFilter)
+    // {
+    //     leftWrenchVectorPtr = &(leftWrenchIt->wrenchInputFiltered);
+    // }
 
-    if(!iDynTree::toiDynTree(*leftWrenchVectorPtr, m_leftWrench))
-    {
-        yError() << "[RobotInterface::getFeedbacks] Unable to convert left foot wrench.";
-        return false;
-    }
+    // if(!iDynTree::toiDynTree(*leftWrenchVectorPtr, m_leftWrench))
+    // {
+    //     yError() << "[RobotInterface::getFeedbacks] Unable to convert left foot wrench.";
+    //     return false;
+    // }
 
-    // sum all the other wrenches
-    std::advance(leftWrenchIt, 1);
-    for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
-    {
-        yarp::sig::Vector* leftWrenchVectorPtr = &(leftWrenchIt->wrenchInput);
-        if(leftWrenchIt->useFilter)
-        {
-            leftWrenchVectorPtr = &(leftWrenchIt->wrenchInputFiltered);
-        }
+    // // sum all the other wrenches
+    // std::advance(leftWrenchIt, 1);
+    // for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
+    // {
+    //     yarp::sig::Vector* leftWrenchVectorPtr = &(leftWrenchIt->wrenchInput);
+    //     if(leftWrenchIt->useFilter)
+    //     {
+    //         leftWrenchVectorPtr = &(leftWrenchIt->wrenchInputFiltered);
+    //     }
 
-        // the idyntree wrench raw data  is not a consecutive array
-        iDynTree::toEigen(m_leftWrench.getLinearVec3()) = yarp::eigen::toEigen(*leftWrenchVectorPtr).head<3>();
-        iDynTree::toEigen(m_leftWrench.getAngularVec3()) = yarp::eigen::toEigen(*leftWrenchVectorPtr).tail<3>();
-    }
+    //     // the idyntree wrench raw data  is not a consecutive array
+    //     iDynTree::toEigen(m_leftWrench.getLinearVec3()) = yarp::eigen::toEigen(*leftWrenchVectorPtr).head<3>();
+    //     iDynTree::toEigen(m_leftWrench.getAngularVec3()) = yarp::eigen::toEigen(*leftWrenchVectorPtr).tail<3>();
+    // }
 
-    // right foot
-    // copy the first wrench
-    auto rightWrenchIt = m_rightFootMeasuredWrench.begin();
-    const yarp::sig::Vector* rightWrenchVectorPtr = &(rightWrenchIt->wrenchInput);
-    if(rightWrenchIt->useFilter)
-    {
-        rightWrenchVectorPtr = &(rightWrenchIt->wrenchInputFiltered);
-    }
+    // // right foot
+    // // copy the first wrench
+    // auto rightWrenchIt = m_rightFootMeasuredWrench.begin();
+    // const yarp::sig::Vector* rightWrenchVectorPtr = &(rightWrenchIt->wrenchInput);
+    // if(rightWrenchIt->useFilter)
+    // {
+    //     rightWrenchVectorPtr = &(rightWrenchIt->wrenchInputFiltered);
+    // }
 
-    if(!iDynTree::toiDynTree(*rightWrenchVectorPtr, m_rightWrench))
-    {
-        yError() << "[RobotInterface::getFeedbacks] Unable to convert right foot wrench.";
-        return false;
-    }
+    // if(!iDynTree::toiDynTree(*rightWrenchVectorPtr, m_rightWrench))
+    // {
+    //     yError() << "[RobotInterface::getFeedbacks] Unable to convert right foot wrench.";
+    //     return false;
+    // }
 
-    // sum all the other wrenches
-    std::advance(rightWrenchIt, 1);
-    for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
-    {
-        yarp::sig::Vector* rightWrenchVectorPtr = &(rightWrenchIt->wrenchInput);
-        if(rightWrenchIt->useFilter)
-        {
-            rightWrenchVectorPtr = &(rightWrenchIt->wrenchInputFiltered);
-        }
+    // // sum all the other wrenches
+    // std::advance(rightWrenchIt, 1);
+    // for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
+    // {
+    //     yarp::sig::Vector* rightWrenchVectorPtr = &(rightWrenchIt->wrenchInput);
+    //     if(rightWrenchIt->useFilter)
+    //     {
+    //         rightWrenchVectorPtr = &(rightWrenchIt->wrenchInputFiltered);
+    //     }
 
-        // the idyntree wrench raw data  is not a consecutive array
-        iDynTree::toEigen(m_rightWrench.getLinearVec3()) = yarp::eigen::toEigen(*rightWrenchVectorPtr).head<3>();
-        iDynTree::toEigen(m_rightWrench.getAngularVec3()) = yarp::eigen::toEigen(*rightWrenchVectorPtr).tail<3>();
-    }
+    //     // the idyntree wrench raw data  is not a consecutive array
+    //     iDynTree::toEigen(m_rightWrench.getLinearVec3()) = yarp::eigen::toEigen(*rightWrenchVectorPtr).head<3>();
+    //     iDynTree::toEigen(m_rightWrench.getAngularVec3()) = yarp::eigen::toEigen(*rightWrenchVectorPtr).tail<3>();
+    // }
 
 
     return true;
