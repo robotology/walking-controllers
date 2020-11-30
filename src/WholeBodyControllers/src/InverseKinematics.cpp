@@ -31,7 +31,7 @@
 using namespace WalkingControllers;
 
 WalkingIK::WalkingIK()
-    : m_verbose(false)
+    : m_verbose(true)
     , m_lFootFrame("l_sole")
     , m_rFootFrame("r_sole")
     , m_inertial_R_world(iDynTree::Rotation::Identity())
@@ -287,7 +287,7 @@ bool WalkingIK::prepareIK()
     }
 
     m_ik.setCostTolerance(1e-4);
-    m_ik.setConstraintsTolerance(1e-4);
+    m_ik.setConstraintsTolerance(1e-6);
     m_ik.setCOMAsConstraintTolerance(1e-4);
 
     ///DEBUG
@@ -413,10 +413,12 @@ bool WalkingIK::computeIK(const iDynTree::Transform& leftTransform, const iDynTr
 
     iDynTree::Position comError = desiredCoMPosition - lchecker.getCenterOfMassPosition();
     iDynTree::Position footError = desiredRightTransform.getPosition() - lchecker.getRelativeTransform(m_lFootFrame, m_rFootFrame).getPosition();
+    iDynTree::Rotation footRotationError = desiredRightTransform.getRotation() * lchecker.getRelativeTransform(m_lFootFrame, m_rFootFrame).getRotation().inverse();
 
     if (m_verbose) {
         yInfo() << "CoM error position: "<< comError.toString();
         yInfo() << "Foot position error: "<<footError.toString();
+        yInfo() << "Foot rotation error: "<<footRotationError.toString();
     }
 
     result = m_qResult;
