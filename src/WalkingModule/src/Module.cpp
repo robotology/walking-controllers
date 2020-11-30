@@ -817,7 +817,7 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       m_robotControlHelper->getJointPosition(),
-                                      m_retargetingClient->jointValues());
+                                      m_qDesired);
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -991,6 +991,8 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         yError() << "[WalkingModule::prepareRobot] Inverse Kinematics failed while computing the initial position.";
         return false;
     }
+
+    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesired) * 180 / M_PI).transpose() << std::endl;
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
     {
@@ -1220,16 +1222,14 @@ bool WalkingModule::startWalking()
                     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "neck_pitch", "neck_roll", "neck_yaw",
                     "torso_pitch", "torso_roll", "torso_yaw",
-                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup",
-                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup",
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
                     "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
                     "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
-                    "neck_pitch_des", "neck_roll_des", "neck_yaw_des",
                     "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
-                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des",
-                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des",
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des",
                     "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
                     "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des"});
     }
