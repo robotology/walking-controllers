@@ -220,7 +220,7 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     if(!YarpUtilities::getVectorOfBooleanFromSearchable(config, "good_tracking_required",
                                                         m_isGoodTrackingRequired))
     {
-        yError() << "[RobotInterface::configureRobot] Unable to find is_good_tracking_required into config file.";
+        yError() << "[RobotInterface::configureRobot] Unable to find good_tracking_required into config file.";
         return false;
     }
 
