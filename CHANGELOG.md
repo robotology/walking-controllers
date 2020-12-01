@@ -3,6 +3,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 ### Added
+
+### Changed
+
+## [0.4.0] - 2020-12-01
+### Added
 - Adding the possibility to use Gazebo base data inside the walking controller
 - `TrajectoryGenerator` class of the `TrajectoryPlanner` library includes now
   the method `getWeightPercentage` to retrieve the amount of weight on each foot
@@ -99,7 +104,8 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
-[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.3.2...devel
+[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.4.0...devel
+[0.4.0]: https://github.com/robotology/walking-controllers/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/robotology/walking-controllers/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/robotology/walking-controllers/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/robotology/walking-controllers/compare/v0.2.0...v0.3.0
