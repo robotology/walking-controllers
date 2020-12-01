@@ -17,6 +17,7 @@ All notable changes to this project are documented in this file.
   - `RobotInterface/Helper`
   - `TrajectoryPlanner/TrajectoryGenerator`
   - `WalkingModule`
+- Tune gains for iCubGenova04
 
 ## [0.3.2] - 2020-03-21
 ### Changed
