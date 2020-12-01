@@ -46,6 +46,14 @@ namespace WalkingControllers
         bool yarpListToStringVector(yarp::os::Value*& input, std::vector<std::string>& output);
 
         /**
+         * Convert a yarp list into a vector of bool
+         * @param input is the pointer of a yarp value;
+         * @param output is the vector of bool.
+         * @return true/false in case of success/failure
+         */
+        bool yarpListToBoolVector(yarp::os::Value*& input, std::vector<bool>& output);
+
+        /**
          * Extract a string from a searchable object.
          * @param config is the searchable object;
          * @param key the name to check for;

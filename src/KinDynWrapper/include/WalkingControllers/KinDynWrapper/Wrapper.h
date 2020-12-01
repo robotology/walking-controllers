@@ -17,9 +17,12 @@
 
 //iDynTree
 #include <iDynTree/KinDynComputations.h>
+#include <iDynTree/Model/FreeFloatingState.h>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
+
+#include <unordered_map>
 
 namespace WalkingControllers
 {
@@ -28,10 +31,14 @@ namespace WalkingControllers
     {
         iDynTree::KinDynComputations m_kinDyn; /**< KinDynComputations solver. */
 
+        bool m_useExternalRobotBase; /**< is external estimator for the base of robot used? */
+        iDynTree::FreeFloatingGeneralizedTorques m_generalizedBiasForces;
+
         bool m_prevContactLeft; /**< Boolean is the previous contact foot the left one? */
         bool m_dcmEvaluated; /**< is the DCM evaluated? */
         bool m_comEvaluated; /**< is the CoM evaluated? */
 
+        iDynTree::FrameIndex m_frameBaseIndex;
         iDynTree::FrameIndex m_frameLeftIndex; /**< Index of the frame attached to the left foot in which all the left foot transformations are expressed. */
         iDynTree::FrameIndex m_frameRightIndex; /**< Index of the frame attached to the right foot in which all the right foot transformations are expressed. */
         iDynTree::FrameIndex m_frameRootIndex; /**< Index of the frame attached to the root_link. */
@@ -46,6 +53,8 @@ namespace WalkingControllers
         iDynTree::Transform m_frameHlinkLeft; /**< Transformation between the l_sole and the l_foot frame (l_ankle_2?!). */
         iDynTree::Transform m_frameHlinkRight; /**< Transformation between the l_sole and the l_foot frame (l_ankle_2?!). */
         iDynTree::Transform m_worldToBaseTransform; /**< World to base transformation. */
+        std::unordered_map<std::string, std::pair<const std::string, const iDynTree::Transform>> m_baseFrames;/**< Transform related to the base frame */
+        iDynTree::Twist m_baseTwist;/**< twist related to base frame */
 
         iDynTree::Position m_comPosition; /**< Position of the CoM. */
         iDynTree::Vector3 m_comVelocity; /**< Velocity of the CoM. */
@@ -59,6 +68,8 @@ namespace WalkingControllers
         bool m_useFilters; /**< If it is true the filters will be used. */
 
         bool m_firstStep; /**< True only during the first step. */
+
+        iDynTree::VectorDynSize m_jointPositions; /**< joint positions in radians. */
 
         /**
          * Set the model of the robot.
@@ -76,6 +87,14 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool setBaseFrames(const std::string& lFootFrame, const std::string& rFootFrame);
+
+        /**
+         * Set The base frames for enabling using Gazebo as a base estimator.
+         * @param baseFrame the frame name inside model;
+         * @param name label for storing the frame information;
+         * @return true/false in case of success/failure.
+         */
+        bool setBaseFrame(const std::string& baseFrame, const std::string& name);
 
         /**
          * Evaluate the Divergent component of motion.
@@ -99,23 +118,13 @@ namespace WalkingControllers
                         const iDynTree::Model& model);
 
         /**
-         * Evaluate the first world to base transformation.
-         * @note: The The first reference frame is always the left foot.
-         * @note: please use this method only with evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
-         * @param leftFootTransform transformation from the world to the left foot frame (l_sole);
-         * @return true/false in case of success/failure.
-         */
-        bool evaluateFirstWorldToBaseTransformation(const iDynTree::Transform& leftFootTransform);
-
-        /**
          * Evaluate the world to base transformation
-         * @note: During the walking task the frame shift from the left to the right foot.
-         * the new base frame is attached where the foot is.
-         * @note: please use this method only with evaluateFirstWorldToBaseTransformation();
-         * @param isLeftFixedFrame true if the main frame of the left foot is fixed one.
+         * @param rootTransform transformation from the world to the root frame.
+         * @param rootTwist twist of the root frame.
          * @return true/false in case of success/failure.
          */
-        bool evaluateWorldToBaseTransformation(const bool& isLeftFixedFrame);
+        void evaluateWorldToBaseTransformation(const iDynTree::Transform& rootTransform,
+                                               const iDynTree::Twist& rootTwist);
 
         /**
          * Evaluate the world to base transformation
@@ -251,6 +260,12 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool getCoMJacobian(iDynTree::MatrixDynSize &jacobian);
+
+        /**
+         * Get the joint position
+         * @return the joint position expressed in radians
+         */
+        const iDynTree::VectorDynSize& getJointPos();
     };
 };
 #endif

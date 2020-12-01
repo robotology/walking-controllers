@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 ## MAIN project
 project(WalkingControllers
-  VERSION 0.3.3)
+  VERSION 0.4.0)
 
 # Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
 # See https://cmake.org/cmake/help/latest/module/GNUInstallDirs.html

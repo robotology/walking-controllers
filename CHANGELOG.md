@@ -6,6 +6,23 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+## [0.4.0] - 2020-12-01
+### Added
+- Adding the possibility to use Gazebo base data inside the walking controller
+- `TrajectoryGenerator` class of the `TrajectoryPlanner` library includes now
+  the method `getWeightPercentage` to retrieve the amount of weight on each foot
+  requested by the planner.
+
+### Changed
+- Adding the `use_external_robot_base` parameter inside the `dcm_walking_with_joypad.ini`
+- Adding the Gazebo base data port inside the `robotControl.ini`
+- Tunning the `zmpControllerParams.ini` and `dcmReactiveControllerParams.ini`
+- Modifying the follwoing classes for geting and using Gazebo base data:
+  - `/KinDynWrapper/Wrapper`
+  - `RobotInterface/Helper`
+  - `TrajectoryPlanner/TrajectoryGenerator`
+  - `WalkingModule`
+- Tune gains for iCubGenova04
 
 ## [0.3.3] - 2020-11-23
 ### Added
@@ -27,6 +44,7 @@ All notable changes to this project are documented in this file.
 - The `CHANGELOG.md` file
 - Implement the `WalkingControllersFindDepencies.cmake`
 - Adding the possibility of selecting Stiff/Compliant mode in joint level.
+
 ### Changed
 - General refactoring of the library. The WalkingModule is now split in several library. Namelly:
    - `YarpUtilities`: utilities for using `YARP`
@@ -93,7 +111,8 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
-[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.3.3...devel
+[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.4.0...devel
+[0.4.0]: https://github.com/robotology/walking-controllers/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/robotology/walking-controllers/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/robotology/walking-controllers/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/robotology/walking-controllers/compare/v0.3.0...v0.3.1

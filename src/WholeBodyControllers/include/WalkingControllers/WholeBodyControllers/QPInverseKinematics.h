@@ -24,6 +24,7 @@
 #include <iCub/ctrl/minJerkCtrl.h>
 
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
 
 namespace WalkingControllers
 {
@@ -40,6 +41,9 @@ namespace WalkingControllers
     class WalkingQPIK
     {
     private:
+
+        enum class RetargetingType { handRetargeting, jointRetargeting, none };
+        RetargetingType m_retargetingType;
 
         /**
          * Set the joint positions and velocities bounds
@@ -65,6 +69,8 @@ namespace WalkingControllers
         iDynTree::Twist m_leftFootCorrection; /**< Correction of the desired velocity related to the left foot (evaluated using the position error). */
         iDynTree::Twist m_rightFootCorrection; /**< Correction of the desired velocity related to the left foot (evaluated using the position error). */
 
+        iDynTree::Twist m_desiredLeftHandTwist; /**< Desired Twist of the left hand. */
+        iDynTree::Twist m_desiredRightHandTwist; /**< Desired Twist of the right hand. */
         iDynTree::Vector3 m_desiredComVelocity; /**< Desired Linear velocity of the CoM. */
 
         iDynTree::Position m_desiredComPosition; /**< Desired Linear velocity of the CoM. */
@@ -79,6 +85,7 @@ namespace WalkingControllers
                                                     desiredNeckOrientation rotation matrix). */
 
         iDynTree::VectorDynSize m_regularizationTerm; /**< Desired joint position (regularization term).*/
+        iDynTree::VectorDynSize m_retargetingJointValue; /**< Desired joint retargeting position.*/
 
         iDynTree::Position m_comPosition; /**< Desired Linear velocity of the CoM. */
         iDynTree::Transform m_leftFootToWorldTransform; /**< Actual left foot to world transformation.*/
@@ -93,12 +100,21 @@ namespace WalkingControllers
         unsigned int m_actuatedDOFs; /**< Number of actuated actuated DoF. */
 
         iDynTree::VectorDynSize m_jointRegularizationGains;  /**< Gain related to the joint regularization. */
+        iDynTree::VectorDynSize m_jointRetargetingGains;  /**< Gain related to the joint regularization. */
         double m_kPosFoot; /**< Gain related to the desired foot position. */
         double m_kAttFoot; /**< Gain related to the desired foot attitude. */
         double m_kPosHand; /**< Gain related to the desired Hand position. */
         double m_kAttHand; /**< Gain related to the desired hand attitude. */
         double m_kNeck; /**< Gain related to the desired neck attitude. */
         double m_kCom; /**< Gain related to the desired CoM position. */
+
+        iDynTree::VectorDynSize m_jointRegularizationWeights; /**< Weight related to the the regularization term */
+
+        iDynTree::VectorDynSize m_jointRegularizationGainsTimeWeights; /**< Product between the jointRegularizationGains
+                                                                          and the jointRegularizationWeights.
+                                                                          This quantity is used only if the joint retargeting is
+                                                                          disabled*/
+
         iDynTree::Vector3 m_comWeight; /**< CoM weight. */
         double m_neckWeight; /**< Neck weight matrix. */
         iDynSparseMatrix m_jointRegularizationHessian; /**< Contains a constant matrix that can be useful
@@ -121,9 +137,27 @@ namespace WalkingControllers
         yarp::sig::Vector m_handWeightStanceVector; /**< Weight matrix (only the diagonal) used for
                                                        the hand retargeting during stance. */
 
+        // gain scheduling in case of joint retargeting
+        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRetargetingWeightSmoother; /**< Minimum jerk trajectory
+                                                                                         for the Joint retargeting weight matrix. */
+        yarp::sig::Vector m_jointRetargetingWeightWalking; /**< Weight matrix (only the diagonal) used for
+                                                              the joint retargeting during walking. */
+        yarp::sig::Vector m_jointRetargetingWeightStance; /**< Weight matrix (only the diagonal) used for
+                                                             the joint retargeting during stance. */
+
+        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_jointRegularizationWeightSmoother; /**< Minimum jerk trajectory
+                                                                                            for the Joint regularization weight matrix. */
+        yarp::sig::Vector m_jointRegularizationWeightWalking; /**< Weight matrix (only the diagonal) used for
+                                                                 the joint regularization during walking. */
+        yarp::sig::Vector m_jointRegularizationWeightStance; /**< Weight matrix (only the diagonal) used for
+                                                                the joint regularization during stance. */
+
+        std::unique_ptr<iCub::ctrl::minJerkTrajGen> m_torsoWeightSmoother; /**< Minimum jerk trajectory for the torso weight matrix. */
+        double m_torsoWeightWalking; /**< Weight matrix (only the diagonal) used for the torso during walking. */
+        double m_torsoWeightStance; /**< Weight matrix (only the diagonal) used for the torso during stance. */
+
         bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
         bool m_useJointsLimitsConstraint; /**< True if the CoM is added as a constraint. */
-        bool m_enableHandRetargeting; /**< True if the hand retargeting is used */
 
         iDynTree::MatrixDynSize m_hessianDense; /**< Hessian matrix */
         iDynTree::VectorDynSize m_gradient; /**< Gradient vector */
@@ -146,6 +180,14 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool initializeHandRetargeting(const yarp::os::Searchable& config);
+
+        /**
+         * Initialize joint retargeting.
+         * @param config configuration parameters
+         * @return true/false in case of success/failure.
+         */
+        bool initializeJointRetargeting(const yarp::os::Searchable& config);
+
 
         /**
          * Instantiate the solver
@@ -205,22 +247,11 @@ namespace WalkingControllers
 
         /**
          * Set the robot state.
-         * @param jointPosition vector of joint positions (in rad);
-         * @param leftFootToWorldTransform transformation between the inertial frame and the left foot;
-         * @param rightFootToWorldTransform transformation between the inertial frame and the right foot;
-         * @param leftHandToWorldTransform transformation between the inertial frame and the left foot;
-         * @param rightHandToWorldTransform transformation between the inertial frame and the right foot;
-         * @param neckOrientation rotation between the inertial frame and the neck;
-         * @param comPosition position of the CoM
+         * @param kinDynWrapper wrapper required to retrieve information related to the forward
+         * kinematics
          * @return true/false in case of success/failure.
          */
-        bool setRobotState(const iDynTree::VectorDynSize& jointPosition,
-                           const iDynTree::Transform& leftFootToWorldTransform,
-                           const iDynTree::Transform& rightFootToWorldTransform,
-                           const iDynTree::Transform& leftHandToWorldTransform,
-                           const iDynTree::Transform& rightHandToWorldTransform,
-                           const iDynTree::Rotation& neckOrientation,
-                           const iDynTree::Position& comPosition);
+        bool setRobotState(WalkingFK& kinDynWrapper);
 
         /**
          * Set the Jacobian of the CoM
@@ -279,6 +310,21 @@ namespace WalkingControllers
          */
         void setDesiredFeetTwist(const iDynTree::Twist& leftFootTwist,
                                  const iDynTree::Twist& rightFootTwist);
+
+        /**
+         * Set the desired twist of both feet
+         * @param leftHandTwist contain the desired twist of the left hand (MIXED representation);
+         * @param rightHandTwist contain the desired twist of the right hand (MIXED representation).
+         */
+        void setDesiredHandsTwist(const iDynTree::Twist& leftHandTwist,
+                                  const iDynTree::Twist& rightHandTwist);
+
+        /**
+         * Set the desired joint positions in radians
+         * @param jointPosition contain the desired joint position used in the retargeting.
+         * @return true/false in case of success/failure.
+         */
+        bool setDesiredRetargetingJoint(const iDynTree::VectorDynSize& jointPosition);
 
         /**
          * Set the desired CoMVelocity

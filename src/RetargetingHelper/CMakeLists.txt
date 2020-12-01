@@ -24,6 +24,7 @@ if(WALKING_CONTROLLERS_COMPILE_RetargetingHelper)
 
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC
     WalkingControllers::YarpUtilities
+    WalkingControllers::KinDynWrapper
     ${iDynTree_LIBRARIES}
     ctrlLib
     PRIVATE Eigen3::Eigen)
