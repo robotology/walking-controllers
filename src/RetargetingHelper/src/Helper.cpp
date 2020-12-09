@@ -216,8 +216,8 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
 
 bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
 {
-    m_leftHand.data = kinDynWrapper.getLeftHandToWorldTransform();
-    m_rightHand.data = kinDynWrapper.getRightHandToWorldTransform();
+    m_leftHand.data = kinDynWrapper.getHeadToWorldTransform().inverse() * kinDynWrapper.getLeftHandToWorldTransform();
+    m_rightHand.data = kinDynWrapper.getHeadToWorldTransform().inverse() * kinDynWrapper.getRightHandToWorldTransform();
 
     if(m_useHandRetargeting)
     {
