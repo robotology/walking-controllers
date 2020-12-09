@@ -5,6 +5,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 ### Changed
+- Bugfix while resetting the hand smoother in the `RetargetingClient` (https://github.com/robotology/walking-controllers/pull/75)
 
 ## [0.4.0] - 2020-12-01
 ### Added
