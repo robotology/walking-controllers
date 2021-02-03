@@ -32,7 +32,8 @@ if(WALKING_CONTROLLERS_COMPILE_SimplifiedModelControllers)
     WalkingControllers::iDynTreeUtilities
     osqp::osqp
     OsqpEigen::OsqpEigen
-    Eigen3::Eigen)
+    Eigen3::Eigen
+    ctrlLib)
 
   add_library(WalkingControllers::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
 

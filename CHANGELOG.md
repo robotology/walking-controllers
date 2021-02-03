@@ -2,10 +2,15 @@
 All notable changes to this project are documented in this file.
 
 ## [Unreleased]
+
+## [0.4.1] - 2020-03-02
+
 ### Added
 
 ### Changed
 - Bugfix while resetting the hand smoother in the `RetargetingClient` (https://github.com/robotology/walking-controllers/pull/75)
+- Fixed compilation if iDynTree 3 is used (https://github.com/robotology/walking-controllers/pull/77).
+
 
 ## [0.4.0] - 2020-12-01
 ### Added
