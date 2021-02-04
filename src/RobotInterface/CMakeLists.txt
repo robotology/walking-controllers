@@ -28,6 +28,7 @@ if(WALKING_CONTROLLERS_COMPILE_RobotInterface)
   target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC
     WalkingControllers::YarpUtilities
     WalkingControllers::iDynTreeUtilities
+    ctrlLib
     PRIVATE Eigen3::Eigen)
 
   add_library(WalkingControllers::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
