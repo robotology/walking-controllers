@@ -21,6 +21,7 @@
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
+#include <iDynTree/Core/Position.h>
 
 namespace WalkingControllers
 {
