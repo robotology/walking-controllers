@@ -42,6 +42,7 @@ if(WALKING_CONTROLLERS_COMPILE_WholeBodyControllers)
     osqp::osqp
     OsqpEigen::OsqpEigen
     ${qpOASES_LIBRARIES}
+    Eigen3::Eigen
     ctrlLib)
 
   add_library(WalkingControllers::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
