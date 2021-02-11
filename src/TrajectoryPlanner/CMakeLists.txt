@@ -11,12 +11,14 @@ if(WALKING_CONTROLLERS_COMPILE_TrajectoryPlanner)
   set(${LIBRARY_TARGET_NAME}_SRC
     src/StableDCMModel.cpp
     src/TrajectoryGenerator.cpp
+    src/FreeSpaceEllipseManager.cpp
     )
 
   # set hpp files
   set(${LIBRARY_TARGET_NAME}_HDR
     include/WalkingControllers/TrajectoryPlanner/StableDCMModel.h
     include/WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h
+    include/WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h
     )
 
   # add an executable to the project using the specified source files.

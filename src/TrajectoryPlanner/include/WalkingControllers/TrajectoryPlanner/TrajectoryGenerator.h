@@ -22,6 +22,7 @@
 #include <iDynTree/Core/VectorFixSize.h>
 
 #include <UnicycleGenerator.h>
+#include <FreeSpaceEllipse.h>
 
 namespace WalkingControllers
 {
@@ -66,6 +67,9 @@ namespace WalkingControllers
 
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointVelocity; /**< DCM velocity at the merge point. */
+
+        FreeSpaceEllipse m_freeSpaceEllipse; /**< The free space ellipse object. */
+        bool m_newFreeSpaceEllipse; /**< Check if the free space ellipse has been updated. */
 
         std::mutex m_mutex; /**< Mutex. */
 
@@ -128,6 +132,15 @@ namespace WalkingControllers
         bool updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                                 const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
                                 const iDynTree::Transform& measured, const iDynTree::Vector2& desiredPosition);
+
+        /**
+         * @brief Set the free space ellipse in which the robot can walk.
+         * @note The ellipse is supposed to be defined in robot frame.
+         * @param imageMatrix The image matrix mapping a unit circle to the ellipse
+         * @param centerOffset The position of the center of the ellipse
+         * @return true in case of success, false otherwise
+         */
+        bool setFreeSpaceEllipse(const iDynTree::MatrixFixSize<2,2>& imageMatrix, const iDynTree::VectorFixSize<2>& centerOffset);
 
         /**
          * Return if the trajectory was computed

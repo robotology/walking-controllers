@@ -158,6 +158,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     m_correctLeft = true;
 
+    m_newFreeSpaceEllipse = false;
+
     if(ok)
     {
         // the mutex is automatically released when lock_guard goes out of its scope
@@ -195,6 +197,9 @@ void TrajectoryGenerator::computeThread()
         iDynTree::Vector2 DCMBoundaryConditionAtMergePointPosition;
         iDynTree::Vector2 DCMBoundaryConditionAtMergePointVelocity;
 
+        bool shouldUpdateEllipsoid;
+        FreeSpaceEllipse freeSpaceEllipse;
+
         // wait until a new trajectory has to be evaluated.
         {
             std::unique_lock<std::mutex> lock(m_mutex);
@@ -227,6 +232,10 @@ void TrajectoryGenerator::computeThread()
             measuredAngleRight = m_measuredTransformRight.getRotation().asRPY()(2);
 
             correctLeft = m_correctLeft;
+
+            freeSpaceEllipse = m_freeSpaceEllipse;
+            shouldUpdateEllipsoid = m_newFreeSpaceEllipse;
+            m_newFreeSpaceEllipse = false;
         }
 
         // clear the old trajectory
@@ -258,6 +267,18 @@ void TrajectoryGenerator::computeThread()
             m_generatorState = GeneratorState::Configured;
             yError() << "[TrajectoryGenerator_Thread] Failed to set the initial state.";
             break;
+        }
+
+        if (shouldUpdateEllipsoid)
+        {
+         //TODOOOOOOOOOOOOOOO   Devo prima cambiare il frame
+            if (!m_trajectoryGenerator.unicyclePlanner()->setFreeSpaceEllipse(freeSpaceEllipse))
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Failed in setting free space ellipsoid.";
+                continue;
+            }
         }
 
         if(m_trajectoryGenerator.reGenerate(initTime, dT, endTime,
@@ -487,6 +508,13 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
     m_conditionVariable.notify_one();
 
     return true;
+}
+
+bool TrajectoryGenerator::setFreeSpaceEllipse(const iDynTree::MatrixFixSize<2, 2> &imageMatrix, const iDynTree::VectorFixSize<2> &centerOffset)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_newFreeSpaceEllipse = m_freeSpaceEllipse.setEllipse(imageMatrix, centerOffset);
+    return m_newFreeSpaceEllipse;
 }
 
 bool TrajectoryGenerator::isTrajectoryComputed()
