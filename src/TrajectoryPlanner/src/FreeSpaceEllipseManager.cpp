@@ -129,6 +129,7 @@ bool WalkingControllers::FreeSpaceEllipseManager::initialize(const yarp::os::Sea
     }
 
     m_isThreadRunning = true;
+    m_newEllipseReady = false;
 
     m_referenceThread = std::thread(&FreeSpaceEllipseManager::referenceThread, this);
 
@@ -147,6 +148,8 @@ WalkingControllers::FreeSpaceEllipseManager::Ellipse WalkingControllers::FreeSpa
 
     output.imageMatrix = m_inputEllipse.imageMatrix();
     output.centerOffset = m_inputEllipse.centerOffset();
+
+    m_newEllipseReady = false;
 
     return output;
 }
