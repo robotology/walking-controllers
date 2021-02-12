@@ -188,6 +188,8 @@ void TrajectoryGenerator::computeThread()
         double endTime;
         double dT;
 
+        double nominalWidth;
+
         bool correctLeft;
 
         iDynTree::Vector2 desiredPoint;
@@ -236,6 +238,7 @@ void TrajectoryGenerator::computeThread()
             freeSpaceEllipse = m_freeSpaceEllipse;
             shouldUpdateEllipsoid = m_newFreeSpaceEllipse;
             m_newFreeSpaceEllipse = false;
+            nominalWidth = m_nominalWidth;
         }
 
         // clear the old trajectory
@@ -271,7 +274,50 @@ void TrajectoryGenerator::computeThread()
 
         if (shouldUpdateEllipsoid)
         {
-         //TODOOOOOOOOOOOOOOO   Devo prima cambiare il frame
+            iDynTree::MatrixFixSize<2,2> ellipseImage = freeSpaceEllipse.imageMatrix(), newEllipseImage;
+            iDynTree::VectorFixSize<2> centerOffset = freeSpaceEllipse.centerOffset(), newCenterOffset;
+
+            Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
+            unicyclePositionFromStanceFoot(0) = 0.0;
+
+            Eigen::Matrix2d unicycleRotation;
+            double theta;
+
+            if (correctLeft)
+            {
+                unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
+                theta = measuredAngleLeft;
+                footPosition = iDynTree::toEigen(measuredPositionLeft);
+            }
+            else
+            {
+                unicyclePositionFromStanceFoot(1) = nominalWidth/2;
+                theta = measuredAngleRight;
+                footPosition = iDynTree::toEigen(measuredPositionRight);
+            }
+
+            double s_theta = std::sin(theta);
+            double c_theta = std::cos(theta);
+
+            unicycleRotation(0,0) = c_theta;
+            unicycleRotation(0,1) = -s_theta;
+            unicycleRotation(1,0) = s_theta;
+            unicycleRotation(1,1) = c_theta;
+
+            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+
+            iDynTree::toEigen(newEllipseImage) = unicycleRotation * iDynTree::toEigen(ellipseImage);
+
+            iDynTree::toEigen(newCenterOffset) = unicycleRotation * iDynTree::toEigen(centerOffset) + unicyclePosition;
+
+            if (!freeSpaceEllipse.setEllipse(newEllipseImage, newCenterOffset))
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Failed in setting the free space ellipsoid to a world frame.";
+                continue;
+            }
+
             if (!m_trajectoryGenerator.unicyclePlanner()->setFreeSpaceEllipse(freeSpaceEllipse))
             {
                 std::lock_guard<std::mutex> guard(m_mutex);
