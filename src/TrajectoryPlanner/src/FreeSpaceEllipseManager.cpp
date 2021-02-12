@@ -32,11 +32,11 @@ void WalkingControllers::FreeSpaceEllipseManager::referenceThread()
             {
                 double a = 10, b = 10, theta = 0, centerX = 0, centerY = 0;
 
-                std::vector<std::tuple<size_t, double*> >inputs = {{0, &a},
-                                                                   {1, &b},
-                                                                   {2, &theta},
-                                                                   {3, &centerX},
-                                                                   {4, &centerY}};
+                std::vector<std::tuple<size_t, double&> >inputs = {{0, a},
+                                                                   {1, b},
+                                                                   {2, theta},
+                                                                   {3, centerX},
+                                                                   {4, centerY}};
 
                 for (auto i : inputs)
                 {
@@ -47,7 +47,7 @@ void WalkingControllers::FreeSpaceEllipseManager::referenceThread()
                         continue;
                     }
 
-                    *(std::get<1>(i)) = bottleInput->get(std::get<0>(i)).asDouble();
+                    std::get<1>(i) = bottleInput->get(std::get<0>(i)).asDouble();
                 }
 
                 if (!inputEllipse.setEllipse(a, b, theta, centerX, centerY))
@@ -128,8 +128,44 @@ bool WalkingControllers::FreeSpaceEllipseManager::initialize(const yarp::os::Sea
         return false;
     }
 
+    m_newEllipseReady = config.check("use_initial_ellipse", yarp::os::Value(false)).asBool();
+
+    if (m_newEllipseReady)
+    {
+        yarp::os::Bottle initialEllipseGroup = config.findGroup("INITIAL_ELLIPSE");
+
+        if (initialEllipseGroup.isNull())
+        {
+            yError() << "[FreeSpaceEllipseManager::initialize] use_initial_ellipse is set to true, but no group named INITIAL_ELLIPSE has been found.";
+            return false;
+        }
+
+        double a = 10, b = 10, theta = 0, centerX = 0, centerY = 0;
+
+        std::vector<std::tuple<std::string, double&> >inputs = {{"semi_major_axis", a},
+                                                                {"semi_minor_axis", b},
+                                                                {"angle", theta},
+                                                                {"center_x", centerX},
+                                                                {"center_y", centerY}};
+
+        for (auto i : inputs)
+        {
+            yarp::os::Value input;
+            if (!YarpUtilities::getNumberFromSearchable(initialEllipseGroup, std::get<0>(i), std::get<1>(i)))
+            {
+                yError() << "[FreeSpaceEllipseManager::initialize] The group INITIAL_ELLIPSE is missing some fields.";
+                return false;
+            }
+        }
+
+        if (!m_inputEllipse.setEllipse(a, b, theta, centerX, centerY))
+        {
+            yError() << "[FreeSpaceEllipseManager::initialize] Failed to set the initial ellipse.";
+            return false;
+        }
+    }
+
     m_isThreadRunning = true;
-    m_newEllipseReady = false;
 
     m_referenceThread = std::thread(&FreeSpaceEllipseManager::referenceThread, this);
 
