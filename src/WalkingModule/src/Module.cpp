@@ -194,7 +194,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     //initialize the Free space ellipse manager
     m_freeSpaceEllipseManager = std::make_unique<FreeSpaceEllipseManager>();
-    yarp::os::Bottle& ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
+    yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     ellipseMangerOptions.append(generalOptions);
     if(!m_freeSpaceEllipseManager->initialize(ellipseMangerOptions))
     {
