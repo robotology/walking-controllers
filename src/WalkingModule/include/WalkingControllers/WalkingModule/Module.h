@@ -29,6 +29,7 @@
 #include <WalkingControllers/RobotInterface/PIDHandler.h>
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 #include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
+#include <WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h>
 
 #include <WalkingControllers/SimplifiedModelControllers/DCMModelPredictiveController.h>
 #include <WalkingControllers/SimplifiedModelControllers/DCMReactiveController.h>
@@ -74,6 +75,7 @@ namespace WalkingControllers
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
+        std::unique_ptr<FreeSpaceEllipseManager> m_freeSpaceEllipseManager; /**< Pointer to the free space ellipse manager. */
         std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
         std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */

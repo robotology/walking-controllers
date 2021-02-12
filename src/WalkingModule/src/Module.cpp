@@ -192,6 +192,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    //initialize the Free space ellipse manager
+    m_freeSpaceEllipseManager = std::make_unique<FreeSpaceEllipseManager>();
+    yarp::os::Bottle& ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
+    ellipseMangerOptions.append(generalOptions);
+    if(!m_freeSpaceEllipseManager->initialize(ellipseMangerOptions))
+    {
+        yError() << "[configure] Unable to initialize the free space ellipse manager.";
+        return false;
+    }
+
     if(m_useMPC)
     {
         // initialize the MPC controller
@@ -1081,10 +1091,26 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         return false;
     }
 
+    if (!m_freeSpaceEllipseManager)
+    {
+        yError() << "[WalkingModule::askNewTrajectories] Free space ellipsoid not available.";
+        return false;
+    }
+
     if(mergePoint >= m_DCMPositionDesired.size())
     {
         yError() << "[WalkingModule::askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
         return false;
+    }
+
+    if (m_freeSpaceEllipseManager->isNewEllipseAvailable())
+    {
+        auto freeSpaceEllipse = m_freeSpaceEllipseManager->getEllipse();
+        if (!m_trajectoryGenerator->setFreeSpaceEllipse(freeSpaceEllipse.imageMatrix, freeSpaceEllipse.centerOffset))
+        {
+            yError() << "[WalkingModule::askNewTrajectories] Unable to set the free space ellipse.";
+            return false;
+        }
     }
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
