@@ -7,58 +7,83 @@
  */
 
 #include <WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h>
+#include <WalkingControllers/YarpUtilities/Helper.h>
 #include <vector>
 #include <tuple>
 #include <yarp/os/LogStream.h>
+#include <chrono>
 
 void WalkingControllers::FreeSpaceEllipseManager::referenceThread()
 {
     while (m_isThreadRunning)
     {
-        yarp::os::Bottle* bottleInput = m_inputPort.read(true);
-
-        FreeSpaceEllipse inputEllipse;
-
-        if(bottleInput->size() == 5)
+        if (m_inputPort.getPendingReads())
         {
-            double a = 0, b = 0, theta = 0, centerX = 0, centerY = 0;
+            yarp::os::Bottle* bottleInput = m_inputPort.read(false);
 
-            std::vector<std::tuple<size_t, double*> >inputs = {{0, &a},
-                                                               {1, &b},
-                                                               {2, &theta},
-                                                               {3, &centerX},
-                                                               {4, &centerY}};
-
-            for (auto i : inputs)
+            if (!bottleInput)
             {
-                if (!bottleInput->get(std::get<0>(i)).isDouble())
-                {
-                    yError() << "[FreeSpaceEllipseManager::referenceThread] The input number " << std::get<0>(i) << "(0 based) is not a double.";
-                    continue;
-                }
-
-                *(std::get<1>(i)) = bottleInput->get(std::get<0>(i)).asDouble();
-            }
-
-            if (!inputEllipse.setEllipse(a, b, theta, centerX, centerY))
-            {
-                yError() << "[FreeSpaceEllipseManager::referenceThread] Failed to set the new ellipse.";
                 continue;
             }
-        //TODOOOOOOOOOO Deal with the matrix case
+
+            FreeSpaceEllipse inputEllipse;
+
+            if(bottleInput->size() == 5)
+            {
+                double a = 10, b = 10, theta = 0, centerX = 0, centerY = 0;
+
+                std::vector<std::tuple<size_t, double*> >inputs = {{0, &a},
+                                                                   {1, &b},
+                                                                   {2, &theta},
+                                                                   {3, &centerX},
+                                                                   {4, &centerY}};
+
+                for (auto i : inputs)
+                {
+                    if (!bottleInput->get(std::get<0>(i)).isDouble())
+                    {
+                        std::lock_guard<std::mutex> lock(m_mutex);
+                        yError() << "[FreeSpaceEllipseManager::referenceThread] The input number " << std::get<0>(i) << "(0 based) is not a double.";
+                        continue;
+                    }
+
+                    *(std::get<1>(i)) = bottleInput->get(std::get<0>(i)).asDouble();
+                }
+
+                if (!inputEllipse.setEllipse(a, b, theta, centerX, centerY))
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    yError() << "[FreeSpaceEllipseManager::referenceThread] Failed to set the new ellipse.";
+                    continue;
+                }
+            //We can also deal with the matrix case eventually
+            }
+            else
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                yError() << "[FreeSpaceEllipseManager::referenceThread] The number of inputs written on the port are wrong.";
+                continue;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                m_inputEllipse = inputEllipse;
+                m_newEllipseReady = true;
+            }
         }
         else
         {
-            yError() << "[FreeSpaceEllipseManager::referenceThread] The number of inputs written on the port are wrong.";
-            continue;
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(1ms);
         }
-
 
     }
 }
 
 WalkingControllers::FreeSpaceEllipseManager::~FreeSpaceEllipseManager()
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
     m_isThreadRunning = false;
 
     if (m_referenceThread.joinable())
@@ -66,12 +91,48 @@ WalkingControllers::FreeSpaceEllipseManager::~FreeSpaceEllipseManager()
         m_referenceThread.join();
         m_referenceThread = std::thread();
     }
+
+    m_inputPort.close();
 }
 
-bool WalkingControllers::FreeSpaceEllipseManager::initialize(const yarp::os::Searchable &generalConfig, const yarp::os::Searchable &specificConfig)
+bool WalkingControllers::FreeSpaceEllipseManager::initialize(const yarp::os::Searchable &config)
 {
-    //TODOOOOOOOOOOOOO to be filled
-    //Also I need to connect these parts in the walking module
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    if (m_referenceThread.joinable())
+    {
+        yError() << "[FreeSpaceEllipseManager::initialize] The internal thread is already running. Have you called this method twice?";
+        return false;
+    }
+
+    std::string name;
+    if(!YarpUtilities::getStringFromSearchable(config, "name", name))
+    {
+        yError() << "[FreeSpaceEllipseManager::initialize] Unable to get the name from the general config.";
+        return false;
+    }
+
+    yarp::os::Value portName = config.check("port_name", yarp::os::Value("freeSpaceEllipse:in"));
+
+    if (!portName.isString())
+    {
+        yError() << "[FreeSpaceEllipseManager::initialize] Found port_name but it is not a string.";
+        return false;
+    }
+
+    std::string fullPortName = "/" + name + "/" + portName.toString();
+
+    if (!m_inputPort.open(fullPortName))
+    {
+        yError() << "[FreeSpaceEllipseManager::initialize] Failed to open port with name " << fullPortName <<".";
+        return false;
+    }
+
+    m_isThreadRunning = true;
+
+    m_referenceThread = std::thread(&FreeSpaceEllipseManager::referenceThread, this);
+
+    return true;
 }
 
 bool WalkingControllers::FreeSpaceEllipseManager::isNewEllipseAvailable() const

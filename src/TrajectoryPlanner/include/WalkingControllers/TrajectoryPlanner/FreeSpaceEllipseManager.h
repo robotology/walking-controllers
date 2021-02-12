@@ -40,7 +40,7 @@ namespace WalkingControllers
 
         ~FreeSpaceEllipseManager();
 
-        bool initialize(const yarp::os::Searchable& generalConfig, const yarp::os::Searchable& specificConfig);
+        bool initialize(const yarp::os::Searchable& config);
 
         bool isNewEllipseAvailable() const;
 
