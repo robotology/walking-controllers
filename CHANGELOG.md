@@ -2,7 +2,10 @@
 All notable changes to this project are documented in this file.
 
 ## [Unreleased]
-- Added Eigen3 dependency in CMakeList.txt for WholeBodyControllers
+### Added
+
+### Changed
+- Fixed missing link library in `WholeBodyControllers` component  (https://github.com/robotology/walking-controllers/pull/81).
 
 ## [0.4.1] - 2020-02-04
 
