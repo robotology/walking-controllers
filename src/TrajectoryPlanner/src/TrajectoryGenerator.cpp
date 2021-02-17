@@ -239,6 +239,11 @@ void TrajectoryGenerator::computeThread()
             shouldUpdateEllipsoid = m_newFreeSpaceEllipse;
             m_newFreeSpaceEllipse = false;
             nominalWidth = m_nominalWidth;
+
+            if (shouldUpdateEllipsoid)
+            {
+                yInfo() << "[TrajectoryGenerator_Thread] Setting ellipsoid: " << freeSpaceEllipse.printInfo();
+            }
         }
 
         // clear the old trajectory
