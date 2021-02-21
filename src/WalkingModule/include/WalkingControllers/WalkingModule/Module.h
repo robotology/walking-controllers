@@ -72,6 +72,9 @@ namespace WalkingControllers
         bool m_useQPIK; /**< True if the QP-IK is used. */
         bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
+        bool m_firstRun; /**< True if it is the first run. */
+
+        double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */

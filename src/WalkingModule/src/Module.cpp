@@ -132,6 +132,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
+    m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asDouble();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -521,6 +522,7 @@ bool WalkingModule::updateModule()
 
             }
 
+            m_firstRun = true;
 
             m_robotState = WalkingFSM::Prepared;
 
@@ -718,6 +720,17 @@ bool WalkingModule::updateModule()
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
         desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
 
+        if (m_firstRun)
+        {
+            double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocity).norm();
+
+            if (comVelocityNorm > m_maxInitialCoMVelocity)
+            {
+                yError() << "[WalkingModule::updateModule] The initial CoM velocity is too high.";
+                return false;
+            }
+        }
+
         // evaluate desired neck transformation
         double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
         double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
@@ -840,6 +853,8 @@ bool WalkingModule::updateModule()
         }
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
+
+        m_firstRun = false;
     }
     return true;
 }
