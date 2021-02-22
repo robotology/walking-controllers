@@ -924,6 +924,13 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
         {
             m_constantZMPCounter++;
 
+            if (m_constantZMPCounter >= m_constantZMPMaxCounter/2)
+            {
+                yWarning() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
+                         << m_constantZMPCounter << " times.";
+            }
+
+
             if (m_constantZMPCounter >= m_constantZMPMaxCounter)
             {
                 yError() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
