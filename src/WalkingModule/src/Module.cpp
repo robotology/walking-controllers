@@ -133,6 +133,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asDouble();
+    m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asDouble();
+    m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -328,6 +330,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // initialize some variables
     m_newTrajectoryRequired = false;
     m_newTrajectoryMergeCounter = -1;
+    m_constantZMPCounter = 0;
+    m_previousZMP.zero();
     m_robotState = WalkingFSM::Configured;
 
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
@@ -911,6 +915,33 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 
     zmp(0) = zmpWorld(0);
     zmp(1) = zmpWorld(1);
+
+    if (((zmpLeftDefined + zmpRightDefined) > 1.0) && (m_constantZMPMaxCounter > 0))//i.e. we are in double support
+    {
+        double zmpDifference = (iDynTree::toEigen(zmp) - iDynTree::toEigen(m_previousZMP)).norm();
+
+        if (zmpDifference < m_constantZMPTolerance)
+        {
+            m_constantZMPCounter++;
+
+            if (m_constantZMPCounter >= m_constantZMPMaxCounter)
+            {
+                yError() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
+                         << m_constantZMPCounter << " times.";
+                return false;
+            }
+        }
+        else
+        {
+            m_constantZMPCounter = 0;
+            m_previousZMP = zmp;
+        }
+    }
+    else
+    {
+        m_constantZMPCounter = 0;
+        m_previousZMP = zmp;
+    }
 
     return true;
 }

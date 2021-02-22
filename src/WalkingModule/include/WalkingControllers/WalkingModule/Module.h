@@ -76,6 +76,11 @@ namespace WalkingControllers
 
         double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
 
+        iDynTree::Vector2 m_previousZMP; /**< Previous ZMP value to check if the ZMP was constant for a while. */
+        unsigned int m_constantZMPCounter; /**< Counter to check for how long the ZMP was constant. */
+        double m_constantZMPTolerance; /**< Tolerance to consider the ZMP constant. */
+        unsigned int m_constantZMPMaxCounter; /**< Max counter value for triggering the error on the constant measured ZMP. */
+
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
         std::unique_ptr<FreeSpaceEllipseManager> m_freeSpaceEllipseManager; /**< Pointer to the free space ellipse manager. */
