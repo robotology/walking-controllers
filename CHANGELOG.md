@@ -3,9 +3,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 ### Added
+- Add the possibility to use the walking-module with iCubGenova09 (https://github.com/robotology/walking-controllers/pull/80)
 
 ### Changed
 - Fixed missing link library in `WholeBodyControllers` component  (https://github.com/robotology/walking-controllers/pull/81).
+- Add the possibility to handle multiple wrenches in the RobotInterface/Helper class (https://github.com/robotology/walking-controllers/pull/80)
 
 ## [0.4.1] - 2020-02-04
 
@@ -121,7 +123,8 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
-[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.4.0...devel
+[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.4.1...devel
+[0.4.1]: https://github.com/robotology/walking-controllers/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/robotology/walking-controllers/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/robotology/walking-controllers/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/robotology/walking-controllers/compare/v0.3.1...v0.3.2
