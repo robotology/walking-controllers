@@ -519,11 +519,29 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
+            // reset the retargeting client with the desired robot data
+            iDynTree::VectorDynSize zero(m_qDesired.size());
+            zero.zero();
+            // reset the internal robot state of the kindyn object
+            if(!m_FKSolver->setInternalRobotState(m_qDesired, zero))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the robot state before resetting the retargeting client.";
+                return false;
+            }
+
+
             if(!m_retargetingClient->reset(*m_FKSolver))
             {
                 yError() << "[WalkingModule::updateModule] Unable to reset the retargeting client.";
                 return false;
+            }
 
+            // reset the internal robot state of the kindyn object
+            if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                  m_robotControlHelper->getJointVelocity()))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the robot state after resetting the retargeting client.";
+                return false;
             }
 
             m_firstRun = true;
