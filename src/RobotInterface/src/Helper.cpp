@@ -163,8 +163,8 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
             {
                 // the idyntree wrench raw data  is not a consecutive array
-                iDynTree::toEigen(m_leftWrench.getLinearVec3()) = yarp::eigen::toEigen(leftWrenchIt->wrenchInput).head<3>();
-                iDynTree::toEigen(m_leftWrench.getAngularVec3()) = yarp::eigen::toEigen(leftWrenchIt->wrenchInput).tail<3>();
+                iDynTree::toEigen(m_leftWrench.getLinearVec3()) += yarp::eigen::toEigen(leftWrenchIt->wrenchInput).head<3>();
+                iDynTree::toEigen(m_leftWrench.getAngularVec3()) += yarp::eigen::toEigen(leftWrenchIt->wrenchInput).tail<3>();
             }
 
             // right foot
@@ -181,8 +181,8 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
             {
                 // the idyntree wrench raw data  is not a consecutive array
-                iDynTree::toEigen(m_rightWrench.getLinearVec3()) = yarp::eigen::toEigen(rightWrenchIt->wrenchInput).head<3>();
-                iDynTree::toEigen(m_rightWrench.getAngularVec3()) = yarp::eigen::toEigen(rightWrenchIt->wrenchInput).tail<3>();
+                iDynTree::toEigen(m_rightWrench.getLinearVec3()) += yarp::eigen::toEigen(rightWrenchIt->wrenchInput).head<3>();
+                iDynTree::toEigen(m_rightWrench.getAngularVec3()) += yarp::eigen::toEigen(rightWrenchIt->wrenchInput).tail<3>();
             }
 
             return true;
