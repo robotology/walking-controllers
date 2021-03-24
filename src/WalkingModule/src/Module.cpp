@@ -135,6 +135,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asDouble();
     m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asDouble();
     m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt();
+    m_minimumNormalForceZMP = rf.check("minimum_normal_force_ZMP", yarp::os::Value(0.001)).asDouble();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -895,7 +896,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
 
     const iDynTree::Wrench& rightWrench = m_robotControlHelper->getRightWrench();
-    if(rightWrench.getLinearVec3()(2) < 0.001)
+    if(rightWrench.getLinearVec3()(2) < m_minimumNormalForceZMP)
         zmpRightDefined = 0.0;
     else
     {
@@ -906,7 +907,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     const iDynTree::Wrench& leftWrench = m_robotControlHelper->getLeftWrench();
-    if(leftWrench.getLinearVec3()(2) < 0.001)
+    if(leftWrench.getLinearVec3()(2) < m_minimumNormalForceZMP)
         zmpLeftDefined = 0.0;
     else
     {
@@ -917,7 +918,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     double totalZ = rightWrench.getLinearVec3()(2) + leftWrench.getLinearVec3()(2);
-    if(totalZ < 0.1)
+    if((zmpLeftDefined + zmpRightDefined) < 0.5)
     {
         yError() << "[evaluateZMP] The total z-component of contact wrenches is too low.";
         return false;
