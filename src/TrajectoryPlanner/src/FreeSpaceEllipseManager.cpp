@@ -38,7 +38,7 @@ void WalkingControllers::FreeSpaceEllipseManager::referenceThread()
                                                                    {3, centerX},
                                                                    {4, centerY}};
 
-                for (auto i : inputs)
+                for (const auto& i : inputs)
                 {
                     if (!bottleInput->get(std::get<0>(i)).isDouble())
                     {
