@@ -132,6 +132,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
+    m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asDouble();
+    m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asDouble();
+    m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -189,6 +192,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
+        return false;
+    }
+
+    //initialize the Free space ellipse manager
+    m_freeSpaceEllipseManager = std::make_unique<FreeSpaceEllipseManager>();
+    yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
+    ellipseMangerOptions.append(generalOptions);
+    if(!m_freeSpaceEllipseManager->initialize(ellipseMangerOptions))
+    {
+        yError() << "[configure] Unable to initialize the free space ellipse manager.";
         return false;
     }
 
@@ -317,6 +330,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // initialize some variables
     m_newTrajectoryRequired = false;
     m_newTrajectoryMergeCounter = -1;
+    m_constantZMPCounter = 0;
+    m_previousZMP.zero();
     m_robotState = WalkingFSM::Configured;
 
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
@@ -504,13 +519,32 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
+            // reset the retargeting client with the desired robot data
+            iDynTree::VectorDynSize zero(m_qDesired.size());
+            zero.zero();
+            // reset the internal robot state of the kindyn object
+            if(!m_FKSolver->setInternalRobotState(m_qDesired, zero))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the robot state before resetting the retargeting client.";
+                return false;
+            }
+
+
             if(!m_retargetingClient->reset(*m_FKSolver))
             {
                 yError() << "[WalkingModule::updateModule] Unable to reset the retargeting client.";
                 return false;
-
             }
 
+            // reset the internal robot state of the kindyn object
+            if(!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                  m_robotControlHelper->getJointVelocity()))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the robot state after resetting the retargeting client.";
+                return false;
+            }
+
+            m_firstRun = true;
 
             m_robotState = WalkingFSM::Prepared;
 
@@ -708,6 +742,17 @@ bool WalkingModule::updateModule()
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
         desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
 
+        if (m_firstRun)
+        {
+            double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocity).norm();
+
+            if (comVelocityNorm > m_maxInitialCoMVelocity)
+            {
+                yError() << "[WalkingModule::updateModule] The initial CoM velocity is too high.";
+                return false;
+            }
+        }
+
         // evaluate desired neck transformation
         double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
         double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
@@ -830,6 +875,8 @@ bool WalkingModule::updateModule()
         }
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
+
+        m_firstRun = false;
     }
     return true;
 }
@@ -886,6 +933,40 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
 
     zmp(0) = zmpWorld(0);
     zmp(1) = zmpWorld(1);
+
+    if (((zmpLeftDefined + zmpRightDefined) > 1.0) && (m_constantZMPMaxCounter > 0))//i.e. we are in double support
+    {
+        double zmpDifference = (iDynTree::toEigen(zmp) - iDynTree::toEigen(m_previousZMP)).norm();
+
+        if (zmpDifference < m_constantZMPTolerance)
+        {
+            m_constantZMPCounter++;
+
+            if (m_constantZMPCounter >= m_constantZMPMaxCounter/2)
+            {
+                yWarning() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
+                         << m_constantZMPCounter << " times.";
+            }
+
+
+            if (m_constantZMPCounter >= m_constantZMPMaxCounter)
+            {
+                yError() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
+                         << m_constantZMPCounter << " times.";
+                return false;
+            }
+        }
+        else
+        {
+            m_constantZMPCounter = 0;
+            m_previousZMP = zmp;
+        }
+    }
+    else
+    {
+        m_constantZMPCounter = 0;
+        m_previousZMP = zmp;
+    }
 
     return true;
 }
@@ -1081,10 +1162,26 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         return false;
     }
 
+    if (!m_freeSpaceEllipseManager)
+    {
+        yError() << "[WalkingModule::askNewTrajectories] Free space ellipsoid not available.";
+        return false;
+    }
+
     if(mergePoint >= m_DCMPositionDesired.size())
     {
         yError() << "[WalkingModule::askNewTrajectories] The mergePoint has to be lower than the trajectory size.";
         return false;
+    }
+
+    if (m_freeSpaceEllipseManager->isNewEllipseAvailable())
+    {
+        auto freeSpaceEllipse = m_freeSpaceEllipseManager->getEllipse();
+        if (!m_trajectoryGenerator->setFreeSpaceEllipse(freeSpaceEllipse.imageMatrix, freeSpaceEllipse.centerOffset))
+        {
+            yError() << "[WalkingModule::askNewTrajectories] Unable to set the free space ellipse.";
+            return false;
+        }
     }
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
