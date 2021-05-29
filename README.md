@@ -118,10 +118,13 @@ export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
    * `setGoal x y`: send the desired final position, `x` and `y` are expressed in iCub fixed frame.
 
 ## How to run the Joypad Module
-Suppose that you want to run the Joypad application, called
-`WalkingJoypadModule` in the same machine where the physical device is
-connected. The only think that you have to do is running the following command from
-the terminal
+The Joypad application, called `WalkingJoypadModule`, allows you to send all the rpc commands using the buttons. The application processes the button press events associating them to the pre-defined rpc commands which are then sent through Yarp to the Walking Coordinator module. The joypad keys mapping is as follows:
+ * `A` for preparing the robot
+ * `B` for start walking
+ * `Y` for pause walking
+ * `X` for stop walking
+
+Suppose that you want to run the Joypad application, called `WalkingJoypadModule` in the same machine where the physical device is connected. The only think that you have to do is running the following command from the terminal:
 
 ``` sh
 YARP_CLOCK=/clock WalkingJoypadModule
@@ -129,8 +132,7 @@ YARP_CLOCK=/clock WalkingJoypadModule
 The application will take care to open an [`SDLJoypad`](http://www.yarp.it/classyarp_1_1dev_1_1SDLJoypad.html) device.
 
 
-While, if you want to control run the `WalkingJoypadModule` in a machine that is
-different form the one where the phisical devce is connected. The
+While, if you want to run the `WalkingJoypadModule` in a machine that is different form the one where the physical devce is connected. The
 [`JoypadControlServer`](http://www.yarp.it/classyarp_1_1dev_1_1JoypadControlServer.html) -
 [`JoypadControlClient`](http://www.yarp.it/classyarp_1_1dev_1_1JoypadControlClient.html)
 architecture is required. In details:
@@ -147,15 +149,10 @@ architecture is required. In details:
     YARP_CLOCK=/clock WalkingJoypadModule --device JoypadControlClient --local /joypadInput --remote /joypadDevice/xbox
     ```
 
-The Joypad allows you to send all the rpc commands using the buttons. In
-details:
- * `A` for preparing the robot
- * `B` for start walking
- * `Y` for pause walking
- * `X` for stop walking
-
 ## How to dump data
-Before run `WalkingModule` check if [`dump_data`](app/robots/iCubGazeboV2_5/dcmWalkingCoordinator.ini#L33) is set to 1
+Before running `WalkingModule` check if `dump_data` is set to 1. This parameter is set in a configuration `ini` file depending on the control mode:
+* controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini)
+* control using the human retargeting: in the same folder `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}`, the configuration files `dcm_walking_hand_retargeting.ini` and `dcm_walking_joint_retargeting.ini`.
 
 Run the Logger Module
 ``` sh
