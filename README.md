@@ -151,7 +151,7 @@ architecture is required. In details:
 
 ## How to dump data
 Before running `WalkingModule` check if `dump_data` is set to 1. This parameter is set in a configuration `ini` file depending on the control mode:
-* controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini)
+* controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L12)
 * control using the human retargeting: in the same folder `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}`, the configuration files `dcm_walking_hand_retargeting.ini` and `dcm_walking_joint_retargeting.ini`.
 
 Run the Logger Module
@@ -162,7 +162,25 @@ YARP_CLOCK=/clock WalkingLoggerModule
 All the data will be saved in the current folder inside a `txt` named `Dataset_YYYY_MM_DD_HH_MM_SS.txt`
 
 ## Some interesting parameters
-You can change the DCM controller and the inverse kinematics solver by edit [these parameters](app/robots/iCubGazeboV2_5/dcmWalkingCoordinator.ini#L22-L30)
+You can change the DCM controller and the inverse kinematics solver by editing [these parameters](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L22-L57).
+
+### Inverse Kinematics configuration
+The Inverse Kinematics block configuration can be set through the file src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joint_retargeting/inverseKinematics.ini.
+
+The Inverse Kinematics block uses an open source package for large-scale optimisation, IPOPT (Interior Point Optimizer), which requires other packages like BLAS (Basic Linear Algebra Sub-routines), LAPACK (Linear Algebra PACKage) and a sparse symmetric indefinite linear solver ([MAxx, HSLMAxx](http://www.hsl.rl.ac.uk/), MUMPS, PARDISO etc). Further documentation can be found at https://coin-or.github.io/Ipopt and https://coin-or.github.io/Ipopt/INSTALL.html#EXTERNALCODE. The package IPOPT installed with the superbuild (via homebrew or conda) is built with the solver [MUMPS](http://mumps.enseeiht.fr/) by default, which is reflected in the default configuration of the Inverse Kinematics block src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joypad_control/inverseKinematics.ini#L14-L17:
+```sh
+# solver paramenters
+solver-verbosity        0
+solver_name             mumps
+max-cpu-time            20
+```
+
+For instance, for using MA27 solver instead of MUMPS, replace `mumps` by `ma27`.
+
+:warning: HSL solvers are not compiled with IPOPT by default. Refer to https://coin-or.github.io/Ipopt/INSTALL.html#EXTERNALCODE for further documentation.
+
+In case you encounter issues when starting the Walking Module with the selected options, you can increase the verbosity to 1 for additional debug information.
+
 
 # :running: How to test on iCub
 You can follows the same instructions of the simulation section without using `YARP_CLOCK=/clock`. Make sure your `YARP_ROBOT_NAME` is coherent with the name of the robot (e.g. iCubGenova04)
