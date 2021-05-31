@@ -115,7 +115,16 @@ export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
      controller sending `startWalking` command;
    * `stopWalking`: the controller is stopped, in order to start again the
      controller you have to prepare again the robot.
-   * `setGoal x y`: send the desired final position, `x` and `y` are expressed in iCub fixed frame.
+   * `setGoal x y`: send the desired final position, `x` and `y` are doubles expressed in iCub fixed frame, in meters. Send this command after `startWalking`.
+
+   Example sequence:
+   ```
+   prepareRobot
+   startWalking
+   setGoal 1.0 0.0
+   setGoal 1.0 0.0
+   stopWalking
+   ```
 
 ## How to run the Joypad Module
 The Joypad application, called `WalkingJoypadModule`, allows you to send all the rpc commands using the buttons. The application processes the button press events associating them to the pre-defined rpc commands which are then sent through Yarp to the Walking Coordinator module. The joypad keys mapping is as follows:
@@ -154,7 +163,7 @@ Before running `WalkingModule` check if `dump_data` is set to 1. This parameter 
 * controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L12)
 * control using the human retargeting: in the same folder `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}`, the configuration files `dcm_walking_hand_retargeting.ini` and `dcm_walking_joint_retargeting.ini`.
 
-Run the Logger Module
+Run the Logger Module `WalkingLoggerModule` before the Walking Module `WalkingModule`.
 ``` sh
 YARP_CLOCK=/clock WalkingLoggerModule
 ```
