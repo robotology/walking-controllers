@@ -124,7 +124,7 @@ The Joypad application, called `WalkingJoypadModule`, allows you to send all the
  * `Y` for pause walking
  * `X` for stop walking
 
-Suppose that you want to run the Joypad application, called `WalkingJoypadModule` in the same machine where the physical device is connected. The only think that you have to do is running the following command from the terminal:
+Suppose that you want to run the Joypad application, called `WalkingJoypadModule` in the same machine where the physical device is connected. The only thing that you have to do is running the following command from the terminal:
 
 ``` sh
 YARP_CLOCK=/clock WalkingJoypadModule
