@@ -115,13 +115,25 @@ export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
      controller sending `startWalking` command;
    * `stopWalking`: the controller is stopped, in order to start again the
      controller you have to prepare again the robot.
-   * `setGoal x y`: send the desired final position, `x` and `y` are expressed in iCub fixed frame.
+   * `setGoal x y`: send the desired final position, `x` and `y` are doubles expressed in iCub fixed frame, in meters. Send this command after `startWalking`.
+
+   Example sequence:
+   ```
+   prepareRobot
+   startWalking
+   setGoal 1.0 0.0
+   setGoal 1.0 0.0
+   stopWalking
+   ```
 
 ## How to run the Joypad Module
-Suppose that you want to run the Joypad application, called
-`WalkingJoypadModule` in the same machine where the physical device is
-connected. The only think that you have to do is running the following command from
-the terminal
+The Joypad application, called `WalkingJoypadModule`, allows you to send all the rpc commands using the buttons. The application processes the button press events associating them to the pre-defined rpc commands which are then sent through Yarp to the Walking Coordinator module. The joypad keys mapping is as follows:
+ * `A` for preparing the robot
+ * `B` for start walking
+ * `Y` for pause walking
+ * `X` for stop walking
+
+Suppose that you want to run the Joypad application, called `WalkingJoypadModule` in the same machine where the physical device is connected. The only thing that you have to do is running the following command from the terminal:
 
 ``` sh
 YARP_CLOCK=/clock WalkingJoypadModule
@@ -129,8 +141,7 @@ YARP_CLOCK=/clock WalkingJoypadModule
 The application will take care to open an [`SDLJoypad`](http://www.yarp.it/classyarp_1_1dev_1_1SDLJoypad.html) device.
 
 
-While, if you want to control run the `WalkingJoypadModule` in a machine that is
-different form the one where the phisical devce is connected. The
+While, if you want to run the `WalkingJoypadModule` in a machine that is different form the one where the physical devce is connected. The
 [`JoypadControlServer`](http://www.yarp.it/classyarp_1_1dev_1_1JoypadControlServer.html) -
 [`JoypadControlClient`](http://www.yarp.it/classyarp_1_1dev_1_1JoypadControlClient.html)
 architecture is required. In details:
@@ -147,17 +158,12 @@ architecture is required. In details:
     YARP_CLOCK=/clock WalkingJoypadModule --device JoypadControlClient --local /joypadInput --remote /joypadDevice/xbox
     ```
 
-The Joypad allows you to send all the rpc commands using the buttons. In
-details:
- * `A` for preparing the robot
- * `B` for start walking
- * `Y` for pause walking
- * `X` for stop walking
-
 ## How to dump data
-Before run `WalkingModule` check if [`dump_data`](app/robots/iCubGazeboV2_5/dcmWalkingCoordinator.ini#L33) is set to 1
+Before running `WalkingModule` check if `dump_data` is set to 1. This parameter is set in a configuration `ini` file depending on the control mode:
+* controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L12)
+* control using the human retargeting: in the same folder `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}`, the configuration files `dcm_walking_hand_retargeting.ini` and `dcm_walking_joint_retargeting.ini`.
 
-Run the Logger Module
+Run the Logger Module `WalkingLoggerModule` before the Walking Module `WalkingModule`.
 ``` sh
 YARP_CLOCK=/clock WalkingLoggerModule
 ```
@@ -165,7 +171,25 @@ YARP_CLOCK=/clock WalkingLoggerModule
 All the data will be saved in the current folder inside a `txt` named `Dataset_YYYY_MM_DD_HH_MM_SS.txt`
 
 ## Some interesting parameters
-You can change the DCM controller and the inverse kinematics solver by edit [these parameters](app/robots/iCubGazeboV2_5/dcmWalkingCoordinator.ini#L22-L30)
+You can change the DCM controller and the inverse kinematics solver by editing [these parameters](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L22-L57).
+
+### Inverse Kinematics configuration
+The Inverse Kinematics block configuration can be set through the file src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joint_retargeting/inverseKinematics.ini.
+
+The Inverse Kinematics block uses an open source package for large-scale optimisation, IPOPT (Interior Point Optimizer), which requires other packages like BLAS (Basic Linear Algebra Sub-routines), LAPACK (Linear Algebra PACKage) and a sparse symmetric indefinite linear solver ([MAxx, HSLMAxx](http://www.hsl.rl.ac.uk/), MUMPS, PARDISO etc). Further documentation can be found at https://coin-or.github.io/Ipopt and https://coin-or.github.io/Ipopt/INSTALL.html#EXTERNALCODE. The package IPOPT installed with the superbuild (via homebrew or conda) is built with the solver [MUMPS](http://mumps.enseeiht.fr/) by default, which is reflected in the default configuration of the Inverse Kinematics block src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joypad_control/inverseKinematics.ini#L14-L17:
+```sh
+# solver paramenters
+solver-verbosity        0
+solver_name             mumps
+max-cpu-time            20
+```
+
+For instance, for using MA27 solver instead of MUMPS, replace `mumps` by `ma27`.
+
+:warning: HSL solvers are not compiled with IPOPT by default. Refer to https://coin-or.github.io/Ipopt/INSTALL.html#EXTERNALCODE for further documentation.
+
+In case you encounter issues when starting the Walking Module with the selected options, you can increase the verbosity to 1 for additional debug information.
+
 
 # :running: How to test on iCub
 You can follows the same instructions of the simulation section without using `YARP_CLOCK=/clock`. Make sure your `YARP_ROBOT_NAME` is coherent with the name of the robot (e.g. iCubGenova04)
