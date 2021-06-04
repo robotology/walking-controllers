@@ -80,6 +80,8 @@ namespace WalkingControllers
         int m_constantZMPCounter; /**< Counter to check for how long the ZMP was constant. */
         double m_constantZMPTolerance; /**< Tolerance to consider the ZMP constant. */
         int m_constantZMPMaxCounter; /**< Max counter value for triggering the error on the constant measured ZMP. */
+        double m_minimumNormalForceZMP; /**< Minimum force value to consider a contact stable. */
+        iDynTree::Vector2 m_maxZMP; /**< Max value to consider the local ZMP valid. */
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */

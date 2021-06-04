@@ -135,6 +135,37 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asDouble();
     m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asDouble();
     m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt();
+    m_minimumNormalForceZMP = rf.check("minimum_normal_force_ZMP", yarp::os::Value(0.001)).asDouble();
+    m_maxZMP[0] = 1.0;
+    m_maxZMP[1] = 1.0;
+
+    yarp::os::Value maxLocalZMP = rf.find("maximum_local_zmp");
+    if (maxLocalZMP.isList())
+    {
+        yarp::os::Bottle* localBot = maxLocalZMP.asList();
+        if (localBot->size() != 2)
+        {
+            yError() << "[WalkingModule::configure] maximum_local_zmp is supposed to have two elements.";
+            return false;
+        }
+
+        if (!localBot->get(0).isDouble())
+        {
+            yError() << "[WalkingModule::configure] The first element of maximum_local_zmp is not a double.";
+            return false;
+        }
+
+        if (!localBot->get(1).isDouble())
+        {
+            yError() << "[WalkingModule::configure] The second element of maximum_local_zmp is not a double.";
+            return false;
+        }
+
+        m_maxZMP[0] = localBot->get(0).asDouble();
+        m_maxZMP[1] = localBot->get(1).asDouble();
+
+    }
+
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -895,31 +926,47 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
 
     const iDynTree::Wrench& rightWrench = m_robotControlHelper->getRightWrench();
-    if(rightWrench.getLinearVec3()(2) < 0.001)
+    if(rightWrench.getLinearVec3()(2) < m_minimumNormalForceZMP)
         zmpRightDefined = 0.0;
     else
     {
         zmpRight(0) = -rightWrench.getAngularVec3()(1) / rightWrench.getLinearVec3()(2);
         zmpRight(1) = rightWrench.getAngularVec3()(0) / rightWrench.getLinearVec3()(2);
         zmpRight(2) = 0.0;
-        zmpRightDefined = 1.0;
+
+        if ((std::fabs(zmpRight(0)) < m_maxZMP[0]) && (std::fabs(zmpRight(1)) < m_maxZMP[1]))
+        {
+            zmpRightDefined = 1.0;
+        }
+        else
+        {
+            zmpRightDefined = 0.0;
+        }
     }
 
     const iDynTree::Wrench& leftWrench = m_robotControlHelper->getLeftWrench();
-    if(leftWrench.getLinearVec3()(2) < 0.001)
+    if(leftWrench.getLinearVec3()(2) < m_minimumNormalForceZMP)
         zmpLeftDefined = 0.0;
     else
     {
         zmpLeft(0) = -leftWrench.getAngularVec3()(1) / leftWrench.getLinearVec3()(2);
         zmpLeft(1) = leftWrench.getAngularVec3()(0) / leftWrench.getLinearVec3()(2);
         zmpLeft(2) = 0.0;
-        zmpLeftDefined = 1.0;
+
+        if ((std::fabs(zmpLeft(0)) < m_maxZMP[0]) && (std::fabs(zmpLeft(1)) < m_maxZMP[1]))
+        {
+            zmpLeftDefined = 1.0;
+        }
+        else
+        {
+            zmpLeftDefined = 0.0;
+        }
     }
 
-    double totalZ = rightWrench.getLinearVec3()(2) + leftWrench.getLinearVec3()(2);
-    if(totalZ < 0.1)
+    double totalZ = rightWrench.getLinearVec3()(2) * zmpRightDefined + leftWrench.getLinearVec3()(2) * zmpLeftDefined;
+    if((zmpLeftDefined + zmpRightDefined) < 0.5)
     {
-        yError() << "[evaluateZMP] The total z-component of contact wrenches is too low.";
+        yError() << "[evaluateZMP] None of the two contacts is valid.";
         return false;
     }
 
