@@ -893,7 +893,8 @@ bool WalkingModule::updateModule()
                                       m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       m_robotControlHelper->getJointPosition(),
-                                      m_qDesired);
+                                      m_qDesired,
+                                      m_retargetingClient->jointValues());
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1367,15 +1368,20 @@ bool WalkingModule::startWalking()
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
                     "torso_pitch", "torso_roll", "torso_yaw",
-                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow",
-                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup", "l_wrist_pitch", "l_wrist_yaw",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup", "r_wrist_pitch", "r_wrist_yaw",
                     "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
                     "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
                     "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
-                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des",
-                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des",
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
                     "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
-                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des"});
+                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
+                    "torso_pitch_ret", "torso_roll_ret", "torso_yaw_ret",
+                    "l_shoulder_pitch_ret", "l_shoulder_roll_ret", "l_shoulder_yaw_ret", "l_elbow_ret", "l_wrist_prosup_ret", "l_wrist_pitch_ret", "l_wrist_yaw_ret",
+                    "r_shoulder_pitch_ret", "r_shoulder_roll_ret", "r_shoulder_yaw_ret", "r_elbow_ret", "r_wrist_prosup_ret", "r_wrist_pitch_ret", "r_wrist_yaw_ret",
+                    "l_hip_pitch_ret", "l_hip_roll_ret", "l_hip_yaw_ret", "l_knee_ret", "l_ankle_pitch_ret", "l_ankle_roll_ret",
+                    "r_hip_pitch_ret", "r_hip_roll_ret", "r_hip_yaw_ret", "r_knee_ret", "r_ankle_pitch_ret", "r_ankle_roll_ret"});
     }
 
     // if the robot was only prepared the filters has to be reseted
