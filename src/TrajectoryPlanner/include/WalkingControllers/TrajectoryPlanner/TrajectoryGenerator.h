@@ -49,6 +49,8 @@ namespace WalkingControllers
         double m_plannerHorizon; /**< Horizon of the planner. */
         std::size_t m_stancePhaseDelay; /**< Delay in ticks of the beginning of the stance phase. */
 
+        double m_leftYawDeltaInRad; /**< Offset for the left foot rotation around the z axis. */
+        double m_rightYawDeltaInRad; /**< Offset for the right foot rotation around the z axis. */
         double m_nominalWidth; /**< Nominal width between two feet. */
         double m_initTime; /**< Init time of the current trajectory. */
 
