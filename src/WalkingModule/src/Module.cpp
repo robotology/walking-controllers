@@ -581,7 +581,7 @@ bool WalkingModule::updateModule()
             m_firstRun = true;
 
             m_rootLinkOffset = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2) - m_FKSolver->getCoMPosition()(2);
-            
+
             m_robotState = WalkingFSM::Prepared;
 
             yInfo() << "[WalkingModule::updateModule] rootlink offset " << m_rootLinkOffset << ".";
@@ -892,7 +892,7 @@ bool WalkingModule::updateModule()
             customCoM(0) = m_FKSolver->getCoMPosition()(0);
             customCoM(1) = m_FKSolver->getCoMPosition()(1);
             customCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
-            
+
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
@@ -905,20 +905,8 @@ bool WalkingModule::updateModule()
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       m_robotControlHelper->getJointPosition(),
                                       m_qDesired,
-                                      m_robotControlHelper->getJointVelocity());
-
-                        // m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                        //               measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-                        //               m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight()),
-                        //               m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
-                        //               leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-                        //               rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-                        //               m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
-                        //               m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                        //               m_robotControlHelper->getJointPosition(),
-                        //               m_qDesired,
-                        //               m_retargetingClient->jointValues(),
-                        //               m_robotControlHelper->getJointVelocity());
+                                      desiredCoMPosition,
+                                      m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front());
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1392,58 +1380,20 @@ bool WalkingModule::startWalking()
                     "rf_des_x", "rf_des_y", "rf_des_z",
                     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
                     "torso_pitch", "torso_roll", "torso_yaw",
-                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", 
-                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", 
+                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow",
+                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow",
                     "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
                     "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
                     "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
-                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", 
-                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", 
+                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des",
+                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des",
                     "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
                     "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
-                    "torso_pitch_vel", "torso_roll_vel", "torso_yaw_vel",
-                    "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel", 
-                    "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel", 
-                    "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
-                    "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel"});
-
-
-                // m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                //     "dcm_des_x", "dcm_des_y",
-                //     "dcm_des_dx", "dcm_des_dy",
-                //     "zmp_x", "zmp_y",
-                //     "zmp_des_x", "zmp_des_y",
-                //     "com_x", "com_y", "com_z",
-                //     "com_des_x", "com_des_y", "com_des_z",
-                //     "com_des_dx", "com_des_dy", "com_des_dz",
-                //     "lf_x", "lf_y", "lf_z",
-                //     "lf_roll", "lf_pitch", "lf_yaw",
-                //     "rf_x", "rf_y", "rf_z",
-                //     "rf_roll", "rf_pitch", "rf_yaw",
-                //     "lf_des_x", "lf_des_y", "lf_des_z",
-                //     "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                //     "rf_des_x", "rf_des_y", "rf_des_z",
-                //     "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                //     "torso_pitch", "torso_roll", "torso_yaw",
-                //     "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup", "l_wrist_pitch", "l_wrist_yaw",
-                //     "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup", "r_wrist_pitch", "r_wrist_yaw",
-                //     "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
-                //     "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
-                //     "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
-                //     "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
-                //     "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
-                //     "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
-                //     "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
-                //     "torso_pitch_ret", "torso_roll_ret", "torso_yaw_ret",
-                //     "l_shoulder_pitch_ret", "l_shoulder_roll_ret", "l_shoulder_yaw_ret", "l_elbow_ret", "l_wrist_prosup_ret", "l_wrist_pitch_ret", "l_wrist_yaw_ret",
-                //     "r_shoulder_pitch_ret", "r_shoulder_roll_ret", "r_shoulder_yaw_ret", "r_elbow_ret", "r_wrist_prosup_ret", "r_wrist_pitch_ret", "r_wrist_yaw_ret",
-                //     "l_hip_pitch_ret", "l_hip_roll_ret", "l_hip_yaw_ret", "l_knee_ret", "l_ankle_pitch_ret", "l_ankle_roll_ret",
-                //     "r_hip_pitch_ret", "r_hip_roll_ret", "r_hip_yaw_ret", "r_knee_ret", "r_ankle_pitch_ret", "r_ankle_roll_ret",
-                //     "torso_pitch_vel", "torso_roll_vel", "torso_yaw_vel",
-                //     "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel", "l_wrist_prosup_vel", "l_wrist_pitch_vel", "l_wrist_yaw_vel",
-                //     "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel", "r_wrist_prosup_vel", "r_wrist_pitch_vel", "r_wrist_yaw_vel",
-                //     "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
-                //     "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel"});
+                    "com_des_x_macumba","com_des_y_macumba", "com_des_z_macumba",
+                    "lf_des_dx", "lf_des_dy", "lf_des_dz",
+                    "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
+                    "rf_des_dx", "rf_des_dy", "rf_des_dz",
+                    "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",});
     }
 
     // if the robot was only prepared the filters has to be reseted
