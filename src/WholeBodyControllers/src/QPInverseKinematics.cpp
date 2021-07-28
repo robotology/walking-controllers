@@ -811,27 +811,27 @@ void WalkingQPIK::evaluateBounds()
 
     rightFootCorrectionAngular = m_kAttFoot * (iDynTree::unskew(iDynTree::toEigen(errorRightAttitude)));
 
-    if((m_desiredLeftFootTwist(0) == m_desiredLeftFootTwist(1)) && (m_desiredLeftFootTwist(0) == 0))
-    {
-        lowerBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist);
-        upperBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist);
-    }
-    else
-    {
+    // if((m_desiredLeftFootTwist(0) == m_desiredLeftFootTwist(1)) && (m_desiredLeftFootTwist(0) == 0))
+    // {
+    //     lowerBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist);
+    //     upperBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist);
+    // }
+    // else
+    // {
         lowerBound.segment<6>(0) = iDynTree::toEigen(m_desiredLeftFootTwist) - iDynTree::toEigen(m_leftFootCorrection);
         upperBound.segment<6>(0) = lowerBound.segment<6>(0);
-    }
+    // }
 
-    if((m_desiredRightFootTwist(0) == m_desiredRightFootTwist(1)) && (m_desiredRightFootTwist(0) == 0))
-    {
-        lowerBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist);
-        upperBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist);
-    }
-    else
-    {
+    // if((m_desiredRightFootTwist(0) == m_desiredRightFootTwist(1)) && (m_desiredRightFootTwist(0) == 0))
+    // {
+    //     lowerBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist);
+    //     upperBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist);
+    // }
+    // else
+    // {
         lowerBound.segment<6>(6) = iDynTree::toEigen(m_desiredRightFootTwist) - iDynTree::toEigen(m_rightFootCorrection);
         upperBound.segment<6>(6) = lowerBound.segment<6>(6);
-    }
+    // }
     if(m_useCoMAsConstraint)
     {
         lowerBound.segment<3>(12) = iDynTree::toEigen(m_desiredComVelocity)
