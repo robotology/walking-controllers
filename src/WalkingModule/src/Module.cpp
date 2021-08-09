@@ -225,7 +225,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
+    yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     trajectoryPlannerOptions.append(generalOptions);
+    trajectoryPlannerOptions.append(ellipseMangerOptions);
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
@@ -234,7 +236,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     //initialize the Free space ellipse manager
     m_freeSpaceEllipseManager = std::make_unique<FreeSpaceEllipseManager>();
-    yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     ellipseMangerOptions.append(generalOptions);
     if(!m_freeSpaceEllipseManager->initialize(ellipseMangerOptions))
     {

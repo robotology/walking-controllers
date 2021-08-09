@@ -112,7 +112,9 @@ bool WalkingControllers::FreeSpaceEllipseManager::initialize(const yarp::os::Sea
         return false;
     }
 
-    yarp::os::Value portName = config.check("port_name", yarp::os::Value("freeSpaceEllipse:in"));
+    yarp::os::Bottle settingsGroup = config.findGroup("ELLIPSE_MANAGER_SETTINGS");
+
+    yarp::os::Value portName = settingsGroup.check("port_name", yarp::os::Value("freeSpaceEllipse:in"));
 
     if (!portName.isString())
     {
@@ -128,7 +130,7 @@ bool WalkingControllers::FreeSpaceEllipseManager::initialize(const yarp::os::Sea
         return false;
     }
 
-    m_newEllipseReady = config.check("use_initial_ellipse", yarp::os::Value(false)).asBool();
+    m_newEllipseReady = settingsGroup.check("use_initial_ellipse", yarp::os::Value(false)).asBool();
 
     if (m_newEllipseReady)
     {
