@@ -898,6 +898,7 @@ bool WalkingModule::updateModule()
 
 	    const double omega = std::sqrt(9.81 / 0.565);
 	    iDynTree::toEigen(desiredZMPPlanner) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
+ 	    
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
@@ -912,7 +913,10 @@ bool WalkingModule::updateModule()
                                       m_qDesired,
                                       m_robotControlHelper->getJointVelocity(),
                                       desiredCoMPosition,
-                                      m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front());
+                                      m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front(),
+				      desiredZMPPlanner,
+				      m_robotControlHelper->getLeftWrench(),
+				      m_robotControlHelper->getRightWrench());
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1404,7 +1408,12 @@ bool WalkingModule::startWalking()
                     "lf_des_dx", "lf_des_dy", "lf_des_dz",
                     "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
                     "rf_des_dx", "rf_des_dy", "rf_des_dz",
-                    "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",});
+                    "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
+		    "zmp_des_planner_x", "zmp_des_planner_y",
+		    "lf_force_x", "lf_force_y", "lf_force_z",
+                    "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
+		    "rf_force_x", "rf_force_y", "rf_force_z",
+                    "rf_force_roll", "rf_force_pitch", "rf_force_yaw",});
     }
 
     // if the robot was only prepared the filters has to be reseted
