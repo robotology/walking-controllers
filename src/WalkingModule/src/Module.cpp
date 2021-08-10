@@ -905,6 +905,7 @@ bool WalkingModule::updateModule()
                                       m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
                                       m_robotControlHelper->getJointPosition(),
                                       m_qDesired,
+                                      m_robotControlHelper->getJointVelocity(),
                                       desiredCoMPosition,
                                       m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front());
         }
@@ -1389,6 +1390,11 @@ bool WalkingModule::startWalking()
                     "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des",
                     "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
                     "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
+                    "torso_pitch_vel", "torso_roll_vel", "torso_yaw_vel",
+                    "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel",
+                    "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel",
+                    "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
+                    "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel",
                     "com_des_x_macumba","com_des_y_macumba", "com_des_z_macumba",
                     "lf_des_dx", "lf_des_dy", "lf_des_dz",
                     "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
