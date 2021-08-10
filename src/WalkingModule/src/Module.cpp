@@ -746,6 +746,9 @@ bool WalkingModule::updateModule()
         else
             desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
+	const double omega = std::sqrt(9.81 / 0.565);
+	iDynTree::toEigen(desiredZMP) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
+	
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
         m_walkingZMPController->setReferenceSignal(desiredZMP, m_stableDCMModel->getCoMPosition(),
@@ -882,7 +885,7 @@ bool WalkingModule::updateModule()
         // send data to the WalkingLogger
         if(m_dumpData)
         {
-            iDynTree::Vector2 desiredZMP;
+	  iDynTree::Vector2 desiredZMP, desiredZMPPlanner;
             if(m_useMPC)
                 desiredZMP = m_walkingController->getControllerOutput();
             else
@@ -893,6 +896,8 @@ bool WalkingModule::updateModule()
             customCoM(1) = m_FKSolver->getCoMPosition()(1);
             customCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
 
+	    const double omega = std::sqrt(9.81 / 0.565);
+	    iDynTree::toEigen(desiredZMPPlanner) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
