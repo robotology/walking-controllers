@@ -1020,7 +1020,7 @@ bool RobotInterface::setDirectPositionReferences(const iDynTree::VectorDynSize& 
         return false;
     }
 
-    if(worstError.second > 0.5)
+    if(worstError.second > 0.7)
     {
         yError() << "[RobotInterface::setDirectPositionReferences] The worst error between the current and the "
                  << "desired position of the " <<  m_axesList[worstError.first]
