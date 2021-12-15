@@ -53,6 +53,7 @@ if(WALKING_CONTROLLERS_COMPILE_WalkingModule)
     WalkingControllers::WholeBodyControllers
     WalkingControllers::RetargetingHelper
     WalkingControllers::LoggerClient
+    BipedalLocomotion::YarpUtilities
     ctrlLib
     )
 

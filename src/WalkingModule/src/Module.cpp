@@ -340,13 +340,18 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // initialize the logger
     if(m_dumpData)
     {
-        m_walkingLogger = std::make_unique<LoggerClient>();
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
-        if(!m_walkingLogger->configure(loggerOptions, getName()))
+        std::string portOutput;
+        // open the connect the data logger port
+        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
+                                                   "dataLoggerOutputPort_name",
+                                                   portOutput))
         {
-            yError() << "[WalkingModule::configure] Unable to configure the logger.";
+            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
         }
+
+        m_loggerPort.open("/" + name + portOutput);
     }
 
     // time profiler
@@ -884,17 +889,32 @@ bool WalkingModule::updateModule()
 
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-                                      m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight()),
-                                      m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
-                                      leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-                                      rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-                                      m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
-                                      m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      m_robotControlHelper->getJointPosition(),
-                                      m_qDesired,
-                                      m_retargetingClient->jointValues());
+
+            BipedalLocomotion::YarpUtilities::VectorsCollection& data = m_loggerPort.prepare();
+            data.vectors.clear();
+
+            data.vectors.insert({"measured_dcm", std::vector<double>(m_FKSolver->getDCM().size(),
+                                                                    m_FKSolver->getDCM().data())});
+            data.vectors.insert({"desired_dcm", std::vector<double>(m_DCMPositionDesired.front().size(),
+                                                                    m_DCMPositionDesired.front().data())});
+            data.vectors.insert({"desired_zmp", std::vector<double>(desiredZMP.size(),
+                                                                    desiredZMP.data())});
+            data.vectors.insert({"measured_zmp", std::vector<double>(measuredZMP.size(),
+                                                                     measuredZMP.data())});
+
+
+            // measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
+            // m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight()),
+            // m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
+            // leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
+            // rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
+            // m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
+            // m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
+            // m_robotControlHelper->getJointPosition(),
+            // m_qDesired,
+            // m_retargetingClient->jointValues());
+
+            m_loggerPort.write();
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1347,41 +1367,6 @@ bool WalkingModule::startWalking()
     {
         yError() << "[WalkingModule::startWalking] Unable to start walking if the robot is not prepared or paused.";
         return false;
-    }
-
-    if(m_dumpData)
-    {
-        m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                    "dcm_des_x", "dcm_des_y",
-                    "dcm_des_dx", "dcm_des_dy",
-                    "zmp_x", "zmp_y",
-                    "zmp_des_x", "zmp_des_y",
-                    "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y", "com_des_z",
-                    "com_des_dx", "com_des_dy", "com_des_dz",
-                    "lf_x", "lf_y", "lf_z",
-                    "lf_roll", "lf_pitch", "lf_yaw",
-                    "rf_x", "rf_y", "rf_z",
-                    "rf_roll", "rf_pitch", "rf_yaw",
-                    "lf_des_x", "lf_des_y", "lf_des_z",
-                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    "rf_des_x", "rf_des_y", "rf_des_z",
-                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "torso_pitch", "torso_roll", "torso_yaw",
-                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup", "l_wrist_pitch", "l_wrist_yaw",
-                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup", "r_wrist_pitch", "r_wrist_yaw",
-                    "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
-                    "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
-                    "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
-                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
-                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
-                    "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
-                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
-                    "torso_pitch_ret", "torso_roll_ret", "torso_yaw_ret",
-                    "l_shoulder_pitch_ret", "l_shoulder_roll_ret", "l_shoulder_yaw_ret", "l_elbow_ret", "l_wrist_prosup_ret", "l_wrist_pitch_ret", "l_wrist_yaw_ret",
-                    "r_shoulder_pitch_ret", "r_shoulder_roll_ret", "r_shoulder_yaw_ret", "r_elbow_ret", "r_wrist_prosup_ret", "r_wrist_pitch_ret", "r_wrist_yaw_ret",
-                    "l_hip_pitch_ret", "l_hip_roll_ret", "l_hip_yaw_ret", "l_knee_ret", "l_ankle_pitch_ret", "l_ankle_roll_ret",
-                    "r_hip_pitch_ret", "r_hip_roll_ret", "r_hip_yaw_ret", "r_knee_ret", "r_ankle_pitch_ret", "r_ankle_roll_ret"});
     }
 
     // if the robot was only prepared the filters has to be reseted
