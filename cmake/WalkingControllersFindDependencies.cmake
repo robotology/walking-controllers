@@ -149,7 +149,7 @@ checkandset_dependency(qpOASES)
 find_package(Catch2 QUIET)
 checkandset_dependency(Catch2)
 
-find_package(BipedalLocomotionFramework 0.5.100 COMPONENTS YarpUtilities REQUIRED)
+find_package(BipedalLocomotionFramework 0.5.100 COMPONENTS VectorsCollection REQUIRED)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_tests "Compile tests?" ON WALKING_CONTROLLERS_HAS_Catch2 OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_YarpUtilities "Compile YarpHelper library?" ON WALKING_CONTROLLERS_HAS_YARP OFF)

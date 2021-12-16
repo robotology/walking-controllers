@@ -895,12 +895,12 @@ bool WalkingModule::updateModule()
 
             data.vectors.insert({"measured_dcm", std::vector<double>(m_FKSolver->getDCM().size(),
                                                                     m_FKSolver->getDCM().data())});
-            data.vectors.insert({"desired_dcm", std::vector<double>(m_DCMPositionDesired.front().size(),
+            /*data.vectors.insert({"desired_dcm", std::vector<double>(m_DCMPositionDesired.front().size(),
                                                                     m_DCMPositionDesired.front().data())});
             data.vectors.insert({"desired_zmp", std::vector<double>(desiredZMP.size(),
                                                                     desiredZMP.data())});
             data.vectors.insert({"measured_zmp", std::vector<double>(measuredZMP.size(),
-                                                                     measuredZMP.data())});
+                                                                     measuredZMP.data())});*/
 
 
             // measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),

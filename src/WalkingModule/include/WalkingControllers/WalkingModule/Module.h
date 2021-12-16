@@ -143,7 +143,7 @@ namespace WalkingControllers
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
-        yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Desired robot position port. */
+        yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
 
         /**
          * Get the robot model from the resource finder and set it.
