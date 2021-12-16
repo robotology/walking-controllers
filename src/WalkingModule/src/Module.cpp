@@ -30,6 +30,12 @@
 
 using namespace WalkingControllers;
 
+template <class T>
+std::vector<double> toStdVector(const T& vector)
+{
+    return std::vector<double>(vector.data(), vector.data() + vector.size());
+}
+
 void WalkingModule::propagateTime()
 {
     // propagate time
@@ -893,8 +899,8 @@ bool WalkingModule::updateModule()
             BipedalLocomotion::YarpUtilities::VectorsCollection& data = m_loggerPort.prepare();
             data.vectors.clear();
 
-            data.vectors.insert({"measured_dcm", std::vector<double>(m_FKSolver->getDCM().size(),
-                                                                    m_FKSolver->getDCM().data())});
+            data.vectors.insert({"measured_dcm", toStdVector(m_FKSolver->getDCM())});
+
             /*data.vectors.insert({"desired_dcm", std::vector<double>(m_DCMPositionDesired.front().size(),
                                                                     m_DCMPositionDesired.front().data())});
             data.vectors.insert({"desired_zmp", std::vector<double>(desiredZMP.size(),
