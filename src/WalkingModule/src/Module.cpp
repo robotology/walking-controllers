@@ -347,8 +347,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if(m_dumpData)
     {
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
-        std::string portOutput;
-        // open the connect the data logger port
+        // open and connect the data logger port
+        std::string portInput, portOutput;
         if(!YarpUtilities::getStringFromSearchable(loggerOptions,
                                                    "dataLoggerOutputPort_name",
                                                    portOutput))
@@ -356,8 +356,21 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
         }
+        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
+                                                   "dataLoggerInputPort_name",
+                                                   portInput))
+        {
+            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
+            return false;
+        }
 
         m_loggerPort.open("/" + name + portOutput);
+        
+        if(!yarp::os::Network::connect("/" + name + portOutput,  portInput))
+        {
+            yError() << "Unable to connect the ports " << "/" + name + portOutput << "and" << portInput;
+            return false;
+        }
     }
 
     // time profiler
@@ -395,13 +408,13 @@ void WalkingModule::reset()
     m_trajectoryGenerator->reset();
 
     if(m_dumpData)
-        m_walkingLogger->quit();
+        m_loggerPort.close();
 }
 
 bool WalkingModule::close()
 {
     if(m_dumpData)
-        m_walkingLogger->quit();
+        m_loggerPort.close();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -884,7 +897,7 @@ bool WalkingModule::updateModule()
             errorL = m_QPIKSolver->getLeftFootError();
         }
 
-        // send data to the WalkingLogger
+        // send data to the logger
         if(m_dumpData)
         {
             iDynTree::Vector2 desiredZMP;
@@ -900,25 +913,36 @@ bool WalkingModule::updateModule()
             data.vectors.clear();
 
             data.vectors.insert({"measured_dcm", toStdVector(m_FKSolver->getDCM())});
+            data.vectors.insert({"desired_dcm", toStdVector(m_DCMPositionDesired.front())});
+            data.vectors.insert({"desired_dcm", toStdVector(m_DCMVelocityDesired.front())});
+            data.vectors.insert({"measured_zmp", toStdVector(measuredZMP)});
+            data.vectors.insert({"desired_zmp", toStdVector(desiredZMP)});
+            data.vectors.insert({"measured_com", toStdVector(m_FKSolver->getCoMPosition())});
+            data.vectors.insert({"measured_left_foot_position", toStdVector(leftFoot.getPosition())});
+            data.vectors.insert({"measured_left_foot_orientation", toStdVector(leftFoot.getRotation().asRPY())});
+            data.vectors.insert({"measured_right_foot_position", toStdVector(rightFoot.getPosition())});
+            data.vectors.insert({"measured_right_foot_orientation", toStdVector(rightFoot.getRotation().asRPY())});
+            data.vectors.insert({"desired_left_foot_position", toStdVector(m_leftTrajectory.front().getPosition())});
+            data.vectors.insert({"desired_left_foot_orientation", toStdVector(m_leftTrajectory.front().getRotation().asRPY())});
+            data.vectors.insert({"desired_right_foot_position", toStdVector(m_rightTrajectory.front().getPosition())});
+            data.vectors.insert({"desired_right_foot_orientation", toStdVector(m_rightTrajectory.front().getRotation().asRPY())});
+            data.vectors.insert({"measured_joint_positions", toStdVector(m_robotControlHelper->getJointPosition())});
+            data.vectors.insert({"desired_joint_positions", toStdVector(m_qDesired)});
+            data.vectors.insert({"retargeting_joint_positions", toStdVector(m_retargetingClient->jointValues())});
 
-            /*data.vectors.insert({"desired_dcm", std::vector<double>(m_DCMPositionDesired.front().size(),
-                                                                    m_DCMPositionDesired.front().data())});
-            data.vectors.insert({"desired_zmp", std::vector<double>(desiredZMP.size(),
-                                                                    desiredZMP.data())});
-            data.vectors.insert({"measured_zmp", std::vector<double>(measuredZMP.size(),
-                                                                     measuredZMP.data())});*/
+            // Manual definition of this value to add also the planned CoM height
+            std::vector<double> CoMPositionDesired(3);
+            CoMPositionDesired[0] = m_stableDCMModel->getCoMPosition().data()[0];
+            CoMPositionDesired[1] = m_stableDCMModel->getCoMPosition().data()[1];
+            CoMPositionDesired[2] = m_retargetingClient->comHeight();
+            data.vectors.insert({"desired_com", CoMPositionDesired});
 
-
-            // measuredZMP, desiredZMP, m_FKSolver->getCoMPosition(),
-            // m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight()),
-            // m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
-            // leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-            // rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-            // m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
-            // m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-            // m_robotControlHelper->getJointPosition(),
-            // m_qDesired,
-            // m_retargetingClient->jointValues());
+            // Manual definition of this value to add also the planned CoM height velocity
+            std::vector<double> CoMVelocityDesired(3);
+            CoMVelocityDesired[0] = m_stableDCMModel->getCoMVelocity().data()[0];
+            CoMVelocityDesired[1] = m_stableDCMModel->getCoMVelocity().data()[1];
+            CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
+            data.vectors.insert({"desired_com_velocity", CoMVelocityDesired}); 
 
             m_loggerPort.write();
         }
@@ -1477,7 +1501,7 @@ bool WalkingModule::pauseWalking()
 
     // close the logger
     if(m_dumpData)
-        m_walkingLogger->quit();
+        m_loggerPort.close();
 
     m_robotState = WalkingFSM::Paused;
     return true;
