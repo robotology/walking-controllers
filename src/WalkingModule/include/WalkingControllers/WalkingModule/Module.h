@@ -135,8 +135,9 @@ namespace WalkingControllers
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
-        double m_rootLinkOffset{0};
-        
+        bool m_useRootLinkForHeight;
+        double m_comHeightOffset{0};
+
         std::mutex m_mutex; /**< Mutex. */
 
         iDynTree::Vector2 m_desiredPosition;

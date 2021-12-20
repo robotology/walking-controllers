@@ -157,6 +157,7 @@ namespace WalkingControllers
         double m_torsoWeightStance; /**< Weight matrix (only the diagonal) used for the torso during stance. */
 
         bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
+        bool m_useRootLinkForTheCoMHeight; /**< True if we need to use the root_link height instead of the COM one. */
         bool m_useJointsLimitsConstraint; /**< True if the CoM is added as a constraint. */
 
         iDynTree::MatrixDynSize m_hessianDense; /**< Hessian matrix */

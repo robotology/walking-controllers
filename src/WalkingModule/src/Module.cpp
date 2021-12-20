@@ -166,7 +166,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     }
 
-
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
     std::string name;
@@ -176,6 +175,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
     setName(name.c_str());
+
+    std::string heightFrame = generalOptions.check("height_reference_frame", yarp::os::Value("com")).asString();
+    m_useRootLinkForHeight = heightFrame == "root_link";
 
     m_robotControlHelper = std::make_unique<RobotInterface>();
     yarp::os::Bottle& robotControlHelperOptions = rf.findGroup("ROBOT_CONTROL");
@@ -461,9 +463,14 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     ok &= solver->setNeckJacobian(jacobian);
 
     ok &= m_FKSolver->getCoMJacobian(comJacobian);
-    ok &= m_FKSolver->getRootLinkJacobian(jacobian);
 
-    iDynTree::toEigen(comJacobian).bottomRows<1>() = iDynTree::toEigen(jacobian).row(2);
+    if (m_useRootLinkForHeight)
+    {
+        ok &= m_FKSolver->getRootLinkJacobian(jacobian);
+
+        iDynTree::toEigen(comJacobian).bottomRows<1>() = iDynTree::toEigen(jacobian).row(2);
+    }
+
     solver->setCoMJacobian(comJacobian);
 
     ok &= m_FKSolver->getLeftHandJacobian(jacobian);
@@ -580,11 +587,18 @@ bool WalkingModule::updateModule()
 
             m_firstRun = true;
 
-            m_rootLinkOffset = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2) - m_FKSolver->getCoMPosition()(2);
+            if (m_useRootLinkForHeight)
+            {
+                m_comHeightOffset = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2) - m_FKSolver->getCoMPosition()(2);
+                yInfo() << "[WalkingModule::updateModule] rootlink offset " << m_comHeightOffset << ".";
+            }
+            else
+            {
+                m_comHeightOffset = 0.0;
+            }
 
             m_robotState = WalkingFSM::Prepared;
 
-            yInfo() << "[WalkingModule::updateModule] rootlink offset " << m_rootLinkOffset << ".";
             yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
         }
     }
@@ -774,7 +788,7 @@ bool WalkingModule::updateModule()
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_retargetingClient->comHeight() + m_rootLinkOffset;
+        desiredCoMPosition(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
 
 
         iDynTree::Vector3 desiredCoMVelocity;
@@ -885,25 +899,27 @@ bool WalkingModule::updateModule()
         // send data to the WalkingLogger
         if(m_dumpData)
         {
-	  iDynTree::Vector2 desiredZMP, desiredZMPPlanner;
+            iDynTree::Vector2 desiredZMP, desiredZMPPlanner;
             if(m_useMPC)
                 desiredZMP = m_walkingController->getControllerOutput();
             else
                 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
-            iDynTree::Vector3 customCoM;
-            customCoM(0) = m_FKSolver->getCoMPosition()(0);
-            customCoM(1) = m_FKSolver->getCoMPosition()(1);
-            customCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
+            iDynTree::Vector3 measuredCoM = m_FKSolver->getCoMPosition();
 
-	    const double omega = std::sqrt(9.81 / 0.565);
-	    iDynTree::toEigen(desiredZMPPlanner) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
- 	    
+            if (m_useRootLinkForHeight)
+            {
+                measuredCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
+            }
+
+            const double omega = std::sqrt(9.81 / 0.565);
+            iDynTree::toEigen(desiredZMPPlanner) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
+
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
             m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP, customCoM,
-                                      m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight() + m_rootLinkOffset),
+                                      measuredZMP, desiredZMP, measuredCoM,
+                                      m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight() + m_comHeightOffset),
                                       m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
                                       leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
                                       rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
@@ -914,10 +930,10 @@ bool WalkingModule::updateModule()
                                       m_robotControlHelper->getJointVelocity(),
                                       desiredCoMPosition,
                                       m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front(),
-				      desiredZMPPlanner,
-				      m_robotControlHelper->getLeftWrench(),
-				      m_robotControlHelper->getRightWrench(),
-				      m_retargetingClient->jointValues());
+                                      desiredZMPPlanner,
+                                      m_robotControlHelper->getLeftWrench(),
+                                      m_robotControlHelper->getRightWrench(),
+                                      m_retargetingClient->jointValues());
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1410,10 +1426,10 @@ bool WalkingModule::startWalking()
                     "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
                     "rf_des_dx", "rf_des_dy", "rf_des_dz",
                     "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
-		    "zmp_des_planner_x", "zmp_des_planner_y",
-		    "lf_force_x", "lf_force_y", "lf_force_z",
+                    "zmp_des_planner_x", "zmp_des_planner_y",
+                    "lf_force_x", "lf_force_y", "lf_force_z",
                     "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
-		    "rf_force_x", "rf_force_y", "rf_force_z",
+                    "rf_force_x", "rf_force_y", "rf_force_z",
                     "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
                     "torso_pitch_ret", "torso_roll_ret", "torso_yaw_ret",
                     "l_shoulder_pitch_ret", "l_shoulder_roll_ret", "l_shoulder_yaw_ret", "l_elbow_ret", "l_wrist_prosup_ret", "l_wrist_pitch_ret", "l_wrist_yaw_ret",

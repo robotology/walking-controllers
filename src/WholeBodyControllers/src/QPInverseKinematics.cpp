@@ -50,6 +50,9 @@ bool WalkingQPIK::initialize(const yarp::os::Searchable &config,
     bool enableHandRetargeting = config.check("use_hand_retargeting", yarp::os::Value(false)).asBool();
     bool enableJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
 
+    std::string heightFrame = config.check("height_reference_frame", yarp::os::Value("com")).asString();
+    m_useRootLinkForTheCoMHeight = heightFrame == "root_link";
+
     if(enableHandRetargeting && enableJointRetargeting)
     {
         yError() << "[initialize] You cannot enable both hand and joint retargeting.";
@@ -396,7 +399,10 @@ bool WalkingQPIK::setRobotState(WalkingFK& kinDynWrapper)
     m_rightFootToWorldTransform = kinDynWrapper.getRightFootToWorldTransform();
     m_neckOrientation = kinDynWrapper.getNeckOrientation();
     m_comPosition = kinDynWrapper.getCoMPosition();
-    m_comPosition(2) = kinDynWrapper.getRootLinkToWorldTransform().getPosition()(2);
+    if (m_useRootLinkForTheCoMHeight)
+    {
+        m_comPosition(2) = kinDynWrapper.getRootLinkToWorldTransform().getPosition()(2);
+    }
 
     return true;
 }
