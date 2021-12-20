@@ -168,6 +168,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_maxZMP[1] = localBot->get(1).asDouble();
 
     }
+    m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -758,14 +759,18 @@ bool WalkingModule::updateModule()
         m_walkingZMPController->setPhase(m_isStancePhase.front());
 
         iDynTree::Vector2 desiredZMP;
-        if(m_useMPC)
-            desiredZMP = m_walkingController->getControllerOutput();
+        if (m_skipDCMController)
+        {
+            desiredZMP = m_desiredZMP.front();
+        }
         else
-            desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+        {
+            if(m_useMPC)
+                desiredZMP = m_walkingController->getControllerOutput();
+            else
+                desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+        }
 
-	const double omega = std::sqrt(9.81 / 0.565);
-	iDynTree::toEigen(desiredZMP) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
-	
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
         m_walkingZMPController->setReferenceSignal(desiredZMP, m_stableDCMModel->getCoMPosition(),
@@ -902,7 +907,7 @@ bool WalkingModule::updateModule()
         // send data to the WalkingLogger
         if(m_dumpData)
         {
-            iDynTree::Vector2 desiredZMP, desiredZMPPlanner;
+            iDynTree::Vector2 desiredZMP;
             if(m_useMPC)
                 desiredZMP = m_walkingController->getControllerOutput();
             else
@@ -914,9 +919,6 @@ bool WalkingModule::updateModule()
             {
                 measuredCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
             }
-
-            const double omega = std::sqrt(9.81 / 0.565);
-            iDynTree::toEigen(desiredZMPPlanner) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
 
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
@@ -933,7 +935,7 @@ bool WalkingModule::updateModule()
                                       m_robotControlHelper->getJointVelocity(),
                                       desiredCoMPosition,
                                       m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front(),
-                                      desiredZMPPlanner,
+                                      m_desiredZMP.front(),
                                       m_robotControlHelper->getLeftWrench(),
                                       m_robotControlHelper->getRightWrench(),
                                       m_retargetingClient->jointValues());

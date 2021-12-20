@@ -73,6 +73,7 @@ namespace WalkingControllers
         bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
+        bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
 
         double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
 
