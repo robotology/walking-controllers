@@ -252,6 +252,13 @@ namespace WalkingControllers
         bool getIsStancePhase(std::vector<bool>& isStancePhase);
 
         /**
+         * Get the desired ZMP trajectory
+         * @param desiredZMP vector containing the desired ZMP on the xy plane
+         * @return true/false in case of success/failure.
+         */
+        bool getDesiredZMPPosition(std::vector<iDynTree::Vector2>& desiredZMP);
+
+        /**
          * Reset the planner
          */
         void reset();

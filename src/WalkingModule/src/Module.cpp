@@ -87,6 +87,9 @@ bool WalkingModule::advanceReferenceSignals()
     m_isStancePhase.pop_front();
     m_isStancePhase.push_back(m_isStancePhase.back());
 
+    m_desiredZMP.pop_front();
+    m_desiredZMP.push_back(m_desiredZMP.back());
+
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
     // A new trajectory will be merged at the first merge point or if the deque is empty
@@ -1295,6 +1298,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::Twist> rightTwistTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
+    std::vector<iDynTree::Vector2> desiredZMP;
     std::vector<bool> rightInContact;
     std::vector<bool> leftInContact;
     std::vector<double> comHeightTrajectory;
@@ -1323,6 +1327,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get stance phase flags
     m_trajectoryGenerator->getIsStancePhase(isStancePhase);
 
+    m_trajectoryGenerator->getDesiredZMPPosition(desiredZMP);
+
     // append vectors to deques
     StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
@@ -1340,6 +1346,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
 
     StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
+
+    StdUtilities::appendVectorToDeque(desiredZMP, m_desiredZMP, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 

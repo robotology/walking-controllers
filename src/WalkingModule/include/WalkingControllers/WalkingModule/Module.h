@@ -121,6 +121,7 @@ namespace WalkingControllers
                                                 In general a main frame of a foot is the fix frame only during the
                                                 stance and the switch out phases. */
 
+        std::deque<iDynTree::Vector2> m_desiredZMP; /**< Deque containing the desired ZMP position. */
 
         iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
