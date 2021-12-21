@@ -106,7 +106,7 @@ namespace WalkingControllers
         double m_kPosHand; /**< Gain related to the desired Hand position. */
         double m_kAttHand; /**< Gain related to the desired hand attitude. */
         double m_kNeck; /**< Gain related to the desired neck attitude. */
-        double m_kCom; /**< Gain related to the desired CoM position. */
+        iDynTree::Matrix3x3 m_kCom; /**< Gain related to the desired CoM position. */
 
         iDynTree::VectorDynSize m_jointRegularizationWeights; /**< Weight related to the the regularization term */
 

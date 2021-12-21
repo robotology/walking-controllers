@@ -223,9 +223,34 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
         return false;
     }
 
-    if(!YarpUtilities::getNumberFromSearchable(config, "k_posCom", m_kCom))
+    iDynTree::toEigen(m_kCom).setIdentity();
+    yarp::os::Value k_posComValue = config.find("k_posCom");
+    if (k_posComValue.isDouble())
     {
-        yError() << "Initialization failed while reading k_posCom.";
+        iDynTree::toEigen(m_kCom) *= k_posComValue.asDouble();
+    }
+    else if (k_posComValue.isList())
+    {
+        yarp::os::Bottle* k_posComList = k_posComValue.asList();
+        if (k_posComList->size() != 3)
+        {
+            yError() << "Initialization failed while reading k_posCom. It is a list, but not of size 3.";
+            return false;
+        }
+
+        for (size_t i = 0; i < 3; ++i)
+        {
+            if (!k_posComList->get(i).isDouble())
+            {
+                yError() << "Initialization failed while reading k_posCom. It is a list, but the element with index" << i << "(0-based) is not a double.";
+                return false;
+            }
+            m_kCom(i,i) = k_posComList->get(i).asDouble();
+        }
+    }
+    else
+    {
+        yError() << "Initialization failed while reading k_posCom. It is neither a list, nor a boolean.";
         return false;
     }
 
@@ -778,7 +803,7 @@ void WalkingQPIK::evaluateGradientVector()
     if(!m_useCoMAsConstraint)
     {
         gradient += -comJacobian.transpose() * comWeight.asDiagonal() *
-            (desiredComVelocity - m_kCom * (comPosition - desiredComPosition));
+            (desiredComVelocity - iDynTree::toEigen(m_kCom) * (comPosition - desiredComPosition));
     }
 }
 
@@ -827,11 +852,9 @@ void WalkingQPIK::evaluateBounds()
 
     if(m_useCoMAsConstraint)
     {
-        lowerBound.segment<2>(12) = iDynTree::toEigen(m_desiredComVelocity).head<2>()
-            - m_kCom * (iDynTree::toEigen(m_comPosition).head<2>() -  iDynTree::toEigen(m_desiredComPosition).head<2>());
+        lowerBound.segment<3>(12) = iDynTree::toEigen(m_desiredComVelocity)
+            - iDynTree::toEigen(m_kCom) * (iDynTree::toEigen(m_comPosition) -  iDynTree::toEigen(m_desiredComPosition));
 
-        lowerBound.segment<1>(14) = iDynTree::toEigen(m_desiredComVelocity).tail<1>()
-            - 0.5 * (iDynTree::toEigen(m_comPosition).tail<1>() -  iDynTree::toEigen(m_desiredComPosition).tail<1>());
         upperBound.segment<3>(12) = lowerBound.segment<3>(12);
     }
 
