@@ -30,12 +30,6 @@
 
 using namespace WalkingControllers;
 
-template <class T>
-std::vector<double> toStdVector(const T& vector)
-{
-    return std::vector<double>(vector.data(), vector.data() + vector.size());
-}
-
 void WalkingModule::propagateTime()
 {
     // propagate time
@@ -931,65 +925,71 @@ bool WalkingModule::updateModule()
             data.vectors.clear();
 
             // DCM
-            data.vectors.insert({"dcm::position::measured", toStdVector(m_FKSolver->getDCM())});
-            data.vectors.insert({"dcm::position::desired", toStdVector(m_DCMPositionDesired.front())});
-            data.vectors.insert({"dcm::velocity::desired", toStdVector(m_DCMVelocityDesired.front())});
+            data.vectors["dcm::position::measured"].assign(m_FKSolver->getDCM().data(), m_FKSolver->getDCM().data() + m_FKSolver->getDCM().size());
+            data.vectors["dcm::position::desired"].assign(m_DCMPositionDesired.front().data(), m_DCMPositionDesired.front().data() + m_DCMPositionDesired.front().size());
+            data.vectors["dcm::velocity::desired"].assign(m_DCMVelocityDesired.front().data(), m_DCMVelocityDesired.front().data() + m_DCMVelocityDesired.front().size());
 
             // ZMP
-            data.vectors.insert({"zmp::measured", toStdVector(measuredZMP)});
-            data.vectors.insert({"zmp::desired", toStdVector(desiredZMP)});
+            data.vectors["zmp::measured"].assign(measuredZMP.data(), measuredZMP.data() + measuredZMP.size());
+            data.vectors["zmp::desired"].assign(desiredZMP.data(), desiredZMP.data() + desiredZMP.size());
             // "zmp_des_planner_x", "zmp_des_planner_y",
-            data.vectors.insert({"zmp::desired_planner", toStdVector(desiredZMPPlanner)});
+            data.vectors["zmp::desired_planner"].assign(desiredZMPPlanner.data(), desiredZMPPlanner.data() + desiredZMPPlanner.size());
 
             // COM
-            data.vectors.insert({"com::position::measured", toStdVector(customCoM)}); // TODO: doublecheck with "m_FKSolver->getCoMPosition()"
+            data.vectors["com::position::measured"].assign(customCoM.data(), customCoM.data() + customCoM.size()); // TODO: doublecheck with "m_FKSolver->getCoMPosition()"
+
             // Manual definition of this value to add also the planned CoM height
             std::vector<double> CoMPositionDesired(3);
             CoMPositionDesired[0] = m_stableDCMModel->getCoMPosition().data()[0];
             CoMPositionDesired[1] = m_stableDCMModel->getCoMPosition().data()[1];
             CoMPositionDesired[2] = m_retargetingClient->comHeight() + m_rootLinkOffset; // TODO: doublecheck with "m_retargetingClient->comHeight()"
-            data.vectors.insert({"com::position::desired", CoMPositionDesired});
-            data.vectors.insert({"com::position::desired_macumba", toStdVector(desiredCoMPosition)});
+            data.vectors["com::position::desired"].assign(CoMPositionDesired.begin(), CoMPositionDesired.begin() + CoMPositionDesired.size());
+            data.vectors["com::position::desired_macumba"].assign(desiredCoMPosition.data(), desiredCoMPosition.data() + desiredCoMPosition.size());
+
             // Manual definition of this value to add also the planned CoM height velocity
             std::vector<double> CoMVelocityDesired(3);
             CoMVelocityDesired[0] = m_stableDCMModel->getCoMVelocity().data()[0];
             CoMVelocityDesired[1] = m_stableDCMModel->getCoMVelocity().data()[1];
             CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
-            data.vectors.insert({"com::velocity::desired", CoMVelocityDesired});
+            data.vectors["com::velocity::desired"].assign(CoMVelocityDesired.begin(), CoMVelocityDesired.begin() + CoMVelocityDesired.size());
 
             // Left foot
-            data.vectors.insert({"left_foot::position::measured", toStdVector(leftFoot.getPosition())});
-            data.vectors.insert({"left_foot::position::desired", toStdVector(m_leftTrajectory.front().getPosition())});
-            data.vectors.insert({"left_foot::orientation::measured", toStdVector(leftFoot.getRotation().asRPY())});
-            data.vectors.insert({"left_foot::orientation::desired", toStdVector(m_leftTrajectory.front().getRotation().asRPY())});
+            data.vectors["left_foot::position::measured"].assign(leftFoot.getPosition().data(), leftFoot.getPosition().data() + leftFoot.getPosition().size());
+            data.vectors["left_foot::position::desired"].assign(m_leftTrajectory.front().getPosition().data(), m_leftTrajectory.front().getPosition().data() + m_leftTrajectory.front().getPosition().size());
+            data.vectors["left_foot::orientation::measured"].assign(leftFoot.getRotation().asRPY().data(), leftFoot.getRotation().asRPY().data() + leftFoot.getRotation().asRPY().size());
+            data.vectors["left_foot::orientation::desired"].assign(m_leftTrajectory.front().getRotation().asRPY().data(), m_leftTrajectory.front().getRotation().asRPY().data() + m_leftTrajectory.front().getRotation().asRPY().size());
+
             // "lf_des_dx", "lf_des_dy", "lf_des_dz",
             // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
-            data.vectors.insert({"left_foot::linear_velocity::measured", toStdVector(m_leftTwistTrajectory.front().getLinearVec3())});
-            data.vectors.insert({"left_foot::angular_velocity::measured", toStdVector(m_leftTwistTrajectory.front().getAngularVec3())});
+            data.vectors["left_foot::linear_velocity::measured"].assign(m_leftTwistTrajectory.front().getLinearVec3().data(), m_leftTwistTrajectory.front().getLinearVec3().data() + m_leftTwistTrajectory.front().getLinearVec3().size());
+            data.vectors["left_foot::angular_velocity::measured"].assign(m_leftTwistTrajectory.front().getAngularVec3().data(), m_leftTwistTrajectory.front().getAngularVec3().data() + m_leftTwistTrajectory.front().getAngularVec3().size());
+
             // "lf_force_x", "lf_force_y", "lf_force_z",
             // "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
-	    data.vectors.insert({"left_foot::linear_force::measured", toStdVector(m_robotControlHelper->getLeftWrench().getLinearVec3())});
-            data.vectors.insert({"left_foot::angular_torque::measured", toStdVector(m_robotControlHelper->getLeftWrench().getAngularVec3())});
+            data.vectors["left_foot::linear_force::measured"].assign(m_robotControlHelper->getLeftWrench().getLinearVec3().data(), m_robotControlHelper->getLeftWrench().getLinearVec3().data() + m_robotControlHelper->getLeftWrench().getLinearVec3().size());
+            data.vectors["left_foot::angular_torque::measured"].assign(m_robotControlHelper->getLeftWrench().getAngularVec3().data(), m_robotControlHelper->getLeftWrench().getAngularVec3().data() + m_robotControlHelper->getLeftWrench().getAngularVec3().size());
 
             // Right foot
-            data.vectors.insert({"right_foot::position::measured", toStdVector(rightFoot.getPosition())});
-            data.vectors.insert({"right_foot::position::desired", toStdVector(m_rightTrajectory.front().getPosition())});
-            data.vectors.insert({"right_foot::orientation::measured", toStdVector(rightFoot.getRotation().asRPY())});
-            data.vectors.insert({"right_foot::orientation::desired", toStdVector(m_rightTrajectory.front().getRotation().asRPY())});
+            data.vectors["right_foot::position::measured"].assign(rightFoot.getPosition().data(), rightFoot.getPosition().data() + rightFoot.getPosition().size());
+            data.vectors["right_foot::position::desired"].assign(m_rightTrajectory.front().getPosition().data(), m_rightTrajectory.front().getPosition().data() + m_rightTrajectory.front().getPosition().size());
+            data.vectors["right_foot::orientation::measured"].assign(rightFoot.getRotation().asRPY().data(), rightFoot.getRotation().asRPY().data() + rightFoot.getRotation().asRPY().size());
+            data.vectors["right_foot::orientation::desired"].assign(m_rightTrajectory.front().getRotation().asRPY().data(), m_rightTrajectory.front().getRotation().asRPY().data() + m_rightTrajectory.front().getRotation().asRPY().size());
+
             // "rf_des_dx", "rf_des_dy", "rf_des_dz",
             // "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
-            data.vectors.insert({"right_foot::linear_velocity::measured", toStdVector(m_rightTwistTrajectory.front().getLinearVec3())});
-            data.vectors.insert({"right_foot::angular_velocity::measured", toStdVector(m_rightTwistTrajectory.front().getAngularVec3())});
+            data.vectors["right_foot::linear_velocity::measured"].assign(m_rightTwistTrajectory.front().getLinearVec3().data(), m_rightTwistTrajectory.front().getLinearVec3().data() + m_rightTwistTrajectory.front().getLinearVec3().size());
+            data.vectors["right_foot::angular_velocity::measured"].assign(m_rightTwistTrajectory.front().getAngularVec3().data(), m_rightTwistTrajectory.front().getAngularVec3().data() + m_rightTwistTrajectory.front().getAngularVec3().size());
+
             // "rf_force_x", "rf_force_y", "rf_force_z",
             // "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
-            data.vectors.insert({"right_foot::linear_force::measured", toStdVector(m_robotControlHelper->getRightWrench().getLinearVec3())});
-            data.vectors.insert({"right_foot::angular_torque::measured", toStdVector(m_robotControlHelper->getRightWrench().getAngularVec3())});
+            data.vectors["right_foot::linear_force::measured"].assign(m_robotControlHelper->getRightWrench().getLinearVec3().data(), m_robotControlHelper->getRightWrench().getLinearVec3().data() + m_robotControlHelper->getRightWrench().getLinearVec3().size());
+            data.vectors["right_foot::angular_torque::measured"].assign(m_robotControlHelper->getRightWrench().getAngularVec3().data(), m_robotControlHelper->getRightWrench().getAngularVec3().data() + m_robotControlHelper->getRightWrench().getAngularVec3().size());
 
             // Joint
-            data.vectors.insert({"joint::positions::measured", toStdVector(m_robotControlHelper->getJointPosition())});
-            data.vectors.insert({"joint::positions::desired", toStdVector(m_qDesired)});
-            data.vectors.insert({"joint::positions::retargeting", toStdVector(m_retargetingClient->jointValues())});
-            data.vectors.insert({"joint::velocities::measured", toStdVector(m_robotControlHelper->getJointVelocity())});
+            data.vectors["joint::positions::measured"].assign(m_robotControlHelper->getJointPosition().data(), m_robotControlHelper->getJointPosition().data() + m_robotControlHelper->getJointPosition().size());
+            data.vectors["joint::positions::desired"].assign(m_qDesired.data(), m_qDesired.data() + m_qDesired.size());
+            data.vectors["joint::positions::retargeting"].assign(m_retargetingClient->jointValues().data(), m_retargetingClient->jointValues().data() + m_retargetingClient->jointValues().size());
+            data.vectors["joint::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
 
             m_loggerPort.write();
 
