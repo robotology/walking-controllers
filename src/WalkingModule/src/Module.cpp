@@ -975,11 +975,15 @@ bool WalkingModule::updateModule()
             CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
             data.vectors["com::velocity::desired"].assign(CoMVelocityDesired.begin(), CoMVelocityDesired.begin() + CoMVelocityDesired.size());
 
-            // Left foot
+            // Left foot position
             data.vectors["left_foot::position::measured"].assign(leftFoot.getPosition().data(), leftFoot.getPosition().data() + leftFoot.getPosition().size());
             data.vectors["left_foot::position::desired"].assign(m_leftTrajectory.front().getPosition().data(), m_leftTrajectory.front().getPosition().data() + m_leftTrajectory.front().getPosition().size());
-            data.vectors["left_foot::orientation::measured"].assign(leftFoot.getRotation().asRPY().data(), leftFoot.getRotation().asRPY().data() + leftFoot.getRotation().asRPY().size());
-            data.vectors["left_foot::orientation::desired"].assign(m_leftTrajectory.front().getRotation().asRPY().data(), m_leftTrajectory.front().getRotation().asRPY().data() + m_leftTrajectory.front().getRotation().asRPY().size());
+
+            // Left foot orientation
+            iDynTree::Vector3 leftFootOrientationMeasured = leftFoot.getRotation().asRPY();
+            data.vectors["left_foot::orientation::measured"].assign(leftFootOrientationMeasured.begin(), leftFootOrientationMeasured.begin() + leftFootOrientationMeasured.size());
+            iDynTree::Vector3 leftFootOrientationDesired = m_leftTrajectory.front().getRotation().asRPY();
+            data.vectors["left_foot::orientation::desired"].assign(leftFootOrientationDesired.begin(), leftFootOrientationDesired.begin() + leftFootOrientationDesired.size());
 
             // "lf_des_dx", "lf_des_dy", "lf_des_dz",
             // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
@@ -991,11 +995,15 @@ bool WalkingModule::updateModule()
             data.vectors["left_foot::linear_force::measured"].assign(m_robotControlHelper->getLeftWrench().getLinearVec3().data(), m_robotControlHelper->getLeftWrench().getLinearVec3().data() + m_robotControlHelper->getLeftWrench().getLinearVec3().size());
             data.vectors["left_foot::angular_torque::measured"].assign(m_robotControlHelper->getLeftWrench().getAngularVec3().data(), m_robotControlHelper->getLeftWrench().getAngularVec3().data() + m_robotControlHelper->getLeftWrench().getAngularVec3().size());
 
-            // Right foot
+            // Right foot position
             data.vectors["right_foot::position::measured"].assign(rightFoot.getPosition().data(), rightFoot.getPosition().data() + rightFoot.getPosition().size());
             data.vectors["right_foot::position::desired"].assign(m_rightTrajectory.front().getPosition().data(), m_rightTrajectory.front().getPosition().data() + m_rightTrajectory.front().getPosition().size());
-            data.vectors["right_foot::orientation::measured"].assign(rightFoot.getRotation().asRPY().data(), rightFoot.getRotation().asRPY().data() + rightFoot.getRotation().asRPY().size());
-            data.vectors["right_foot::orientation::desired"].assign(m_rightTrajectory.front().getRotation().asRPY().data(), m_rightTrajectory.front().getRotation().asRPY().data() + m_rightTrajectory.front().getRotation().asRPY().size());
+
+            // Right foot orientation
+            iDynTree::Vector3 rightFootOrientationMeasured = rightFoot.getRotation().asRPY();
+            data.vectors["right_foot::orientation::measured"].assign(rightFootOrientationMeasured.begin(), rightFootOrientationMeasured.begin() + rightFootOrientationMeasured.size());
+            iDynTree::Vector3 rightFootOrientationDesired = m_rightTrajectory.front().getRotation().asRPY();
+            data.vectors["right_foot::orientation::desired"].assign(rightFootOrientationDesired.begin(), rightFootOrientationDesired.begin() + rightFootOrientationDesired.size());
 
             // "rf_des_dx", "rf_des_dy", "rf_des_dz",
             // "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
