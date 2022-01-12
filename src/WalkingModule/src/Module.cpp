@@ -1016,10 +1016,10 @@ bool WalkingModule::updateModule()
             data.vectors["right_foot::angular_torque::measured"].assign(m_robotControlHelper->getRightWrench().getAngularVec3().data(), m_robotControlHelper->getRightWrench().getAngularVec3().data() + m_robotControlHelper->getRightWrench().getAngularVec3().size());
 
             // Joint
-            data.vectors["joint::positions::measured"].assign(m_robotControlHelper->getJointPosition().data(), m_robotControlHelper->getJointPosition().data() + m_robotControlHelper->getJointPosition().size());
-            data.vectors["joint::positions::desired"].assign(m_qDesired.data(), m_qDesired.data() + m_qDesired.size());
-            data.vectors["joint::positions::retargeting"].assign(m_retargetingClient->jointValues().data(), m_retargetingClient->jointValues().data() + m_retargetingClient->jointValues().size());
-            data.vectors["joint::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
+            data.vectors["joints_state::positions::measured"].assign(m_robotControlHelper->getJointPosition().data(), m_robotControlHelper->getJointPosition().data() + m_robotControlHelper->getJointPosition().size());
+            data.vectors["joints_state::positions::desired"].assign(m_qDesired.data(), m_qDesired.data() + m_qDesired.size());
+            data.vectors["joints_state::positions::retargeting"].assign(m_retargetingClient->jointValues().data(), m_retargetingClient->jointValues().data() + m_retargetingClient->jointValues().size());
+            data.vectors["joints_state::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
 
             m_loggerPort.write();
 
