@@ -752,3 +752,15 @@ bool TrajectoryGenerator::getIsStancePhase(std::vector<bool>& isStancePhase)
 
     return true;
 }
+
+bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &desiredZMP)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getDesiredZMP] No trajectories are available";
+        return false;
+    }
+
+    desiredZMP = m_dcmGenerator->getZMPPosition();
+    return true;
+}

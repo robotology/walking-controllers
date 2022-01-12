@@ -87,6 +87,9 @@ bool WalkingModule::advanceReferenceSignals()
     m_isStancePhase.pop_front();
     m_isStancePhase.push_back(m_isStancePhase.back());
 
+    m_desiredZMP.pop_front();
+    m_desiredZMP.push_back(m_desiredZMP.back());
+
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
     // A new trajectory will be merged at the first merge point or if the deque is empty
@@ -165,7 +168,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_maxZMP[1] = localBot->get(1).asDouble();
 
     }
-
+    m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
@@ -176,6 +179,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
     setName(name.c_str());
+
+    std::string heightFrame = generalOptions.check("height_reference_frame", yarp::os::Value("com")).asString();
+    m_useRootLinkForHeight = heightFrame == "root_link";
 
     m_robotControlHelper = std::make_unique<RobotInterface>();
     yarp::os::Bottle& robotControlHelperOptions = rf.findGroup("ROBOT_CONTROL");
@@ -340,11 +346,30 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // initialize the logger
     if(m_dumpData)
     {
-        m_walkingLogger = std::make_unique<LoggerClient>();
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
-        if(!m_walkingLogger->configure(loggerOptions, getName()))
+        // open and connect the data logger port
+        std::string portInput, portOutput;
+        // open the connect the data logger port
+        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
+                                                   "dataLoggerOutputPort_name",
+                                                   portOutput))
         {
-            yError() << "[WalkingModule::configure] Unable to configure the logger.";
+            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
+            return false;
+        }
+        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
+                                                   "dataLoggerInputPort_name",
+                                                   portInput))
+        {
+            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
+            return false;
+        }
+
+        m_loggerPort.open("/" + name + portOutput);
+
+        if(!yarp::os::Network::connect("/" + name + portOutput,  portInput))
+        {
+            yError() << "Unable to connect the ports " << "/" + name + portOutput << "and" << portInput;
             return false;
         }
     }
@@ -384,13 +409,13 @@ void WalkingModule::reset()
     m_trajectoryGenerator->reset();
 
     if(m_dumpData)
-        m_walkingLogger->quit();
+         m_loggerPort.close();
 }
 
 bool WalkingModule::close()
 {
     if(m_dumpData)
-        m_walkingLogger->quit();
+        m_loggerPort.close();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -461,9 +486,14 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     ok &= solver->setNeckJacobian(jacobian);
 
     ok &= m_FKSolver->getCoMJacobian(comJacobian);
-    ok &= m_FKSolver->getRootLinkJacobian(jacobian);
 
-    iDynTree::toEigen(comJacobian).bottomRows<1>() = iDynTree::toEigen(jacobian).row(2);
+    if (m_useRootLinkForHeight)
+    {
+        ok &= m_FKSolver->getRootLinkJacobian(jacobian);
+
+        iDynTree::toEigen(comJacobian).bottomRows<1>() = iDynTree::toEigen(jacobian).row(2);
+    }
+
     solver->setCoMJacobian(comJacobian);
 
     ok &= m_FKSolver->getLeftHandJacobian(jacobian);
@@ -580,11 +610,18 @@ bool WalkingModule::updateModule()
 
             m_firstRun = true;
 
-            m_rootLinkOffset = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2) - m_FKSolver->getCoMPosition()(2);
+            if (m_useRootLinkForHeight)
+            {
+                m_comHeightOffset = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2) - m_FKSolver->getCoMPosition()(2);
+                yInfo() << "[WalkingModule::updateModule] rootlink offset " << m_comHeightOffset << ".";
+            }
+            else
+            {
+                m_comHeightOffset = 0.0;
+            }
 
             m_robotState = WalkingFSM::Prepared;
 
-            yInfo() << "[WalkingModule::updateModule] rootlink offset " << m_rootLinkOffset << ".";
             yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
         }
     }
@@ -741,14 +778,18 @@ bool WalkingModule::updateModule()
         m_walkingZMPController->setPhase(m_isStancePhase.front());
 
         iDynTree::Vector2 desiredZMP;
-        if(m_useMPC)
-            desiredZMP = m_walkingController->getControllerOutput();
+        if (m_skipDCMController)
+        {
+            desiredZMP = m_desiredZMP.front();
+        }
         else
-            desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+        {
+            if(m_useMPC)
+                desiredZMP = m_walkingController->getControllerOutput();
+            else
+                desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
+        }
 
-	const double omega = std::sqrt(9.81 / 0.565);
-	iDynTree::toEigen(desiredZMP) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
-	
         // set feedback and the desired signal
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
         m_walkingZMPController->setReferenceSignal(desiredZMP, m_stableDCMModel->getCoMPosition(),
@@ -774,7 +815,7 @@ bool WalkingModule::updateModule()
         iDynTree::Position desiredCoMPosition;
         desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
         desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_retargetingClient->comHeight() + m_rootLinkOffset;
+        desiredCoMPosition(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
 
 
         iDynTree::Vector3 desiredCoMVelocity;
@@ -882,42 +923,106 @@ bool WalkingModule::updateModule()
             errorL = m_QPIKSolver->getLeftFootError();
         }
 
-        // send data to the WalkingLogger
+        // send data to the logger
         if(m_dumpData)
         {
-	  iDynTree::Vector2 desiredZMP, desiredZMPPlanner;
+            iDynTree::Vector2 desiredZMP;
             if(m_useMPC)
                 desiredZMP = m_walkingController->getControllerOutput();
             else
                 desiredZMP = m_walkingDCMReactiveController->getControllerOutput();
 
-            iDynTree::Vector3 customCoM;
-            customCoM(0) = m_FKSolver->getCoMPosition()(0);
-            customCoM(1) = m_FKSolver->getCoMPosition()(1);
-            customCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
+            iDynTree::Vector3 measuredCoM = m_FKSolver->getCoMPosition();
 
-	    const double omega = std::sqrt(9.81 / 0.565);
-	    iDynTree::toEigen(desiredZMPPlanner) = iDynTree::toEigen(m_DCMPositionDesired.front()) - iDynTree::toEigen(m_DCMVelocityDesired.front())/omega;
- 	    
+            if (m_useRootLinkForHeight)
+            {
+                measuredCoM(2) = m_FKSolver->getRootLinkToWorldTransform().getPosition()(2);
+            }
+
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
-            m_walkingLogger->sendData(m_FKSolver->getDCM(), m_DCMPositionDesired.front(), m_DCMVelocityDesired.front(),
-                                      measuredZMP, desiredZMP, customCoM,
-                                      m_stableDCMModel->getCoMPosition(), yarp::sig::Vector(1, m_retargetingClient->comHeight() + m_rootLinkOffset),
-                                      m_stableDCMModel->getCoMVelocity(), yarp::sig::Vector(1, m_retargetingClient->comHeightVelocity()),
-                                      leftFoot.getPosition(), leftFoot.getRotation().asRPY(),
-                                      rightFoot.getPosition(), rightFoot.getRotation().asRPY(),
-                                      m_leftTrajectory.front().getPosition(), m_leftTrajectory.front().getRotation().asRPY(),
-                                      m_rightTrajectory.front().getPosition(), m_rightTrajectory.front().getRotation().asRPY(),
-                                      m_robotControlHelper->getJointPosition(),
-                                      m_qDesired,
-                                      m_robotControlHelper->getJointVelocity(),
-                                      desiredCoMPosition,
-                                      m_leftTwistTrajectory.front(), m_rightTwistTrajectory.front(),
-				      desiredZMPPlanner,
-				      m_robotControlHelper->getLeftWrench(),
-				      m_robotControlHelper->getRightWrench(),
-				      m_retargetingClient->jointValues());
+
+            BipedalLocomotion::YarpUtilities::VectorsCollection& data = m_loggerPort.prepare();
+            data.vectors.clear();
+
+            // DCM
+            data.vectors["dcm::position::measured"].assign(m_FKSolver->getDCM().data(), m_FKSolver->getDCM().data() + m_FKSolver->getDCM().size());
+            data.vectors["dcm::position::desired"].assign(m_DCMPositionDesired.front().data(), m_DCMPositionDesired.front().data() + m_DCMPositionDesired.front().size());
+            data.vectors["dcm::velocity::desired"].assign(m_DCMVelocityDesired.front().data(), m_DCMVelocityDesired.front().data() + m_DCMVelocityDesired.front().size());
+
+            // ZMP
+            data.vectors["zmp::measured"].assign(measuredZMP.data(), measuredZMP.data() + measuredZMP.size());
+            data.vectors["zmp::desired"].assign(desiredZMP.data(), desiredZMP.data() + desiredZMP.size());
+            // "zmp_des_planner_x", "zmp_des_planner_y",
+            iDynTree::Vector2& desiredZMPPlanner = m_desiredZMP.front();
+            data.vectors["zmp::desired_planner"].assign(desiredZMPPlanner.data(), desiredZMPPlanner.data() + desiredZMPPlanner.size());
+
+            // COM
+            data.vectors["com::position::measured"].assign(measuredCoM.data(), measuredCoM.data() + measuredCoM.size());
+
+            // Manual definition of this value to add also the planned CoM height
+            std::vector<double> CoMPositionDesired(3);
+            CoMPositionDesired[0] = m_stableDCMModel->getCoMPosition().data()[0];
+            CoMPositionDesired[1] = m_stableDCMModel->getCoMPosition().data()[1];
+            CoMPositionDesired[2] = m_retargetingClient->comHeight() + m_comHeightOffset;
+            data.vectors["com::position::desired"].assign(CoMPositionDesired.begin(), CoMPositionDesired.begin() + CoMPositionDesired.size());
+            data.vectors["com::position::desired_macumba"].assign(desiredCoMPosition.data(), desiredCoMPosition.data() + desiredCoMPosition.size());
+
+            // Manual definition of this value to add also the planned CoM height velocity
+            std::vector<double> CoMVelocityDesired(3);
+            CoMVelocityDesired[0] = m_stableDCMModel->getCoMVelocity().data()[0];
+            CoMVelocityDesired[1] = m_stableDCMModel->getCoMVelocity().data()[1];
+            CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
+            data.vectors["com::velocity::desired"].assign(CoMVelocityDesired.begin(), CoMVelocityDesired.begin() + CoMVelocityDesired.size());
+
+            // Left foot position
+            data.vectors["left_foot::position::measured"].assign(leftFoot.getPosition().data(), leftFoot.getPosition().data() + leftFoot.getPosition().size());
+            data.vectors["left_foot::position::desired"].assign(m_leftTrajectory.front().getPosition().data(), m_leftTrajectory.front().getPosition().data() + m_leftTrajectory.front().getPosition().size());
+
+            // Left foot orientation
+            iDynTree::Vector3 leftFootOrientationMeasured = leftFoot.getRotation().asRPY();
+            data.vectors["left_foot::orientation::measured"].assign(leftFootOrientationMeasured.begin(), leftFootOrientationMeasured.begin() + leftFootOrientationMeasured.size());
+            iDynTree::Vector3 leftFootOrientationDesired = m_leftTrajectory.front().getRotation().asRPY();
+            data.vectors["left_foot::orientation::desired"].assign(leftFootOrientationDesired.begin(), leftFootOrientationDesired.begin() + leftFootOrientationDesired.size());
+
+            // "lf_des_dx", "lf_des_dy", "lf_des_dz",
+            // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
+            data.vectors["left_foot::linear_velocity::measured"].assign(m_leftTwistTrajectory.front().getLinearVec3().data(), m_leftTwistTrajectory.front().getLinearVec3().data() + m_leftTwistTrajectory.front().getLinearVec3().size());
+            data.vectors["left_foot::angular_velocity::measured"].assign(m_leftTwistTrajectory.front().getAngularVec3().data(), m_leftTwistTrajectory.front().getAngularVec3().data() + m_leftTwistTrajectory.front().getAngularVec3().size());
+
+            // "lf_force_x", "lf_force_y", "lf_force_z",
+            // "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
+            data.vectors["left_foot::linear_force::measured"].assign(m_robotControlHelper->getLeftWrench().getLinearVec3().data(), m_robotControlHelper->getLeftWrench().getLinearVec3().data() + m_robotControlHelper->getLeftWrench().getLinearVec3().size());
+            data.vectors["left_foot::angular_torque::measured"].assign(m_robotControlHelper->getLeftWrench().getAngularVec3().data(), m_robotControlHelper->getLeftWrench().getAngularVec3().data() + m_robotControlHelper->getLeftWrench().getAngularVec3().size());
+
+            // Right foot position
+            data.vectors["right_foot::position::measured"].assign(rightFoot.getPosition().data(), rightFoot.getPosition().data() + rightFoot.getPosition().size());
+            data.vectors["right_foot::position::desired"].assign(m_rightTrajectory.front().getPosition().data(), m_rightTrajectory.front().getPosition().data() + m_rightTrajectory.front().getPosition().size());
+
+            // Right foot orientation
+            iDynTree::Vector3 rightFootOrientationMeasured = rightFoot.getRotation().asRPY();
+            data.vectors["right_foot::orientation::measured"].assign(rightFootOrientationMeasured.begin(), rightFootOrientationMeasured.begin() + rightFootOrientationMeasured.size());
+            iDynTree::Vector3 rightFootOrientationDesired = m_rightTrajectory.front().getRotation().asRPY();
+            data.vectors["right_foot::orientation::desired"].assign(rightFootOrientationDesired.begin(), rightFootOrientationDesired.begin() + rightFootOrientationDesired.size());
+
+            // "rf_des_dx", "rf_des_dy", "rf_des_dz",
+            // "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
+            data.vectors["right_foot::linear_velocity::measured"].assign(m_rightTwistTrajectory.front().getLinearVec3().data(), m_rightTwistTrajectory.front().getLinearVec3().data() + m_rightTwistTrajectory.front().getLinearVec3().size());
+            data.vectors["right_foot::angular_velocity::measured"].assign(m_rightTwistTrajectory.front().getAngularVec3().data(), m_rightTwistTrajectory.front().getAngularVec3().data() + m_rightTwistTrajectory.front().getAngularVec3().size());
+
+            // "rf_force_x", "rf_force_y", "rf_force_z",
+            // "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
+            data.vectors["right_foot::linear_force::measured"].assign(m_robotControlHelper->getRightWrench().getLinearVec3().data(), m_robotControlHelper->getRightWrench().getLinearVec3().data() + m_robotControlHelper->getRightWrench().getLinearVec3().size());
+            data.vectors["right_foot::angular_torque::measured"].assign(m_robotControlHelper->getRightWrench().getAngularVec3().data(), m_robotControlHelper->getRightWrench().getAngularVec3().data() + m_robotControlHelper->getRightWrench().getAngularVec3().size());
+
+            // Joint
+            data.vectors["joints_state::positions::measured"].assign(m_robotControlHelper->getJointPosition().data(), m_robotControlHelper->getJointPosition().data() + m_robotControlHelper->getJointPosition().size());
+            data.vectors["joints_state::positions::desired"].assign(m_qDesired.data(), m_qDesired.data() + m_qDesired.size());
+            data.vectors["joints_state::positions::retargeting"].assign(m_retargetingClient->jointValues().data(), m_retargetingClient->jointValues().data() + m_retargetingClient->jointValues().size());
+            data.vectors["joints_state::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
+
+            m_loggerPort.write();
+
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1279,6 +1384,7 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     std::vector<iDynTree::Twist> rightTwistTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
+    std::vector<iDynTree::Vector2> desiredZMP;
     std::vector<bool> rightInContact;
     std::vector<bool> leftInContact;
     std::vector<double> comHeightTrajectory;
@@ -1307,6 +1413,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     // get stance phase flags
     m_trajectoryGenerator->getIsStancePhase(isStancePhase);
 
+    m_trajectoryGenerator->getDesiredZMPPosition(desiredZMP);
+
     // append vectors to deques
     StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
@@ -1324,6 +1432,8 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
 
     StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
+
+    StdUtilities::appendVectorToDeque(desiredZMP, m_desiredZMP, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 
@@ -1370,56 +1480,6 @@ bool WalkingModule::startWalking()
     {
         yError() << "[WalkingModule::startWalking] Unable to start walking if the robot is not prepared or paused.";
         return false;
-    }
-
-    if(m_dumpData)
-    {
-        m_walkingLogger->startRecord({"record","dcm_x", "dcm_y",
-                    "dcm_des_x", "dcm_des_y",
-                    "dcm_des_dx", "dcm_des_dy",
-                    "zmp_x", "zmp_y",
-                    "zmp_des_x", "zmp_des_y",
-                    "com_x", "com_y", "com_z",
-                    "com_des_x", "com_des_y", "com_des_z",
-                    "com_des_dx", "com_des_dy", "com_des_dz",
-                    "lf_x", "lf_y", "lf_z",
-                    "lf_roll", "lf_pitch", "lf_yaw",
-                    "rf_x", "rf_y", "rf_z",
-                    "rf_roll", "rf_pitch", "rf_yaw",
-                    "lf_des_x", "lf_des_y", "lf_des_z",
-                    "lf_des_roll", "lf_des_pitch", "lf_des_yaw",
-                    "rf_des_x", "rf_des_y", "rf_des_z",
-                    "rf_des_roll", "rf_des_pitch", "rf_des_yaw",
-                    "torso_pitch", "torso_roll", "torso_yaw",
-                    "l_shoulder_pitch", "l_shoulder_roll", "l_shoulder_yaw", "l_elbow", "l_wrist_prosup", "l_wrist_pitch", "l_wrist_yaw",
-                    "r_shoulder_pitch", "r_shoulder_roll", "r_shoulder_yaw", "r_elbow", "r_wrist_prosup", "r_wrist_pitch", "r_wrist_yaw",
-                    "l_hip_pitch", "l_hip_roll", "l_hip_yaw", "l_knee", "l_ankle_pitch", "l_ankle_roll",
-                    "r_hip_pitch", "r_hip_roll", "r_hip_yaw", "r_knee", "r_ankle_pitch", "r_ankle_roll",
-                    "torso_pitch_des", "torso_roll_des", "torso_yaw_des",
-                    "l_shoulder_pitch_des", "l_shoulder_roll_des", "l_shoulder_yaw_des", "l_elbow_des", "l_wrist_prosup_des", "l_wrist_pitch_des", "l_wrist_yaw_des",
-                    "r_shoulder_pitch_des", "r_shoulder_roll_des", "r_shoulder_yaw_des", "r_elbow_des", "r_wrist_prosup_des", "r_wrist_pitch_des", "r_wrist_yaw_des",
-                    "l_hip_pitch_des", "l_hip_roll_des", "l_hip_yaw_des", "l_knee_des", "l_ankle_pitch_des", "l_ankle_roll_des",
-                    "r_hip_pitch_des", "r_hip_roll_des", "r_hip_yaw_des", "r_knee_des", "r_ankle_pitch_des", "r_ankle_roll_des",
-                    "torso_pitch_vel", "torso_roll_vel", "torso_yaw_vel",
-                    "l_shoulder_pitch_vel", "l_shoulder_roll_vel", "l_shoulder_yaw_vel", "l_elbow_vel", "l_wrist_prosup_vel", "l_wrist_pitch_vel", "l_wrist_yaw_vel",
-                    "r_shoulder_pitch_vel", "r_shoulder_roll_vel", "r_shoulder_yaw_vel", "r_elbow_vel", "r_wrist_prosup_vel", "r_wrist_pitch_vel", "r_wrist_yaw_vel",
-                    "l_hip_pitch_vel", "l_hip_roll_vel", "l_hip_yaw_vel", "l_knee_vel", "l_ankle_pitch_vel", "l_ankle_roll_vel",
-                    "r_hip_pitch_vel", "r_hip_roll_vel", "r_hip_yaw_vel", "r_knee_vel", "r_ankle_pitch_vel", "r_ankle_roll_vel",
-                    "com_des_x_macumba","com_des_y_macumba", "com_des_z_macumba",
-                    "lf_des_dx", "lf_des_dy", "lf_des_dz",
-                    "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
-                    "rf_des_dx", "rf_des_dy", "rf_des_dz",
-                    "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
-		    "zmp_des_planner_x", "zmp_des_planner_y",
-		    "lf_force_x", "lf_force_y", "lf_force_z",
-                    "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
-		    "rf_force_x", "rf_force_y", "rf_force_z",
-                    "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
-                    "torso_pitch_ret", "torso_roll_ret", "torso_yaw_ret",
-                    "l_shoulder_pitch_ret", "l_shoulder_roll_ret", "l_shoulder_yaw_ret", "l_elbow_ret", "l_wrist_prosup_ret", "l_wrist_pitch_ret", "l_wrist_yaw_ret",
-                    "r_shoulder_pitch_ret", "r_shoulder_roll_ret", "r_shoulder_yaw_ret", "r_elbow_ret", "r_wrist_prosup_ret", "r_wrist_pitch_ret", "r_wrist_yaw_ret",
-                    "l_hip_pitch_ret", "l_hip_roll_ret", "l_hip_yaw_ret", "l_knee_ret", "l_ankle_pitch_ret", "l_ankle_roll_ret",
-                    "r_hip_pitch_ret", "r_hip_roll_ret", "r_hip_yaw_ret", "r_knee_ret", "r_ankle_pitch_ret", "r_ankle_roll_ret"});
     }
 
     // if the robot was only prepared the filters has to be reseted
@@ -1524,7 +1584,7 @@ bool WalkingModule::pauseWalking()
 
     // close the logger
     if(m_dumpData)
-        m_walkingLogger->quit();
+        m_loggerPort.close();
 
     m_robotState = WalkingFSM::Paused;
     return true;
