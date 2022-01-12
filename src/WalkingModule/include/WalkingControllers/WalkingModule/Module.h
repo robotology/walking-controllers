@@ -20,6 +20,8 @@
 #include <yarp/os/RpcClient.h>
 
 
+#include <BipedalLocomotion/YarpUtilities/VectorsCollection.h>
+
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
@@ -73,6 +75,7 @@ namespace WalkingControllers
         bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
+        bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
 
         double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
 
@@ -121,6 +124,7 @@ namespace WalkingControllers
                                                 In general a main frame of a foot is the fix frame only during the
                                                 stance and the switch out phases. */
 
+        std::deque<iDynTree::Vector2> m_desiredZMP; /**< Deque containing the desired ZMP position. */
 
         iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
@@ -135,12 +139,17 @@ namespace WalkingControllers
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
+        bool m_useRootLinkForHeight;
+        double m_comHeightOffset{0};
+
         std::mutex m_mutex; /**< Mutex. */
 
         iDynTree::Vector2 m_desiredPosition;
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
+
+        yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
 
         /**
          * Get the robot model from the resource finder and set it.

@@ -106,7 +106,7 @@ namespace WalkingControllers
         double m_kPosHand; /**< Gain related to the desired Hand position. */
         double m_kAttHand; /**< Gain related to the desired hand attitude. */
         double m_kNeck; /**< Gain related to the desired neck attitude. */
-        double m_kCom; /**< Gain related to the desired CoM position. */
+        iDynTree::Matrix3x3 m_kCom; /**< Gain related to the desired CoM position. */
 
         iDynTree::VectorDynSize m_jointRegularizationWeights; /**< Weight related to the the regularization term */
 
@@ -157,6 +157,7 @@ namespace WalkingControllers
         double m_torsoWeightStance; /**< Weight matrix (only the diagonal) used for the torso during stance. */
 
         bool m_useCoMAsConstraint; /**< True if the CoM is added as a constraint. */
+        bool m_useRootLinkForTheCoMHeight; /**< True if we need to use the root_link height instead of the COM one. */
         bool m_useJointsLimitsConstraint; /**< True if the CoM is added as a constraint. */
 
         iDynTree::MatrixDynSize m_hessianDense; /**< Hessian matrix */

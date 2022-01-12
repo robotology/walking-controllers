@@ -834,8 +834,16 @@ bool RobotInterface::switchToControlMode(const int& controlMode)
     std::vector<int> controlModes(m_actuatedDOFs, controlMode);
     if(!m_controlModeInterface->setControlModes(controlModes.data()))
     {
-        yError() << "[RobotInterface::switchToControlMode] Error while setting the controlMode.";
-        return false;
+        yError() << "[RobotInterface::switchToControlMode] Error while setting the controlMode. Trying joint by joint";
+
+        for (int i = 0; i < m_actuatedDOFs; i++)
+        {
+            if (!m_controlModeInterface->setControlMode(i, controlMode) && m_isGoodTrackingRequired[i])
+            {
+                yError() << "[RobotInterface::switchToControlMode] Error while setting the controlMode of" << m_axesList[i] << "and it requires good tracking.";
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -1020,7 +1028,7 @@ bool RobotInterface::setDirectPositionReferences(const iDynTree::VectorDynSize& 
         return false;
     }
 
-    if(worstError.second > 0.5)
+    if(worstError.second > 0.7)
     {
         yError() << "[RobotInterface::setDirectPositionReferences] The worst error between the current and the "
                  << "desired position of the " <<  m_axesList[worstError.first]
