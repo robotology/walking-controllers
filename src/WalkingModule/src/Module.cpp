@@ -912,11 +912,6 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        m_profiler->setEndTime("Total");
-
-        // print timings
-        m_profiler->profiling();
-
         iDynTree::VectorDynSize errorL(6), errorR(6);
         if(m_useQPIK)
         {
@@ -1038,6 +1033,11 @@ bool WalkingModule::updateModule()
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
 
         m_firstRun = false;
+
+        m_profiler->setEndTime("Total");
+
+        // print timings
+        m_profiler->profiling();
     }
     return true;
 }
