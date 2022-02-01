@@ -134,7 +134,7 @@ checkandset_dependency(iDynTree)
 find_package(Eigen3 3.2.92 QUIET)
 checkandset_dependency(Eigen3)
 
-find_package(UnicyclePlanner 0.1.102 QUIET)
+find_package(UnicyclePlanner 0.4.0 QUIET)
 checkandset_dependency(UnicyclePlanner)
 
 find_package(osqp QUIET)
@@ -148,6 +148,8 @@ checkandset_dependency(qpOASES)
 
 find_package(Catch2 QUIET)
 checkandset_dependency(Catch2)
+
+find_package(BipedalLocomotionFramework 0.6.0 COMPONENTS VectorsCollection REQUIRED)
 
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_tests "Compile tests?" ON WALKING_CONTROLLERS_HAS_Catch2 OFF)
 walking_controllers_dependent_option(WALKING_CONTROLLERS_COMPILE_YarpUtilities "Compile YarpHelper library?" ON WALKING_CONTROLLERS_HAS_YARP OFF)

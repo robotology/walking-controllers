@@ -1,5 +1,6 @@
 #include <iDynTree/Core/Utils.h>
 #include <iDynTree/Core/EigenHelpers.h>
+#include <yarp/eigen/Eigen.h>
 #include <iDynTree/yarp/YARPConversions.h>
 
 #include <WalkingControllers/RobotInterface/Helper.h>
@@ -57,8 +58,15 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
     bool okPosition = false;
     bool okVelocity = false;
 
-    bool okLeftWrench = false;
-    bool okRightWrench = false;
+    // reset the measured wrenches
+    for(auto& wrench : m_leftFootMeasuredWrench)
+        wrench.isUpdated = false;
+
+    for(auto& wrench : m_rightFootMeasuredWrench)
+        wrench.isUpdated = false;
+
+    bool okLeftWrenches = false;
+    bool okRightWrenches = false;
 
     bool okBaseEstimation = !m_useExternalRobotBase;
 
@@ -71,25 +79,31 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
         if(!okVelocity)
             okVelocity = m_encodersInterface->getEncoderSpeeds(m_velocityFeedbackDeg.data());
 
-        if(!okLeftWrench)
+        for(auto& wrench : m_leftFootMeasuredWrench)
         {
-            yarp::sig::Vector *leftWrenchRaw = NULL;
-            leftWrenchRaw = m_leftWrenchPort.read(false);
-            if(leftWrenchRaw != NULL)
+            if(!wrench.isUpdated)
             {
-                m_leftWrenchInput = *leftWrenchRaw;
-                okLeftWrench = true;
+                yarp::sig::Vector *wrenchRaw = NULL;
+                wrenchRaw = wrench.port->read(false);
+                if(wrenchRaw != NULL)
+                {
+                    wrench.wrenchInput = *wrenchRaw;
+                    wrench.isUpdated = true;
+                }
             }
         }
 
-        if(!okRightWrench)
+        for(auto& wrench : m_rightFootMeasuredWrench)
         {
-            yarp::sig::Vector *rightWrenchRaw = NULL;
-            rightWrenchRaw = m_rightWrenchPort.read(false);
-            if(rightWrenchRaw != NULL)
+            if(!wrench.isUpdated)
             {
-                m_rightWrenchInput = *rightWrenchRaw;
-                okRightWrench = true;
+                yarp::sig::Vector *wrenchRaw = NULL;
+                wrenchRaw = wrench.port->read(false);
+                if(wrenchRaw != NULL)
+                {
+                    wrench.wrenchInput = *wrenchRaw;
+                    wrench.isUpdated = true;
+                }
             }
         }
 
@@ -113,7 +127,18 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
             }
         }
 
-        if(okPosition && okVelocity && okLeftWrench && okRightWrench && okBaseEstimation)
+
+        bool okLeft = true;
+        for(const auto& wrench : m_leftFootMeasuredWrench)
+            okLeft = okLeft && wrench.isUpdated;
+        okLeftWrenches = okLeft;
+
+        bool okRight = true;
+        for(const auto& wrench : m_rightFootMeasuredWrench)
+            okRight = okRight && wrench.isUpdated;
+        okRightWrenches = okRight;
+
+        if(okPosition && okVelocity && okLeftWrenches && okRightWrenches && okBaseEstimation)
         {
             for(unsigned j = 0 ; j < m_actuatedDOFs; j++)
             {
@@ -121,16 +146,45 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
                 m_velocityFeedbackRad(j) = iDynTree::deg2rad(m_velocityFeedbackDeg(j));
             }
 
-            if(!iDynTree::toiDynTree(m_leftWrenchInput, m_leftWrench))
+            // let's sum all the wrenches together. Notice here we assume that
+            // the wrenches on the foot are computed with the same pole.
+
+            // left foot
+            // copy the first wrench
+            auto leftWrenchIt = m_leftFootMeasuredWrench.begin();
+            if(!iDynTree::toiDynTree(leftWrenchIt->wrenchInput, m_leftWrench))
             {
                 yError() << "[RobotInterface::getFeedbacksRaw] Unable to convert left foot wrench.";
                 return false;
             }
-            if(!iDynTree::toiDynTree(m_rightWrenchInput, m_rightWrench))
+
+            // sum all the other wrenches
+            std::advance(leftWrenchIt, 1);
+            for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
+            {
+                // the idyntree wrench raw data  is not a consecutive array
+                iDynTree::toEigen(m_leftWrench.getLinearVec3()) += yarp::eigen::toEigen(leftWrenchIt->wrenchInput).head<3>();
+                iDynTree::toEigen(m_leftWrench.getAngularVec3()) += yarp::eigen::toEigen(leftWrenchIt->wrenchInput).tail<3>();
+            }
+
+            // right foot
+            // copy the first wrench
+            auto rightWrenchIt = m_rightFootMeasuredWrench.begin();
+            if(!iDynTree::toiDynTree(rightWrenchIt->wrenchInput, m_rightWrench))
             {
                 yError() << "[RobotInterface::getFeedbacksRaw] Unable to convert right foot wrench.";
                 return false;
             }
+
+            // sum all the other wrenches
+            std::advance(rightWrenchIt, 1);
+            for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
+            {
+                // the idyntree wrench raw data  is not a consecutive array
+                iDynTree::toEigen(m_rightWrench.getLinearVec3()) += yarp::eigen::toEigen(rightWrenchIt->wrenchInput).head<3>();
+                iDynTree::toEigen(m_rightWrench.getAngularVec3()) += yarp::eigen::toEigen(rightWrenchIt->wrenchInput).tail<3>();
+            }
+
             return true;
         }
         yarp::os::Time::delay(0.001);
@@ -144,11 +198,11 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
     if(!okVelocity)
         yError() << "\t - Velocity encoders";
 
-    if(!okLeftWrench)
-        yError() << "\t - Left wrench";
+    if(!okLeftWrenches)
+        yError() << "\t - Left wrenches";
 
-    if(!okRightWrench)
-        yError() << "\t - Right wrench";
+    if(!okRightWrenches)
+        yError() << "\t - Right wrenches";
 
     if(!okBaseEstimation)
         yError() << "\t - Base estimation";
@@ -428,6 +482,33 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     return true;
 }
 
+bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
+                                                const std::string& portInputName,
+                                                const std::string& wholeBodyDynamicsPortName,
+                                                const double& samplingTime,
+                                                bool useWrenchFilter,
+                                                double cutFrequency,
+                                                MeasuredWrench& measuredWrench)
+{
+
+    measuredWrench.port = std::make_unique<yarp::os::BufferedPort<yarp::sig::Vector>>();
+    measuredWrench.port->open("/" + portPrefix + portInputName);
+    // connect port
+    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
+    {
+        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
+                 << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;
+        return false;
+    }
+
+    if(useWrenchFilter)
+    {
+        measuredWrench.lowPassFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
+                                                                                             samplingTime);
+    }
+    return true;
+}
+
 bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& config)
 {
     std::string portInput, portOutput;
@@ -439,74 +520,142 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
         return false;
     }
 
-    std::string name;
-    if(!YarpUtilities::getStringFromSearchable(config, "name", name))
+    std::string portPrefix;
+    if(!YarpUtilities::getStringFromSearchable(config, "name", portPrefix))
     {
         yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get the string from searchable.";
         return false;
     }
 
-    double sampligTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
 
-    // open and connect left foot wrench
-    if(!YarpUtilities::getStringFromSearchable(config, "leftFootWrenchInputPort_name", portInput))
+    // collect the information for the ports of the left foot wrenches
+    // from now on we assume that the wrenches are expressed in the same frame (e.g l_sole)
+    yarp::os::Value* listLeftFootWrenchInputPorts;
+    std::string key = "left_foot_wrench_input_port_name";
+    if(!config.check(key, listLeftFootWrenchInputPorts))
     {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get "
-            "the string from searchable.";
+        yError() << "[RobotInterface::configureForceTorqueSensors] Missing field "<< key;
         return false;
     }
-    if(!YarpUtilities::getStringFromSearchable(config, "leftFootWrenchOutputPort_name", portOutput))
+    std::vector<std::string> leftFootWrenchInputPorts;
+    if (!YarpUtilities::yarpListToStringVector(listLeftFootWrenchInputPorts,
+                                               leftFootWrenchInputPorts))
     {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get the string from searchable.";
-        return false;
-    }
-    // open port
-    m_leftWrenchPort.open("/" + name + portInput);
-    // connect port
-    if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
-    {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
-                 << portOutput << " to " << "/" + name + portInput;
-        return false;
+      yError() << "[RobotInterface::configureForceTorqueSensors] Unable to "
+                  "convert the yarp list into a vector of string.";
+      return false;
     }
 
-    // open and connect right foot wrench
-    if(!YarpUtilities::getStringFromSearchable(config, "rightFootWrenchInputPort_name", portInput))
+    yarp::os::Value* listLeftFootWrenchOutputPorts;
+    key = "left_foot_wrench_output_port_name";
+    if(!config.check(key, listLeftFootWrenchOutputPorts))
     {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get the string from searchable.";
+        yError() << "[RobotInterface::configureForceTorqueSensors] Missing field "<< key;
         return false;
     }
-    if(!YarpUtilities::getStringFromSearchable(config, "rightFootWrenchOutputPort_name", portOutput))
+    std::vector<std::string> leftFootWrenchOutputPorts;
+    if (!YarpUtilities::yarpListToStringVector(listLeftFootWrenchOutputPorts,
+                                               leftFootWrenchOutputPorts))
     {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to get the string from searchable.";
-        return false;
-    }
-    // open port
-    m_rightWrenchPort.open("/" + name + portInput);
-    // connect port
-    if(!yarp::os::Network::connect(portOutput, "/" + name + portInput))
-    {
-        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
-                 << portOutput << " to " << "/" + name + portInput;
+        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to "
+                    "convert the yarp list into a vector of string.";
         return false;
     }
 
-    m_useWrenchFilter = config.check("use_wrench_filter", yarp::os::Value("False")).asBool();
-    if(m_useWrenchFilter)
+    if (leftFootWrenchOutputPorts.size() != leftFootWrenchInputPorts.size())
     {
-        double cutFrequency;
+        yError() << "[RobotInterface::configureForceTorqueSensors] The number of "
+                    "the input port associated to the left foot and the output port should be the "
+                    "same. The input ports are "
+                 << leftFootWrenchInputPorts.size() << ", while the output ports "
+                 << leftFootWrenchOutputPorts.size();
+        return false;
+    }
+
+
+    // collect the information for the ports of the right foot wrenches
+    // from now on we assume that the wrenches are expressed in the same frame (e.g l_sole)
+    yarp::os::Value* listRightFootWrenchInputPorts;
+    key = "right_foot_wrench_input_port_name";
+    if(!config.check(key, listRightFootWrenchInputPorts))
+    {
+        yError() << "[RobotInterface::configureForceTorqueSensors] Missing field "<< key;
+        return false;
+    }
+    std::vector<std::string> rightFootWrenchInputPorts;
+    if (!YarpUtilities::yarpListToStringVector(listRightFootWrenchInputPorts,
+                                               rightFootWrenchInputPorts))
+    {
+        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to "
+            "convert the yarp list into a vector of string.";
+        return false;
+    }
+
+    yarp::os::Value* listRightFootWrenchOutputPorts;
+    key = "right_foot_wrench_output_port_name";
+    if(!config.check(key, listRightFootWrenchOutputPorts))
+    {
+        yError() << "[RobotInterface::configureForceTorqueSensors] Missing field "<< key;
+        return false;
+    }
+    std::vector<std::string> rightFootWrenchOutputPorts;
+    if (!YarpUtilities::yarpListToStringVector(listRightFootWrenchOutputPorts,
+                                               rightFootWrenchOutputPorts))
+    {
+        yError() << "[RobotInterface::configureForceTorqueSensors] Unable to "
+            "convert the yarp list into a vector of string.";
+        return false;
+    }
+
+    if (rightFootWrenchOutputPorts.size() != rightFootWrenchInputPorts.size())
+    {
+        yError() << "[RobotInterface::configureForceTorqueSensors] The number of "
+            "the input port associated to the right foot and the output port should be the "
+            "same. The input ports are "
+                 << rightFootWrenchInputPorts.size() << ", while the output ports "
+                 << rightFootWrenchOutputPorts.size();
+        return false;
+    }
+
+    // resize the wrenches vectors
+    m_leftFootMeasuredWrench.resize(leftFootWrenchOutputPorts.size());
+    m_rightFootMeasuredWrench.resize(rightFootWrenchOutputPorts.size());
+
+    const bool useWrenchFilter = config.check("use_wrench_filter", yarp::os::Value("False")).asBool();
+    double cutFrequency = 0;
+    if(useWrenchFilter)
+    {
         if(!YarpUtilities::getNumberFromSearchable(config, "wrench_cut_frequency", cutFrequency))
         {
             yError() << "[RobotInterface::configureForceTorqueSensors] Unable get double from searchable.";
             return false;
         }
-
-        m_leftWrenchFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
-                                                                                   sampligTime);
-        m_rightWrenchFilter = std::make_unique<iCub::ctrl::FirstOrderLowPassFilter>(cutFrequency,
-                                                                                    sampligTime);
     }
-    return true;
+
+    // initialize the measured wrenches
+    bool ok = true;
+    for (std::size_t i = 0; i < leftFootWrenchOutputPorts.size(); i++)
+    {
+        ok = ok && this->configureForceTorqueSensor(portPrefix,
+                                                    leftFootWrenchInputPorts[i],
+                                                    leftFootWrenchOutputPorts[i],
+                                                    samplingTime,
+                                                    useWrenchFilter, cutFrequency,
+                                                    m_leftFootMeasuredWrench[i]);
+    }
+
+    for (std::size_t i = 0; i < rightFootWrenchOutputPorts.size(); i++)
+    {
+        ok = ok && this->configureForceTorqueSensor(portPrefix,
+                                                    rightFootWrenchInputPorts[i],
+                                                    rightFootWrenchOutputPorts[i],
+                                                    samplingTime,
+                                                    useWrenchFilter, cutFrequency,
+                                                    m_rightFootMeasuredWrench[i]);
+    }
+
+    return ok;
 }
 
 bool RobotInterface::configurePIDHandler(const yarp::os::Bottle& config)
@@ -527,11 +676,36 @@ bool RobotInterface::resetFilters()
     if(m_useVelocityFilter)
         m_velocityFilter->init(m_velocityFeedbackDeg);
 
-    if(m_useWrenchFilter)
+    for(auto& wrench : m_leftFootMeasuredWrench)
     {
-        m_leftWrenchFilter->init(m_leftWrenchInput);
-        m_rightWrenchFilter->init(m_rightWrenchInput);
+        if(wrench.useFilter)
+        {
+            if(!wrench.isUpdated)
+            {
+                yError() << "[RobotInterface::resetFilters] The left wrench is not updated. I cannot reset the filter.";
+                return false;
+            }
+
+            // reset the filter
+            wrench.lowPassFilter->init(wrench.wrenchInput);
+        }
     }
+
+    for(auto& wrench : m_rightFootMeasuredWrench)
+    {
+        if(wrench.useFilter)
+        {
+            if(!wrench.isUpdated)
+            {
+                yError() << "[RobotInterface::resetFilters] The right wrench is not updated. I cannot reset the filter.";
+                return false;
+            }
+
+            // reset the filter
+            wrench.lowPassFilter->init(wrench.wrenchInput);
+        }
+    }
+
 
     return true;
 }
@@ -551,22 +725,99 @@ bool RobotInterface::getFeedbacks(unsigned int maxAttempts)
         for(unsigned j = 0; j < m_actuatedDOFs; ++j)
             m_velocityFeedbackRad(j) = iDynTree::deg2rad(m_velocityFeedbackDegFiltered(j));
     }
-    if(m_useWrenchFilter)
-    {
-        m_leftWrenchInputFiltered = m_leftWrenchFilter->filt(m_leftWrenchInput);
-        m_rightWrenchInputFiltered = m_rightWrenchFilter->filt(m_rightWrenchInput);
 
-        if(!iDynTree::toiDynTree(m_leftWrenchInputFiltered, m_leftWrench))
+    // filt all the wrenches
+    for(auto& wrench : m_leftFootMeasuredWrench)
+    {
+        if(wrench.useFilter)
         {
-            yError() << "[RobotInterface::getFeedbacks] Unable to convert left foot wrench.";
-            return false;
-        }
-        if(!iDynTree::toiDynTree(m_rightWrenchInputFiltered, m_rightWrench))
-        {
-            yError() << "[RobotInterface::getFeedbacks] Unable to convert right foot wrench.";
-            return false;
+            if(!wrench.isUpdated)
+            {
+                yError() << "[RobotInterface::getFeedbacks] The left wrench is not updated. I cannot filter it.";
+                return false;
+            }
+
+            // apply the filter
+            wrench.wrenchInputFiltered =  wrench.lowPassFilter->filt(wrench.wrenchInput);
         }
     }
+
+    for(auto& wrench : m_rightFootMeasuredWrench)
+    {
+        if(wrench.useFilter)
+        {
+            if(!wrench.isUpdated)
+            {
+                yError() << "[RobotInterface::getFeedbacks] The right wrench is not updated. I cannot filter it.";
+                return false;
+            }
+
+            // apply the filter
+            wrench.wrenchInputFiltered =  wrench.lowPassFilter->filt(wrench.wrenchInput);
+        }
+    }
+
+    // left foot
+    // copy the first wrench
+    auto leftWrenchIt = m_leftFootMeasuredWrench.begin();
+    const yarp::sig::Vector* leftWrenchVectorPtr = &(leftWrenchIt->wrenchInput);
+    if(leftWrenchIt->useFilter)
+    {
+        leftWrenchVectorPtr = &(leftWrenchIt->wrenchInputFiltered);
+    }
+
+    if(!iDynTree::toiDynTree(*leftWrenchVectorPtr, m_leftWrench))
+    {
+        yError() << "[RobotInterface::getFeedbacks] Unable to convert left foot wrench.";
+        return false;
+    }
+
+    // sum all the other wrenches
+    std::advance(leftWrenchIt, 1);
+    for(;leftWrenchIt != m_leftFootMeasuredWrench.end(); std::advance(leftWrenchIt, 1))
+    {
+        yarp::sig::Vector* leftWrenchVectorPtr = &(leftWrenchIt->wrenchInput);
+        if(leftWrenchIt->useFilter)
+        {
+            leftWrenchVectorPtr = &(leftWrenchIt->wrenchInputFiltered);
+        }
+
+        // the idyntree wrench raw data  is not a consecutive array
+        iDynTree::toEigen(m_leftWrench.getLinearVec3()) += yarp::eigen::toEigen(*leftWrenchVectorPtr).head<3>();
+        iDynTree::toEigen(m_leftWrench.getAngularVec3()) += yarp::eigen::toEigen(*leftWrenchVectorPtr).tail<3>();
+    }
+
+    // right foot
+    // copy the first wrench
+    auto rightWrenchIt = m_rightFootMeasuredWrench.begin();
+    const yarp::sig::Vector* rightWrenchVectorPtr = &(rightWrenchIt->wrenchInput);
+    if(rightWrenchIt->useFilter)
+    {
+        rightWrenchVectorPtr = &(rightWrenchIt->wrenchInputFiltered);
+    }
+
+    if(!iDynTree::toiDynTree(*rightWrenchVectorPtr, m_rightWrench))
+    {
+        yError() << "[RobotInterface::getFeedbacks] Unable to convert right foot wrench.";
+        return false;
+    }
+
+    // sum all the other wrenches
+    std::advance(rightWrenchIt, 1);
+    for(;rightWrenchIt != m_rightFootMeasuredWrench.end(); std::advance(rightWrenchIt, 1))
+    {
+        yarp::sig::Vector* rightWrenchVectorPtr = &(rightWrenchIt->wrenchInput);
+        if(rightWrenchIt->useFilter)
+        {
+            rightWrenchVectorPtr = &(rightWrenchIt->wrenchInputFiltered);
+        }
+
+        // the idyntree wrench raw data  is not a consecutive array
+        iDynTree::toEigen(m_rightWrench.getLinearVec3()) += yarp::eigen::toEigen(*rightWrenchVectorPtr).head<3>();
+        iDynTree::toEigen(m_rightWrench.getAngularVec3()) += yarp::eigen::toEigen(*rightWrenchVectorPtr).tail<3>();
+    }
+
+
     return true;
 }
 
@@ -583,8 +834,16 @@ bool RobotInterface::switchToControlMode(const int& controlMode)
     std::vector<int> controlModes(m_actuatedDOFs, controlMode);
     if(!m_controlModeInterface->setControlModes(controlModes.data()))
     {
-        yError() << "[RobotInterface::switchToControlMode] Error while setting the controlMode.";
-        return false;
+        yError() << "[RobotInterface::switchToControlMode] Error while setting the controlMode. Trying joint by joint";
+
+        for (int i = 0; i < m_actuatedDOFs; i++)
+        {
+            if (!m_controlModeInterface->setControlMode(i, controlMode) && m_isGoodTrackingRequired[i])
+            {
+                yError() << "[RobotInterface::switchToControlMode] Error while setting the controlMode of" << m_axesList[i] << "and it requires good tracking.";
+                return false;
+            }
+        }
     }
     return true;
 }
@@ -769,7 +1028,7 @@ bool RobotInterface::setDirectPositionReferences(const iDynTree::VectorDynSize& 
         return false;
     }
 
-    if(worstError.second > 0.5)
+    if(worstError.second > 0.7)
     {
         yError() << "[RobotInterface::setDirectPositionReferences] The worst error between the current and the "
                  << "desired position of the " <<  m_axesList[worstError.first]
@@ -834,8 +1093,13 @@ bool RobotInterface::setVelocityReferences(const iDynTree::VectorDynSize& desire
 
 bool RobotInterface::close()
 {
-    m_rightWrenchPort.close();
-    m_leftWrenchPort.close();
+    // close all the ports
+    for(auto& wrench : m_leftFootMeasuredWrench)
+        wrench.port->close();
+
+    for(auto& wrench : m_rightFootMeasuredWrench)
+        wrench.port->close();
+
     switchToControlMode(VOCAB_CM_POSITION);
     m_controlMode = VOCAB_CM_POSITION;
     setInteractionMode(yarp::dev::InteractionModeEnum::VOCAB_IM_STIFF);

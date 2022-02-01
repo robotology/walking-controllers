@@ -83,6 +83,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double timeWeight = config.check("timeWeight", yarp::os::Value(2.5)).asDouble();
     double positionWeight = config.check("positionWeight", yarp::os::Value(1.0)).asDouble();
     double slowWhenTurningGain = config.check("slowWhenTurningGain", yarp::os::Value(0.0)).asDouble();
+    double slowWhenBackwardFactor = config.check("slowWhenBackwardFactor", yarp::os::Value(1.0)).asDouble();
     double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asDouble();
     double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asDouble();
     double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asDouble();
@@ -103,6 +104,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
                                                yarp::os::Value(0.4)).asDouble();
     double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
     double lastStepDCMOffset = config.check("lastStepDCMOffset", yarp::os::Value(0.0)).asDouble();
+    m_leftYawDeltaInRad = iDynTree::deg2rad(config.check("leftYawDeltaInDeg", yarp::os::Value(0.0)).asDouble());
+    m_rightYawDeltaInRad = iDynTree::deg2rad(config.check("rightYawDeltaInDeg", yarp::os::Value(0.0)).asDouble());
 
     m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
 
@@ -111,6 +114,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_useMinimumJerk = config.check("useMinimumJerkFootTrajectory",
                                     yarp::os::Value(false)).asBool();
     double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asDouble();
+
+    yarp::os::Bottle ellipseMethodGroup = config.findGroup("ELLIPSE_METHOD_SETTINGS");
+    double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();
+    double innerEllipseOffset = ellipseMethodGroup.check("inner_ellipse_offset", yarp::os::Value(0.0)).asFloat64();
 
     // try to configure the planner
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
@@ -129,9 +136,14 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
-    unicyclePlanner->addTerminalStep(false);
+    ok = ok && unicyclePlanner->setSlowWhenBackwardFactor(slowWhenBackwardFactor);
+    unicyclePlanner->setLeftFootYawOffsetInRadians(m_leftYawDeltaInRad);
+    unicyclePlanner->setRightFootYawOffsetInRadians(m_rightYawDeltaInRad);
+    unicyclePlanner->addTerminalStep(true);
     unicyclePlanner->startWithLeft(m_swingLeft);
     unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
+    ok = ok && unicyclePlanner->setFreeSpaceEllipseConservativeFactor(freeSpaceConservativeFactor);
+    ok = ok && unicyclePlanner->setInnerFreeSpaceEllipseOffset(innerEllipseOffset);
 
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
@@ -157,6 +169,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_dcmGenerator->setLastStepDCMOffsetPercentage(lastStepDCMOffset);
 
     m_correctLeft = true;
+
+    m_newFreeSpaceEllipse = false;
 
     if(ok)
     {
@@ -186,14 +200,20 @@ void TrajectoryGenerator::computeThread()
         double endTime;
         double dT;
 
+        double nominalWidth;
+
         bool correctLeft;
 
-        iDynTree::Vector2 desiredPoint;
+        iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
         iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
         double measuredAngleLeft, measuredAngleRight;
+        double leftYawDeltaInRad, rightYawDeltaInRad;
 
         iDynTree::Vector2 DCMBoundaryConditionAtMergePointPosition;
         iDynTree::Vector2 DCMBoundaryConditionAtMergePointVelocity;
+
+        bool shouldUpdateEllipsoid;
+        FreeSpaceEllipse freeSpaceEllipse;
 
         // wait until a new trajectory has to be evaluated.
         {
@@ -210,7 +230,7 @@ void TrajectoryGenerator::computeThread()
             endTime = initTime + m_plannerHorizon;
 
             // set desired point
-            desiredPoint = m_desiredPoint;
+            desiredPointInRelativeFrame = m_desiredPoint;
 
             // dcm boundary conditions
             DCMBoundaryConditionAtMergePointPosition = m_DCMBoundaryConditionAtMergePointPosition;
@@ -220,27 +240,25 @@ void TrajectoryGenerator::computeThread()
             measuredPositionLeft(0) = m_measuredTransformLeft.getPosition()(0);
             measuredPositionLeft(1) = m_measuredTransformLeft.getPosition()(1);
             measuredAngleLeft = m_measuredTransformLeft.getRotation().asRPY()(2);
+            leftYawDeltaInRad = m_leftYawDeltaInRad;
 
             // right foot
             measuredPositionRight(0) = m_measuredTransformRight.getPosition()(0);
             measuredPositionRight(1) = m_measuredTransformRight.getPosition()(1);
             measuredAngleRight = m_measuredTransformRight.getRotation().asRPY()(2);
+            rightYawDeltaInRad = m_rightYawDeltaInRad;
 
             correctLeft = m_correctLeft;
-        }
 
-        // clear the old trajectory
-        std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
-        unicyclePlanner->clearDesiredTrajectory();
+            freeSpaceEllipse = m_freeSpaceEllipse;
+            shouldUpdateEllipsoid = m_newFreeSpaceEllipse;
+            m_newFreeSpaceEllipse = false;
+            nominalWidth = m_nominalWidth;
 
-        // add new point
-        if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, desiredPoint))
-        {
-            // something goes wrong
-            std::lock_guard<std::mutex> guard(m_mutex);
-            m_generatorState = GeneratorState::Configured;
-            yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-            break;
+            if (shouldUpdateEllipsoid)
+            {
+                yInfo() << "[TrajectoryGenerator_Thread] Setting ellipsoid: " << freeSpaceEllipse.printInfo();
+            }
         }
 
         iDynTree::Vector2 measuredPosition;
@@ -252,12 +270,86 @@ void TrajectoryGenerator::computeThread()
         initialState.initialPosition = DCMBoundaryConditionAtMergePointPosition;
         initialState.initialVelocity = DCMBoundaryConditionAtMergePointVelocity;
 
+        Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
+        unicyclePositionFromStanceFoot(0) = 0.0;
+
+        Eigen::Matrix2d unicycleRotation;
+        double unicycleAngle;
+
+        if (correctLeft)
+        {
+            unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
+            unicycleAngle = measuredAngleLeft - leftYawDeltaInRad;
+            footPosition = iDynTree::toEigen(measuredPositionLeft);
+        }
+        else
+        {
+            unicyclePositionFromStanceFoot(1) = nominalWidth/2;
+            unicycleAngle = measuredAngleRight - rightYawDeltaInRad;
+            footPosition = iDynTree::toEigen(measuredPositionRight);
+        }
+
+        double s_theta = std::sin(unicycleAngle);
+        double c_theta = std::cos(unicycleAngle);
+
+        unicycleRotation(0,0) = c_theta;
+        unicycleRotation(0,1) = -s_theta;
+        unicycleRotation(1,0) = s_theta;
+        unicycleRotation(1,1) = c_theta;
+
+        unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+
+        // apply the homogeneous transformation w_H_{unicycle}
+        iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
+                                                                             iDynTree::toEigen(desiredPointInRelativeFrame))
+                + unicyclePosition;
+
+        // clear the old trajectory
+        std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+        unicyclePlanner->clearDesiredTrajectory();
+
+        // add new point
+        if(!unicyclePlanner->addDesiredTrajectoryPoint(endTime, desiredPointInAbsoluteFrame))
+        {
+            // something goes wrong
+            std::lock_guard<std::mutex> guard(m_mutex);
+            m_generatorState = GeneratorState::Configured;
+            yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+            break;
+        }
+
         if (!m_dcmGenerator->setDCMInitialState(initialState)) {
             // something goes wrong
             std::lock_guard<std::mutex> guard(m_mutex);
             m_generatorState = GeneratorState::Configured;
             yError() << "[TrajectoryGenerator_Thread] Failed to set the initial state.";
             break;
+        }
+
+        if (shouldUpdateEllipsoid)
+        {
+            iDynTree::MatrixFixSize<2,2> ellipseImage = freeSpaceEllipse.imageMatrix(), newEllipseImage;
+            iDynTree::VectorFixSize<2> centerOffset = freeSpaceEllipse.centerOffset(), newCenterOffset;
+
+            iDynTree::toEigen(newEllipseImage) = unicycleRotation * iDynTree::toEigen(ellipseImage);
+
+            iDynTree::toEigen(newCenterOffset) = unicycleRotation * iDynTree::toEigen(centerOffset) + unicyclePosition;
+
+            if (!freeSpaceEllipse.setEllipse(newEllipseImage, newCenterOffset))
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Failed in setting the free space ellipsoid to a world frame.";
+                continue;
+            }
+
+            if (!m_trajectoryGenerator.unicyclePlanner()->setFreeSpaceEllipse(freeSpaceEllipse))
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Failed in setting free space ellipsoid.";
+                continue;
+            }
         }
 
         if(m_trajectoryGenerator.reGenerate(initTime, dT, endTime,
@@ -417,7 +509,10 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
         return false;
     }
 
-    m_generatorState = GeneratorState::Returned;
+    {
+        std::lock_guard<std::mutex> guard(m_mutex);
+        m_generatorState = GeneratorState::Returned;
+    }
     return true;
 }
 
@@ -441,32 +536,8 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                      << "Please call 'generateFirstTrajectories()' method.";
             return false;
         }
-    }
-    // if correctLeft is true the stance foot is the true.
-    // The vector (expressed in the unicycle reference frame from the left foot to the center of the
-    // unicycle is [0, width/2]')
-    iDynTree::Vector2 unicyclePositionFromStanceFoot;
-    unicyclePositionFromStanceFoot(0) = 0.0;
-    unicyclePositionFromStanceFoot(1) = correctLeft ? -m_nominalWidth/2 : m_nominalWidth/2;
 
-    iDynTree::Vector2 desredPositionFromStanceFoot;
-    iDynTree::toEigen(desredPositionFromStanceFoot) = iDynTree::toEigen(unicyclePositionFromStanceFoot)
-        + iDynTree::toEigen(m_referencePointDistance) + iDynTree::toEigen(desiredPosition);
-
-    // prepare the rotation matrix w_R_{unicycle}
-    double theta = measured.getRotation().asRPY()(2);
-    double s_theta = std::sin(theta);
-    double c_theta = std::cos(theta);
-
-    // save the data
-    {
-        std::lock_guard<std::mutex> guard(m_mutex);
-
-        // apply the homogeneous transformation w_H_{unicycle}
-        m_desiredPoint(0) = c_theta * desredPositionFromStanceFoot(0)
-            - s_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(0);
-        m_desiredPoint(1) = s_theta * desredPositionFromStanceFoot(0)
-            + c_theta * desredPositionFromStanceFoot(1) + measured.getPosition()(1);
+        m_desiredPoint = desiredPosition;
 
         m_initTime = initTime;
 
@@ -487,6 +558,13 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
     m_conditionVariable.notify_one();
 
     return true;
+}
+
+bool TrajectoryGenerator::setFreeSpaceEllipse(const iDynTree::MatrixFixSize<2, 2> &imageMatrix, const iDynTree::VectorFixSize<2> &centerOffset)
+{
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_newFreeSpaceEllipse = m_freeSpaceEllipse.setEllipse(imageMatrix, centerOffset);
+    return m_newFreeSpaceEllipse;
 }
 
 bool TrajectoryGenerator::isTrajectoryComputed()
@@ -678,5 +756,17 @@ bool TrajectoryGenerator::getIsStancePhase(std::vector<bool>& isStancePhase)
         }
     }
 
+    return true;
+}
+
+bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &desiredZMP)
+{
+    if(!isTrajectoryComputed())
+    {
+        yError() << "[getDesiredZMP] No trajectories are available";
+        return false;
+    }
+
+    desiredZMP = m_dcmGenerator->getZMPPosition();
     return true;
 }

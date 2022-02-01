@@ -20,6 +20,8 @@
 #include <yarp/os/RpcClient.h>
 
 
+#include <BipedalLocomotion/YarpUtilities/VectorsCollection.h>
+
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
@@ -29,6 +31,7 @@
 #include <WalkingControllers/RobotInterface/PIDHandler.h>
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 #include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
+#include <WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h>
 
 #include <WalkingControllers/SimplifiedModelControllers/DCMModelPredictiveController.h>
 #include <WalkingControllers/SimplifiedModelControllers/DCMReactiveController.h>
@@ -71,9 +74,21 @@ namespace WalkingControllers
         bool m_useQPIK; /**< True if the QP-IK is used. */
         bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
+        bool m_firstRun; /**< True if it is the first run. */
+        bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
+
+        double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
+
+        iDynTree::Vector2 m_previousZMP; /**< Previous ZMP value to check if the ZMP was constant for a while. */
+        int m_constantZMPCounter; /**< Counter to check for how long the ZMP was constant. */
+        double m_constantZMPTolerance; /**< Tolerance to consider the ZMP constant. */
+        int m_constantZMPMaxCounter; /**< Max counter value for triggering the error on the constant measured ZMP. */
+        double m_minimumNormalForceZMP; /**< Minimum force value to consider a contact stable. */
+        iDynTree::Vector2 m_maxZMP; /**< Max value to consider the local ZMP valid. */
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
+        std::unique_ptr<FreeSpaceEllipseManager> m_freeSpaceEllipseManager; /**< Pointer to the free space ellipse manager. */
         std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
         std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
@@ -109,6 +124,7 @@ namespace WalkingControllers
                                                 In general a main frame of a foot is the fix frame only during the
                                                 stance and the switch out phases. */
 
+        std::deque<iDynTree::Vector2> m_desiredZMP; /**< Deque containing the desired ZMP position. */
 
         iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
@@ -123,12 +139,17 @@ namespace WalkingControllers
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
+        bool m_useRootLinkForHeight;
+        double m_comHeightOffset{0};
+
         std::mutex m_mutex; /**< Mutex. */
 
         iDynTree::Vector2 m_desiredPosition;
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
+
+        yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
 
         /**
          * Get the robot model from the resource finder and set it.

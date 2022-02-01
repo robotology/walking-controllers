@@ -87,6 +87,7 @@ export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
 3. Run gazebo and drag and drop iCub (e.g. icubGazeboSim or iCubGazeboV2_5):
 
     ``` sh
+    export YARP_CLOCK=/clock
     gazebo -slibgazebo_yarp_clock.so
     ```
 4. Run `yarprobotinterface`
