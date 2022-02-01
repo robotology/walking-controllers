@@ -2,6 +2,8 @@
 All notable changes to this project are documented in this file.
 
 ## [Unreleased]
+
+## [0.5.0] - 2022-02-01
 ### Added
 - Add the possibility to use the walking-module with iCubGenova09 (https://github.com/robotology/walking-controllers/pull/80)
 - Add the possibility to use the `FreeSpaceEllipse` in the `TrajectoryPlanner` (https://github.com/robotology/walking-controllers/pull/82)
@@ -131,7 +133,8 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
-[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.4.1...devel
+[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.5.0...devel
+[0.5.0]: https://github.com/robotology/walking-controllers/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/robotology/walking-controllers/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/robotology/walking-controllers/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/robotology/walking-controllers/compare/v0.3.2...v0.3.3
