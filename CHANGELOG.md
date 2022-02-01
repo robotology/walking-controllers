@@ -4,10 +4,18 @@ All notable changes to this project are documented in this file.
 ## [Unreleased]
 ### Added
 - Add the possibility to use the walking-module with iCubGenova09 (https://github.com/robotology/walking-controllers/pull/80)
+- Add the possibility to use the `FreeSpaceEllipse` in the `TrajectoryPlanner` (https://github.com/robotology/walking-controllers/pull/82)
+- Enable the `iFeel` retargeting pipeline (https://github.com/robotology/walking-controllers/pull/87)
+- Bipedal locomotion v0.6.0 is now required to compile the project (https://github.com/robotology/walking-controllers/pull/97)
+- Add the possibility to control the root link height instead of the CoM height (https://github.com/robotology/walking-controllers/pull/93 and https://github.com/robotology/walking-controllers/pull/96)
 
 ### Changed
-- Fixed missing link library in `WholeBodyControllers` component  (https://github.com/robotology/walking-controllers/pull/81).
 - Add the possibility to handle multiple wrenches in the RobotInterface/Helper class (https://github.com/robotology/walking-controllers/pull/80)
+- Using the `feetYawDelta` and the `slowWhenBackwardFactor` in the `TrajectoryPlanner` (https://github.com/robotology/walking-controllers/pull/89)
+- `WalkingModule` logs the data through bipedal locomotion framework logger (https://github.com/robotology/walking-controllers/pull/97)
+
+### Fixed
+- Fixed missing link library in `WholeBodyControllers` component  (https://github.com/robotology/walking-controllers/pull/81).
 
 ## [0.4.1] - 2020-02-04
 
