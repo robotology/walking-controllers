@@ -54,6 +54,7 @@ Eprint = {arXiv:1809.02167},
 * [osqp-eigen](https://github.com/robotology/osqp-eigen): to solve the MPC problem;
 * [qpOASES](https://github.com/robotology-dependencies/qpOASES): to solve the IK problem;
 * [Unicycle footstep planner](https://github.com/robotology/unicycle-footstep-planner/tree/dcmTrajectoryGenerator): to generate a trajectory for the DCM;
+* [bipedal-locomotion-framework](https://github.com/ami-iit/bipedal-locomotion-framework): for locomotion functionalities;
 * [Gazebo](http://gazebosim.org/): for the simulation (tested Gazebo 8, 9 and 10);
 * [Catch2](https://github.com/catchorg/Catch2): to compile the tests.
 
