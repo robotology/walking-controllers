@@ -51,7 +51,7 @@ Eprint = {arXiv:1809.02167},
 * [YARP](http://www.yarp.it/): to handle the comunication with the robot;
 * [iDynTree](http://wiki.icub.org/codyco/dox/html/idyntree/html/): to handle the robot kinematics;
 * [iCubContrib](https://github.com/robotology/icub-contrib-common): to configure the modules;
-* [icub-main](https://github.com/robotology/icub-main): to handle signale processing;
+* [icub-main](https://github.com/robotology/icub-main): to smooth and integrate signals;
 * [osqp-eigen](https://github.com/robotology/osqp-eigen): to solve the MPC problem;
 * [qpOASES](https://github.com/robotology-dependencies/qpOASES): to solve the IK problem;
 * [Unicycle footstep planner](https://github.com/robotology/unicycle-footstep-planner): to generate a trajectory for the DCM;
