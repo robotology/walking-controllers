@@ -51,9 +51,10 @@ Eprint = {arXiv:1809.02167},
 * [YARP](http://www.yarp.it/): to handle the comunication with the robot;
 * [iDynTree](http://wiki.icub.org/codyco/dox/html/idyntree/html/): to handle the robot kinematics;
 * [iCubContrib](https://github.com/robotology/icub-contrib-common): to configure the modules;
+* [icub-main](https://github.com/robotology/icub-main): to smooth and integrate signals;
 * [osqp-eigen](https://github.com/robotology/osqp-eigen): to solve the MPC problem;
 * [qpOASES](https://github.com/robotology-dependencies/qpOASES): to solve the IK problem;
-* [Unicycle footstep planner](https://github.com/robotology/unicycle-footstep-planner/tree/dcmTrajectoryGenerator): to generate a trajectory for the DCM;
+* [Unicycle footstep planner](https://github.com/robotology/unicycle-footstep-planner): to generate a trajectory for the DCM;
 * [bipedal-locomotion-framework](https://github.com/ami-iit/bipedal-locomotion-framework): for locomotion functionalities;
 * [Gazebo](http://gazebosim.org/): for the simulation (tested Gazebo 8, 9 and 10);
 * [Catch2](https://github.com/catchorg/Catch2): to compile the tests.
@@ -77,6 +78,13 @@ export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
 ```
 
 # :computer: How to run the simulation
+#### Additional Dependencies
+In order to run the simulation, the following additional dependency are required:
+* [`gazebo-yarp-plugins`](https://github.com/robotology/gazebo-yarp-plugins)
+* [`whole-body-estimators`](https://github.com/robotology/whole-body-estimators)
+* [`icub-models`](https://github.com/robotology/icub-models)
+
+#### How to run
 1. Set the `YARP_ROBOT_NAME` environment variable according to the chosen Gazebo model:
    ```sh
    export YARP_ROBOT_NAME="icubGazeboSim"
