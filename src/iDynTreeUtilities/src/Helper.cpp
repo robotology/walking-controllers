@@ -91,15 +91,15 @@ bool iDynTreeUtilities::Triplets::getTripletsFromValues(const yarp::os::Value& i
             return false;
         }
 
-        int row = tripletPtr->get(0).asInt();
-        int col = tripletPtr->get(1).asInt();
+        int row = tripletPtr->get(0).asInt32();
+        int col = tripletPtr->get(1).asInt32();
 
         if(col >= matrixDimension || row >= matrixDimension)
         {
             iDynTree::reportError("iDynTreeUtilities", "getTripletsFromValues", "Element position exceeds the matrix dimension");
             return false;
         }
-        output.pushTriplet(iDynTree::Triplet(col, row, tripletPtr->get(2).asDouble()));
+        output.pushTriplet(iDynTree::Triplet(col, row, tripletPtr->get(2).asFloat64()));
     }
     return true;
 }

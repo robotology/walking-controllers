@@ -215,7 +215,7 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     // robot name: used to connect to the robot
     std::string robot = config.check("robot", yarp::os::Value("icubSim")).asString();
 
-    double sampligTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    double sampligTime = config.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
 
     std::string name;
     if(!YarpUtilities::getStringFromSearchable(config, "name", name))
@@ -527,7 +527,7 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
         return false;
     }
 
-    double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    double samplingTime = config.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
 
     // collect the information for the ports of the left foot wrenches
     // from now on we assume that the wrenches are expressed in the same frame (e.g l_sole)

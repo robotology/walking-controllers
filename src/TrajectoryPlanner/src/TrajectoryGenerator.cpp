@@ -52,10 +52,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     }
 
 
-    m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
-    m_plannerHorizon = config.check("plannerHorizon", yarp::os::Value(20.0)).asDouble();
-    double unicycleGain = config.check("unicycleGain", yarp::os::Value(10.0)).asDouble();
-    double stancePhaseDelaySeconds = config.check("stance_phase_delay",yarp::os::Value(0.0)).asDouble();
+    m_dT = config.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
+    m_plannerHorizon = config.check("plannerHorizon", yarp::os::Value(20.0)).asFloat64();
+    double unicycleGain = config.check("unicycleGain", yarp::os::Value(10.0)).asFloat64();
+    double stancePhaseDelaySeconds = config.check("stance_phase_delay",yarp::os::Value(0.0)).asFloat64();
 
     m_stancePhaseDelay = (std::size_t) std::round(stancePhaseDelaySeconds / m_dT);
 
@@ -80,40 +80,40 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
         return false;
     }
 
-    double timeWeight = config.check("timeWeight", yarp::os::Value(2.5)).asDouble();
-    double positionWeight = config.check("positionWeight", yarp::os::Value(1.0)).asDouble();
-    double slowWhenTurningGain = config.check("slowWhenTurningGain", yarp::os::Value(0.0)).asDouble();
-    double slowWhenBackwardFactor = config.check("slowWhenBackwardFactor", yarp::os::Value(1.0)).asDouble();
-    double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asDouble();
-    double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asDouble();
-    double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asDouble();
+    double timeWeight = config.check("timeWeight", yarp::os::Value(2.5)).asFloat64();
+    double positionWeight = config.check("positionWeight", yarp::os::Value(1.0)).asFloat64();
+    double slowWhenTurningGain = config.check("slowWhenTurningGain", yarp::os::Value(0.0)).asFloat64();
+    double slowWhenBackwardFactor = config.check("slowWhenBackwardFactor", yarp::os::Value(1.0)).asFloat64();
+    double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asFloat64();
+    double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asFloat64();
+    double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asFloat64();
     double maxAngleVariation = iDynTree::deg2rad(config.check("maxAngleVariation",
-                                                              yarp::os::Value(40.0)).asDouble());
+                                                              yarp::os::Value(40.0)).asFloat64());
     double minAngleVariation = iDynTree::deg2rad(config.check("minAngleVariation",
-                                                              yarp::os::Value(5.0)).asDouble());
-    double maxStepDuration = config.check("maxStepDuration", yarp::os::Value(8.0)).asDouble();
-    double minStepDuration = config.check("minStepDuration", yarp::os::Value(2.9)).asDouble();
-    double stepHeight = config.check("stepHeight", yarp::os::Value(0.005)).asDouble();
-    double landingVelocity = config.check("stepLandingVelocity", yarp::os::Value(0.0)).asDouble();
-    double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asDouble();
-    double comHeight = config.check("com_height", yarp::os::Value(0.49)).asDouble();
-    double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asDouble();
-    double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asDouble();
-    double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asDouble();
+                                                              yarp::os::Value(5.0)).asFloat64());
+    double maxStepDuration = config.check("maxStepDuration", yarp::os::Value(8.0)).asFloat64();
+    double minStepDuration = config.check("minStepDuration", yarp::os::Value(2.9)).asFloat64();
+    double stepHeight = config.check("stepHeight", yarp::os::Value(0.005)).asFloat64();
+    double landingVelocity = config.check("stepLandingVelocity", yarp::os::Value(0.0)).asFloat64();
+    double apexTime = config.check("footApexTime", yarp::os::Value(0.5)).asFloat64();
+    double comHeight = config.check("com_height", yarp::os::Value(0.49)).asFloat64();
+    double comHeightDelta = config.check("comHeightDelta", yarp::os::Value(0.01)).asFloat64();
+    double nominalDuration = config.check("nominalDuration", yarp::os::Value(4.0)).asFloat64();
+    double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asFloat64();
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
-                                               yarp::os::Value(0.4)).asDouble();
-    double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asDouble();
-    double lastStepDCMOffset = config.check("lastStepDCMOffset", yarp::os::Value(0.0)).asDouble();
-    m_leftYawDeltaInRad = iDynTree::deg2rad(config.check("leftYawDeltaInDeg", yarp::os::Value(0.0)).asDouble());
-    m_rightYawDeltaInRad = iDynTree::deg2rad(config.check("rightYawDeltaInDeg", yarp::os::Value(0.0)).asDouble());
+                                               yarp::os::Value(0.4)).asFloat64();
+    double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asFloat64();
+    double lastStepDCMOffset = config.check("lastStepDCMOffset", yarp::os::Value(0.0)).asFloat64();
+    m_leftYawDeltaInRad = iDynTree::deg2rad(config.check("leftYawDeltaInDeg", yarp::os::Value(0.0)).asFloat64());
+    m_rightYawDeltaInRad = iDynTree::deg2rad(config.check("rightYawDeltaInDeg", yarp::os::Value(0.0)).asFloat64());
 
-    m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asDouble();
+    m_nominalWidth = config.check("nominalWidth", yarp::os::Value(0.04)).asFloat64();
 
     m_swingLeft = config.check("swingLeft", yarp::os::Value(true)).asBool();
     bool startWithSameFoot = config.check("startAlwaysSameFoot", yarp::os::Value(false)).asBool();
     m_useMinimumJerk = config.check("useMinimumJerkFootTrajectory",
                                     yarp::os::Value(false)).asBool();
-    double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asDouble();
+    double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asFloat64();
 
     yarp::os::Bottle ellipseMethodGroup = config.findGroup("ELLIPSE_METHOD_SETTINGS");
     double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();

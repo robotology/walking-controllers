@@ -40,14 +40,14 @@ void WalkingControllers::FreeSpaceEllipseManager::referenceThread()
 
                 for (const auto& i : inputs)
                 {
-                    if (!bottleInput->get(std::get<0>(i)).isDouble())
+                    if (!bottleInput->get(std::get<0>(i)).isFloat64())
                     {
                         std::lock_guard<std::mutex> lock(m_mutex);
                         yError() << "[FreeSpaceEllipseManager::referenceThread] The input number " << std::get<0>(i) << "(0 based) is not a double.";
                         continue;
                     }
 
-                    std::get<1>(i) = bottleInput->get(std::get<0>(i)).asDouble();
+                    std::get<1>(i) = bottleInput->get(std::get<0>(i)).asFloat64();
                 }
 
                 if (!inputEllipse.setEllipse(a, b, theta, centerX, centerY))

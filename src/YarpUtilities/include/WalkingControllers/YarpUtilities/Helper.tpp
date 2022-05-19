@@ -36,12 +36,12 @@ bool WalkingControllers::YarpUtilities::yarpListToVector(const yarp::os::Value& 
 
     for (int i = 0; i < inputPtr->size(); i++)
     {
-        if (!inputPtr->get(i).isDouble() && !inputPtr->get(i).isInt())
+        if (!inputPtr->get(i).isFloat64() && !inputPtr->get(i).isInt32())
         {
             yError() << "[yarpListToVector] The input is expected to be a double or an int";
             return false;
         }
-        output(i) = inputPtr->get(i).asDouble();
+        output(i) = inputPtr->get(i).asFloat64();
     }
     return true;
 }

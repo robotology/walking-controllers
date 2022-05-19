@@ -26,7 +26,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     // get the period
-    m_dT = rf.check("period", yarp::os::Value(0.1)).asDouble();
+    m_dT = rf.check("period", yarp::os::Value(0.1)).asFloat64();
 
     // set the module name
     std::string name;

@@ -70,7 +70,7 @@ bool LoggerClient::startRecord(const std::initializer_list<std::string>& strings
     YarpUtilities::populateBottleWithStrings(cmd, strings);
 
     m_rpcPort.write(cmd, outcome);
-    if(outcome.get(0).asInt() != 1)
+    if(outcome.get(0).asInt32() != 1)
     {
         yError() << "[startWalking] Unable to store data";
         return false;
@@ -84,7 +84,7 @@ void LoggerClient::quit()
     yarp::os::Bottle cmd, outcome;
     cmd.addString("quit");
     m_rpcPort.write(cmd, outcome);
-    if(outcome.get(0).asInt() != 1)
+    if(outcome.get(0).asInt32() != 1)
         yInfo() << "[close] Unable to close the stream.";
 
     // close ports

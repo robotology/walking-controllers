@@ -134,14 +134,14 @@ bool WalkingPIDHandler::parsePIDElement(const yarp::os::Value &groupElement, std
 
         for (int g = 1; g < 4; ++g) {
             yarp::os::Value gain = element->get(g);
-            if(!(gain.isDouble())&& !(gain.isInt())){
+            if(!(gain.isFloat64())&& !(gain.isInt32())){
                 yError() << "The gains are supposed to be numeric. " << jointName << ": " <<  element->get(g).toString();
                 return false;
             }
         }
-        pid.setKp(element->get(1).asDouble());
-        pid.setKi(element->get(2).asDouble());
-        pid.setKd(element->get(3).asDouble());
+        pid.setKp(element->get(1).asFloat64());
+        pid.setKi(element->get(2).asFloat64());
+        pid.setKd(element->get(3).asFloat64());
     } else {
         return false;
     }
@@ -151,8 +151,8 @@ bool WalkingPIDHandler::parsePIDElement(const yarp::os::Value &groupElement, std
 bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSettings)
 {
     m_useGainScheduling = PIDSettings.check("useGainScheduling", yarp::os::Value(false)).asBool();
-    m_firmwareDelay = PIDSettings.check("firmwareDelay", yarp::os::Value(0.0)).asDouble();
-    double smoothingTime = PIDSettings.check("smoothingTime", yarp::os::Value(1.0)).asDouble();
+    m_firmwareDelay = PIDSettings.check("firmwareDelay", yarp::os::Value(0.0)).asFloat64();
+    double smoothingTime = PIDSettings.check("smoothingTime", yarp::os::Value(1.0)).asFloat64();
 
     if (smoothingTime <= 0.0) {
         yError() << "The smoothing time is supposed to be positive.";
@@ -186,8 +186,8 @@ bool WalkingPIDHandler::parsePIDConfigurationFile(const yarp::os::Bottle &PIDSet
                 if (!fromStringToPIDPhase(phaseInput.asString(), phase))
                     return false;
 
-                double activationOffset = group->check("activationOffset", yarp::os::Value(0.0)).asDouble();
-//                double smoothingTime = group->check("smoothingTime", yarp::os::Value(1.0)).asDouble(); //For the time being we use a common smoothingTime
+                double activationOffset = group->check("activationOffset", yarp::os::Value(0.0)).asFloat64();
+//                double smoothingTime = group->check("smoothingTime", yarp::os::Value(1.0)).asFloat64(); //For the time being we use a common smoothingTime
 
                 PIDmap groupMap;
                 if (!parsePIDGroup(group, groupMap))
@@ -345,7 +345,7 @@ void WalkingPIDHandler::setPIDThread()
 
   if (m_originalSmoothingTimesInMs.get(i).isList()) {
   for (int j = 0; j < m_originalSmoothingTimesInMs.get(i).asList()->size(); ++j){
-  newList.addInt(smoothingTimeinMs);
+  newList.addInt32(smoothingTimeinMs);
   }
   } else {
   yError() << "The structure of the original smoothing times is not the expected one.";
@@ -399,9 +399,9 @@ bool WalkingPIDHandler::setGeneralSmoothingTime(double smoothingTime)
                 yarp::os::Bottle &innerOutput = output.addList();
                 yarp::os::Bottle *innerInput = input.get(i).asList();
                 for (int j = 0; j < innerInput->size(); ++j)
-                    innerOutput.addInt(smoothingTimeinMs);
+                    innerOutput.addInt32(smoothingTimeinMs);
             } else {
-                output.addInt(smoothingTimeinMs);
+                output.addInt32(smoothingTimeinMs);
             }
         }
 
