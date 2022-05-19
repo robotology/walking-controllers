@@ -225,9 +225,9 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 
     iDynTree::toEigen(m_kCom).setIdentity();
     yarp::os::Value k_posComValue = config.find("k_posCom");
-    if (k_posComValue.isDouble())
+    if (k_posComValue.isFloat64())
     {
-        iDynTree::toEigen(m_kCom) *= k_posComValue.asDouble();
+        iDynTree::toEigen(m_kCom) *= k_posComValue.asFloat64();
     }
     else if (k_posComValue.isList())
     {
@@ -240,12 +240,12 @@ bool WalkingQPIK::initializeMatrices(const yarp::os::Searchable& config)
 
         for (size_t i = 0; i < 3; ++i)
         {
-            if (!k_posComList->get(i).isDouble())
+            if (!k_posComList->get(i).isFloat64())
             {
                 yError() << "Initialization failed while reading k_posCom. It is a list, but the element with index" << i << "(0-based) is not a double.";
                 return false;
             }
-            m_kCom(i,i) = k_posComList->get(i).asDouble();
+            m_kCom(i,i) = k_posComList->get(i).asFloat64();
         }
     }
     else

@@ -41,7 +41,7 @@ bool WalkingDCMReactiveController::initialize(const yarp::os::Searchable& config
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
-    double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
+    double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asFloat64();
     m_omega = sqrt(gravityAcceleration / comHeight);
 
     m_isInitialized = true;

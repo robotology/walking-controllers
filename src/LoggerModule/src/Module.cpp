@@ -44,11 +44,11 @@ bool WalkingLoggerModule::respond(const yarp::os::Bottle& command, yarp::os::Bot
         if(!m_stream.is_open())
         {
             yError() << "[RPC Server] The stream is not open.";
-            reply.addInt(0);
+            reply.addInt32(0);
             return true;
         }
         m_stream.close();
-        reply.addInt(1);
+        reply.addInt32(1);
 
         yInfo() << "[RPC Server] The stream is closed.";
         return true;
@@ -58,7 +58,7 @@ bool WalkingLoggerModule::respond(const yarp::os::Bottle& command, yarp::os::Bot
         if(m_stream.is_open())
         {
             yError() << "[RPC Server] The stream is already open.";
-            reply.addInt(0);
+            reply.addInt32(0);
             return false;
         }
 
@@ -87,13 +87,13 @@ bool WalkingLoggerModule::respond(const yarp::os::Bottle& command, yarp::os::Bot
         // write the head of the table
         m_stream << head << std::endl;
 
-        reply.addInt(1);
+        reply.addInt32(1);
         return true;
     }
     else
     {
         yError() << "[RPC Server] Unknown command.";
-        reply.addInt(0);
+        reply.addInt32(0);
         return false;
     }
     return true;
@@ -136,7 +136,7 @@ bool WalkingLoggerModule::configure(yarp::os::ResourceFinder &rf)
     attach(m_rpcPort);
 
     // set the RFModule period
-    m_dT = rf.check("sampling_time", yarp::os::Value(0.005)).asDouble();
+    m_dT = rf.check("sampling_time", yarp::os::Value(0.005)).asFloat64();
 
     return true;
 }

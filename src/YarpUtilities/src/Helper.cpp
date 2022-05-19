@@ -93,7 +93,7 @@ bool YarpUtilities::yarpListToBoolVector(yarp::os::Value*& input, std::vector<bo
     for(int i = 0; i < bottle->size(); i++)
     {
         // check if the elements of the bottle are bool or integer
-        if(!bottle->get(i).isBool() && !bottle->get(i).isInt())
+        if(!bottle->get(i).isBool() && !bottle->get(i).isInt32())
         {
             yError() << "[yarpListToBoolVector] There is a field that is not a bool.";
             return false;
@@ -113,13 +113,13 @@ bool YarpUtilities::getNumberFromSearchable(const yarp::os::Searchable& config, 
         return false;
     }
 
-    if(!value->isDouble())
+    if(!value->isFloat64())
     {
         yError() << "[getNumberFromSearchable] the value is not a double.";
         return false;
     }
 
-    number = value->asDouble();
+    number = value->asFloat64();
     return true;
 }
 
@@ -133,13 +133,13 @@ bool YarpUtilities::getNumberFromSearchable(const yarp::os::Searchable& config, 
         return false;
     }
 
-    if(!value->isInt())
+    if(!value->isInt32())
     {
         yError() << "[getNumberFromSearchable] the value is not an integer.";
         return false;
     }
 
-    number = value->asInt();
+    number = value->asInt32();
     return true;
 }
 

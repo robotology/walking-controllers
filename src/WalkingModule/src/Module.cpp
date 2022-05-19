@@ -135,10 +135,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_useOSQP = rf.check("use_osqp", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
-    m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asDouble();
-    m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asDouble();
-    m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt();
-    m_minimumNormalForceZMP = rf.check("minimum_normal_force_ZMP", yarp::os::Value(0.001)).asDouble();
+    m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asFloat64();
+    m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asFloat64();
+    m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt32();
+    m_minimumNormalForceZMP = rf.check("minimum_normal_force_ZMP", yarp::os::Value(0.001)).asFloat64();
     m_maxZMP[0] = 1.0;
     m_maxZMP[1] = 1.0;
 
@@ -152,26 +152,26 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             return false;
         }
 
-        if (!localBot->get(0).isDouble())
+        if (!localBot->get(0).isFloat64())
         {
             yError() << "[WalkingModule::configure] The first element of maximum_local_zmp is not a double.";
             return false;
         }
 
-        if (!localBot->get(1).isDouble())
+        if (!localBot->get(1).isFloat64())
         {
             yError() << "[WalkingModule::configure] The second element of maximum_local_zmp is not a double.";
             return false;
         }
 
-        m_maxZMP[0] = localBot->get(0).asDouble();
-        m_maxZMP[1] = localBot->get(1).asDouble();
+        m_maxZMP[0] = localBot->get(0).asFloat64();
+        m_maxZMP[1] = localBot->get(1).asFloat64();
 
     }
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
-    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
     std::string name;
     if(!YarpUtilities::getStringFromSearchable(generalOptions, "name", name))
     {

@@ -48,9 +48,9 @@ void WalkingIK::setVerboseMode(bool verboseMode) { m_verbose = verboseMode; }
 
 bool WalkingIK::initialize(yarp::os::Searchable& ikOption, const iDynTree::Model& model, const std::vector<std::string>& jointList)
 {
-    solverVerbosity = ikOption.check("solver-verbosity",yarp::os::Value(0)).asInt();
-    maxCpuTime = ikOption.check("max-cpu-time",yarp::os::Value(0.2)).asDouble();
-    m_jointRegularizationWeight = ikOption.check("joint_regularization_weight", yarp::os::Value(0.5)).asDouble();
+    solverVerbosity = ikOption.check("solver-verbosity",yarp::os::Value(0)).asInt32();
+    maxCpuTime = ikOption.check("max-cpu-time",yarp::os::Value(0.2)).asFloat64();
+    m_jointRegularizationWeight = ikOption.check("joint_regularization_weight", yarp::os::Value(0.5)).asFloat64();
     std::string lFootFrame = ikOption.check("left_foot_frame", yarp::os::Value("l_sole")).asString();
     std::string rFootFrame = ikOption.check("right_foot_frame", yarp::os::Value("r_sole")).asString();
     std::string solverName = ikOption.check("solver_name", yarp::os::Value("mumps")).asString();
@@ -135,11 +135,11 @@ bool WalkingIK::initialize(yarp::os::Searchable& ikOption, const iDynTree::Model
 
         for(int i = 0; i < guessValue->size(); ++i)
         {
-            if(!guessValue->get(i).isDouble() && !guessValue->get(i).isInt())
+            if(!guessValue->get(i).isFloat64() && !guessValue->get(i).isInt32())
             {
                 yError("The jointRegularization value is expected to be a double");
             }
-            m_jointRegularization(i) = guessValue->get(i).asDouble()*iDynTree::deg2rad(1);
+            m_jointRegularization(i) = guessValue->get(i).asFloat64()*iDynTree::deg2rad(1);
         }
         m_guess = m_jointRegularization;
     }

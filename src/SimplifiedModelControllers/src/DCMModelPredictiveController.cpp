@@ -182,11 +182,11 @@ bool WalkingController::initializeMatrices(const yarp::os::Searchable& config)
     }
 
     // get sampling time
-    double dT = config.check("sampling_time", yarp::os::Value(0.016)).asDouble();
+    double dT = config.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
 
     // evaluate the controller horizon
     double controllerHorizonSeconds = config.check("controllerHorizon",
-                                                   yarp::os::Value(2.0)).asDouble();
+                                                   yarp::os::Value(2.0)).asFloat64();
     m_controllerHorizon = round(controllerHorizonSeconds / dT);
 
     // get the state weight matrix
@@ -230,7 +230,7 @@ bool WalkingController::initializeMatrices(const yarp::os::Searchable& config)
         yError() << "[initialize] Unable to get the double from searchable.";
         return false;
     }
-    double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asDouble();
+    double gravityAcceleration = config.check("gravity_acceleration", yarp::os::Value(9.81)).asFloat64();
     double omega = sqrt(gravityAcceleration / comHeight);
 
     // evaluate dynamics matrix
@@ -275,8 +275,8 @@ bool WalkingController::initializeConstraints(const yarp::os::Searchable& config
         return false;
     }
 
-    double xlimit1 = xLimitsPtr->get(0).asDouble();
-    double xlimit2 = xLimitsPtr->get(1).asDouble();
+    double xlimit1 = xLimitsPtr->get(0).asFloat64();
+    double xlimit2 = xLimitsPtr->get(1).asFloat64();
 
     yarp::os::Value& yLimits = feetDimensionsPointer->get(1);
     if(yLimits.isNull() || !yLimits.isList())
@@ -292,8 +292,8 @@ bool WalkingController::initializeConstraints(const yarp::os::Searchable& config
         return false;
     }
 
-    double ylimit1 = yLimitsPtr->get(0).asDouble();
-    double ylimit2 = yLimitsPtr->get(1).asDouble();
+    double ylimit1 = yLimitsPtr->get(0).asFloat64();
+    double ylimit2 = yLimitsPtr->get(1).asFloat64();
 
     // evaluate the foot polygon
     iDynTree::Polygon foot;
@@ -306,7 +306,7 @@ bool WalkingController::initializeConstraints(const yarp::os::Searchable& config
     m_feetPolygons[1] = foot;
 
     // set the tolerance of the convex hull
-    m_convexHullTolerance = config.check("convex_hull_tolerance", yarp::os::Value(0.01)).asDouble();
+    m_convexHullTolerance = config.check("convex_hull_tolerance", yarp::os::Value(0.01)).asFloat64();
 
     return true;
 }
@@ -338,12 +338,12 @@ bool WalkingController::initialize(const yarp::os::Searchable& config)
 
     for (int i = 0; i < inputPtr->size(); ++i)
     {
-        if(!inputPtr->get(i).isDouble())
+        if(!inputPtr->get(i).isFloat64())
         {
             yError() << "[initialize] The zmp position is expected to be a double";
             return false;
         }
-        m_output(i) = inputPtr->get(i).asDouble();
+        m_output(i) = inputPtr->get(i).asFloat64();
     }
 
     if(!initializeMatrices(config))
