@@ -117,7 +117,9 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     yarp::os::Bottle ellipseMethodGroup = config.findGroup("ELLIPSE_METHOD_SETTINGS");
     double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();
-    double innerEllipseOffset = ellipseMethodGroup.check("inner_ellipse_offset", yarp::os::Value(0.0)).asFloat64();
+    double innerEllipseSemiMajorOffset = ellipseMethodGroup.check("inner_offset_major", yarp::os::Value(0.0)).asFloat64();
+    double innerEllipseSemiMinorOffset = ellipseMethodGroup.check("inner_offset_minor", yarp::os::Value(0.0)).asFloat64();
+
 
     // try to configure the planner
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
@@ -143,7 +145,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     unicyclePlanner->startWithLeft(m_swingLeft);
     unicyclePlanner->resetStartingFootIfStill(startWithSameFoot);
     ok = ok && unicyclePlanner->setFreeSpaceEllipseConservativeFactor(freeSpaceConservativeFactor);
-    ok = ok && unicyclePlanner->setInnerFreeSpaceEllipseOffset(innerEllipseOffset);
+    ok = ok && unicyclePlanner->setInnerFreeSpaceEllipseOffsets(innerEllipseSemiMajorOffset, innerEllipseSemiMinorOffset);
 
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
