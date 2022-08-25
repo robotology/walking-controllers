@@ -28,6 +28,8 @@
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/StdUtilities/Helper.h>
 
+constexpr std::size_t askNewTrajectoryIndex = 80;
+
 using namespace WalkingControllers;
 
 void WalkingModule::propagateTime()
@@ -382,6 +384,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_profiler->addTimer("MPC");
 
     m_profiler->addTimer("IK");
+    m_profiler->addTimer("Send Data");
     m_profiler->addTimer("Total");
 
     // initialize some variables
@@ -649,7 +652,7 @@ bool WalkingModule::updateModule()
         if(m_newTrajectoryRequired)
         {
             // when we are near to the merge point the new trajectory is evaluated
-            if(m_newTrajectoryMergeCounter == 20)
+            if(m_newTrajectoryMergeCounter == askNewTrajectoryIndex)
             {
 
                 double initTimeTrajectory;
@@ -922,6 +925,9 @@ bool WalkingModule::updateModule()
         // send data to the logger
         if(m_dumpData)
         {
+
+	    m_profiler->setInitTime("Send Data");
+
             iDynTree::Vector2 desiredZMP;
             if(m_useMPC)
                 desiredZMP = m_walkingController->getControllerOutput();
@@ -1018,6 +1024,8 @@ bool WalkingModule::updateModule()
             data.vectors["joints_state::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
 
             m_loggerPort.write();
+
+            m_profiler->setEndTime("Send Data");
 
         }
 
@@ -1534,13 +1542,13 @@ bool WalkingModule::setPlannerInput(double x, double y)
             return true;
 
         // Since the evaluation of a new trajectory takes time the new trajectory will be merged after x cycles
-        m_newTrajectoryMergeCounter = 20;
+        m_newTrajectoryMergeCounter = askNewTrajectoryIndex;
     }
 
     // the trajectory was not finished the new trajectory will be attached at the next merge point
     else
     {
-        if(m_mergePoints.front() > 20)
+        if(m_mergePoints.front() > askNewTrajectoryIndex)
             m_newTrajectoryMergeCounter = m_mergePoints.front();
         else if(m_mergePoints.size() > 1)
         {
@@ -1554,7 +1562,7 @@ bool WalkingModule::setPlannerInput(double x, double y)
             if(m_newTrajectoryRequired)
                 return true;
 
-            m_newTrajectoryMergeCounter = 20;
+            m_newTrajectoryMergeCounter = askNewTrajectoryIndex;
         }
     }
 
