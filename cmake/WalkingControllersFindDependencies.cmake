@@ -134,7 +134,7 @@ checkandset_dependency(iDynTree)
 find_package(Eigen3 3.2.92 QUIET)
 checkandset_dependency(Eigen3)
 
-find_package(UnicyclePlanner 0.4.3 QUIET)
+find_package(UnicyclePlanner 0.5.0 QUIET)
 checkandset_dependency(UnicyclePlanner)
 
 find_package(osqp QUIET)

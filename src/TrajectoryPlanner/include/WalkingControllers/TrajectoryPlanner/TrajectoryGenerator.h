@@ -38,6 +38,7 @@ namespace WalkingControllers
     class TrajectoryGenerator
     {
         UnicycleGenerator m_trajectoryGenerator; /**< UnicycleTrajectoryGenerator object. */
+        UnicycleController m_unicycleController; /**< The controller used by the unicycle. */
         std::shared_ptr<DCMTrajectoryGenerator> m_dcmGenerator;
         std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGenerator;
         std::shared_ptr<FeetGenerator> m_feetGenerator;
