@@ -101,6 +101,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double positionWeight = config.check("positionWeight", yarp::os::Value(1.0)).asFloat64();
     double slowWhenTurningGain = config.check("slowWhenTurningGain", yarp::os::Value(0.0)).asFloat64();
     double slowWhenBackwardFactor = config.check("slowWhenBackwardFactor", yarp::os::Value(1.0)).asFloat64();
+    double slowWhenSidewaysFactor = config.check("slowWhenSidewaysFactor", yarp::os::Value(1.0)).asFloat64();
     double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asFloat64();
     double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asFloat64();
     double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asFloat64();
@@ -156,6 +157,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
     ok = ok && unicyclePlanner->setSlowWhenBackwardFactor(slowWhenBackwardFactor);
+    ok = ok && unicyclePlanner->setSlowWhenSidewaysFactor(slowWhenSidewaysFactor);
     unicyclePlanner->setLeftFootYawOffsetInRadians(m_leftYawDeltaInRad);
     unicyclePlanner->setRightFootYawOffsetInRadians(m_rightYawDeltaInRad);
     unicyclePlanner->addTerminalStep(true);
