@@ -125,14 +125,14 @@ In order to run the simulation, the following additional dependency are required
      controller sending `startWalking` command;
    * `stopWalking`: the controller is stopped, in order to start again the
      controller you have to prepare again the robot.
-   * `setGoal x y`: send the desired final position, `x` and `y` are doubles expressed in iCub fixed frame, in meters. Send this command after `startWalking`.
+   * `setGoal x y`: send the desired input to the planner. Send this command after `startWalking`.
 
    Example sequence:
    ```
    prepareRobot
    startWalking
-   setGoal 1.0 0.0
-   setGoal 1.0 0.0
+   setGoal (1.0 0.0)
+   setGoal (1.0 0.0)
    stopWalking
    ```
 
