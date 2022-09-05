@@ -638,11 +638,13 @@ bool WalkingModule::updateModule()
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if(desiredUnicyclePosition != nullptr)
-            if(!setPlannerInput((*desiredUnicyclePosition)(0), (*desiredUnicyclePosition)(1)))
+        {
+            if(!setPlannerInput(*desiredUnicyclePosition))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
             }
+        }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
         // the time to attach new one
@@ -662,7 +664,7 @@ bool WalkingModule::updateModule()
                 // ask for a new trajectory
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
                                        measuredTransform, m_newTrajectoryMergeCounter,
-                                       m_desiredPosition))
+                                       m_plannerInput))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to ask for a new trajectory.";
                     return false;
@@ -1331,7 +1333,7 @@ bool WalkingModule::generateFirstTrajectories()
 
 bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
                                        const iDynTree::Transform& measuredTransform,
-                                       const size_t& mergePoint, const iDynTree::Vector2& desiredPosition)
+                                       const size_t& mergePoint, const iDynTree::VectorDynSize &plannerDesiredInput)
 {
     if(m_trajectoryGenerator == nullptr)
     {
@@ -1363,7 +1365,7 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
-                                                  measuredTransform, desiredPosition))
+                                                  measuredTransform, plannerDesiredInput))
     {
         yError() << "[WalkingModule::askNewTrajectories] Unable to update the trajectory.";
         return false;
@@ -1513,7 +1515,7 @@ bool WalkingModule::startWalking()
     return true;
 }
 
-bool WalkingModule::setPlannerInput(double x, double y)
+bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
 {
     // in the approaching phase the robot should not move
     // as soon as the approaching phase is finished the user
@@ -1558,22 +1560,21 @@ bool WalkingModule::setPlannerInput(double x, double y)
         }
     }
 
-    m_desiredPosition(0) = x;
-    m_desiredPosition(1) = y;
+    m_plannerInput = plannerInput;
 
     m_newTrajectoryRequired = true;
 
     return true;
 }
 
-bool WalkingModule::setGoal(double x, double y)
+bool WalkingModule::setGoal(const yarp::sig::Vector &plannerInput)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
     if(m_robotState != WalkingFSM::Walking)
         return false;
 
-    return setPlannerInput(x, y);
+    return setPlannerInput(plannerInput);
 }
 
 bool WalkingModule::pauseWalking()
