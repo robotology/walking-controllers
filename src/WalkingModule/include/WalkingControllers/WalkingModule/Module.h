@@ -144,7 +144,7 @@ namespace WalkingControllers
 
         std::mutex m_mutex; /**< Mutex. */
 
-        iDynTree::VectorDynSize m_plannerInput;
+        iDynTree::VectorDynSize m_plannerInput, m_goalScaling;
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
@@ -251,6 +251,12 @@ namespace WalkingControllers
          * Reset the entire controller architecture
          */
         void reset();
+
+        /**
+         * @brief Apply the scaling on the input from goal port.
+         * @param plannerInput The raw data read from the goal port.
+         */
+        void applyGoalScaling(yarp::sig::Vector &plannerInput);
 
     public:
 

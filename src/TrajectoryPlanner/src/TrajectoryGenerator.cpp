@@ -571,13 +571,19 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
 
         if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
-            if (plannerDesiredInput.size() != 2)
+            if (plannerDesiredInput.size() < 2)
             {
                 yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
                                     << ". Using zero input.";
             }
             else
             {
+                if (plannerDesiredInput.size() > 2)
+                {
+                    yWarningOnce() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+                                        << ". Using only the first two inputs. This warning will be showed only once.";
+                }
+
                 m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
                 m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
             }

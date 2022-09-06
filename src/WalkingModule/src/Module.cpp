@@ -141,6 +141,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_minimumNormalForceZMP = rf.check("minimum_normal_force_ZMP", yarp::os::Value(0.001)).asFloat64();
     m_maxZMP[0] = 1.0;
     m_maxZMP[1] = 1.0;
+    std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
 
     yarp::os::Value maxLocalZMP = rf.find("maximum_local_zmp");
     if (maxLocalZMP.isList())
@@ -169,6 +170,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     }
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
+
+    m_goalScaling.resize(3);
+    if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
+    {
+        yError() << "[WalkingModule::configure] Failed while reading goal_port_scaling.";
+        return false;
+    }
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
     m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
@@ -215,7 +223,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
-    std::string desiredUnyciclePositionPortName = "/" + getName() + "/goal:i";
+    std::string desiredUnyciclePositionPortName = "/" + getName() + goalSuffix;
     if(!m_desiredUnyciclePositionPort.open(desiredUnyciclePositionPortName))
     {
         yError() << "[WalkingModule::configure] Could not open" << desiredUnyciclePositionPortName << " port.";
@@ -410,7 +418,15 @@ void WalkingModule::reset()
     m_trajectoryGenerator->reset();
 
     if(m_dumpData)
-         m_loggerPort.close();
+        m_loggerPort.close();
+}
+
+void WalkingModule::applyGoalScaling(yarp::sig::Vector &plannerInput)
+{
+    for (size_t i = 0; i < std::min(plannerInput.size(), m_goalScaling.size()); ++i)
+    {
+        plannerInput(i) *= m_goalScaling(i);
+    }
 }
 
 bool WalkingModule::close()
@@ -639,6 +655,7 @@ bool WalkingModule::updateModule()
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if(desiredUnicyclePosition != nullptr)
         {
+            applyGoalScaling(*desiredUnicyclePosition);
             if(!setPlannerInput(*desiredUnicyclePosition))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
