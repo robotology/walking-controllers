@@ -10,6 +10,7 @@
 #define WALKING_MODULE_HPP
 
 // std
+#include <WalkingControllers/WholeBodyControllers/IntegrationBasedIK.h>
 #include <memory>
 #include <deque>
 
@@ -70,6 +71,7 @@ namespace WalkingControllers
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
+        bool m_useBLFIK; /**< True if the BLF-IK is used. */
         bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
@@ -92,6 +94,7 @@ namespace WalkingControllers
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
         std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
         std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
+        std::unique_ptr<IntegrationBasedIK> m_BLFIKSolver; /**< Pointer to the integration base ik. */
         std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
@@ -188,6 +191,10 @@ namespace WalkingControllers
                        const iDynTree::Rotation& desiredNeckOrientation,
                        iDynTree::VectorDynSize &output);
 
+        bool solveBLFIK(const iDynTree::Position& desiredCoMPosition,
+                        const iDynTree::Vector3& desiredCoMVelocity,
+                        const iDynTree::Rotation& desiredNeckOrientation,
+                        iDynTree::VectorDynSize &output);
         /**
          * Evaluate the position of Zero momentum point.
          * @param zmp zero momentum point.
