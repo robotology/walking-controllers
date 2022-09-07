@@ -29,7 +29,7 @@ namespace WalkingControllers
 
     class WalkingFK
     {
-        iDynTree::KinDynComputations m_kinDyn; /**< KinDynComputations solver. */
+        std::shared_ptr<iDynTree::KinDynComputations> m_kinDyn; /**< KinDynComputations solver. */
 
         bool m_useExternalRobotBase; /**< is external estimator for the base of robot used? */
         iDynTree::FreeFloatingGeneralizedTorques m_generalizedBiasForces;
@@ -267,6 +267,8 @@ namespace WalkingControllers
          * @return the joint position expressed in radians
          */
         const iDynTree::VectorDynSize& getJointPos();
+
+        std::shared_ptr<iDynTree::KinDynComputations> getKinDyn();
     };
 };
 #endif

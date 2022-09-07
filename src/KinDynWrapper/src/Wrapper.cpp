@@ -10,6 +10,8 @@
 #include <cmath>
 
 // YARP
+#include <iDynTree/KinDynComputations.h>
+#include <memory>
 #include <yarp/os/LogStream.h>
 #include <yarp/os/Value.h>
 
@@ -26,13 +28,13 @@ using namespace WalkingControllers;
 
 bool WalkingFK::setRobotModel(const iDynTree::Model& model)
 {
-    if(!m_kinDyn.loadRobotModel(model))
+    if(!m_kinDyn->loadRobotModel(model))
     {
         yError() << "[WalkingFK::setRobotModel] Error while loading into KinDynComputations object.";
         return false;
     }
 
-    m_kinDyn.setFrameVelocityRepresentation(iDynTree::MIXED_REPRESENTATION);
+    m_kinDyn->setFrameVelocityRepresentation(iDynTree::MIXED_REPRESENTATION);
 
     // initialize some quantities needed for the first step
     m_prevContactLeft = false;
@@ -42,7 +44,7 @@ bool WalkingFK::setRobotModel(const iDynTree::Model& model)
 
 bool WalkingFK::setBaseFrame(const std::string& baseFrame, const std::string& name)
 {
-    if(!m_kinDyn.isValid())
+    if(!m_kinDyn->isValid())
     {
         yError() << "[WalkingFK::setBaseFrames] Please set the Robot model before calling this method.";
         return false;
@@ -53,17 +55,17 @@ bool WalkingFK::setBaseFrame(const std::string& baseFrame, const std::string& na
     // - left_foot when the left foot is the stance foot;
     // - right_foot when the right foot is the stance foot.
     //.-.root when the external base supposed to be used
-    m_frameBaseIndex = m_kinDyn.model().getFrameIndex(baseFrame);
+    m_frameBaseIndex = m_kinDyn->model().getFrameIndex(baseFrame);
     if(m_frameBaseIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[setBaseFrames] Unable to find the frame named: " << baseFrame;
         return false;
     }
-    iDynTree::LinkIndex linkBaseIndex = m_kinDyn.model().getFrameLink(m_frameBaseIndex);
+    iDynTree::LinkIndex linkBaseIndex = m_kinDyn->model().getFrameLink(m_frameBaseIndex);
 
-    std::string baseFrameName = m_kinDyn.model().getLinkName(linkBaseIndex);
+    std::string baseFrameName = m_kinDyn->model().getLinkName(linkBaseIndex);
     m_baseFrames.insert({name, std::make_pair(baseFrameName,
-                                              m_kinDyn.getRelativeTransform(m_frameBaseIndex,
+                                              m_kinDyn->getRelativeTransform(m_frameBaseIndex,
                                                                             linkBaseIndex))});
 
     return true;
@@ -72,6 +74,8 @@ bool WalkingFK::setBaseFrame(const std::string& baseFrame, const std::string& na
 bool WalkingFK::initialize(const yarp::os::Searchable& config,
                            const iDynTree::Model& model)
 {
+    m_kinDyn = std::make_shared<iDynTree::KinDynComputations>();
+
     // check if the config is empty
     if(!setRobotModel(model))
     {
@@ -101,7 +105,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         return false;
     }
 
-    m_frameLeftIndex = m_kinDyn.model().getFrameIndex(lFootFrame);
+    m_frameLeftIndex = m_kinDyn->model().getFrameIndex(lFootFrame);
     if(m_frameLeftIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << lFootFrame;
@@ -110,7 +114,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
 
 
     // set base frames
-    m_frameRightIndex = m_kinDyn.model().getFrameIndex(rFootFrame);
+    m_frameRightIndex = m_kinDyn->model().getFrameIndex(rFootFrame);
     if(m_frameRightIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rFootFrame;
@@ -124,7 +128,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
         return false;
     }
-    m_frameLeftHandIndex = m_kinDyn.model().getFrameIndex(lHandFrame);
+    m_frameLeftHandIndex = m_kinDyn->model().getFrameIndex(lHandFrame);
     if(m_frameLeftHandIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << lHandFrame;
@@ -138,7 +142,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
         return false;
     }
-    m_frameRightHandIndex = m_kinDyn.model().getFrameIndex(rHandFrame);
+    m_frameRightHandIndex = m_kinDyn->model().getFrameIndex(rHandFrame);
     if(m_frameRightHandIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rHandFrame;
@@ -151,7 +155,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
         return false;
     }
-    m_frameHeadIndex = m_kinDyn.model().getFrameIndex(headFrame);
+    m_frameHeadIndex = m_kinDyn->model().getFrameIndex(headFrame);
     if(m_frameHeadIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << headFrame;
@@ -164,7 +168,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
         return false;
     }
-    m_frameRootIndex = m_kinDyn.model().getFrameIndex(rootFrame);
+    m_frameRootIndex = m_kinDyn->model().getFrameIndex(rootFrame);
     if(m_frameRootIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << rootFrame;
@@ -177,7 +181,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         yError() << "[WalkingFK::initialize] Unable to get the string from searchable.";
         return false;
     }
-    m_frameNeckIndex = m_kinDyn.model().getFrameIndex(torsoFrame);
+    m_frameNeckIndex = m_kinDyn->model().getFrameIndex(torsoFrame);
     if(m_frameNeckIndex == iDynTree::FRAME_INVALID_INDEX)
     {
         yError() << "[WalkingFK::initialize] Unable to find the frame named: " << torsoFrame;
@@ -213,7 +217,7 @@ bool WalkingFK::initialize(const yarp::os::Searchable& config,
         }
 
         // in this specific case the base is always the root link
-        if(!m_kinDyn.setFloatingBase(m_baseFrames["root"].first))
+        if(!m_kinDyn->setFloatingBase(m_baseFrames["root"].first))
         {
             yError() << "[initialize] Unable to set the floating base";
             return false;
@@ -303,7 +307,7 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         {
             auto& base = m_baseFrames["leftFoot"];
             m_worldToBaseTransform = leftFootTransform * base.second;
-            if(!m_kinDyn.setFloatingBase(base.first))
+            if(!m_kinDyn->setFloatingBase(base.first))
             {
                 yError() << "[evaluateWorldToBaseTransformation] Error while setting the floating "
                          << "base on link " << base.first;
@@ -320,7 +324,7 @@ bool WalkingFK::evaluateWorldToBaseTransformation(const iDynTree::Transform& lef
         {
             auto base = m_baseFrames["rightFoot"];
             m_worldToBaseTransform = rightFootTransform * base.second;
-            if(!m_kinDyn.setFloatingBase(base.first))
+            if(!m_kinDyn->setFloatingBase(base.first))
             {
                 yError() << "[WalkingFK::evaluateWorldToBaseTransformation] Error while setting the floating "
                          << "base on link " << base.first;
@@ -344,7 +348,7 @@ bool WalkingFK::setInternalRobotState(const iDynTree::VectorDynSize& positionFee
     gravity.zero();
     gravity(2) = -9.81;
 
-    if(!m_kinDyn.setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
+    if(!m_kinDyn->setRobotState(m_worldToBaseTransform, positionFeedbackInRadians,
                                m_baseTwist, velocityFeedbackInRadians,
                                gravity))
     {
@@ -363,8 +367,8 @@ void WalkingFK::evaluateCoM()
     if(m_comEvaluated)
         return;
 
-    m_comPosition = m_kinDyn.getCenterOfMassPosition();
-    m_comVelocity = m_kinDyn.getCenterOfMassVelocity();
+    m_comPosition = m_kinDyn->getCenterOfMassPosition();
+    m_comVelocity = m_kinDyn->getCenterOfMassVelocity();
 
     yarp::sig::Vector temp;
     temp.resize(3);
@@ -442,7 +446,7 @@ bool WalkingFK::setBaseOnTheFly()
 
     auto base = m_baseFrames["leftFoot"];
     m_worldToBaseTransform = base.second;
-    if(!m_kinDyn.setFloatingBase(base.first))
+    if(!m_kinDyn->setFloatingBase(base.first))
     {
         yError() << "[setBaseOnTheFly] Error while setting the floating base on link "
                  << base.first;
@@ -454,85 +458,90 @@ bool WalkingFK::setBaseOnTheFly()
 
 iDynTree::Transform WalkingFK::getLeftFootToWorldTransform()
 {
-    return m_kinDyn.getWorldTransform(m_frameLeftIndex);
+    return m_kinDyn->getWorldTransform(m_frameLeftIndex);
 }
 
 iDynTree::Transform WalkingFK::getRightFootToWorldTransform()
 {
-    return m_kinDyn.getWorldTransform(m_frameRightIndex);
+    return m_kinDyn->getWorldTransform(m_frameRightIndex);
 }
 
 iDynTree::Transform WalkingFK::getLeftHandToWorldTransform()
 {
-    return m_kinDyn.getWorldTransform(m_frameLeftHandIndex);
+    return m_kinDyn->getWorldTransform(m_frameLeftHandIndex);
 }
 
 iDynTree::Transform WalkingFK::getRightHandToWorldTransform()
 {
-    return m_kinDyn.getWorldTransform(m_frameRightHandIndex);
+    return m_kinDyn->getWorldTransform(m_frameRightHandIndex);
 }
 
 iDynTree::Transform WalkingFK::getHeadToWorldTransform()
 {
-    return m_kinDyn.getWorldTransform(m_frameHeadIndex);
+    return m_kinDyn->getWorldTransform(m_frameHeadIndex);
 }
 
 iDynTree::Transform WalkingFK::getRootLinkToWorldTransform()
 {
-    return m_kinDyn.getWorldTransform(m_frameRootIndex);
+    return m_kinDyn->getWorldTransform(m_frameRootIndex);
 }
 
 iDynTree::Twist WalkingFK::getRootLinkVelocity()
 {
-    return m_kinDyn.getFrameVel(m_frameRootIndex);
+    return m_kinDyn->getFrameVel(m_frameRootIndex);
 }
 
 iDynTree::Rotation WalkingFK::getNeckOrientation()
 {
-    return m_kinDyn.getWorldTransform(m_frameNeckIndex).getRotation();
+    return m_kinDyn->getWorldTransform(m_frameNeckIndex).getRotation();
 }
 
 bool WalkingFK::getLeftFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftIndex, jacobian);
+    return m_kinDyn->getFrameFreeFloatingJacobian(m_frameLeftIndex, jacobian);
 }
 
 bool WalkingFK::getRightFootJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightIndex, jacobian);
+    return m_kinDyn->getFrameFreeFloatingJacobian(m_frameRightIndex, jacobian);
 }
 
 bool WalkingFK::getRightHandJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRightHandIndex, jacobian);
+    return m_kinDyn->getFrameFreeFloatingJacobian(m_frameRightHandIndex, jacobian);
 }
 
 bool WalkingFK::getLeftHandJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameLeftHandIndex, jacobian);
+    return m_kinDyn->getFrameFreeFloatingJacobian(m_frameLeftHandIndex, jacobian);
 }
 
 bool WalkingFK::getRootLinkJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameRootIndex, jacobian);
+    return m_kinDyn->getFrameFreeFloatingJacobian(m_frameRootIndex, jacobian);
 }
 
 bool WalkingFK::getNeckJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getFrameFreeFloatingJacobian(m_frameNeckIndex, jacobian);
+    return m_kinDyn->getFrameFreeFloatingJacobian(m_frameNeckIndex, jacobian);
 }
 
 bool WalkingFK::getCoMJacobian(iDynTree::MatrixDynSize &jacobian)
 {
-    return m_kinDyn.getCenterOfMassJacobian(jacobian);
+    return m_kinDyn->getCenterOfMassJacobian(jacobian);
 }
 
 const iDynTree::VectorDynSize& WalkingFK::getJointPos()
 {
 
-    bool ok = m_kinDyn.getJointPos(m_jointPositions);
+    bool ok = m_kinDyn->getJointPos(m_jointPositions);
 
     assert(ok);
 
     return m_jointPositions;
+}
+
+std::shared_ptr<iDynTree::KinDynComputations> WalkingFK::getKinDyn()
+{
+    return m_kinDyn;
 }
