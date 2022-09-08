@@ -69,14 +69,21 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     iDynTree::Vector2 leftZMPDelta;
     if(!YarpUtilities::getVectorFromSearchable(config, "leftZMPDelta", leftZMPDelta))
     {
-        yError() << "[configurePlanner] Initialization failed while reading rStancePosition vector.";
+        yError() << "[configurePlanner] Initialization failed while reading leftZMPDelta vector.";
         return false;
     }
 
     iDynTree::Vector2 rightZMPDelta;
     if(!YarpUtilities::getVectorFromSearchable(config, "rightZMPDelta", rightZMPDelta))
     {
-        yError() << "[configurePlanner] Initialization failed while reading rStancePosition vector.";
+        yError() << "[configurePlanner] Initialization failed while reading rightZMPDelta vector.";
+        return false;
+    }
+
+    iDynTree::Vector2 saturationFactors;
+    if(!YarpUtilities::getVectorFromSearchable(config, "saturationFactors", saturationFactors))
+    {
+        yError() << "[configurePlanner] Initialization failed while reading saturationFactors vector.";
         return false;
     }
 
@@ -158,6 +165,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setSlowWhenTurnGain(slowWhenTurningGain);
     ok = ok && unicyclePlanner->setSlowWhenBackwardFactor(slowWhenBackwardFactor);
     ok = ok && unicyclePlanner->setSlowWhenSidewaysFactor(slowWhenSidewaysFactor);
+    ok = ok && unicyclePlanner->setSaturationsConservativeFactors(saturationFactors(0), saturationFactors(1));
     unicyclePlanner->setLeftFootYawOffsetInRadians(m_leftYawDeltaInRad);
     unicyclePlanner->setRightFootYawOffsetInRadians(m_rightYawDeltaInRad);
     unicyclePlanner->addTerminalStep(true);
