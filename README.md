@@ -160,15 +160,37 @@ architecture is required. In details:
 
     ``` sh
     YARP_CLOCK=/clock yarpdev --device JoypadControlServer --use_separate_ports 1 --period 10 --name /joypadDevice/xbox --subdevice SDLJoypad --sticks 0
-
+   
     ```
 2. Run the `WalkingJoypadModule` in the other computer
 
     ```
     YARP_CLOCK=/clock WalkingJoypadModule --device JoypadControlClient --local /joypadInput --remote /joypadDevice/xbox
     ```
+    
+## How to walk sideways
+In order to enable the sideways walking it is necessary to set the parameter ``controlType`` to ``direct`` in the ``plannerParams`` configuration file. In this configuration, the goal set with ``setGoal`` is interpreted as a desired velocity reference for the unicycle. In this case, ``setGoal`` expects three doubles that represent the forward velocity, angular velocity, and lateral velocity. For example
+```
+setGoal (0.0 0.0 1.0)
+```
+will command the robot to step sideways to the left.
+
+In case the planner fails in finding a solution, it is possible to reduce the values in ``saturationFactors`` in the ``plannerParams`` file. These numbers represent conservative factors that multiply the unicycle velocity saturations computed from the other parameters, like the ``minStepDuration``. The first number multiplies the saturation for the linear and lateral velocity. The second number multiplies the angular velocity saturation. Suggested values for ``saturationFactors``:
+- ``personFollowing`` case: ``(0.9, 0.7)``
+- ``direct`` case: ``(0.7, 0.7)``
+
+​    
+## How to control the robot from YARP port
+The ``WalkingModule`` opens a port named by default ``/walking-coordinator/goal:i`` (it can be edited from the main configuration file). This port expects a vector of double of size 2 if the ``controlType`` in ``plannerParams`` is set to ``personFollowing``, or 3 if the value is ``direct``. In the first case, they represent the x and y position in a robot centered frame of the desired point to reach. In the second case, they represent the desired unicycle velocities. 
+
+The range of the numbers is expected to be ``[-1, +1]``. Some scaling can be applied in the main configuration file through the parameter ``goal_port_scaling``. Suggested scaling:
+- ``personFollowing`` case: ``(10.0, 10.0, 1.0)`` (the third input is not considered) 
+- ``direct`` case: ``(0.5, 1.0, 0.5)``
+
+
 
 ## How to dump data
+
 Before running `WalkingModule` check if `dump_data` is set to 1. This parameter is set in a configuration `ini` file depending on the control mode:
 * controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L12)
 * control using the human retargeting: in the same folder `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}`, the configuration files `dcm_walking_hand_retargeting.ini` and `dcm_walking_joint_retargeting.ini`.
