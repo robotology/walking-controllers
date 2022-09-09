@@ -343,6 +343,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             auto paramHandler
                 = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>();
             paramHandler->set(inverseKinematicsQPSolverOptions);
+            paramHandler->setParameter("use_root_link_for_height", m_useRootLinkForHeight);
 
             if(!m_BLFIKSolver->initialize(paramHandler, m_FKSolver->getKinDyn()))
             {
@@ -581,6 +582,12 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position& desiredCoMPosition,
                                                 m_rightTwistTrajectory.front());
     ok = ok && m_BLFIKSolver->setCoMSetPoint(desiredCoMPosition, desiredCoMVelocity);
     ok = ok && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointValues());
+
+    if (m_useRootLinkForHeight)
+    {
+        ok = ok && m_BLFIKSolver->setRootSetPoint(desiredCoMPosition, desiredCoMVelocity);
+    }
+
     ok = ok && m_BLFIKSolver->solve();
 
     if (ok)
