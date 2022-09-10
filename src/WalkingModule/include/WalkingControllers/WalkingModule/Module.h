@@ -144,7 +144,7 @@ namespace WalkingControllers
 
         std::mutex m_mutex; /**< Mutex. */
 
-        iDynTree::Vector2 m_desiredPosition;
+        iDynTree::VectorDynSize m_plannerInput, m_goalScaling;
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
@@ -218,12 +218,12 @@ namespace WalkingControllers
          * @param isLeftSwinging todo wrong name?;
          * @param measuredTransform transformation between the world and the (stance/swing??) foot;
          * @param mergePoint is the instant at which the old and the new trajectory will be merged;
-         * @param desiredPosition final desired position of the projection of the CoM.
+         * @param plannerDesiredInput The desired input to the planner.
          * @return true/false in case of success/failure.
          */
         bool askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
                                 const iDynTree::Transform& measuredTransform,
-                                const size_t& mergePoint, const iDynTree::Vector2& desiredPosition);
+                                const size_t& mergePoint, const iDynTree::VectorDynSize &plannerDesiredInput);
 
         /**
          * Update the old trajectory.
@@ -235,19 +235,28 @@ namespace WalkingControllers
         bool updateTrajectories(const size_t& mergePoint);
 
         /**
-         * Set the input of the planner. The desired position is expressed using a
+         * Set the input of the planner. The size of the input is different according to the
+         * controller type of the planner.
+         * If using the personFollowing controller, the input is a desired position is expressed using a
          * reference frame attached to the robot. The X axis points forward while the
          * Y axis points on the left.
-         * @param x desired forward position of the robot
-         * @param y desired lateral position of the robot
+         * If the controller is the direct one, the input sets the desired control inputs for the unicycle,
+         * namely the forward, angular and lateral velocity.
+         * @param plannerInput The input to the planner
          * @return true/false in case of success/failure.
          */
-        bool setPlannerInput(double x, double y);
+        bool setPlannerInput(const yarp::sig::Vector &plannerInput);
 
         /**
          * Reset the entire controller architecture
          */
         void reset();
+
+        /**
+         * @brief Apply the scaling on the input from goal port.
+         * @param plannerInput The raw data read from the goal port.
+         */
+        void applyGoalScaling(yarp::sig::Vector &plannerInput);
 
     public:
 
@@ -289,12 +298,10 @@ namespace WalkingControllers
         virtual bool startWalking() override;
 
         /**
-         * set the desired final position of the CoM.
-         * @param x desired x position of the CoM;
-         * @param y desired y position of the CoM.
-         * @return true in case of success and false otherwise.
+         * Set the desired goal position to the planner.
+         * @return true/false in case of success/failure;
          */
-        virtual bool setGoal(double x, double y) override;
+        virtual bool setGoal(const yarp::sig::Vector& plannerInput) override;
 
         /**
          * Pause walking.

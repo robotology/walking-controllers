@@ -38,6 +38,7 @@ namespace WalkingControllers
     class TrajectoryGenerator
     {
         UnicycleGenerator m_trajectoryGenerator; /**< UnicycleTrajectoryGenerator object. */
+        UnicycleController m_unicycleController; /**< The controller used by the unicycle. */
         std::shared_ptr<DCMTrajectoryGenerator> m_dcmGenerator;
         std::shared_ptr<CoMHeightTrajectoryGenerator> m_heightGenerator;
         std::shared_ptr<FeetGenerator> m_feetGenerator;
@@ -65,7 +66,8 @@ namespace WalkingControllers
         iDynTree::Transform m_measuredTransformLeft; /**< Measured transformation between the left foot and the world frame. (w_H_lf) */
         iDynTree::Transform m_measuredTransformRight; /**< Measured transformation between the right foot and the world frame. (w_H_rf) */
 
-        iDynTree::Vector2 m_desiredPoint; /**< Desired final position of the x-y projection of the CoM. */
+        iDynTree::Vector2 m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
+        iDynTree::Vector3 m_desiredDirectControl; /**< Desired control input to send to the Unicycle Planner. */
 
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointVelocity; /**< DCM velocity at the merge point. */
@@ -128,12 +130,12 @@ namespace WalkingControllers
          * @param DCMBoundaryConditionAtMergePointVelocity is the velocity of the DCM at the merge point;
          * @param correctLeft todo;
          * @param measured Measured transformation between the stance foot and the world frame. (w_H_{stancefoot});
-         * @param desiredPosition final desired position of the projection of the CoM.
+         * @param desiredInput desiredInput to the unicycle planner
          * @return true/false in case of success/failure.
          */
         bool updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                                 const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
-                                const iDynTree::Transform& measured, const iDynTree::Vector2& desiredPosition);
+                                const iDynTree::Transform& measured, const iDynTree::VectorDynSize& plannerDesiredInput);
 
         /**
          * @brief Set the free space ellipse in which the robot can walk.

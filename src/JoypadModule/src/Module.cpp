@@ -51,19 +51,6 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    // set scaling factors
-    if(!YarpUtilities::getNumberFromSearchable(rf, "scale_x", m_scaleX))
-    {
-        yError() << "[configure] Unable to get a double from a searchable";
-        return false;
-    }
-
-    if(!YarpUtilities::getNumberFromSearchable(rf, "scale_y", m_scaleY))
-    {
-        yError() << "[configure] Unable to get a double from a searchable";
-        return false;
-    }
-
     // set the polydriver
     yarp::os::Property conf;
     std::string deviceName;
@@ -197,14 +184,14 @@ bool JoypadModule::updateModule()
     m_joypadController->getButton(7, r1Button);
 
     // get the values from stick
-    double x, y;
-    m_joypadController->getAxis(0, x);
-    m_joypadController->getAxis(1, y);
+    double x, y, z;
+    m_joypadController->getAxis(0, y);
+    m_joypadController->getAxis(1, x);
+    m_joypadController->getAxis(2, z);
 
-    x = -m_scaleX * deadzone(x);
-    y = -m_scaleY * deadzone(y);
-
-    std::swap(x,y);
+    x = -deadzone(x);
+    y = -deadzone(y);
+    z = -deadzone(z);
 
     if(aButton > 0)
     {
@@ -240,6 +227,7 @@ bool JoypadModule::updateModule()
         goal.clear();
         goal.push_back(x);
         goal.push_back(y);
+        goal.push_back(z);
         m_robotGoalPort.write();
     }
     return true;

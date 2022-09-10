@@ -6,6 +6,13 @@
  * @date 2018
  */
 
+struct YarpVector {
+  1: list<double> content;
+} (
+  yarp.name = "yarp::sig::Vector"
+  yarp.includefile="yarp/sig/Vector.h"
+)
+
 service WalkingCommands
 {
     /**
@@ -23,11 +30,10 @@ service WalkingCommands
     bool startWalking();
 
     /**
-     * Set the desired goal position. It is important to notice that
-     * x and y are expressed in the iCub main frame.
+     * Set the desired goal position to the planner.
      * @return true/false in case of success/failure;
      */
-    bool setGoal(1:double x, 2:double y);
+    bool setGoal(1:YarpVector plannerInput);
 
     /**
      * Pause the walking controller
