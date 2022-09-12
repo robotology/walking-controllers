@@ -52,7 +52,6 @@ if(WALKING_CONTROLLERS_COMPILE_WalkingModule)
     WalkingControllers::SimplifiedModelControllers
     WalkingControllers::WholeBodyControllers
     WalkingControllers::RetargetingHelper
-    WalkingControllers::LoggerClient
     BipedalLocomotion::VectorsCollection
     ctrlLib
     )
