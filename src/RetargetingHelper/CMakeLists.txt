@@ -2,55 +2,9 @@
 # All Rights Reserved.
 # Authors: Giulio Romualdi <giulio.romualdi@iit.it>
 
-# set target name
-if(WALKING_CONTROLLERS_COMPILE_RetargetingHelper)
-
-  set(LIBRARY_TARGET_NAME RetargetingHelper)
-
-  # set cpp files
-  set(${LIBRARY_TARGET_NAME}_SRC
-    src/Helper.cpp
-    )
-
-  # set hpp files
-  set(${LIBRARY_TARGET_NAME}_HDR
-    include/WalkingControllers/RetargetingHelper/Helper.h
-    )
-
-  # add an executable to the project using the specified source files.
-  add_library(${LIBRARY_TARGET_NAME} SHARED ${${LIBRARY_TARGET_NAME}_SRC} ${${LIBRARY_TARGET_NAME}_HDR})
-
-  set_target_properties(${LIBRARY_TARGET_NAME} PROPERTIES OUTPUT_NAME "${PROJECT_NAME}${LIBRARY_TARGET_NAME}")
-
-  target_link_libraries(${LIBRARY_TARGET_NAME} PUBLIC
-    WalkingControllers::YarpUtilities
-    WalkingControllers::KinDynWrapper
-    ${iDynTree_LIBRARIES}
-    ctrlLib
-    PRIVATE Eigen3::Eigen)
-
-  add_library(WalkingControllers::${LIBRARY_TARGET_NAME} ALIAS ${LIBRARY_TARGET_NAME})
-
-  set_target_properties(${LIBRARY_TARGET_NAME} PROPERTIES VERSION ${WalkingControllers_VERSION}
-    PUBLIC_HEADER "${${LIBRARY_TARGET_NAME}_HDR}")
-
-  # Specify include directories for both compilation and installation process.
-  # The $<INSTALL_PREFIX> generator expression is useful to ensure to create
-  # relocatable configuration files, see https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-relocatable-packages
-  target_include_directories(${LIBRARY_TARGET_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>")
-
-  # Specify installation targets, typology and destination folders.
-  install(TARGETS    ${LIBRARY_TARGET_NAME}
-    EXPORT     ${PROJECT_NAME}
-    COMPONENT  runtime
-    LIBRARY       DESTINATION "${CMAKE_INSTALL_LIBDIR}"                                          COMPONENT shlib
-    ARCHIVE       DESTINATION "${CMAKE_INSTALL_LIBDIR}"                                          COMPONENT lib
-    RUNTIME       DESTINATION "${CMAKE_INSTALL_BINDIR}"                                          COMPONENT bin
-    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/WalkingControllers/RetargetingHelper" COMPONENT dev)
-
-  set_property(GLOBAL APPEND PROPERTY WalkingControllers_TARGETS ${LIBRARY_TARGET_NAME})
-
-  message(STATUS "Created target ${LIBRARY_TARGET_NAME} for export ${PROJECT_NAME}.")
-
-endif()
+add_walking_controllers_library(
+  NAME RetargetingHelper
+  SOURCES src/Helper.cpp
+  PUBLIC_HEADERS include/WalkingControllers/RetargetingHelper/Helper.h
+  PUBLIC_LINK_LIBRARIES WalkingControllers::YarpUtilities WalkingControllers::KinDynWrapper ${iDynTree_LIBRARIES} ctrlLib
+  PRIVATE_LINK_LIBRARIES Eigen3::Eigen)
