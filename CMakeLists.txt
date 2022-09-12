@@ -3,11 +3,10 @@
 # Authors: Giulio Romualdi <giulio.romualdi@iit.it>
 
 cmake_minimum_required(VERSION 3.5)
-set(CMAKE_CXX_STANDARD 14)
 
 ## MAIN project
 project(WalkingControllers
-  VERSION 0.6.0)
+  VERSION 0.6.100)
 
 # Defines the CMAKE_INSTALL_LIBDIR, CMAKE_INSTALL_BINDIR and many other useful macros.
 # See https://cmake.org/cmake/help/latest/module/GNUInstallDirs.html
@@ -34,13 +33,15 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # library in both Release and Debug configuration avoiding naming clashes in the
 # installation directories.
 if(MSVC)
-    set(CMAKE_DEBUG_POSTFIX "d")
+  set(CMAKE_DEBUG_POSTFIX "d")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+option(BUILD_SHARED_LIBS "Build libraries as shared as opposed to static" ON)
+
 # Check WalkingControllers dependencies, find necessary libraries.
-include(WalkingControllersFindDependencies)
+include(WalkingControllersDependencies)
 
 #set default build type to "Release" in single-config generators
 if(NOT CMAKE_CONFIGURATION_TYPES)
@@ -61,6 +62,8 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
   DEPENDS ENABLE_RPATH
   USE_LINK_PATH)
 
+include(AddWalkingControllersLibrary)
+include(AddWalkingControllersApplication)
 add_subdirectory(src)
 
 include(InstallBasicPackageFiles)
@@ -74,7 +77,7 @@ install_basic_package_files(${PROJECT_NAME}
 
 option(BUILD_TESTING "Create tests using CMake" OFF)
 include(CTest)
-if(BUILD_TESTING AND WALKING_CONTROLLERS_COMPILE_tests)
+if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 

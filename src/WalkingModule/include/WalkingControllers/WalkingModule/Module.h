@@ -46,8 +46,6 @@
 
 #include <WalkingControllers/RetargetingHelper/Helper.h>
 
-#include <WalkingControllers/LoggerClient/LoggerClient.h>
-
 #include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
 // iCub-ctrl
@@ -98,7 +96,6 @@ namespace WalkingControllers
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
-        std::unique_ptr<LoggerClient> m_walkingLogger; /**< Pointer to the Walking Logger object. */
         std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
