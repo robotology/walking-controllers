@@ -34,6 +34,10 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # installation directories.
 if(MSVC)
   set(CMAKE_DEBUG_POSTFIX "d")
+  #_USE_MATH_DEFINES is to have constants like M_PI defined also on Windows
+  add_definitions(-D_USE_MATH_DEFINES)
+  #NOMINMAX is to avoid windows.h defining its own versions of min and max
+  add_definitions(-DNOMINMAX)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
