@@ -42,7 +42,9 @@ bool IntegrationBasedIK::initialize(
     }
 
     m_usejointRetargeting = false;
-    ptr->getParameter("use_joint_retargeting", m_usejointRetargeting);
+    int usejointRetargeting = 0;
+    ptr->getParameter("use_joint_retargeting", usejointRetargeting);
+    m_usejointRetargeting = usejointRetargeting != 0;
 
     m_useRootLinkForHeight = false;
     ptr->getParameter("use_root_link_for_height", m_useRootLinkForHeight);
