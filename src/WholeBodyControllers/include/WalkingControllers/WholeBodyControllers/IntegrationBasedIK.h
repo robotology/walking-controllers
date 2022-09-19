@@ -45,7 +45,8 @@ public:
     bool setRightFootSetPoint(const iDynTree::Transform& desiredTransform,
                              const iDynTree::Twist& desiredVelocity);
 
-    bool setRetargetingJointSetPoint(const iDynTree::VectorDynSize& jointPosition);
+    bool setRetargetingJointSetPoint(const iDynTree::VectorDynSize& jointPositions,
+                                     const iDynTree::VectorDynSize& jointVelocities);
     bool setRegularizationJointSetPoint(const iDynTree::VectorDynSize& jointPosition);
     bool setCoMSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);
     bool setRootSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);

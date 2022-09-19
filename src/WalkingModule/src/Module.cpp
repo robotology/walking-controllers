@@ -514,7 +514,7 @@ bool WalkingModule::solveQPIK(const std::unique_ptr<WalkingQPIK>& solver, const 
     solver->setDesiredHandsTransformation(m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->leftHandTransform(),
                                           m_FKSolver->getHeadToWorldTransform() * m_retargetingClient->rightHandTransform());
 
-    ok &= solver->setDesiredRetargetingJoint(m_retargetingClient->jointValues());
+    ok &= solver->setDesiredRetargetingJoint(m_retargetingClient->jointPositions());
 
     // set jacobians
     iDynTree::MatrixDynSize jacobian, comJacobian;
@@ -581,7 +581,9 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position& desiredCoMPosition,
          && m_BLFIKSolver->setRightFootSetPoint(m_rightTrajectory.front(),
                                                 m_rightTwistTrajectory.front());
     ok = ok && m_BLFIKSolver->setCoMSetPoint(desiredCoMPosition, desiredCoMVelocity);
-    ok = ok && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointValues());
+    ok = ok
+         && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointPositions(),
+                                                       m_retargetingClient->jointVelocities());
 
     if (m_useRootLinkForHeight)
     {
@@ -1105,7 +1107,7 @@ bool WalkingModule::updateModule()
             // Joint
             data.vectors["joints_state::positions::measured"].assign(m_robotControlHelper->getJointPosition().data(), m_robotControlHelper->getJointPosition().data() + m_robotControlHelper->getJointPosition().size());
             data.vectors["joints_state::positions::desired"].assign(m_qDesired.data(), m_qDesired.data() + m_qDesired.size());
-            data.vectors["joints_state::positions::retargeting"].assign(m_retargetingClient->jointValues().data(), m_retargetingClient->jointValues().data() + m_retargetingClient->jointValues().size());
+            data.vectors["joints_state::positions::retargeting"].assign(m_retargetingClient->jointPositions().data(), m_retargetingClient->jointPositions().data() + m_retargetingClient->jointPositions().size());
             data.vectors["joints_state::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
 
             m_loggerPort.write();

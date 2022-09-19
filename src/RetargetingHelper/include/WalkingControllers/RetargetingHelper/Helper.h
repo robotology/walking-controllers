@@ -79,15 +79,16 @@ namespace WalkingControllers
         /** Factor required to scale the human CoM displacement to a desired robot CoM displacement */
         double m_comHeightScalingFactor;
 
+        template<typename T>
         struct KinematicState
         {
-            double position;
-            double velocity;
+            T position;
+            T velocity;
         };
-        RetargetingElement<KinematicState> m_comHeight;
+        RetargetingElement<KinematicState<double>> m_comHeight;
 
         std::vector<int> m_retargetJointsIndex; /**< Vector containing the indices of the retargeted joints. */
-        RetargetingElement<iDynTree::VectorDynSize> m_jointRetargeting; /**< Joint retargeting element */
+        RetargetingElement<KinematicState<iDynTree::VectorDynSize>> m_jointRetargeting; /**< Joint retargeting element */
 
         yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of the robot.*/
 
@@ -152,9 +153,14 @@ namespace WalkingControllers
         const iDynTree::Transform& rightHandTransform() const;
 
         /**
-         * Get the value of the retarget joints
+         * Get the position of the retargeting joints
          */
-        const iDynTree::VectorDynSize& jointValues() const;
+        const iDynTree::VectorDynSize& jointPositions() const;
+
+        /**
+         * Get the velocity of the retargeting joints
+         */
+        const iDynTree::VectorDynSize& jointVelocities() const;
 
         /**
          * Get the CoM height

@@ -178,11 +178,14 @@ bool IntegrationBasedIK::setRightFootSetPoint(const iDynTree::Transform& desired
                       BipedalLocomotion::Conversions::toManifTwist(desiredVelocity));
 }
 
-bool IntegrationBasedIK::setRetargetingJointSetPoint(const iDynTree::VectorDynSize& jointPosition)
+bool IntegrationBasedIK::setRetargetingJointSetPoint(const iDynTree::VectorDynSize& jointPositions,
+                                                     const iDynTree::VectorDynSize& jointVelocities)
 {
     if (m_usejointRetargeting)
-        return m_jointRetargetingTask->setSetPoint(iDynTree::toEigen(jointPosition));
-
+    {
+        return m_jointRetargetingTask->setSetPoint(iDynTree::toEigen(jointPositions),
+                                                   iDynTree::toEigen(jointVelocities));
+    }
     return true;
 }
 

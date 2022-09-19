@@ -50,7 +50,8 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         return false;
     }
 
-    m_jointRetargeting.data.resize(controlledJointNames.size());
+    m_jointRetargeting.data.position.resize(controlledJointNames.size());
+    m_jointRetargeting.data.velocity.resize(controlledJointNames.size());
     m_jointRetargeting.yarpReadBuffer.resize(controlledJointNames.size());
 
     if(!m_useHandRetargeting && !m_useVirtualizer &&
@@ -237,8 +238,9 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     }
 
     // joint retargeting
-    m_jointRetargeting.data = kinDynWrapper.getJointPos();
-    iDynTree::toEigen(m_jointRetargeting.yarpReadBuffer) = iDynTree::toEigen(m_jointRetargeting.data);
+    m_jointRetargeting.data.position = kinDynWrapper.getJointPos();
+    m_jointRetargeting.data.velocity.zero();
+    iDynTree::toEigen(m_jointRetargeting.yarpReadBuffer) = iDynTree::toEigen(m_jointRetargeting.data.position);
     if (m_useJointRetargeting)
         m_jointRetargeting.smoother->init(m_jointRetargeting.yarpReadBuffer);
 
@@ -309,7 +311,8 @@ void RetargetingClient::getFeedback()
         }
 
         m_jointRetargeting.smoother->computeNextValues(m_jointRetargeting.yarpReadBuffer);
-        iDynTree::toEigen(m_jointRetargeting.data) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
+        iDynTree::toEigen(m_jointRetargeting.data.position) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
+        iDynTree::toEigen(m_jointRetargeting.data.velocity) = iDynTree::toEigen(m_jointRetargeting.smoother->getVel());
     }
 
 
@@ -352,9 +355,14 @@ const iDynTree::Transform& RetargetingClient::rightHandTransform() const
     return m_rightHand.data;
 }
 
-const iDynTree::VectorDynSize& RetargetingClient::jointValues() const
+const iDynTree::VectorDynSize& RetargetingClient::jointPositions() const
 {
-    return m_jointRetargeting.data;
+    return m_jointRetargeting.data.position;
+}
+
+const iDynTree::VectorDynSize& RetargetingClient::jointVelocities() const
+{
+    return m_jointRetargeting.data.velocity;
 }
 
 double RetargetingClient::comHeight() const
