@@ -185,7 +185,17 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
 
     yarp::os::Bottle& generalOptions = rf.findGroup("GENERAL");
-    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.016)).asFloat64();
+    m_dT = generalOptions.check("sampling_time", yarp::os::Value(0.01)).asFloat64();
+
+    if (m_dT <= 0)
+    {
+        yError() << "[WalkingModule::configure] sampling_time is supposed to be strictly positive.";
+        return false;
+    }
+
+    double plannerAdvanceTimeInS = rf.check("planner_advance_time_in_s", yarp::os::Value(0.18)).asFloat64();
+    m_plannerAdvanceTimeSteps = std::round(plannerAdvanceTimeInS / m_dT) + 2; //The additional 2 steps are because the trajectory from the planner is requested two steps in advance wrt the merge point
+
     std::string name;
     if(!YarpUtilities::getStringFromSearchable(generalOptions, "name", name))
     {
@@ -732,7 +742,7 @@ bool WalkingModule::updateModule()
         if(m_newTrajectoryRequired)
         {
             // when we are near to the merge point the new trajectory is evaluated
-            if(m_newTrajectoryMergeCounter == 20)
+            if(m_newTrajectoryMergeCounter == m_plannerAdvanceTimeSteps)
             {
 
                 double initTimeTrajectory;
@@ -1641,13 +1651,13 @@ bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
             return true;
 
         // Since the evaluation of a new trajectory takes time the new trajectory will be merged after x cycles
-        m_newTrajectoryMergeCounter = 20;
+        m_newTrajectoryMergeCounter = m_plannerAdvanceTimeSteps;
     }
 
     // the trajectory was not finished the new trajectory will be attached at the next merge point
     else
     {
-        if(m_mergePoints.front() > 20)
+        if(m_mergePoints.front() > m_plannerAdvanceTimeSteps)
             m_newTrajectoryMergeCounter = m_mergePoints.front();
         else if(m_mergePoints.size() > 1)
         {
@@ -1661,7 +1671,7 @@ bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
             if(m_newTrajectoryRequired)
                 return true;
 
-            m_newTrajectoryMergeCounter = 20;
+            m_newTrajectoryMergeCounter = m_plannerAdvanceTimeSteps;
         }
     }
 

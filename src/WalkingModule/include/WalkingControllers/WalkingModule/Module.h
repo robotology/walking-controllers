@@ -146,6 +146,8 @@ namespace WalkingControllers
 
         iDynTree::VectorDynSize m_plannerInput, m_goalScaling;
 
+        size_t m_plannerAdvanceTimeSteps; /** How many steps in advance the planner should be called. */
+
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
