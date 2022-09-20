@@ -789,7 +789,11 @@ bool WalkingModule::updateModule()
             m_retargetingClient->setPhase(retargetingPhase);
         }
 
-        m_retargetingClient->getFeedback();
+        if (!m_retargetingClient->getFeedback())
+        {
+            yError() << "[WalkingModule::updateModule] Unable to get the feedback from the retargeting client.";
+            return false;
+        }
 
         if(!updateFKSolver())
         {
