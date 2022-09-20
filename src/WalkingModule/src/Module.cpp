@@ -1113,6 +1113,7 @@ bool WalkingModule::updateModule()
             data.vectors["joints_state::positions::desired"].assign(m_qDesired.data(), m_qDesired.data() + m_qDesired.size());
             data.vectors["joints_state::positions::retargeting"].assign(m_retargetingClient->jointPositions().data(), m_retargetingClient->jointPositions().data() + m_retargetingClient->jointPositions().size());
             data.vectors["joints_state::velocities::measured"].assign(m_robotControlHelper->getJointVelocity().data(), m_robotControlHelper->getJointVelocity().data() + m_robotControlHelper->getJointVelocity().size());
+            data.vectors["joints_state::velocities::retargeting"].assign(m_retargetingClient->jointVelocities().data(), m_retargetingClient->jointVelocities().data() + m_retargetingClient->jointVelocities().size());
 
             m_loggerPort.write();
 
