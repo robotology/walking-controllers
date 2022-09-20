@@ -9,6 +9,7 @@
 // std
 #include <iostream>
 #include <memory>
+#include <algorithm>
 
 // YARP
 #include <yarp/os/RFModule.h>
@@ -1657,14 +1658,15 @@ bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
     // the trajectory was not finished the new trajectory will be attached at the next merge point
     else
     {
-        if(m_mergePoints.front() > m_plannerAdvanceTimeSteps)
-            m_newTrajectoryMergeCounter = m_mergePoints.front();
-        else if(m_mergePoints.size() > 1)
+        //Searches for the first merge point that is at least m_plannerAdvanceTimeSteps steps away
+        auto firstMergePointAvailable = std::find_if(m_mergePoints.begin(), m_mergePoints.end(), [this](size_t input){return input >= m_plannerAdvanceTimeSteps;});
+
+        if(firstMergePointAvailable != m_mergePoints.end())
         {
             if(m_newTrajectoryRequired)
                 return true;
 
-            m_newTrajectoryMergeCounter = m_mergePoints[1];
+            m_newTrajectoryMergeCounter = *firstMergePointAvailable;
         }
         else
         {
