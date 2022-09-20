@@ -7,3 +7,8 @@ add_walking_controllers_library(
   SOURCES src/Helper.cpp
   PUBLIC_HEADERS include/WalkingControllers/YarpUtilities/Helper.h include/WalkingControllers/YarpUtilities/Helper.tpp
   PUBLIC_LINK_LIBRARIES ${YARP_LIBRARIES})
+
+add_walking_controllers_yarp_thrift(
+  NAME HumanState
+  THRIFT thrifts/WalkingControllers/YarpUtilities/HumanState.thrift
+  INSTALLATION_FOLDER YarpUtilities)
