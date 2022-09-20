@@ -127,7 +127,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double lastStepSwitchTime = config.check("lastStepSwitchTime", yarp::os::Value(0.5)).asFloat64();
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
                                                yarp::os::Value(0.4)).asFloat64();
-    double mergePointRatio = config.check("mergePointRatio", yarp::os::Value(0.5)).asFloat64();
     double lastStepDCMOffset = config.check("lastStepDCMOffset", yarp::os::Value(0.0)).asFloat64();
     m_leftYawDeltaInRad = iDynTree::deg2rad(config.check("leftYawDeltaInDeg", yarp::os::Value(0.0)).asFloat64());
     m_rightYawDeltaInRad = iDynTree::deg2rad(config.check("rightYawDeltaInDeg", yarp::os::Value(0.0)).asFloat64());
@@ -139,6 +138,13 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_useMinimumJerk = config.check("useMinimumJerkFootTrajectory",
                                     yarp::os::Value(false)).asBool();
     double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asFloat64();
+
+    iDynTree::Vector2 mergePointRatios;
+    if(!YarpUtilities::getVectorFromSearchable(config, "mergePointRatios", mergePointRatios))
+    {
+        yError() << "[configurePlanner] Initialization failed while reading mergePointRatios vector.";
+        return false;
+    }
 
     yarp::os::Bottle ellipseMethodGroup = config.findGroup("ELLIPSE_METHOD_SETTINGS");
     double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();
@@ -190,7 +196,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     m_heightGenerator = m_trajectoryGenerator.addCoMHeightTrajectoryGenerator();
     ok = ok && m_heightGenerator->setCoMHeightSettings(comHeight, comHeightDelta);
-    ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatio);
+    ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatios[0], mergePointRatios[1]);
 
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
     m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
