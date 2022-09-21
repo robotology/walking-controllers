@@ -44,9 +44,9 @@ public:
         /** In this phase the smoothing time of the minimum jerk trajectory is
             increased. This will guarantee a smoother transition between the
             initial joint configuration and the desired joint configuration. */
-        approacing,
-        stance,
-        walking
+        Approaching,
+        Stance,
+        Walking
     };
 
 private:
@@ -113,7 +113,7 @@ private:
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of
                                                                          the robot.*/
 
-    Phase m_phase{Phase::approacing};
+    Phase m_phase{Phase::Approaching};
     double m_startingApproachingPhaseTime; /**< Initial time of the approaching phase (seconds) */
     double m_approachPhaseDuration; /**< Duration of the approaching phase (seconds) */
 

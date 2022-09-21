@@ -318,7 +318,7 @@ bool RetargetingClient::getFeedback()
         {
             if (m_useCoMHeightRetargeting)
             {
-                if (m_phase == Phase::walking)
+                if (m_phase == Phase::Walking)
                 {
                     m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_comConstantHeight;
                 } else
@@ -381,7 +381,7 @@ bool RetargetingClient::getFeedback()
     }
 
     // check if the approaching phase is finished
-    if(m_phase == Phase::approacing)
+    if(m_phase == Phase::Approaching)
     {
         double now = yarp::os::Time::now();
         if(now - m_startingApproachingPhaseTime > m_approachPhaseDuration)
@@ -448,15 +448,15 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
 
 void RetargetingClient::setPhase(Phase phase)
 {
-    if (phase == Phase::approacing)
+    if (phase == Phase::Approaching)
     {
         startApproachingPhase();
     }
 
-    if (m_phase == Phase::approacing && phase == Phase::walking)
+    if (m_phase == Phase::Approaching && phase == Phase::Walking)
         stopApproachingPhase();
 
-    if (m_phase == Phase::approacing && phase == Phase::stance)
+    if (m_phase == Phase::Approaching && phase == Phase::Stance)
         stopApproachingPhase();
 
     m_phase = phase;
@@ -482,7 +482,7 @@ void RetargetingClient::stopApproachingPhase()
             m_hdeRetargeting.com.smoother.smoothingTimeInWalking);
     }
 
-    m_phase = Phase::stance;
+    m_phase = Phase::Stance;
 }
 
 void RetargetingClient::startApproachingPhase()
@@ -515,5 +515,5 @@ void RetargetingClient::startApproachingPhase()
 
 bool RetargetingClient::isApproachingPhase() const
 {
-    return m_phase == Phase::approacing;
+    return m_phase == Phase::Approaching;
 }

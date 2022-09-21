@@ -785,7 +785,7 @@ bool WalkingModule::updateModule()
         // if the retargeting is not in the approaching phase we can set the stance/walking phase
         if(!m_retargetingClient->isApproachingPhase())
         {
-            auto retargetingPhase = m_isStancePhase.front() ? RetargetingClient::Phase::stance : RetargetingClient::Phase::walking;
+            auto retargetingPhase = m_isStancePhase.front() ? RetargetingClient::Phase::Stance : RetargetingClient::Phase::Walking;
             m_retargetingClient->setPhase(retargetingPhase);
         }
 
@@ -1614,7 +1614,7 @@ bool WalkingModule::startWalking()
 
     // before running the controller the retargeting client goes in approaching phase this
     // guarantees a smooth transition
-    m_retargetingClient->setPhase(RetargetingClient::Phase::approacing);
+    m_retargetingClient->setPhase(RetargetingClient::Phase::Approaching);
     m_robotState = WalkingFSM::Walking;
 
     return true;
