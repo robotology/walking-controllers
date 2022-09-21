@@ -7,9 +7,6 @@
  */
 
 // std
-#include "WalkingControllers/WholeBodyControllers/IntegrationBasedIK.h"
-#include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
-#include <BipedalLocomotion/ParametersHandler/YarpImplementation.h>
 #include <iostream>
 #include <memory>
 
@@ -19,7 +16,6 @@
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
 
-
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/Core/EigenHelpers.h>
@@ -27,9 +23,15 @@
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
 
+// blf
+#include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
+#include <BipedalLocomotion/ParametersHandler/YarpImplementation.h>
+
+// walking-controllers
 #include <WalkingControllers/WalkingModule/Module.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/StdUtilities/Helper.h>
+#include <WalkingControllers/WholeBodyControllers/IntegrationBasedIK.h>
 
 using namespace WalkingControllers;
 
@@ -336,7 +338,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         } else
         {
             yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_BLF_QP_SOLVER");
-            std::cerr << inverseKinematicsQPSolverOptions.toString() << std::endl;
             // TODO check if this is required
             inverseKinematicsQPSolverOptions.append(generalOptions);
             m_BLFIKSolver= std::make_unique<IntegrationBasedIK>();
@@ -345,10 +346,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             paramHandler->set(inverseKinematicsQPSolverOptions);
             paramHandler->setParameter("use_root_link_for_height", m_useRootLinkForHeight);
 
-            if(!m_BLFIKSolver->initialize(paramHandler, m_FKSolver->getKinDyn()))
+            if (!m_BLFIKSolver->initialize(paramHandler, m_FKSolver->getKinDyn()))
             {
-                yError() << "[WalkingModule::configure] Failed to configure the blf ik solver "
-                            "(qpOASES)";
+                yError() << "[WalkingModule::configure] Failed to configure the blf ik solver";
                 return false;
             }
         }
