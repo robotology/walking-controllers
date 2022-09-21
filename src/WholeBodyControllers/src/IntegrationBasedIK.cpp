@@ -46,6 +46,9 @@ bool IntegrationBasedIK::initialize(
     ptr->getParameter("use_joint_retargeting", usejointRetargeting);
     m_usejointRetargeting = usejointRetargeting != 0;
 
+    ptr->getParameter("use_feedforward_term_for_joint_retargeting",
+                      m_useFeedforwardTermForJointRetargeting);
+
     m_useRootLinkForHeight = false;
     ptr->getParameter("use_root_link_for_height", m_useRootLinkForHeight);
 
@@ -88,7 +91,6 @@ bool IntegrationBasedIK::initialize(
     ok = ok && m_leftFootTask->initialize(ptr->getGroup("LEFT_FOOT_TASK"));
     ok = ok && m_qpIK.addTask(m_leftFootTask, "left_foot_task", highPriority);
 
-
     m_torsoTask = std::make_shared<BipedalLocomotion::IK::SO3Task>();
     ok = ok && m_torsoTask->setKinDyn(kinDyn);
     ok = ok && m_torsoTask->initialize(ptr->getGroup("TORSO_TASK"));
@@ -124,7 +126,7 @@ bool IntegrationBasedIK::initialize(
 
     ok = ok && m_qpIK.finalize(m_variableHandler);
 
-    std::cout << m_qpIK.toString() << std::endl;
+    BipedalLocomotion::log()->info("[IntegrationBasedIK::initialize] {}", m_qpIK.toString());
 
     m_jointVelocity.resize(kinDyn->getNrOfDegreesOfFreedom());
 
@@ -183,8 +185,14 @@ bool IntegrationBasedIK::setRetargetingJointSetPoint(const iDynTree::VectorDynSi
 {
     if (m_usejointRetargeting)
     {
-        return m_jointRetargetingTask->setSetPoint(iDynTree::toEigen(jointPositions),
-                                                   iDynTree::toEigen(jointVelocities));
+        if (m_useFeedforwardTermForJointRetargeting)
+        {
+            return m_jointRetargetingTask->setSetPoint(iDynTree::toEigen(jointPositions),
+                                                       iDynTree::toEigen(jointVelocities));
+        } else
+        {
+            return m_jointRetargetingTask->setSetPoint(iDynTree::toEigen(jointPositions));
+        }
     }
     return true;
 }

@@ -12,17 +12,15 @@
 #include <iDynTree/KinDynComputations.h>
 
 #include <BipedalLocomotion/ContinuousDynamicalSystem/MultiStateWeightProvider.h>
-
-#include <BipedalLocomotion/IK/QPInverseKinematics.h>
-#include <BipedalLocomotion/IK/SE3Task.h>
-#include <BipedalLocomotion/IK/R3Task.h>
-#include <BipedalLocomotion/IK/SO3Task.h>
 #include <BipedalLocomotion/IK/CoMTask.h>
 #include <BipedalLocomotion/IK/JointTrackingTask.h>
-
+#include <BipedalLocomotion/IK/QPInverseKinematics.h>
+#include <BipedalLocomotion/IK/R3Task.h>
+#include <BipedalLocomotion/IK/SE3Task.h>
+#include <BipedalLocomotion/IK/SO3Task.h>
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
-
 #include <BipedalLocomotion/System/VariablesHandler.h>
+
 #include <memory>
 
 namespace WalkingControllers
@@ -31,9 +29,8 @@ namespace WalkingControllers
 class IntegrationBasedIK
 {
 public:
-    bool
-    initialize(std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
-               std::shared_ptr<iDynTree::KinDynComputations> kinDyn);
+    bool initialize(std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
+                    std::shared_ptr<iDynTree::KinDynComputations> kinDyn);
 
     bool setPhase(const std::string& phase);
 
@@ -75,6 +72,7 @@ private:
     iDynTree::VectorDynSize m_jointVelocity;
     bool m_usejointRetargeting{false};
     bool m_useRootLinkForHeight{false};
+    bool m_useFeedforwardTermForJointRetargeting{false};
 };
 
 } // namespace WalkingControllers
