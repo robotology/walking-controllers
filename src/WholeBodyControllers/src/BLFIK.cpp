@@ -42,9 +42,7 @@ bool BLFIK::initialize(
     }
 
     m_usejointRetargeting = false;
-    int usejointRetargeting = 0;
-    ptr->getParameter("use_joint_retargeting", usejointRetargeting);
-    m_usejointRetargeting = usejointRetargeting != 0;
+    ptr->getParameter("use_joint_retargeting", m_usejointRetargeting);
 
     ptr->getParameter("use_feedforward_term_for_joint_retargeting",
                       m_useFeedforwardTermForJointRetargeting);
