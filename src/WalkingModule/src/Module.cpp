@@ -31,7 +31,7 @@
 #include <WalkingControllers/WalkingModule/Module.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/StdUtilities/Helper.h>
-#include <WalkingControllers/WholeBodyControllers/IntegrationBasedIK.h>
+#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 
 using namespace WalkingControllers;
 
@@ -340,7 +340,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             yarp::os::Bottle& inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_BLF_QP_SOLVER");
             // TODO check if this is required
             inverseKinematicsQPSolverOptions.append(generalOptions);
-            m_BLFIKSolver= std::make_unique<IntegrationBasedIK>();
+            m_BLFIKSolver= std::make_unique<BLFIK>();
             auto paramHandler
                 = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>();
             paramHandler->set(inverseKinematicsQPSolverOptions);

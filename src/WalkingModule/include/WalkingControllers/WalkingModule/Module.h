@@ -10,7 +10,7 @@
 #define WALKING_MODULE_HPP
 
 // std
-#include <WalkingControllers/WholeBodyControllers/IntegrationBasedIK.h>
+#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 #include <memory>
 #include <deque>
 
@@ -94,7 +94,7 @@ namespace WalkingControllers
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
         std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
         std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
-        std::unique_ptr<IntegrationBasedIK> m_BLFIKSolver; /**< Pointer to the integration base ik. */
+        std::unique_ptr<BLFIK> m_BLFIKSolver; /**< Pointer to the integration based ik. */
         std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */

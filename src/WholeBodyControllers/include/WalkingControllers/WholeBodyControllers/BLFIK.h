@@ -1,12 +1,12 @@
 /**
- * @file IntegrationBasedIK.h
+ * @file BLFIK.h
  * @authors Giulio Romualdi
  * @copyright 2022 Istituto Italiano di Tecnologia (IIT). This software may be modified and
  * distributed under the terms of the LGPLv2.1 or later, see LGPL.TXT
  */
 
-#ifndef WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_INTEGRATION_BASED_IK
-#define WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_INTEGRATION_BASED_IK
+#ifndef WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_BLF_IK
+#define WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_BLF_IK
 
 #include <iDynTree/Core/VectorDynSize.h>
 #include <iDynTree/KinDynComputations.h>
@@ -26,7 +26,7 @@
 namespace WalkingControllers
 {
 
-class IntegrationBasedIK
+class BLFIK
 {
 public:
     bool initialize(std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
@@ -77,4 +77,4 @@ private:
 
 } // namespace WalkingControllers
 
-#endif // WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_INTEGRATION_BASED_IK
+#endif // WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_BLF_IK

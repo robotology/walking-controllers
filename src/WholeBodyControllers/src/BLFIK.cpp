@@ -1,5 +1,5 @@
 /**
- * @file IntegrationBasedIK.h
+ * @file BLFIK.h
  * @authors Giulio Romualdi
  * @copyright 2022 Istituto Italiano di Tecnologia (IIT). This software may be modified and
  * distributed under the terms of the LGPLv2.1 or later, see LGPL.TXT
@@ -12,7 +12,7 @@
 #include <BipedalLocomotion/IK/SO3Task.h>
 #include <BipedalLocomotion/TextLogging/Logger.h>
 
-#include <WalkingControllers/WholeBodyControllers/IntegrationBasedIK.h>
+#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Core/Position.h>
@@ -26,11 +26,11 @@
 
 using namespace WalkingControllers;
 
-bool IntegrationBasedIK::initialize(
+bool BLFIK::initialize(
     std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
     std::shared_ptr<iDynTree::KinDynComputations> kinDyn)
 {
-    constexpr auto prefix = "[IntegrationBasedIK::initialize]";
+    constexpr auto prefix = "[BLFIK::initialize]";
     constexpr std::size_t highPriority = 0;
     constexpr std::size_t lowPriority = 1;
 
@@ -75,7 +75,6 @@ bool IntegrationBasedIK::initialize(
     ok = ok && m_jointRegularizationWeight->initialize(ptr->getGroup("JOINT_REGULARIZATION_TASK"));
 
     // CoM Task
-    // TODO remvove the z
     m_comTask = std::make_shared<BipedalLocomotion::IK::CoMTask>();
     ok = ok && m_comTask->setKinDyn(kinDyn);
     ok = ok && m_comTask->initialize(ptr->getGroup("COM_TASK"));
@@ -94,27 +93,28 @@ bool IntegrationBasedIK::initialize(
     m_torsoTask = std::make_shared<BipedalLocomotion::IK::SO3Task>();
     ok = ok && m_torsoTask->setKinDyn(kinDyn);
     ok = ok && m_torsoTask->initialize(ptr->getGroup("TORSO_TASK"));
-    ok = ok &&  m_qpIK.addTask(m_torsoTask, "torso_task", lowPriority, m_torsoWeight);
+    ok = ok && m_qpIK.addTask(m_torsoTask, "torso_task", lowPriority, m_torsoWeight);
 
     m_jointRegularizationTask = std::make_shared<BipedalLocomotion::IK::JointTrackingTask>();
     ok = ok && m_jointRegularizationTask->setKinDyn(kinDyn);
     ok = ok && m_jointRegularizationTask->initialize(ptr->getGroup("JOINT_REGULARIZATION_TASK"));
-    ok = ok &&  m_qpIK.addTask(m_jointRegularizationTask,
-                               "joint_regularization_task",
-                               lowPriority,
-                               m_jointRegularizationWeight);
+    ok = ok
+         && m_qpIK.addTask(m_jointRegularizationTask,
+                           "joint_regularization_task",
+                           lowPriority,
+                           m_jointRegularizationWeight);
 
     if (m_usejointRetargeting)
     {
         m_jointRetargetingTask = std::make_shared<BipedalLocomotion::IK::JointTrackingTask>();
         ok = ok && m_jointRetargetingTask->setKinDyn(kinDyn);
         ok = ok && m_jointRetargetingTask->initialize(ptr->getGroup("JOINT_RETARGETING_TASK"));
-        ok = ok &&  m_qpIK.addTask(m_jointRetargetingTask,
-                                   "joint_retargeting_task",
-                                   lowPriority,
-                                   m_jointRetargetingWeight);
+        ok = ok
+             && m_qpIK.addTask(m_jointRetargetingTask,
+                               "joint_retargeting_task",
+                               lowPriority,
+                               m_jointRetargetingWeight);
     }
-
 
     if (m_useRootLinkForHeight)
     {
@@ -126,14 +126,14 @@ bool IntegrationBasedIK::initialize(
 
     ok = ok && m_qpIK.finalize(m_variableHandler);
 
-    BipedalLocomotion::log()->info("[IntegrationBasedIK::initialize] {}", m_qpIK.toString());
+    BipedalLocomotion::log()->info("[BLFIK::initialize] {}", m_qpIK.toString());
 
     m_jointVelocity.resize(kinDyn->getNrOfDegreesOfFreedom());
 
     return ok;
 }
 
-bool IntegrationBasedIK::solve()
+bool BLFIK::solve()
 {
     bool ok = m_torsoWeight->advance();
     ok = ok && m_jointRegularizationWeight->advance();
@@ -153,7 +153,7 @@ bool IntegrationBasedIK::solve()
     return ok;
 }
 
-bool IntegrationBasedIK::setPhase(const std::string& phase)
+bool BLFIK::setPhase(const std::string& phase)
 {
     bool ok = m_torsoWeight->setState(phase);
     ok = ok && m_jointRegularizationWeight->setState(phase);
@@ -164,24 +164,24 @@ bool IntegrationBasedIK::setPhase(const std::string& phase)
     return ok;
 }
 
-bool IntegrationBasedIK::setLeftFootSetPoint(const iDynTree::Transform& desiredTransform,
-                                             const iDynTree::Twist& desiredVelocity)
+bool BLFIK::setLeftFootSetPoint(const iDynTree::Transform& desiredTransform,
+                                const iDynTree::Twist& desiredVelocity)
 {
     return m_leftFootTask
         ->setSetPoint(BipedalLocomotion::Conversions::toManifPose(desiredTransform),
                       BipedalLocomotion::Conversions::toManifTwist(desiredVelocity));
 }
 
-bool IntegrationBasedIK::setRightFootSetPoint(const iDynTree::Transform& desiredTransform,
-                                              const iDynTree::Twist& desiredVelocity)
+bool BLFIK::setRightFootSetPoint(const iDynTree::Transform& desiredTransform,
+                                 const iDynTree::Twist& desiredVelocity)
 {
     return m_rightFootTask
         ->setSetPoint(BipedalLocomotion::Conversions::toManifPose(desiredTransform),
                       BipedalLocomotion::Conversions::toManifTwist(desiredVelocity));
 }
 
-bool IntegrationBasedIK::setRetargetingJointSetPoint(const iDynTree::VectorDynSize& jointPositions,
-                                                     const iDynTree::VectorDynSize& jointVelocities)
+bool BLFIK::setRetargetingJointSetPoint(const iDynTree::VectorDynSize& jointPositions,
+                                        const iDynTree::VectorDynSize& jointVelocities)
 {
     if (m_usejointRetargeting)
     {
@@ -197,19 +197,17 @@ bool IntegrationBasedIK::setRetargetingJointSetPoint(const iDynTree::VectorDynSi
     return true;
 }
 
-bool IntegrationBasedIK::setRegularizationJointSetPoint(const iDynTree::VectorDynSize& jointPosition)
+bool BLFIK::setRegularizationJointSetPoint(const iDynTree::VectorDynSize& jointPosition)
 {
     return m_jointRegularizationTask->setSetPoint(iDynTree::toEigen(jointPosition));
 }
 
-bool IntegrationBasedIK::setCoMSetPoint(const iDynTree::Position& position,
-                                        const iDynTree::Vector3& velocity)
+bool BLFIK::setCoMSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity)
 {
     return m_comTask->setSetPoint(iDynTree::toEigen(position), iDynTree::toEigen(velocity));
 }
 
-bool IntegrationBasedIK::setRootSetPoint(const iDynTree::Position& position,
-                                         const iDynTree::Vector3& velocity)
+bool BLFIK::setRootSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity)
 {
     if (m_useRootLinkForHeight)
     {
@@ -218,12 +216,12 @@ bool IntegrationBasedIK::setRootSetPoint(const iDynTree::Position& position,
     return true;
 }
 
-bool IntegrationBasedIK::setTorsoSetPoint(const iDynTree::Rotation& rotation)
+bool BLFIK::setTorsoSetPoint(const iDynTree::Rotation& rotation)
 {
     return m_torsoTask->setSetPoint(BipedalLocomotion::Conversions::toManifRot(rotation));
 }
 
-const iDynTree::VectorDynSize& IntegrationBasedIK::getDesiredJointVelocity() const
+const iDynTree::VectorDynSize& BLFIK::getDesiredJointVelocity() const
 {
     return m_jointVelocity;
 }
