@@ -67,6 +67,7 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
   USE_LINK_PATH)
 
 include(AddWalkingControllersLibrary)
+include(AddWalkingControllersYARPThrift)
 include(AddWalkingControllersApplication)
 add_subdirectory(src)
 

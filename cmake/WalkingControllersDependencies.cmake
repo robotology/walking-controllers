@@ -10,4 +10,7 @@ find_package(Eigen3 3.2.92 REQUIRED)
 find_package(UnicyclePlanner 0.5.0 REQUIRED)
 find_package(OsqpEigen 0.4.0 REQUIRED)
 find_package(qpOASES REQUIRED)
-find_package(BipedalLocomotionFramework 0.6.0 COMPONENTS VectorsCollection REQUIRED)
+find_package(BipedalLocomotionFramework 0.9.0
+  COMPONENTS VectorsCollection IK ParametersHandlerYarpImplementation
+             ContinuousDynamicalSystem ManifConversions
+             ParametersHandlerYarpImplementation REQUIRED)

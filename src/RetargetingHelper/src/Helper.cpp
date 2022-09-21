@@ -50,8 +50,10 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         return false;
     }
 
-    m_jointRetargeting.data.resize(controlledJointNames.size());
-    m_jointRetargeting.yarpReadBuffer.resize(controlledJointNames.size());
+    m_hdeRetargeting.joints.position.resize(controlledJointNames.size());
+    m_hdeRetargeting.joints.velocity.resize(controlledJointNames.size());
+    m_hdeRetargeting.joints.smoother.yarpBuffer.resize(controlledJointNames.size());
+    m_hdeRetargeting.com.smoother.yarpBuffer(1);
 
     if(!m_useHandRetargeting && !m_useVirtualizer &&
        !m_useJointRetargeting && !m_useCoMHeightRetargeting)
@@ -67,8 +69,6 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     }
 
     std::string portName;
-    double smoothingTimeApproching;
-    double smoothingTimeWalking;
     if(m_useHandRetargeting)
     {
         const yarp::os::Bottle& option = config.findGroup("HAND_RETARGETING");
@@ -84,24 +84,25 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             }
             hand.port.open("/" + name + portName);
 
+            if (!YarpUtilities::getNumberFromSearchable(option,
+                                                        "smoothing_time_approaching",
+                                                        hand.smoother.smoothingTimeInApproaching))
+            {
+                yError() << "[RetargetingClient::initialize] Unable to get the number from "
+                            "searchable.";
+                return false;
+            }
 
-            if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching", smoothingTimeApproching))
+            if (!YarpUtilities::getNumberFromSearchable(option,
+                                                        "smoothing_time_walking",
+                                                        hand.smoother.smoothingTimeInWalking))
             {
                 yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
                 return false;
             }
-            hand.smoothingTimeInApproaching = smoothingTimeApproching;
 
-
-            if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", smoothingTimeWalking))
-            {
-                yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-                return false;
-            }
-            hand.smoothingTimeInWalking = smoothingTimeWalking;
-
-            hand.yarpReadBuffer.resize(6);
-            hand.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, hand.smoothingTimeInApproaching);
+            hand.smoother.yarpBuffer.resize(6);
+            hand.smoother.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(6, period, hand.smoother.smoothingTimeInApproaching);
 
             return true;
         };
@@ -131,36 +132,35 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         // find the indices
         for(const std::string& joint : retargetJointNames)
         {
-            int index = std::distance(controlledJointNames.begin(), std::find(controlledJointNames.begin(),
-                                                                              controlledJointNames.end(),
-                                                                              joint));
-            m_retargetJointsIndex.push_back(index);
+            const auto element = std::find(controlledJointNames.begin(), controlledJointNames.end(), joint);
+            if (element == controlledJointNames.end())
+            {
+                yError() << "[RetargetingClient::initialize] Unable to find the joint named: "
+                         << joint << " in the list of the controlled joints.";
+                return false;
+            }
+            m_retargetedJointsToControlJoints[joint] = std::distance(controlledJointNames.begin(), element);
         }
-
-        if(!YarpUtilities::getStringFromSearchable(option, "joint_retargeting_port_name",
-                                                portName))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
-            return false;
-        }
-        m_jointRetargeting.port.open("/" + name + portName);
 
         if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching",
-                                                   m_jointRetargeting.smoothingTimeInApproaching))
+                                                   m_hdeRetargeting.joints.smoother.smoothingTimeInApproaching))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
         }
 
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", m_jointRetargeting.smoothingTimeInWalking))
+        if (!YarpUtilities::getNumberFromSearchable(option,
+                                                    "smoothing_time_walking",
+                                                    m_hdeRetargeting.joints.smoother.smoothingTimeInWalking))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
         }
 
-        m_jointRetargeting.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointNames.size(), period,
-                                                                                   m_jointRetargeting.smoothingTimeInApproaching);
-
+        m_hdeRetargeting.joints.smoother.smoother
+            = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointNames.size(),
+                                                           period,
+                                                           m_hdeRetargeting.joints.smoother.smoothingTimeInApproaching);
     }
 
     if(m_useVirtualizer)
@@ -176,39 +176,48 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         m_robotOrientationPort.open("/" + name + portName);
     }
 
-    if(m_useCoMHeightRetargeting)
+    if (m_useCoMHeightRetargeting)
     {
         const yarp::os::Bottle& option = config.findGroup("COM_RETARGETING");
 
-        m_comHeight.yarpReadBuffer.resize(1);
+        if (!YarpUtilities::getNumberFromSearchable(option,
+                                                    "smoothing_time_approaching",
+                                                    m_hdeRetargeting.com.smoother.smoothingTimeInApproaching))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
 
-        if(!YarpUtilities::getStringFromSearchable(option, "com_height_retargeting_port_name", portName))
+        if (!YarpUtilities::getNumberFromSearchable(option,
+                                                    "smoothing_time_walking",
+                                                    m_hdeRetargeting.com.smoother.smoothingTimeInWalking))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+
+        m_hdeRetargeting.com.smoother.smoother
+            = std::make_unique<iCub::ctrl::minJerkTrajGen>(1,
+                                                           period,
+                                                           m_hdeRetargeting.com.smoother.smoothingTimeInApproaching);
+
+        if (!YarpUtilities::getNumberFromSearchable(option,
+                                                    "com_height_scaling_factor",
+                                                    m_comHeightScalingFactor))
+        {
+            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
+            return false;
+        }
+    }
+
+    if (m_useJointRetargeting || m_useCoMHeightRetargeting)
+    {
+        if (!YarpUtilities::getStringFromSearchable(config, "hde_port_name", portName))
         {
             yError() << "[RetargetingClient::initialize] Unable to get the string from searchable.";
             return false;
         }
-        m_comHeight.port.open("/" + name + portName);
-
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching", m_comHeight.smoothingTimeInApproaching))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-            return false;
-        }
-
-        if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_walking", m_comHeight.smoothingTimeInWalking))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-            return false;
-        }
-
-        m_comHeight.smoother = std::make_unique<iCub::ctrl::minJerkTrajGen>(1, period, m_comHeight.smoothingTimeInApproaching);
-
-        if(!YarpUtilities::getNumberFromSearchable(option, "com_height_scaling_factor",
-                                                   m_comHeightScalingFactor))
-        {
-            yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
-            return false;
-        }
+        m_hdeRetargeting.port.open("/" + name + portName);
     }
 
     return true;
@@ -216,20 +225,20 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
 
 bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
 {
-    m_leftHand.data = kinDynWrapper.getHeadToWorldTransform().inverse() * kinDynWrapper.getLeftHandToWorldTransform();
-    m_rightHand.data = kinDynWrapper.getHeadToWorldTransform().inverse() * kinDynWrapper.getRightHandToWorldTransform();
+    m_leftHand.transform = kinDynWrapper.getHeadToWorldTransform().inverse() * kinDynWrapper.getLeftHandToWorldTransform();
+    m_rightHand.transform = kinDynWrapper.getHeadToWorldTransform().inverse() * kinDynWrapper.getRightHandToWorldTransform();
 
     if(m_useHandRetargeting)
     {
         auto resetHandSmoother = [](auto& hand)
         {
             iDynTree::toEigen(hand.yarpReadBuffer).template segment<3>(0) =
-            iDynTree::toEigen(hand.data.getPosition());
+            iDynTree::toEigen(hand.transform.getPosition());
 
             iDynTree::toEigen(hand.yarpReadBuffer).template segment<3>(3) =
-            iDynTree::toEigen(hand.data.getRotation().asRPY());
+            iDynTree::toEigen(hand.transform.getRotation().asRPY());
 
-            hand.smoother->init(hand.yarpReadBuffer);
+            hand.smoother.smoother->init(hand.yarpReadBuffer);
         };
 
         resetHandSmoother(m_leftHand);
@@ -237,19 +246,22 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     }
 
     // joint retargeting
-    m_jointRetargeting.data = kinDynWrapper.getJointPos();
-    iDynTree::toEigen(m_jointRetargeting.yarpReadBuffer) = iDynTree::toEigen(m_jointRetargeting.data);
+    m_hdeRetargeting.joints.position = kinDynWrapper.getJointPos();
+    m_hdeRetargeting.joints.velocity.zero();
+    iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.position);
     if (m_useJointRetargeting)
-        m_jointRetargeting.smoother->init(m_jointRetargeting.yarpReadBuffer);
+    {
+        m_hdeRetargeting.joints.smoother.smoother->init(m_hdeRetargeting.joints.smoother.yarpBuffer);
+    }
 
-    m_comHeight.data.position = kinDynWrapper.getCoMPosition()(2);
-    m_comHeight.data.velocity = 0;
-    m_comConstantHeight = m_comHeight.data.position;
+    m_hdeRetargeting.com.position = kinDynWrapper.getCoMPosition()(2);
+    m_hdeRetargeting.com.velocity = 0;
+    m_comConstantHeight = m_hdeRetargeting.com.position;
 
     if(m_useCoMHeightRetargeting)
     {
-        m_comHeight.yarpReadBuffer(0) = m_comHeight.data.position;
-        m_comHeight.smoother->init(m_comHeight.yarpReadBuffer);
+        m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_hdeRetargeting.com.position;
+        m_hdeRetargeting.joints.smoother.smoother->init(m_hdeRetargeting.com.smoother.yarpBuffer);
 
         // let's read the port to reset the comHeightInput
         bool okCoMHeight = false;
@@ -258,10 +270,10 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
         {
             if(!okCoMHeight)
             {
-                auto desiredCoMHeight = m_comHeight.port.read(false);
-                if(desiredCoMHeight != nullptr)
+                auto data = m_hdeRetargeting.port.read(false);
+                if(data != nullptr)
                 {
-                    m_comHeightInputOffset = (*desiredCoMHeight)(2);
+                    m_comHeightInputOffset = data->CoMPositionWRTGlobal.z;
                     okCoMHeight = true;
                 }
             }
@@ -281,108 +293,146 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     return true;
 }
 
-void RetargetingClient::getFeedback()
+bool RetargetingClient::getFeedback()
 {
     if(m_useHandRetargeting)
     {
-        auto getHandFeedback = [this](auto& hand)
+        auto getHandFeedback = [this](HandRetargeting& hand)
         {
             auto desiredHandPose = hand.port.read(false);
             if(desiredHandPose != nullptr)
-                hand.yarpReadBuffer = *desiredHandPose;
-
-            hand.smoother->computeNextValues(hand.yarpReadBuffer);
-            convertYarpVectorPoseIntoTransform(hand.smoother->getPos(), hand.data);
+            {
+                hand.smoother.smoother->computeNextValues(*desiredHandPose);
+            }
+            convertYarpVectorPoseIntoTransform(hand.smoother.smoother->getPos(), hand.transform);
         };
 
         getHandFeedback(m_leftHand);
         getHandFeedback(m_rightHand);
     }
 
-    if(m_useJointRetargeting)
+    if (m_useJointRetargeting || m_useCoMHeightRetargeting)
     {
-        auto desiredJoint = m_jointRetargeting.port.read(false);
-        if(desiredJoint != nullptr)
+        const auto HDEData = m_hdeRetargeting.port.read(false);
+        if (HDEData != nullptr)
         {
-            for(int i =0; i < desiredJoint->size(); i++)
-                m_jointRetargeting.yarpReadBuffer(m_retargetJointsIndex[i]) = (*desiredJoint)(i);
-        }
+            if (m_useCoMHeightRetargeting)
+            {
+                if (m_phase == Phase::Walking)
+                {
+                    m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_comConstantHeight;
+                } else
+                {
+                    const auto& desiredCoMHeight = HDEData->CoMPositionWRTGlobal.z;
+                    m_hdeRetargeting.com.smoother.yarpBuffer(0)
+                        = (desiredCoMHeight - m_comHeightInputOffset) * m_comHeightScalingFactor
+                          + m_comConstantHeight;
+                }
+            }
 
-        m_jointRetargeting.smoother->computeNextValues(m_jointRetargeting.yarpReadBuffer);
-        iDynTree::toEigen(m_jointRetargeting.data) = iDynTree::toEigen(m_jointRetargeting.smoother->getPos());
+            if (m_useJointRetargeting)
+            {
+                // the first time we should define the map between the retargeted joints and the
+                // data coming from HDE
+                if (m_retargetedJointsToHDEJoints.empty())
+                {
+                    const auto& HDEJointNames = HDEData->jointNames;
+                    for (const auto& [joint, index] : m_retargetedJointsToControlJoints)
+                    {
+                        const auto element = std::find(HDEJointNames.begin(), HDEJointNames.end(), joint);
+                        if (element == HDEJointNames.end())
+                        {
+                            yError() << "[RetargetingClient::getFeedback] Unable to find the joint "
+                                        "named: "
+                                     << joint << " in the list of the HDE joints.";
+                            return false;
+                        }
+                        m_retargetedJointsToHDEJoints[joint] = std::distance(HDEJointNames.begin(), element);
+                    }
+                }
+
+                const auto& HDEJoints = HDEData->positions;
+                for (const auto& [joint, index] : m_retargetedJointsToControlJoints)
+                {
+                    m_hdeRetargeting.joints.smoother.yarpBuffer(index) = HDEData->positions[m_retargetedJointsToHDEJoints[joint]];
+                }
+            }
+        }
     }
 
-
-    if(m_useCoMHeightRetargeting)
+    // even if the data is not arrived the minimum jerk trajectory has to be updated. This will
+    // generate a smoother trajectory
+    if (m_useCoMHeightRetargeting)
     {
-        if(m_phase == Phase::walking)
-            m_comHeight.yarpReadBuffer(0) = m_comConstantHeight;
-        else
-        {
-            auto desiredCoMHeight = m_comHeight.port.read(false);
-            if(desiredCoMHeight != nullptr)
+        m_hdeRetargeting.com.smoother.smoother->computeNextValues(
+            m_hdeRetargeting.com.smoother.yarpBuffer);
+        m_hdeRetargeting.com.position = m_hdeRetargeting.com.smoother.smoother->getPos()(0);
+        m_hdeRetargeting.com.velocity = m_hdeRetargeting.com.smoother.smoother->getVel()(0);
+    }
 
-                m_comHeight.yarpReadBuffer(0) = ((*desiredCoMHeight)(2) - m_comHeightInputOffset)
-                    * m_comHeightScalingFactor + m_comConstantHeight;
-        }
-
-        m_comHeight.smoother->computeNextValues(m_comHeight.yarpReadBuffer);
-        m_comHeight.data.position = m_comHeight.smoother->getPos()(0);
-        m_comHeight.data.velocity = m_comHeight.smoother->getVel()(0);
+    if (m_useJointRetargeting)
+    {
+        m_hdeRetargeting.joints.smoother.smoother->computeNextValues(
+            m_hdeRetargeting.joints.smoother.yarpBuffer);
+        iDynTree::toEigen(m_hdeRetargeting.joints.position)
+            = iDynTree::toEigen(m_hdeRetargeting.joints.smoother.smoother->getPos());
+        iDynTree::toEigen(m_hdeRetargeting.joints.velocity)
+            = iDynTree::toEigen(m_hdeRetargeting.joints.smoother.smoother->getVel());
     }
 
     // check if the approaching phase is finished
-    if(m_phase == Phase::approacing)
+    if(m_phase == Phase::Approaching)
     {
         double now = yarp::os::Time::now();
         if(now - m_startingApproachingPhaseTime > m_approachPhaseDuration)
             stopApproachingPhase();
     }
 
-    return;
+    return true;
 }
 
 const iDynTree::Transform& RetargetingClient::leftHandTransform() const
 {
-    return m_leftHand.data;
+    return m_leftHand.transform;
 }
 
 const iDynTree::Transform& RetargetingClient::rightHandTransform() const
 {
-    return m_rightHand.data;
+    return m_rightHand.transform;
 }
 
-const iDynTree::VectorDynSize& RetargetingClient::jointValues() const
+const iDynTree::VectorDynSize& RetargetingClient::jointPositions() const
 {
-    return m_jointRetargeting.data;
+    return m_hdeRetargeting.joints.position;
+}
+
+const iDynTree::VectorDynSize& RetargetingClient::jointVelocities() const
+{
+    return m_hdeRetargeting.joints.velocity;
 }
 
 double RetargetingClient::comHeight() const
 {
-    return m_comHeight.data.position;
+    return m_hdeRetargeting.com.position;
 }
 
 double RetargetingClient::comHeightVelocity() const
 {
-    return m_comHeight.data.velocity;
+    return m_hdeRetargeting.com.velocity;
 }
 
 void RetargetingClient::close()
 {
-    if(m_useHandRetargeting)
+    if (m_useHandRetargeting)
     {
         m_leftHand.port.close();
         m_rightHand.port.close();
     }
 
-    if(m_useJointRetargeting)
-        m_jointRetargeting.port.close();
-
-    if(m_useCoMHeightRetargeting)
-        m_comHeight.port.close();
-
-    if(m_useVirtualizer)
-        m_robotOrientationPort.close();
+    if (m_useJointRetargeting || m_useCoMHeightRetargeting)
+    {
+        m_hdeRetargeting.port.close();
+    }
 }
 
 void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotation)
@@ -398,15 +448,15 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
 
 void RetargetingClient::setPhase(Phase phase)
 {
-    if(phase == Phase::approacing)
+    if (phase == Phase::Approaching)
     {
         startApproachingPhase();
     }
 
-    if(m_phase == Phase::approacing && phase == Phase::walking)
+    if (m_phase == Phase::Approaching && phase == Phase::Walking)
         stopApproachingPhase();
 
-    if(m_phase == Phase::approacing && phase == Phase::stance)
+    if (m_phase == Phase::Approaching && phase == Phase::Stance)
         stopApproachingPhase();
 
     m_phase = phase;
@@ -414,23 +464,25 @@ void RetargetingClient::setPhase(Phase phase)
 
 void RetargetingClient::stopApproachingPhase()
 {
-    if(m_useHandRetargeting)
+    if (m_useHandRetargeting)
     {
-        m_leftHand.smoother->setT(m_leftHand.smoothingTimeInWalking);
-        m_rightHand.smoother->setT(m_rightHand.smoothingTimeInWalking);
+        m_leftHand.smoother.smoother->setT(m_leftHand.smoother.smoothingTimeInWalking);
+        m_rightHand.smoother.smoother->setT(m_rightHand.smoother.smoothingTimeInWalking);
     }
 
-    if(m_useJointRetargeting)
+    if (m_useJointRetargeting)
     {
-        m_jointRetargeting.smoother->setT(m_jointRetargeting.smoothingTimeInWalking);
+        m_hdeRetargeting.joints.smoother.smoother->setT(
+            m_hdeRetargeting.joints.smoother.smoothingTimeInWalking);
     }
 
-    if(m_useCoMHeightRetargeting)
+    if (m_useCoMHeightRetargeting)
     {
-        m_comHeight.smoother->setT(m_comHeight.smoothingTimeInWalking);
+        m_hdeRetargeting.com.smoother.smoother->setT(
+            m_hdeRetargeting.com.smoother.smoothingTimeInWalking);
     }
 
-    m_phase = Phase::stance;
+    m_phase = Phase::Stance;
 }
 
 void RetargetingClient::startApproachingPhase()
@@ -443,23 +495,25 @@ void RetargetingClient::startApproachingPhase()
 
     if(m_useHandRetargeting)
     {
-        m_leftHand.smoother->setT(m_leftHand.smoothingTimeInApproaching);
-        m_rightHand.smoother->setT(m_rightHand.smoothingTimeInApproaching);
+        m_leftHand.smoother.smoother->setT(m_leftHand.smoother.smoothingTimeInApproaching);
+        m_rightHand.smoother.smoother->setT(m_rightHand.smoother.smoothingTimeInApproaching);
     }
 
-    if(m_useJointRetargeting)
+    if (m_useJointRetargeting)
     {
-        m_jointRetargeting.smoother->setT(m_jointRetargeting.smoothingTimeInApproaching);
+        m_hdeRetargeting.joints.smoother.smoother->setT(
+            m_hdeRetargeting.joints.smoother.smoothingTimeInApproaching);
     }
 
-    if(m_useCoMHeightRetargeting)
+    if (m_useCoMHeightRetargeting)
     {
-        m_comHeight.smoother->setT(m_comHeight.smoothingTimeInApproaching);
+        m_hdeRetargeting.com.smoother.smoother->setT(
+            m_hdeRetargeting.com.smoother.smoothingTimeInApproaching);
     }
 
 }
 
 bool RetargetingClient::isApproachingPhase() const
 {
-    return m_phase == Phase::approacing;
+    return m_phase == Phase::Approaching;
 }
