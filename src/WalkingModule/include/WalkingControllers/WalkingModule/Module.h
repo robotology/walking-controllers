@@ -10,44 +10,45 @@
 #define WALKING_MODULE_HPP
 
 // std
-#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
+#include <unordered_map>
+#include <vector>
 #include <memory>
 #include <deque>
 
 // YARP
+#include <yarp/dev/PolyDriverList.h>
 #include <yarp/os/RFModule.h>
+#include <yarp/os/RpcClient.h>
 #include <yarp/sig/Vector.h>
 
-#include <yarp/os/RpcClient.h>
-
-
+#include <BipedalLocomotion/RobotInterface/YarpSensorBridge.h>
+#include <BipedalLocomotion/RobotInterface/YarpHelper.h>
 #include <BipedalLocomotion/YarpUtilities/VectorsCollection.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
 #include <iDynTree/ModelIO/ModelLoader.h>
+#include <iDynTree/Core/Rotation.h>
+#include <iDynTree/Core/Transform.h>
+#include <iDynTree/Model/Indices.h>
 
 // WalkingControllers library
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
+#include <WalkingControllers/RetargetingHelper/Helper.h>
 #include <WalkingControllers/RobotInterface/Helper.h>
 #include <WalkingControllers/RobotInterface/PIDHandler.h>
-#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
-#include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
-#include <WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h>
-
 #include <WalkingControllers/SimplifiedModelControllers/DCMModelPredictiveController.h>
 #include <WalkingControllers/SimplifiedModelControllers/DCMReactiveController.h>
 #include <WalkingControllers/SimplifiedModelControllers/ZMPController.h>
-
+#include <WalkingControllers/TimeProfiler/TimeProfiler.h>
+#include <WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h>
+#include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
+#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
+#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 #include <WalkingControllers/WholeBodyControllers/InverseKinematics.h>
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics.h>
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_osqp.h>
 #include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_qpOASES.h>
-
-#include <WalkingControllers/KinDynWrapper/Wrapper.h>
-
-#include <WalkingControllers/RetargetingHelper/Helper.h>
-
-#include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -65,6 +66,8 @@ namespace WalkingControllers
         enum class WalkingFSM {Idle, Configured, Preparing, Prepared, Walking, Paused, Stopped};
         WalkingFSM m_robotState{WalkingFSM::Idle}; /**< State  of the WalkingFSM. */
 
+        std::vector<BipedalLocomotion::RobotInterface::PolyDriverDescriptor> m_polyDrivers;
+
         double m_dT; /**< RFModule period. */
         double m_time; /**< Current time. */
         std::string m_robot; /**< Robot name. */
@@ -73,6 +76,7 @@ namespace WalkingControllers
         bool m_useQPIK; /**< True if the QP-IK is used. */
         bool m_useBLFIK; /**< True if the BLF-IK is used. */
         bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
+        bool m_useFeetImu{false}; /**< True if you want to use the imu on the feet. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
         bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
@@ -100,6 +104,8 @@ namespace WalkingControllers
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+
+        BipedalLocomotion::RobotInterface::YarpSensorBridge m_sensorBridge; /**< Helper to get the data from the robot */
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
         double m_desiredJointsWeight; /**< Desired joint weight matrix. */
@@ -152,6 +158,23 @@ namespace WalkingControllers
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
         yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
+
+        struct IMUOrientationData
+        {
+            iDynTree::Rotation IMU_R_controlledFrame;
+            iDynTree::FrameIndex frameIndex;
+            iDynTree::Rotation I_R_I_IMU;
+            iDynTree::Rotation I_R_IMU;
+            iDynTree::Rotation I_R_controlledFrame;
+        };
+
+        struct linkIMU
+        {
+            std::unordered_map<std::string, IMUOrientationData> IMUs;
+            iDynTree::Rotation averageRotation;
+        };
+
+        std::unordered_map<std::string, linkIMU> m_linksWithIMU;
 
         /**
          * Get the robot model from the resource finder and set it.
@@ -263,6 +286,18 @@ namespace WalkingControllers
          * @param plannerInput The raw data read from the goal port.
          */
         void applyGoalScaling(yarp::sig::Vector &plannerInput);
+
+
+        /**
+         * Configure the SensorBridge.
+         * @param rf is the reference to a resource finder object
+         * @return true in case of success and false otherwise.
+         */
+        bool configureSensorBridge(const yarp::os::Bottle& rf);
+
+        bool configureLinkWithIMU(
+            std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
+            const std::string& linkName);
 
     public:
 
