@@ -10,7 +10,6 @@
 #define WALKING_CONTROLLERS_RETARGETING_HELPER_HELPER_H
 
 // std
-#include <BipedalLocomotion/ContinuousDynamicalSystem/FirstOrderSmoother.h>
 #include <memory>
 #include <vector>
 
