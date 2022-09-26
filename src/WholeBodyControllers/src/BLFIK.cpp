@@ -50,6 +50,11 @@ bool BLFIK::initialize(
     m_useRootLinkForHeight = false;
     ptr->getParameter("use_root_link_for_height", m_useRootLinkForHeight);
 
+    m_useExternalFeedbackForLeftFootOrientation = false;
+    m_useExternalFeedbackForRightFootOrientation = false;
+    ptr->getParameter("use_left_foot_imu", m_useExternalFeedbackForLeftFootOrientation);
+    ptr->getParameter("use_right_foot_imu", m_useExternalFeedbackForRightFootOrientation);
+
     // weight providers
     bool ok = m_qpIK.initialize(ptr->getGroup("IK"));
     auto group = ptr->getGroup("IK").lock();
@@ -78,16 +83,36 @@ bool BLFIK::initialize(
     ok = ok && m_comTask->initialize(ptr->getGroup("COM_TASK"));
     ok = ok && m_qpIK.addTask(m_comTask, "com_task", highPriority);
 
+    // right foot task
     m_rightFootTask = std::make_shared<BipedalLocomotion::IK::SE3Task>();
     ok = ok && m_rightFootTask->setKinDyn(kinDyn);
-    ok = ok && m_rightFootTask->initialize(ptr->getGroup("RIGHT_FOOT_TASK"));
+    auto ptrRight = ptr->getGroup("RIGHT_FOOT_TASK").lock();
+    if (ptrRight == nullptr)
+    {
+        BipedalLocomotion::log()->error("{} Unable to find the 'RIGHT_FOOT_TASK' group.", prefix);
+        return false;
+    }
+    ptrRight->setParameter("use_orientation_exogenous_feedback", m_useExternalFeedbackForRightFootOrientation);
+    ok = ok && m_rightFootTask->initialize(ptrRight);
     ok = ok && m_qpIK.addTask(m_rightFootTask, "right_foot_task", highPriority);
 
+
+    // left foot task
     m_leftFootTask = std::make_shared<BipedalLocomotion::IK::SE3Task>();
     ok = ok && m_leftFootTask->setKinDyn(kinDyn);
-    ok = ok && m_leftFootTask->initialize(ptr->getGroup("LEFT_FOOT_TASK"));
+
+    auto ptrLeft = ptr->getGroup("LEFT_FOOT_TASK").lock();
+    if (ptrLeft == nullptr)
+    {
+        BipedalLocomotion::log()->error("{} Unable to find the 'LEFT_FOOT_TASK' group.", prefix);
+        return false;
+    }
+    ptrLeft->setParameter("use_orientation_exogenous_feedback",
+                          m_useExternalFeedbackForLeftFootOrientation);
+    ok = ok && m_leftFootTask->initialize(ptrLeft);
     ok = ok && m_qpIK.addTask(m_leftFootTask, "left_foot_task", highPriority);
 
+    // torso
     m_torsoTask = std::make_shared<BipedalLocomotion::IK::SO3Task>();
     ok = ok && m_torsoTask->setKinDyn(kinDyn);
     ok = ok && m_torsoTask->initialize(ptr->getGroup("TORSO_TASK"));
@@ -217,6 +242,24 @@ bool BLFIK::setRootSetPoint(const iDynTree::Position& position, const iDynTree::
 bool BLFIK::setTorsoSetPoint(const iDynTree::Rotation& rotation)
 {
     return m_torsoTask->setSetPoint(BipedalLocomotion::Conversions::toManifRot(rotation));
+}
+
+bool BLFIK::setLeftFootMeasuredOrientation(const iDynTree::Rotation& I_R_LF)
+{
+    if (m_useExternalFeedbackForLeftFootOrientation)
+    {
+        return m_leftFootTask->setFeedback(BipedalLocomotion::Conversions::toManifRot(I_R_LF));
+    }
+    return true;
+}
+
+bool BLFIK::setRightFootMeasuredOrientation(const iDynTree::Rotation& I_R_RF)
+{
+    if (m_useExternalFeedbackForRightFootOrientation)
+    {
+        return m_rightFootTask->setFeedback(BipedalLocomotion::Conversions::toManifRot(I_R_RF));
+    }
+    return true;
 }
 
 const iDynTree::VectorDynSize& BLFIK::getDesiredJointVelocity() const
