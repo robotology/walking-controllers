@@ -13,4 +13,5 @@ find_package(qpOASES REQUIRED)
 find_package(BipedalLocomotionFramework 0.9.0
   COMPONENTS VectorsCollection IK ParametersHandlerYarpImplementation
              ContinuousDynamicalSystem ManifConversions
-             ParametersHandlerYarpImplementation REQUIRED)
+             ParametersHandlerYarpImplementation
+             RobotInterfaceYarpImplementation REQUIRED)
