@@ -139,6 +139,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
                                     yarp::os::Value(false)).asBool();
     double pitchDelta = config.check("pitchDelta", yarp::os::Value(0.0)).asFloat64();
 
+    bool isPauseActive = config.check("isPauseActive", yarp::os::Value(true)).asBool();
+
     iDynTree::Vector2 mergePointRatios;
     if(!YarpUtilities::getVectorFromSearchable(config, "mergePointRatios", mergePointRatios))
     {
@@ -183,6 +185,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
     ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
+
+    m_trajectoryGenerator.setPauseActive(isPauseActive);
 
     if (m_useMinimumJerk) {
         m_feetGenerator = m_trajectoryGenerator.addFeetMinimumJerkGenerator();
