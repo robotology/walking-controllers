@@ -245,8 +245,11 @@ bool WalkingModule::configureSensorBridge(const yarp::os::Bottle& rf)
     }
 
     auto polyRemapper = BipedalLocomotion::RobotInterface::constructMultipleAnalogSensorsRemapper(
-        handler->getGroup("MULTIPLE_ANALOG_SENSORS_REMAPPER"));
+             handler->getGroup("MULTIPLE_ANALOG_SENSORS_REMAPPER"), m_polyDrivers);
 
+    std::cerr << polyRemapper.poly << std::endl;
+    std::cerr << polyRemapper.key << std::endl;    
+    
     if(!polyRemapper.isValid())
     {
         yError() << "[WalkingModule::configureSensorBridge] Unable to initialize the remapper";
@@ -256,14 +259,25 @@ bool WalkingModule::configureSensorBridge(const yarp::os::Bottle& rf)
 
 
     yarp::dev::PolyDriverList list;
-    for (auto& polyDriver : m_polyDrivers)
-    {
-        list.push(polyDriver.poly.get(), polyDriver.key.c_str());
-    }
+    list.push(polyRemapper.poly.get(), polyRemapper.key.c_str());
+    // for (auto& polyDriver : m_polyDrivers)
+    // {
+    //     list.push(polyDriver.poly.get(), polyDriver.key.c_str());
+    // }
 
-    if (!m_sensorBridge.setDriversList(list))
+    if (!m_sensorBridge.initialize(handler))
     {
         yError() << "[WalkingModule::configureSensorBridge] Unable to initialize the sensor bridge";
+        return false;
+    }
+
+
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(2000ms);
+    
+    if (!m_sensorBridge.setDriversList(list))
+    {
+        yError() << "[WalkingModule::configureSensorBridge] Unable to set the driver list";
         return false;
     }
 
@@ -529,7 +543,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     bool useLeftFootImu = generalOptions.check("use_left_foot_imu", yarp::os::Value(false)).asBool();
     bool useRightFootImu = generalOptions.check("use_right_foot_imu", yarp::os::Value(false)).asBool();
-    m_useFeetImu = useLeftFootImu || useRightFootImu;
+    m_useFeetImu = true || useLeftFootImu || useRightFootImu;
     if(m_useFeetImu)
     {
         yarp::os::Bottle sensorBridgeOptions = rf.findGroup("SENSOR_BRIDGE");
