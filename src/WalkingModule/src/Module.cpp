@@ -444,7 +444,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
-    yInfo() << "[WalkingModule::configure] Ready to play!";
+    yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
     return true;
 }
@@ -1633,6 +1633,8 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
 {
+    m_plannerInput = plannerInput;
+
     // in the approaching phase the robot should not move
     // as soon as the approaching phase is finished the user
     // can move the robot
@@ -1676,8 +1678,6 @@ bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
             m_newTrajectoryMergeCounter = m_plannerAdvanceTimeSteps;
         }
     }
-
-    m_plannerInput = plannerInput;
 
     m_newTrajectoryRequired = true;
 
