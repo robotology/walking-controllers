@@ -57,6 +57,9 @@ namespace WalkingControllers
 
         iDynTree::Vector2 m_referencePointDistance; /**< Vector between the center of the unicycle and the point that has to be reach the goal. */
 
+        iDynTree::Vector2 m_leftZMPIntialDelta;
+        iDynTree::Vector2 m_rightZMPIntialDelta;
+
         GeneratorState m_generatorState{GeneratorState::NotConfigured}; /**< Useful to track the generator state. */
 
         std::thread m_generatorThread; /**< Main trajectory thread. */
@@ -135,7 +138,8 @@ namespace WalkingControllers
          */
         bool updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                                 const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
-                                const iDynTree::Transform& measured, const iDynTree::VectorDynSize& plannerDesiredInput);
+                                const iDynTree::Transform& measured, const iDynTree::VectorDynSize& plannerDesiredInput,
+                                const iDynTree::Vector2& leftZMPOffsetDelta, const iDynTree::Vector2& rightZMPOffsetDelta);
 
         /**
          * @brief Set the free space ellipse in which the robot can walk.

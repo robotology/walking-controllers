@@ -10,6 +10,7 @@
 #define WALKING_CONTROLLERS_RETARGETING_HELPER_HELPER_H
 
 // std
+#include <iDynTree/Core/VectorFixSize.h>
 #include <memory>
 #include <vector>
 
@@ -73,7 +74,8 @@ private:
     struct HDERetargeting : public RetargetingElement<WalkingControllers::YarpUtilities::HumanState>
     {
         KinematicState<iDynTree::VectorDynSize> joints;
-        KinematicState<double> com;
+        KinematicState<double> comHeight;
+        KinematicState<iDynTree::Vector2> comHorizontal;
     };
 
     struct HandRetargeting : public RetargetingElement<yarp::sig::Vector>
@@ -85,7 +87,8 @@ private:
     bool m_useHandRetargeting; /**< True if the hand retargeting is used */
     bool m_useVirtualizer; /**< True if the virtualizer is used */
     bool m_useJointRetargeting; /**< True if the joint retargeting is used */
-    bool m_useCoMHeightRetargeting; /**< True if the com retargeting is used */
+    bool m_useCoMHeightRetargeting; /**< True if the com height retargeting is used */
+    bool m_useCoMHorizontalRetargeting; /**< True if the horizontal com retargeting is used */
 
     HandRetargeting m_leftHand; /**< Left hand retargeting element */
     HandRetargeting m_rightHand; /**< Right hand retargeting element */
@@ -100,6 +103,11 @@ private:
 
     /** Factor required to scale the human CoM displacement to a desired robot CoM displacement */
     double m_comHeightScalingFactor;
+
+    iDynTree::Vector2 m_comHorizontalInputOffset;
+    iDynTree::Vector2 m_comXLimits;
+    iDynTree::Vector2 m_comYLimits;
+    bool m_comHorizontalRetargetingReady{false};
 
     /** Mapping between the retarget joints and the controlled. */
     std::unordered_map<std::string, int> m_retargetedJointsToControlJoints;
@@ -180,6 +188,13 @@ public:
      * Get the velocity of the retargeting joints
      */
     const iDynTree::VectorDynSize& jointVelocities() const;
+
+
+    /**
+     * Get the position of com horizontal position
+     */
+    const iDynTree::Vector2& comHorizonal() const;
+
 
     /**
      * Get the CoM height

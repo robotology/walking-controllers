@@ -225,11 +225,14 @@ namespace WalkingControllers
          * @param measuredTransform transformation between the world and the (stance/swing??) foot;
          * @param mergePoint is the instant at which the old and the new trajectory will be merged;
          * @param plannerDesiredInput The desired input to the planner.
+         * @param leftZMPOffsetDelta the offset added to the delta ZMP on the left foot
+         * @param rightZMPOffsetDelta the offset added to the delta ZMP on the right foot
          * @return true/false in case of success/failure.
          */
         bool askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
                                 const iDynTree::Transform& measuredTransform,
-                                const size_t& mergePoint, const iDynTree::VectorDynSize &plannerDesiredInput);
+                                const size_t& mergePoint, const iDynTree::VectorDynSize &plannerDesiredInput,
+                                const iDynTree::Vector2& leftZMPOffsetDelta, const iDynTree::Vector2& rightZMPOffsetDelta);
 
         /**
          * Update the old trajectory.

@@ -12,7 +12,9 @@
 
 // iDynTree
 #include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/Core/VectorFixSize.h>
 
+// walking-controllers
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>
 
@@ -66,15 +68,13 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     }
 
     // get left and right ZMP delta
-    iDynTree::Vector2 leftZMPDelta;
-    if(!YarpUtilities::getVectorFromSearchable(config, "leftZMPDelta", leftZMPDelta))
+    if(!YarpUtilities::getVectorFromSearchable(config, "leftZMPDelta", m_leftZMPIntialDelta))
     {
         yError() << "[configurePlanner] Initialization failed while reading leftZMPDelta vector.";
         return false;
     }
 
-    iDynTree::Vector2 rightZMPDelta;
-    if(!YarpUtilities::getVectorFromSearchable(config, "rightZMPDelta", rightZMPDelta))
+    if(!YarpUtilities::getVectorFromSearchable(config, "rightZMPDelta", m_rightZMPIntialDelta))
     {
         yError() << "[configurePlanner] Initialization failed while reading rightZMPDelta vector.";
         return false;
@@ -203,7 +203,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setMergePointRatio(mergePointRatios[0], mergePointRatios[1]);
 
     m_dcmGenerator = m_trajectoryGenerator.addDCMTrajectoryGenerator();
-    m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
+    m_dcmGenerator->setFootOriginOffset(m_leftZMPIntialDelta, m_rightZMPIntialDelta);
     m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
     m_dcmGenerator->setFirstDCMTrajectoryMode(FirstDCMTrajectoryMode::FifthOrderPoly);
     ok = ok && m_dcmGenerator->setLastStepDCMOffsetPercentage(lastStepDCMOffset);
@@ -565,7 +565,8 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
 
 bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Vector2& DCMBoundaryConditionAtMergePointPosition,
                                              const iDynTree::Vector2& DCMBoundaryConditionAtMergePointVelocity, bool correctLeft,
-                                             const iDynTree::Transform& measured, const iDynTree::VectorDynSize &plannerDesiredInput)
+                                             const iDynTree::Transform& measured, const iDynTree::VectorDynSize &plannerDesiredInput,
+                                             const iDynTree::Vector2& leftZMPOffsetDelta, const iDynTree::Vector2& rightZMPOffsetDelta)
 {
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -586,6 +587,12 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
 
         m_personFollowingDesiredPoint.zero();
         m_desiredDirectControl.zero();
+
+        iDynTree::Vector2 leftZMPDelta = m_leftZMPIntialDelta;
+        iDynTree::Vector2 rightZMPDelta = m_rightZMPIntialDelta;
+        iDynTree::toEigen(leftZMPDelta) += iDynTree::toEigen(leftZMPOffsetDelta);
+        iDynTree::toEigen(rightZMPDelta) += iDynTree::toEigen(rightZMPOffsetDelta);
+        m_dcmGenerator->setFootOriginOffset(leftZMPDelta, rightZMPDelta);
 
         if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {

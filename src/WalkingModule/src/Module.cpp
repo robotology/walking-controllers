@@ -745,7 +745,6 @@ bool WalkingModule::updateModule()
             // when we are near to the merge point the new trajectory is evaluated
             if(m_newTrajectoryMergeCounter == m_plannerAdvanceTimeSteps)
             {
-
                 double initTimeTrajectory;
                 initTimeTrajectory = m_time + m_newTrajectoryMergeCounter * m_dT;
 
@@ -754,9 +753,13 @@ bool WalkingModule::updateModule()
                     m_leftTrajectory[m_newTrajectoryMergeCounter];
 
                 // ask for a new trajectory
+                const iDynTree::Vector2& comHorizontal = m_retargetingClient->comHorizonal();
+                iDynTree::Vector2 zmpOffset;
+                zmpOffset(0) = comHorizontal(0);
+                zmpOffset(1) = 0;
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
                                        measuredTransform, m_newTrajectoryMergeCounter,
-                                       m_plannerInput))
+                                       m_plannerInput, zmpOffset, zmpOffset))
                 {
                     yError() << "[WalkingModule::updateModule] Unable to ask for a new trajectory.";
                     return false;
@@ -1071,6 +1074,7 @@ bool WalkingModule::updateModule()
             CoMPositionDesired[2] = m_retargetingClient->comHeight() + m_comHeightOffset;
             data.vectors["com::position::desired"].assign(CoMPositionDesired.begin(), CoMPositionDesired.begin() + CoMPositionDesired.size());
             data.vectors["com::position::desired_macumba"].assign(desiredCoMPosition.data(), desiredCoMPosition.data() + desiredCoMPosition.size());
+            data.vectors["com::position::desired_retargeting"].assign(m_retargetingClient->comHorizonal().data(), m_retargetingClient->comHorizonal().data() + m_retargetingClient->comHorizonal().size());
 
             // Manual definition of this value to add also the planned CoM height velocity
             std::vector<double> CoMVelocityDesired(3);
@@ -1440,7 +1444,8 @@ bool WalkingModule::generateFirstTrajectories()
 
 bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLeftSwinging,
                                        const iDynTree::Transform& measuredTransform,
-                                       const size_t& mergePoint, const iDynTree::VectorDynSize &plannerDesiredInput)
+                                       const size_t& mergePoint, const iDynTree::VectorDynSize &plannerDesiredInput,
+                                       const iDynTree::Vector2& leftZMPOffsetDelta, const iDynTree::Vector2& rightZMPOffsetDelta)
 {
     if(m_trajectoryGenerator == nullptr)
     {
@@ -1472,7 +1477,8 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
 
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
-                                                  measuredTransform, plannerDesiredInput))
+                                                  measuredTransform, plannerDesiredInput,
+                                                  leftZMPOffsetDelta, rightZMPOffsetDelta))
     {
         yError() << "[WalkingModule::askNewTrajectories] Unable to update the trajectory.";
         return false;
