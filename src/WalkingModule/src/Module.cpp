@@ -12,6 +12,7 @@
 #include <algorithm>
 
 // YARP
+#include <vector>
 #include <yarp/os/RFModule.h>
 #include <yarp/os/BufferedPort.h>
 #include <yarp/sig/Vector.h>
@@ -23,6 +24,9 @@
 #include <iDynTree/yarp/YARPConversions.h>
 #include <iDynTree/yarp/YARPEigenConversions.h>
 #include <iDynTree/Model/Model.h>
+#include <iDynTree/Core/Rotation.h>
+#include <iDynTree/Core/SO3Utils.h>
+#include <iDynTree/Model/Indices.h>
 
 // blf
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
@@ -131,6 +135,152 @@ bool WalkingModule::setRobotModel(const yarp::os::Searchable& rf)
         yError() << "[WalkingModule::setRobotModel] Error while loading the model from " << pathToModel;
         return false;
     }
+    return true;
+}
+
+bool WalkingModule::configureLinkWithIMU(
+    std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
+    const std::string& linkName)
+{
+    auto linkPoly
+        = BipedalLocomotion::RobotInterface::constructMultipleAnalogSensorsClient(handler);
+    if (!linkPoly.isValid())
+    {
+        yError() << "[WalkingModule::configureLinkWithIMU] Unable to initialize the left foot imu";
+        return false;
+    }
+
+    auto linkHandler = handler.lock();
+    std::vector<std::string> imuNames;
+    if (!linkHandler->getParameter("imu_names", imuNames))
+    {
+        yError() << "[WalkingModule::configureLinkWithIMU] Unable to get the imu names";
+        return false;
+    }
+
+    std::vector<std::string> frameNames;
+    if (!linkHandler->getParameter("frame_names", frameNames))
+    {
+        yError() << "[WalkingModule::configureLinkWithIMU] Unable to get the frames names associated to each imu";
+        return false;
+    }
+
+    std::string controlledFrameName;
+    if (!linkHandler->getParameter("controlled_frame_name", controlledFrameName))
+    {
+        yError() << "[WalkingModule::configureLinkWithIMU] Unable to get the name of the controlled frame";
+        return false;
+    }
+    iDynTree::FrameIndex controlledFrameIndex
+        = m_FKSolver->getKinDyn()->model().getFrameIndex(controlledFrameName);
+
+    if (controlledFrameIndex == iDynTree::FRAME_INVALID_INDEX)
+    {
+        yError() << "[WalkingModule::configureLinkWithIMU] Unable to find the frame named "
+                 << controlledFrameName;
+        return false;
+    }
+
+    const iDynTree::Rotation link_R_controlledFrame
+        = m_FKSolver->getKinDyn()->model().getFrameTransform(controlledFrameIndex).getRotation();
+
+    if (frameNames.size() != imuNames.size())
+    {
+        yError() << "[WalkingModule::configureLinkWithIMU] Mismatch between the number of imu and "
+                    "the name of the frames";
+        return false;
+    }
+
+    for (int i = 0; i < frameNames.size(); i++)
+    {
+
+        m_linksWithIMU[linkName].IMUs[imuNames[i]].frameIndex
+            = m_FKSolver->getKinDyn()->model().getFrameIndex(frameNames[i]);
+
+        if (m_linksWithIMU[linkName].IMUs[imuNames[i]].frameIndex == iDynTree::FRAME_INVALID_INDEX)
+        {
+            yError() << "[WalkingModule::configureLinkWithIMU] Unable to find the frame named "
+                     << frameNames[i];
+            return false;
+        }
+
+        // check that the frame link between the imu frame and the controlled frame is the same
+        if (m_FKSolver->getKinDyn()->model().getFrameLink(controlledFrameIndex)
+            != m_FKSolver->getKinDyn()->model().getFrameLink(
+                m_linksWithIMU[linkName].IMUs[imuNames[i]].frameIndex))
+        {
+            yError() << "[WalkingModule::configureLinkWithIMU] The controlled frame and the IMU "
+                        "frame should belong to the smae link";
+            return false;
+        }
+        m_linksWithIMU[linkName].IMUs[imuNames[i]].IMU_R_controlledFrame
+            = m_FKSolver->getKinDyn()
+                  ->model()
+                  .getFrameTransform(m_linksWithIMU[linkName].IMUs[imuNames[i]].frameIndex)
+                  .getRotation()
+                  .inverse()
+              * link_R_controlledFrame;
+    }
+
+    m_polyDrivers.push_back(linkPoly);
+
+    return true;
+}
+
+bool WalkingModule::configureSensorBridge(const yarp::os::Bottle& rf)
+{
+    auto handler = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>();
+    handler->set(rf);
+
+    if(!this->configureLinkWithIMU(handler->getGroup("RIGHT_FOOT"), "right_foot"))
+    {
+        yError() << "[WalkingModule::configureSensorBridge] Unable to initialize the right foot imu";
+        return false;
+    }
+
+    if(!this->configureLinkWithIMU(handler->getGroup("LEFT_FOOT"), "left_foot"))
+    {
+        yError() << "[WalkingModule::configureSensorBridge] Unable to initialize the left foot imu";
+        return false;
+    }
+
+    auto polyRemapper = BipedalLocomotion::RobotInterface::constructMultipleAnalogSensorsRemapper(
+             handler->getGroup("MULTIPLE_ANALOG_SENSORS_REMAPPER"), m_polyDrivers);
+
+    std::cerr << polyRemapper.poly << std::endl;
+    std::cerr << polyRemapper.key << std::endl;    
+    
+    if(!polyRemapper.isValid())
+    {
+        yError() << "[WalkingModule::configureSensorBridge] Unable to initialize the remapper";
+        return false;
+    }
+    m_polyDrivers.push_back(polyRemapper);
+
+
+    yarp::dev::PolyDriverList list;
+    list.push(polyRemapper.poly.get(), polyRemapper.key.c_str());
+    // for (auto& polyDriver : m_polyDrivers)
+    // {
+    //     list.push(polyDriver.poly.get(), polyDriver.key.c_str());
+    // }
+
+    if (!m_sensorBridge.initialize(handler))
+    {
+        yError() << "[WalkingModule::configureSensorBridge] Unable to initialize the sensor bridge";
+        return false;
+    }
+
+
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(2000ms);
+    
+    if (!m_sensorBridge.setDriversList(list))
+    {
+        yError() << "[WalkingModule::configureSensorBridge] Unable to set the driver list";
+        return false;
+    }
+
     return true;
 }
 
@@ -391,6 +541,18 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    bool useLeftFootImu = generalOptions.check("use_left_foot_imu", yarp::os::Value(false)).asBool();
+    bool useRightFootImu = generalOptions.check("use_right_foot_imu", yarp::os::Value(false)).asBool();
+    m_useFeetImu = true || useLeftFootImu || useRightFootImu;
+    if(m_useFeetImu)
+    {
+        yarp::os::Bottle sensorBridgeOptions = rf.findGroup("SENSOR_BRIDGE");
+        if(!configureSensorBridge(sensorBridgeOptions))
+        {
+            yError() << "[WalkingModule::configure] Unable to use the feet imu";
+            return false;
+        }
+    }
     // initialize the logger
     if(m_dumpData)
     {
@@ -596,6 +758,16 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position& desiredCoMPosition,
          && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointPositions(),
                                                        m_retargetingClient->jointVelocities());
 
+    if (m_useFeetImu)
+    {
+        ok = ok
+             && m_BLFIKSolver->setLeftFootMeasuredOrientation(
+                 m_linksWithIMU["left_foot"].averageRotation);
+        ok = ok
+             && m_BLFIKSolver->setRightFootMeasuredOrientation(
+                 m_linksWithIMU["right_foot"].averageRotation);
+    }
+
     if (m_useRootLinkForHeight)
     {
         ok = ok && m_BLFIKSolver->setRootSetPoint(desiredCoMPosition, desiredCoMVelocity);
@@ -725,6 +897,39 @@ bool WalkingModule::updateModule()
 
         m_profiler->setInitTime("Total");
 
+        // get the imu
+        if (m_useFeetImu)
+        {
+            m_sensorBridge.advance();
+            iDynTree::Vector3 rpyTemp;
+
+            for (auto& [linkName, imu] : m_linksWithIMU)
+            {
+                std::vector<iDynTree::Rotation> tempRots;
+                for (auto& [imuName, orientationData] : imu.IMUs)
+                {
+                    m_sensorBridge.getOrientationSensorMeasurement(imuName,
+                                                                   iDynTree::toEigen(rpyTemp));
+                    orientationData.I_R_IMU
+                        = orientationData.I_R_I_IMU
+                          * iDynTree::Rotation::RPY(rpyTemp(0), rpyTemp(1), rpyTemp(2));
+
+                    // remove the yaw
+                    iDynTree::Vector3 fkRPY = m_FKSolver->getKinDyn()
+                                                  ->getWorldTransform(orientationData.frameIndex)
+                                                  .getRotation()
+                                                  .asRPY();
+
+                    iDynTree::Vector3 I_R_IMU_rpy = orientationData.I_R_IMU.asRPY();
+                    orientationData.I_R_controlledFrame
+                        = iDynTree::Rotation::RPY(I_R_IMU_rpy(0), I_R_IMU_rpy(1), fkRPY(2))
+                          * orientationData.IMU_R_controlledFrame;
+                    tempRots.push_back(orientationData.I_R_controlledFrame);
+                }
+
+                iDynTree::geodesicL2MeanRotation(tempRots, imu.averageRotation);
+            }
+        }
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
@@ -1086,6 +1291,13 @@ bool WalkingModule::updateModule()
             // Left foot orientation
             iDynTree::Vector3 leftFootOrientationMeasured = leftFoot.getRotation().asRPY();
             data.vectors["left_foot::orientation::measured"].assign(leftFootOrientationMeasured.begin(), leftFootOrientationMeasured.begin() + leftFootOrientationMeasured.size());
+
+            if(m_useFeetImu)
+            {
+                iDynTree::Vector3 leftFootOrientationMeasuredIMU = m_linksWithIMU["left_foot"].averageRotation.asRPY();
+                data.vectors["left_foot::orientation::measured_imu"].assign(leftFootOrientationMeasuredIMU.begin(), leftFootOrientationMeasuredIMU.begin() + leftFootOrientationMeasuredIMU.size());
+            }
+
             iDynTree::Vector3 leftFootOrientationDesired = m_leftTrajectory.front().getRotation().asRPY();
             data.vectors["left_foot::orientation::desired"].assign(leftFootOrientationDesired.begin(), leftFootOrientationDesired.begin() + leftFootOrientationDesired.size());
 
@@ -1106,6 +1318,12 @@ bool WalkingModule::updateModule()
             // Right foot orientation
             iDynTree::Vector3 rightFootOrientationMeasured = rightFoot.getRotation().asRPY();
             data.vectors["right_foot::orientation::measured"].assign(rightFootOrientationMeasured.begin(), rightFootOrientationMeasured.begin() + rightFootOrientationMeasured.size());
+            if(m_useFeetImu)
+            {
+                iDynTree::Vector3 rightFootOrientationMeasuredIMU = m_linksWithIMU["right_foot"].averageRotation.asRPY();
+                data.vectors["right_foot::orientation::measured_imu"].assign(rightFootOrientationMeasuredIMU.begin(), rightFootOrientationMeasuredIMU.begin() + rightFootOrientationMeasuredIMU.size());
+            }
+
             iDynTree::Vector3 rightFootOrientationDesired = m_rightTrajectory.front().getRotation().asRPY();
             data.vectors["right_foot::orientation::desired"].assign(rightFootOrientationDesired.begin(), rightFootOrientationDesired.begin() + rightFootOrientationDesired.size());
 
@@ -1623,6 +1841,24 @@ bool WalkingModule::startWalking()
         }
     }
 
+    // reset the world frame for the imus
+    if (m_useFeetImu)
+    {
+        iDynTree::Vector3 rpyTemp;
+        m_sensorBridge.advance();
+        for (auto& [linkName, imu] : m_linksWithIMU)
+        {
+            for (auto& [imuName, orientationData] : imu.IMUs)
+            {
+                m_sensorBridge.getOrientationSensorMeasurement(imuName, iDynTree::toEigen(rpyTemp));
+                orientationData.I_R_I_IMU
+                    = m_FKSolver->getKinDyn()
+                          ->getWorldTransform(orientationData.frameIndex)
+                          .getRotation()
+                      * iDynTree::Rotation::RPY(rpyTemp(0), rpyTemp(1), rpyTemp(2)).inverse();
+            }
+        }
+    }
     // before running the controller the retargeting client goes in approaching phase this
     // guarantees a smooth transition
     m_retargetingClient->setPhase(RetargetingClient::Phase::Approaching);

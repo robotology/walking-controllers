@@ -48,6 +48,11 @@ public:
     bool setCoMSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);
     bool setRootSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);
     bool setTorsoSetPoint(const iDynTree::Rotation& rotation);
+
+    bool setLeftFootMeasuredOrientation(const iDynTree::Rotation& I_R_LF);
+    bool setRightFootMeasuredOrientation(const iDynTree::Rotation& I_R_RF);
+
+
     const iDynTree::VectorDynSize& getDesiredJointVelocity() const;
 
 private:
@@ -73,6 +78,8 @@ private:
     bool m_usejointRetargeting{false};
     bool m_useRootLinkForHeight{false};
     bool m_useFeedforwardTermForJointRetargeting{false};
+    bool m_useExternalFeedbackForLeftFootOrientation{false};
+    bool m_useExternalFeedbackForRightFootOrientation{false};
 };
 
 } // namespace WalkingControllers
