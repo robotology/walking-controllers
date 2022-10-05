@@ -396,7 +396,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
         // open and connect the data logger port
-        std::string portInput, portOutput;
+        std::string portOutput;
         // open the connect the data logger port
         if(!YarpUtilities::getStringFromSearchable(loggerOptions,
                                                    "dataLoggerOutputPort_name",
@@ -405,21 +405,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
         }
-        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
-                                                   "dataLoggerInputPort_name",
-                                                   portInput))
-        {
-            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
-            return false;
-        }
 
         m_loggerPort.open("/" + name + portOutput);
-
-        if(!yarp::os::Network::connect("/" + name + portOutput,  portInput))
-        {
-            yError() << "Unable to connect the ports " << "/" + name + portOutput << "and" << portInput;
-            return false;
-        }
     }
 
     // time profiler
