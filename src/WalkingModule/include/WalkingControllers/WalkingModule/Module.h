@@ -153,6 +153,13 @@ namespace WalkingControllers
 
         yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
 
+        yarp::os::BufferedPort<yarp::sig::Vector> m_leftFTArmRotatedPort; /**< Desired robot position port. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_rightFTArmRotatedPort; /**< Desired robot position port. */
+
+        yarp::os::BufferedPort<yarp::sig::Vector> m_leftFTArmPort; /**< Desired robot position port. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_rightFTArmPort; /**< Desired robot position port. */
+
+
         /**
          * Get the robot model from the resource finder and set it.
          * @param rf is the reference to a resource finder object.

@@ -12,6 +12,8 @@
 #include <algorithm>
 
 // YARP
+#include <yarp/eigen/Eigen.h>
+#include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
 #include <yarp/os/BufferedPort.h>
 #include <yarp/sig/Vector.h>
@@ -246,6 +248,41 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Could not open" << desiredUnyciclePositionPortName << " port.";
         return false;
     }
+
+    ///////////////// TODO remove this code. DONOT merge
+    std::string leftFTArmRoatedPort =  "/" + getName() + "/left_arm_inertial_ft";
+    if(!m_leftFTArmRotatedPort.open(leftFTArmRoatedPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << leftFTArmRoatedPort << " port.";
+        return false;
+    }
+
+    std::string rightFTArmRoatedPort =  "/" + getName() + "/right_arm_inertial_ft";
+    if(!m_rightFTArmRotatedPort.open(rightFTArmRoatedPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << rightFTArmRoatedPort << " port.";
+        return false;
+    }
+
+    std::string leftFTArmPort =  "/" + getName() + "/left_arm_filtered_ft";
+    if(!m_leftFTArmPort.open(leftFTArmPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << leftFTArmPort << " port.";
+        return false;
+    }
+
+
+    std::string rightFTArmPort =  "/" + getName() + "/right_arm_filtered_ft";
+    if(!m_rightFTArmPort.open(rightFTArmPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << rightFTArmPort << " port.";
+        return false;
+    }
+
+
+    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/l_arm_ft_sensor", leftFTArmPort);
+    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/r_arm_ft_sensor", rightFTArmPort);
+    /////////////////
 
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
@@ -711,6 +748,46 @@ bool WalkingModule::updateModule()
         bool resetTrajectory = false;
 
         m_profiler->setInitTime("Total");
+
+        /////////////////////////  TODO this part of the code should be removed. DONOT merge this feature
+        yarp::sig::Vector* leftFTData = m_leftFTArmPort.read(false);
+        yarp::sig::Vector& leftArmRotated = m_leftFTArmRotatedPort.prepare();
+        leftArmRotated.resize(3);
+        if (leftFTData == nullptr)
+        {
+            yarp::eigen::toEigen(leftArmRotated).setZero();
+        }
+        else {
+            iDynTree::Vector3 temp;
+            temp(0) = (*leftFTData)[0];
+            temp(1) = (*leftFTData)[1];
+            temp(2) = (*leftFTData)[2];
+
+            yarp::eigen::toEigen(leftArmRotated) = iDynTree::toEigen(m_FKSolver->getKinDyn()->getWorldTransform("l_arm_ft_sensor").getRotation()) *
+                iDynTree::toEigen(temp);
+        }
+        m_leftFTArmRotatedPort.write();
+
+
+        yarp::sig::Vector* rightFTData = m_rightFTArmPort.read(false);
+        yarp::sig::Vector& rightArmRotated = m_rightFTArmRotatedPort.prepare();
+        rightArmRotated.resize(3);
+        if (rightFTData == nullptr)
+        {
+            yarp::eigen::toEigen(rightArmRotated).setZero();
+        }
+        else {
+            iDynTree::Vector3 temp;
+            temp(0) = (*rightFTData)[0];
+            temp(1) = (*rightFTData)[1];
+            temp(2) = (*rightFTData)[2];
+
+            yarp::eigen::toEigen(rightArmRotated) = iDynTree::toEigen(m_FKSolver->getKinDyn()->getWorldTransform("r_arm_ft_sensor").getRotation()) *
+                iDynTree::toEigen(temp);
+        }
+        m_rightFTArmRotatedPort.write();
+
+        //////////////////////////////////
 
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
