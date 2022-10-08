@@ -16,6 +16,7 @@
 #include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
 #include <yarp/os/BufferedPort.h>
+#include <yarp/sig/Matrix.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
 
@@ -196,6 +197,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    // we will send the data every 100ms
+    m_sendInfoMaxCounter = std::floor(0.01 / m_dT);
+
     double plannerAdvanceTimeInS = rf.check("planner_advance_time_in_s", yarp::os::Value(0.18)).asFloat64();
     m_plannerAdvanceTimeSteps = std::round(plannerAdvanceTimeInS / m_dT) + 2; //The additional 2 steps are because the trajectory from the planner is requested two steps in advance wrt the merge point
 
@@ -282,6 +286,21 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/l_arm_ft_sensor", leftFTArmPort);
     yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/r_arm_ft_sensor", rightFTArmPort);
+
+
+    std::string leftHandPort =  "/" + getName() + "/left_hand:o";
+    if(!m_leftHandPort.open(leftHandPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << leftHandPort << " port.";
+        return false;
+    }
+
+    std::string rightHandPort =  "/" + getName() + "/right_hand:o";
+    if(!m_rightHandPort.open(rightHandPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << rightHandPort << " port.";
+        return false;
+    }
     /////////////////
 
     // initialize the trajectory planner
@@ -749,43 +768,77 @@ bool WalkingModule::updateModule()
 
         m_profiler->setInitTime("Total");
 
-        /////////////////////////  TODO this part of the code should be removed. DONOT merge this feature
-        yarp::sig::Vector* leftFTData = m_leftFTArmPort.read(false);
-        yarp::sig::Vector& leftArmRotated = m_leftFTArmRotatedPort.prepare();
-        leftArmRotated.resize(3);
-        if (leftFTData == nullptr)
+        /////////////////////////  TODO this part of the code should be removed. DONOT merge this
+        ///feature
+        if (m_sendInfoIndex == 0)
         {
-            yarp::eigen::toEigen(leftArmRotated).setZero();
-        }
-        else {
-            iDynTree::Vector3 temp;
-            temp(0) = (*leftFTData)[0];
-            temp(1) = (*leftFTData)[1];
-            temp(2) = (*leftFTData)[2];
+            yarp::sig::Vector* leftFTData = m_leftFTArmPort.read(false);
+            yarp::sig::Vector& leftArmRotated = m_leftFTArmRotatedPort.prepare();
+            leftArmRotated.resize(3);
+            if (leftFTData == nullptr)
+            {
+                yarp::eigen::toEigen(leftArmRotated).setZero();
+            } else
+            {
+                iDynTree::Vector3 temp;
+                temp(0) = (*leftFTData)[0];
+                temp(1) = (*leftFTData)[1];
+                temp(2) = (*leftFTData)[2];
 
-            yarp::eigen::toEigen(leftArmRotated) = iDynTree::toEigen(m_FKSolver->getKinDyn()->getWorldTransform("l_arm_ft_sensor").getRotation()) *
-                iDynTree::toEigen(temp);
-        }
-        m_leftFTArmRotatedPort.write();
+                yarp::eigen::toEigen(leftArmRotated)
+                    = iDynTree::toEigen(m_FKSolver->getKinDyn()
+                                            ->getWorldTransform("l_arm_ft_sensor")
+                                            .getRotation())
+                      * iDynTree::toEigen(temp);
+            }
+            m_leftFTArmRotatedPort.write();
 
+            yarp::sig::Vector* rightFTData = m_rightFTArmPort.read(false);
+            yarp::sig::Vector& rightArmRotated = m_rightFTArmRotatedPort.prepare();
+            rightArmRotated.resize(3);
+            if (rightFTData == nullptr)
+            {
+                yarp::eigen::toEigen(rightArmRotated).setZero();
+            } else
+            {
+                iDynTree::Vector3 temp;
+                temp(0) = (*rightFTData)[0];
+                temp(1) = (*rightFTData)[1];
+                temp(2) = (*rightFTData)[2];
 
-        yarp::sig::Vector* rightFTData = m_rightFTArmPort.read(false);
-        yarp::sig::Vector& rightArmRotated = m_rightFTArmRotatedPort.prepare();
-        rightArmRotated.resize(3);
-        if (rightFTData == nullptr)
-        {
-            yarp::eigen::toEigen(rightArmRotated).setZero();
-        }
-        else {
-            iDynTree::Vector3 temp;
-            temp(0) = (*rightFTData)[0];
-            temp(1) = (*rightFTData)[1];
-            temp(2) = (*rightFTData)[2];
+                yarp::eigen::toEigen(rightArmRotated)
+                    = iDynTree::toEigen(m_FKSolver->getKinDyn()
+                                            ->getWorldTransform("r_arm_ft_sensor")
+                                            .getRotation())
+                      * iDynTree::toEigen(temp);
+            }
+            m_rightFTArmRotatedPort.write();
 
-            yarp::eigen::toEigen(rightArmRotated) = iDynTree::toEigen(m_FKSolver->getKinDyn()->getWorldTransform("r_arm_ft_sensor").getRotation()) *
-                iDynTree::toEigen(temp);
+            const iDynTree::Transform head_T_left_hand
+                = m_FKSolver->getHeadToWorldTransform().inverse()
+                  * m_FKSolver->getLeftHandToWorldTransform();
+
+            const iDynTree::Transform head_T_right_hand
+                = m_FKSolver->getHeadToWorldTransform().inverse()
+                  * m_FKSolver->getRightHandToWorldTransform();
+
+            yarp::sig::Matrix& matrixLeft = m_leftHandPort.prepare();
+            matrixLeft.resize(4, 4);
+            iDynTree::toYarp(head_T_left_hand, matrixLeft);
+            m_leftHandPort.write();
+
+            yarp::sig::Matrix& matrixRight = m_rightHandPort.prepare();
+            matrixRight.resize(4, 4);
+            iDynTree::toYarp(head_T_right_hand, matrixRight);
+            m_rightHandPort.write();
+
+            // send the data every m_sendInfoMaxCounter
+            m_sendInfoIndex++;
+            if (m_sendInfoIndex > m_sendInfoMaxCounter)
+            {
+                m_sendInfoIndex = 0;
+            }
         }
-        m_rightFTArmRotatedPort.write();
 
         //////////////////////////////////
 

@@ -159,6 +159,11 @@ namespace WalkingControllers
         yarp::os::BufferedPort<yarp::sig::Vector> m_leftFTArmPort; /**< Desired robot position port. */
         yarp::os::BufferedPort<yarp::sig::Vector> m_rightFTArmPort; /**< Desired robot position port. */
 
+        yarp::os::BufferedPort<yarp::sig::Matrix> m_rightHandPort;
+        yarp::os::BufferedPort<yarp::sig::Matrix> m_leftHandPort;
+
+        int m_sendInfoIndex{0};
+        int m_sendInfoMaxCounter{0};
 
         /**
          * Get the robot model from the resource finder and set it.
