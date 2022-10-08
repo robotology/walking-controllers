@@ -831,15 +831,15 @@ bool WalkingModule::updateModule()
             matrixRight.resize(4, 4);
             iDynTree::toYarp(head_T_right_hand, matrixRight);
             m_rightHandPort.write();
-
-            // send the data every m_sendInfoMaxCounter
-            m_sendInfoIndex++;
-            if (m_sendInfoIndex > m_sendInfoMaxCounter)
-            {
-                m_sendInfoIndex = 0;
-            }
         }
 
+	// send the data every m_sendInfoMaxCounter
+	m_sendInfoIndex++;	
+        if (m_sendInfoIndex > m_sendInfoMaxCounter)
+        {
+            m_sendInfoIndex = 0;
+        }
+	
         //////////////////////////////////
 
         // check desired planner input
