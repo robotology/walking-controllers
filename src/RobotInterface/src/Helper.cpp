@@ -494,7 +494,7 @@ bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
     measuredWrench.port = std::make_unique<yarp::os::BufferedPort<yarp::sig::Vector>>();
     measuredWrench.port->open("/" + portPrefix + portInputName);
     // connect port
-    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
+    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName, "fast_tcp"))
     {
         yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
                  << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;

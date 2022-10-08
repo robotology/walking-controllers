@@ -284,8 +284,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
 
 
-    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/l_arm_ft_sensor", leftFTArmPort);
-    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/r_arm_ft_sensor", rightFTArmPort);
+    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/l_arm_ft_sensor", leftFTArmPort, "fast_tcp");
+    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/r_arm_ft_sensor", rightFTArmPort, "fast_tcp");
 
 
     std::string leftHandPort =  "/" + getName() + "/left_hand:o";
