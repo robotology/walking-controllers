@@ -148,6 +148,9 @@ namespace WalkingControllers
 
         size_t m_plannerAdvanceTimeSteps; /** How many steps in advance the planner should be called. */
 
+        size_t m_feedbackAttempts;
+        double m_feedbackAttemptDelay;
+
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
