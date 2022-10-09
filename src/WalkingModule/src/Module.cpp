@@ -197,6 +197,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    double maxFBDelay = rf.check("max_feedback_delay_in_s", yarp::os::Value(1.0)).asFloat64();
+    m_feedbackAttemptDelay = m_dT / 10;
+    m_feedbackAttempts = maxFBDelay / m_feedbackAttemptDelay;
+
     // we will send the data every 100ms
     m_sendInfoMaxCounter = std::floor(0.01 / m_dT);
 
@@ -661,7 +665,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
 
-        if(!m_robotControlHelper->getFeedbacksRaw(100))
+        if(!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
             {
                 yError() << "[updateModule] Unable to get the feedback.";
                 return false;
@@ -706,7 +710,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(100))
+            if(!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -833,13 +837,13 @@ bool WalkingModule::updateModule()
             m_rightHandPort.write();
         }
 
-	// send the data every m_sendInfoMaxCounter
-	m_sendInfoIndex++;	
+    // send the data every m_sendInfoMaxCounter
+    m_sendInfoIndex++;
         if (m_sendInfoIndex > m_sendInfoMaxCounter)
         {
             m_sendInfoIndex = 0;
         }
-	
+
         //////////////////////////////////
 
         // check desired planner input
@@ -904,7 +908,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(100))
+        if(!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -1386,7 +1390,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(100))
+    if(!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1712,7 +1716,7 @@ bool WalkingModule::startWalking()
     // if the robot was only prepared the filters has to be reseted
     if(m_robotState == WalkingFSM::Prepared)
     {
-        m_robotControlHelper->resetFilters();
+        m_robotControlHelper->resetFilters(m_feedbackAttempts, m_feedbackAttemptDelay);
 
         updateFKSolver();
 
