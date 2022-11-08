@@ -244,7 +244,7 @@ void TrajectoryGenerator::computeThread()
 
         bool correctLeft;
 
-        iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
+        //iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
         iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
         iDynTree::Vector3 desiredDirectControl;
         double measuredAngleLeft, measuredAngleRight;
@@ -271,7 +271,7 @@ void TrajectoryGenerator::computeThread()
             endTime = initTime + m_plannerHorizon;
 
             // set desired point
-            desiredPointInRelativeFrame = m_personFollowingDesiredPoint;
+            //desiredPointInRelativeFrame = m_personFollowingDesiredPoint;
 
             desiredDirectControl = m_desiredDirectControl;
 
@@ -342,6 +342,7 @@ void TrajectoryGenerator::computeThread()
 
         unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
 
+        //TODO addWaypoints should contain this transformation
         // apply the homogeneous transformation w_H_{unicycle}
         iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
                                                                              iDynTree::toEigen(desiredPointInRelativeFrame))
@@ -589,7 +590,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
 
         if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
-            if (plannerDesiredInput.size() < 2)
+            if (plannerDesiredInput.size() < 2) //
             {
                 yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
                                     << ". Using zero input.";
@@ -638,6 +639,50 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
     }
 
     m_conditionVariable.notify_one();
+
+    return true;
+}
+
+bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime)
+{   
+    iDynTree::Vector2 approxSpeed; //speed taken from the saturation values of the linear velocity of the unicycle controller, multiplied by a reducing factor
+    approxSpeed(0) = std::sqrt(std::pow(conf.maxL, 2) - std::pow(conf.nominalW, 2)) / conf.minT * 0.9 * 0.8;    //TODO use config files
+    approxSpeed(1) = .0;
+    auto planner = m_trajectoryGenerator.unicyclePlanner();
+
+    //check the number of poses
+    if (m_path.size() < 1)
+    {
+        //error
+        return false;
+    }
+    else
+    {
+        // clear current trajectory
+        planner->clearPersonFollowingDesiredTrajectory();
+        double elapsedTime = initTime;
+        size_t i = (m_path.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
+
+        for (size_t i = 1; i < m_path.size(); ++i)
+        {
+            // path is a vector of (x, y, theta) pose vectors in the robot frame
+            double relativePoseDistance = sqrt(pow(m_path.at(i)[0] - m_path.at(i-1)[0], 2) + 
+                                   pow(m_path.at(i)[1] - m_path.at(i-1)[1], 2));
+            double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
+            elapsedTime += eta;
+            if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
+            {
+                break;
+            }
+            iDynTree::Vector2 absoluteFramePose;     //pose to be added to the planner
+            // transform in the global frame
+            iDynTree::toEigen(absoluteFramePose) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
+                                                                                iDynTree::toEigen(m_path.at(i)))
+                                                    + unicyclePosition;
+            planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, absoluteFramePose, approxSpeed);
+        }
+        
+    }
 
     return true;
 }

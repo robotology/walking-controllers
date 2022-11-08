@@ -75,12 +75,24 @@ namespace WalkingControllers
         FreeSpaceEllipse m_freeSpaceEllipse; /**< The free space ellipse object. */
         bool m_newFreeSpaceEllipse; /**< Check if the free space ellipse has been updated. */
 
+        std::vector<iDynTree::Vector3> m_path; /**< Path of 2D poses in the robot reference frame */
+
         std::mutex m_mutex; /**< Mutex. */
 
         /**
          * Main thread method.
          */
         void computeThread();
+
+        /**
+         * Add
+         * @param unicyclePosition the position of the robot wrt the world frame
+         * @param unicycleRotation rotation matrix to transform the robot in the world frame
+         * @param initTime initial time of the first pose of the path
+         * @param endTime equal to initialTime plus the planner horizon
+         * @return true/false in case of success/failure.
+         */
+        bool addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime);
 
     public:
 
