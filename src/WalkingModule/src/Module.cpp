@@ -730,7 +730,7 @@ bool WalkingModule::updateModule()
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if(desiredUnicyclePosition != nullptr)
         {
-            applyGoalScaling(*desiredUnicyclePosition);
+            //applyGoalScaling(*desiredUnicyclePosition);   //removed scaling since we have a variable number of poses
             if(!setPlannerInput(*desiredUnicyclePosition))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";

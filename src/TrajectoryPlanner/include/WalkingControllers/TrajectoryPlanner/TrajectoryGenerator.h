@@ -54,6 +54,8 @@ namespace WalkingControllers
         double m_rightYawDeltaInRad; /**< Offset for the right foot rotation around the z axis. */
         double m_nominalWidth; /**< Nominal width between two feet. */
         double m_initTime; /**< Init time of the current trajectory. */
+        double m_minStepDuration; /**< Minimum step duration. */
+        double m_maxStepLength; /**< Max step lenght. */
 
         iDynTree::Vector2 m_referencePointDistance; /**< Vector between the center of the unicycle and the point that has to be reach the goal. */
 
@@ -66,7 +68,7 @@ namespace WalkingControllers
         iDynTree::Transform m_measuredTransformLeft; /**< Measured transformation between the left foot and the world frame. (w_H_lf) */
         iDynTree::Transform m_measuredTransformRight; /**< Measured transformation between the right foot and the world frame. (w_H_rf) */
 
-        iDynTree::Vector2 m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
+        iDynTree::VectorDynSize m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
         iDynTree::Vector3 m_desiredDirectControl; /**< Desired control input to send to the Unicycle Planner. */
 
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */
@@ -85,7 +87,7 @@ namespace WalkingControllers
         void computeThread();
 
         /**
-         * Add
+         * Add each pose present in the path as a waypoint to the planner
          * @param unicyclePosition the position of the robot wrt the world frame
          * @param unicycleRotation rotation matrix to transform the robot in the world frame
          * @param initTime initial time of the first pose of the path
