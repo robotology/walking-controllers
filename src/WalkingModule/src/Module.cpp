@@ -443,7 +443,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
-
+    if (!m_feetPort.open("/" + getName() + "feet_positions:o"))
+    {
+        yError() << "[WalkingModule::configure] Could not open feet_positions port";
+    }
+    
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
     return true;
@@ -1029,6 +1033,24 @@ bool WalkingModule::updateModule()
             yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
             return false;
         }
+
+        //Send footsteps info on port anyway (x, y, yaw) wrt root_link
+        auto feetData = m_feetPort.prepare();
+        //left foot
+        for (size_t i = 0; i < m_leftTrajectory.size(); ++i)
+        {
+            iDynTree::Vector3 feetPose = m_leftTrajectory.at(i).getPosition();  //setting x,y
+            feetPose(2) = m_leftTrajectory.at(i).getRotation().asRPY()(2);    //yaw
+            feetData.first.push_back(feetPose);
+        }
+        //right foot
+        for (size_t j = 0; j < m_leftTrajectory.size(); ++j)
+        {
+            iDynTree::Vector3 feetPose = m_rightTrajectory.at(j).getPosition();
+            feetPose(2) = m_rightTrajectory.at(j).getRotation().asRPY()(2);
+            feetData.second.push_back(feetPose);
+        }
+        m_feetPort.write();
 
         // send data to the logger
         if(m_dumpData)
