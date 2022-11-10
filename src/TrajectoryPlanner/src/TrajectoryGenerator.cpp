@@ -506,10 +506,10 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
     
-    m_personFollowingDesiredPoint.resize(2);   //resize the dynamic size
+    //m_personFollowingDesiredPoint.resize(2);   //resize the dynamic size
     // at the beginning iCub has to stop
-    m_personFollowingDesiredPoint(0) = m_referencePointDistance(0);
-    m_personFollowingDesiredPoint(1) = m_referencePointDistance(1);
+    //m_personFollowingDesiredPoint(0) = m_referencePointDistance(0);
+    //m_personFollowingDesiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
     if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, m_referencePointDistance))
@@ -597,7 +597,8 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
             return false;
         }
 
-        m_personFollowingDesiredPoint.zero();
+        //m_personFollowingDesiredPoint.zero();
+        m_path.clear();
         m_desiredDirectControl.zero();
 
         if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
@@ -625,7 +626,21 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
             }
             else
             {
-                m_personFollowingDesiredPoint = plannerDesiredInput;
+                //Here I should convert the data from VectroDynSize to std::vector<Vector2>
+                //m_personFollowingDesiredPoint = plannerDesiredInput;
+                if (plannerDesiredInput.size()%2 != 0) 
+                {
+                    //not even
+                    yWarning() << "[updateTrajectories] plannerDesiredInput should be even, instead is: " << plannerDesiredInput.size()
+                               << "The last element will be ignored";
+                }
+                
+                for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
+                {
+                    m_path.at(i)(0) = plannerDesiredInput(i*2);     //x
+                    m_path.at(i)(1) = plannerDesiredInput(i*2 + 1); //y
+                }
+                
             }
         }
         else if (m_unicycleController == UnicycleController::DIRECT)
