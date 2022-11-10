@@ -731,6 +731,7 @@ bool WalkingModule::updateModule()
         if(desiredUnicyclePosition != nullptr)
         {
             //applyGoalScaling(*desiredUnicyclePosition);   //removed scaling since we have a variable number of poses
+            //std::cout << "Setting planner input" << std::endl;
             if(!setPlannerInput(*desiredUnicyclePosition))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
@@ -742,6 +743,7 @@ bool WalkingModule::updateModule()
         // the time to attach new one
         if(m_newTrajectoryRequired)
         {
+            //std::cout << "newTrajectoryRequired" << std::endl;
             // when we are near to the merge point the new trajectory is evaluated
             if(m_newTrajectoryMergeCounter == m_plannerAdvanceTimeSteps)
             {
@@ -754,6 +756,7 @@ bool WalkingModule::updateModule()
                     m_leftTrajectory[m_newTrajectoryMergeCounter];
 
                 // ask for a new trajectory
+                //std::cout << "askNewTrajectories" << std::endl;
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
                                        measuredTransform, m_newTrajectoryMergeCounter,
                                        m_plannerInput))
@@ -1470,6 +1473,7 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         }
     }
 
+    //std::cout << "m_trajectoryGenerator->updateTrajectories" << std::endl;
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
                                                   measuredTransform, plannerDesiredInput))

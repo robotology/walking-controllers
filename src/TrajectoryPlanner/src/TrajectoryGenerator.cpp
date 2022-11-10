@@ -363,6 +363,7 @@ void TrajectoryGenerator::computeThread()
         //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
         //    break;
         //}
+        //std::cout << "addWaypoints" << std::endl;
         if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
         {
             // something goes wrong
@@ -598,7 +599,11 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         }
 
         //m_personFollowingDesiredPoint.zero();
-        m_path.clear();
+        if (m_path.size() > 0)
+        {
+            m_path.clear();
+        }
+        
         m_desiredDirectControl.zero();
 
         if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
@@ -626,6 +631,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
             }
             else
             {
+                //std::cout << "converting plannerDesiredInput to m-path" << std::endl;
                 //Here I should convert the data from VectroDynSize to std::vector<Vector2>
                 //m_personFollowingDesiredPoint = plannerDesiredInput;
                 if (plannerDesiredInput.size()%2 != 0) 
@@ -637,8 +643,10 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                 
                 for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
                 {
-                    m_path.at(i)(0) = plannerDesiredInput(i*2);     //x
-                    m_path.at(i)(1) = plannerDesiredInput(i*2 + 1); //y
+                    iDynTree::Vector2 tmp_pose;
+                    tmp_pose(0) = plannerDesiredInput(i*2);     //x
+                    tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
+                    m_path.push_back(tmp_pose);
                 }
                 
             }
