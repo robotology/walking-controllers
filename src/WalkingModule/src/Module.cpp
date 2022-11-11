@@ -1036,20 +1036,27 @@ bool WalkingModule::updateModule()
 
         //Send footsteps info on port anyway (x, y, yaw) wrt root_link
         auto feetData = m_feetPort.prepare();
+        feetData.clear();
+        auto rightFeet = feetData.addList();
+        auto leftFeet = feetData.addList();
         //left foot
         for (size_t i = 0; i < m_leftTrajectory.size(); ++i)
         {
-            iDynTree::Vector3 feetPose = m_leftTrajectory.at(i).getPosition();  //setting x,y
-            feetPose(2) = m_leftTrajectory.at(i).getRotation().asRPY()(2);    //yaw
-            feetData.first.push_back(feetPose);
+            auto pose = leftFeet.addList();
+            pose.addFloat64(m_leftTrajectory.at(i).getPosition()(0));   //x
+            pose.addFloat64(m_leftTrajectory.at(i).getPosition()(1));   //y
+            pose.addFloat64(m_leftTrajectory.at(i).getRotation().asRPY()(2));   //yaw
         }
+        
         //right foot
-        for (size_t j = 0; j < m_leftTrajectory.size(); ++j)
+        for (size_t j = 0; j < m_rightTrajectory.size(); ++j)
         {
-            iDynTree::Vector3 feetPose = m_rightTrajectory.at(j).getPosition();
-            feetPose(2) = m_rightTrajectory.at(j).getRotation().asRPY()(2);
-            feetData.second.push_back(feetPose);
+            auto pose = rightFeet.addList();
+            pose.addFloat64(m_rightTrajectory.at(j).getPosition()(0));   //x
+            pose.addFloat64(m_rightTrajectory.at(j).getPosition()(1));   //y
+            pose.addFloat64(m_rightTrajectory.at(j).getRotation().asRPY()(2));   //yaw
         }
+
         m_feetPort.write();
 
         // send data to the logger
