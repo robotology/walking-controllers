@@ -443,7 +443,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
-    if (!m_feetPort.open("/" + getName() + "feet_positions:o"))
+    if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
     {
         yError() << "[WalkingModule::configure] Could not open feet_positions port";
     }
@@ -459,7 +459,7 @@ void WalkingModule::reset()
         m_walkingController->reset();
 
     m_trajectoryGenerator->reset();
-
+    m_feetPort.close();
     if(m_dumpData)
         m_loggerPort.close();
 }
@@ -493,7 +493,7 @@ bool WalkingModule::close()
         yError() << "[WalkingModule::close] Unable to close the connection with the robot.";
         return false;
     }
-
+    m_feetPort.close();
     // clear all the pointer
     m_trajectoryGenerator.reset(nullptr);
     m_walkingController.reset(nullptr);
@@ -1035,29 +1035,34 @@ bool WalkingModule::updateModule()
         }
 
         //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-        auto feetData = m_feetPort.prepare();
-        feetData.clear();
-        auto rightFeet = feetData.addList();
-        auto leftFeet = feetData.addList();
-        //left foot
-        for (size_t i = 0; i < m_leftTrajectory.size(); ++i)
+        if (m_leftTrajectory.size()>0 && m_rightTrajectory.size()>0)
         {
-            auto pose = leftFeet.addList();
-            pose.addFloat64(m_leftTrajectory.at(i).getPosition()(0));   //x
-            pose.addFloat64(m_leftTrajectory.at(i).getPosition()(1));   //y
-            pose.addFloat64(m_leftTrajectory.at(i).getRotation().asRPY()(2));   //yaw
+            auto feetData = m_feetPort.prepare();
+            feetData.clear();
+            auto rightFeet = feetData.addList();
+            auto leftFeet = feetData.addList();
+            //left foot
+            for (size_t i = 0; i < m_leftTrajectory.size(); ++i)
+            {
+                auto pose = leftFeet.addList();
+                pose.addFloat64(m_leftTrajectory.at(i).getPosition()(0));   //x
+                pose.addFloat64(m_leftTrajectory.at(i).getPosition()(1));   //y
+                pose.addFloat64(m_leftTrajectory.at(i).getRotation().asRPY()(2));   //yaw
+            }
+            
+            //right foot
+            for (size_t j = 0; j < m_rightTrajectory.size(); ++j)
+            {
+                auto pose = rightFeet.addList();
+                pose.addFloat64(m_rightTrajectory.at(j).getPosition()(0));   //x
+                pose.addFloat64(m_rightTrajectory.at(j).getPosition()(1));   //y
+                pose.addFloat64(m_rightTrajectory.at(j).getRotation().asRPY()(2));   //yaw
+            }
+    
+            m_feetPort.write();
         }
         
-        //right foot
-        for (size_t j = 0; j < m_rightTrajectory.size(); ++j)
-        {
-            auto pose = rightFeet.addList();
-            pose.addFloat64(m_rightTrajectory.at(j).getPosition()(0));   //x
-            pose.addFloat64(m_rightTrajectory.at(j).getPosition()(1));   //y
-            pose.addFloat64(m_rightTrajectory.at(j).getRotation().asRPY()(2));   //yaw
-        }
-
-        m_feetPort.write();
+        
 
         // send data to the logger
         if(m_dumpData)
@@ -1737,7 +1742,7 @@ bool WalkingModule::pauseWalking()
     // close the logger
     if(m_dumpData)
         m_loggerPort.close();
-
+    m_feetPort.close();
     m_robotState = WalkingFSM::Paused;
     return true;
 }

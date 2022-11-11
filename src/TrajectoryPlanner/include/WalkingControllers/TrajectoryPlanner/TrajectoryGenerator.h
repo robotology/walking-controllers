@@ -278,6 +278,14 @@ namespace WalkingControllers
          * Reset the planner
          */
         void reset();
+
+        /**
+         * Get the footprints planned by the unicycle generator
+         * @param leftFootprints vector containing the desired poses of the left foot on the xy plane
+         * @param rightFootprints vector containing the desired poses of the right foot on the xy plane
+         * @return true/false in case of success/failure.
+         */
+        bool getFootprints(std::vector<iDynTree::Vector3>& leftFootprints, std::vector<iDynTree::Vector3>& rightFootprints);
     };
 };
 
