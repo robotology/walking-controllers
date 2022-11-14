@@ -768,6 +768,40 @@ bool WalkingModule::updateModule()
                     yError() << "[WalkingModule::updateModule] Unable to ask for a new trajectory.";
                     return false;
                 }
+
+                //Send footsteps info on port anyway (x, y, yaw) wrt root_link
+                std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
+                if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+                {
+
+                    if (leftFootprints.size()>0 && rightFootprints.size()>0)
+                    {
+                        std::cout << "left footprints number: " << leftFootprints.size() << " Right footprints number: " << rightFootprints.size() << std::endl;
+                        auto& feetData = m_feetPort.prepare();
+                        feetData.clear();
+                        auto& rightFeet = feetData.addList();
+                        auto& leftFeet = feetData.addList();
+                        //left foot
+                        for (size_t i = 0; i < leftFootprints.size(); ++i)
+                        {
+                            auto& pose = leftFeet.addList();
+                            pose.addFloat64(leftFootprints[i](0));   //x
+                            pose.addFloat64(leftFootprints[i](1));   //y
+                            pose.addFloat64(leftFootprints[i](2));   //yaw
+                        }
+
+                        //right foot
+                        for (size_t j = 0; j < rightFootprints.size(); ++j)
+                        {
+                            auto& pose = rightFeet.addList();
+                            pose.addFloat64(rightFootprints[j](0));   //x
+                            pose.addFloat64(rightFootprints[j](1));   //y
+                            pose.addFloat64(rightFootprints[j](2));   //yaw
+                        }
+
+                        m_feetPort.write();
+                    }
+                }
             }
 
             if(m_newTrajectoryMergeCounter == 2)
@@ -1034,36 +1068,8 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-        if (m_leftTrajectory.size()>0 && m_rightTrajectory.size()>0)
-        {
-            auto feetData = m_feetPort.prepare();
-            feetData.clear();
-            auto rightFeet = feetData.addList();
-            auto leftFeet = feetData.addList();
-            //left foot
-            for (size_t i = 0; i < m_leftTrajectory.size(); ++i)
-            {
-                auto pose = leftFeet.addList();
-                pose.addFloat64(m_leftTrajectory.at(i).getPosition()(0));   //x
-                pose.addFloat64(m_leftTrajectory.at(i).getPosition()(1));   //y
-                pose.addFloat64(m_leftTrajectory.at(i).getRotation().asRPY()(2));   //yaw
-            }
-            
-            //right foot
-            for (size_t j = 0; j < m_rightTrajectory.size(); ++j)
-            {
-                auto pose = rightFeet.addList();
-                pose.addFloat64(m_rightTrajectory.at(j).getPosition()(0));   //x
-                pose.addFloat64(m_rightTrajectory.at(j).getPosition()(1));   //y
-                pose.addFloat64(m_rightTrajectory.at(j).getRotation().asRPY()(2));   //yaw
-            }
-    
-            m_feetPort.write();
-        }
         
         
-
         // send data to the logger
         if(m_dumpData)
         {
