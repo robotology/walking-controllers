@@ -148,11 +148,15 @@ namespace WalkingControllers
 
         size_t m_plannerAdvanceTimeSteps; /** How many steps in advance the planner should be called. */
 
+        std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
+
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
         yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
         yarp::os::BufferedPort<yarp::os::Bottle> m_feetPort; /**< Feet port vector of feet positions (left, right). */
+        yarp::os::BufferedPort<yarp::os::Bottle> m_unicyclePort; /**< Feet port vector of feet positions (left, right). */
+        double m_debugMergeTime = 0;
 
         /**
          * Get the robot model from the resource finder and set it.
@@ -264,6 +268,11 @@ namespace WalkingControllers
          * @param plannerInput The raw data read from the goal port.
          */
         void applyGoalScaling(yarp::sig::Vector &plannerInput);
+
+        /**
+         * Parallel thread for publishing the unicycle status.
+         */
+        void computeVirtualUnicycleThread();
 
     public:
 

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <chrono>
 
 // YARP
 #include <yarp/os/RFModule.h>
@@ -447,6 +448,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yError() << "[WalkingModule::configure] Could not open feet_positions port";
     }
+     if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
+     {
+        yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
+     }
+     
+
+    // start the thread
+    m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -460,6 +469,7 @@ void WalkingModule::reset()
 
     m_trajectoryGenerator->reset();
     m_feetPort.close();
+    m_unicyclePort.close();
     if(m_dumpData)
         m_loggerPort.close();
 }
@@ -494,6 +504,7 @@ bool WalkingModule::close()
         return false;
     }
     m_feetPort.close();
+    m_unicyclePort.close();
     // clear all the pointer
     m_trajectoryGenerator.reset(nullptr);
     m_walkingController.reset(nullptr);
@@ -502,6 +513,12 @@ bool WalkingModule::close()
     m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
+
+    if(m_virtualUnicyclePubliserThread.joinable())
+    {
+        m_virtualUnicyclePubliserThread.join();
+        m_virtualUnicyclePubliserThread = std::thread();
+    }
 
     return true;
 }
@@ -734,6 +751,7 @@ bool WalkingModule::updateModule()
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if(desiredUnicyclePosition != nullptr)
         {
+            m_debugMergeTime = yarp::os::Time::now();
             //applyGoalScaling(*desiredUnicyclePosition);   //removed scaling since we have a variable number of poses
             //std::cout << "Setting planner input" << std::endl;
             if(!setPlannerInput(*desiredUnicyclePosition))
@@ -768,40 +786,7 @@ bool WalkingModule::updateModule()
                     yError() << "[WalkingModule::updateModule] Unable to ask for a new trajectory.";
                     return false;
                 }
-
-                //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-                std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
-                if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
-                {
-
-                    if (leftFootprints.size()>0 && rightFootprints.size()>0)
-                    {
-                        std::cout << "left footprints number: " << leftFootprints.size() << " Right footprints number: " << rightFootprints.size() << std::endl;
-                        auto& feetData = m_feetPort.prepare();
-                        feetData.clear();
-                        auto& rightFeet = feetData.addList();
-                        auto& leftFeet = feetData.addList();
-                        //left foot
-                        for (size_t i = 0; i < leftFootprints.size(); ++i)
-                        {
-                            auto& pose = leftFeet.addList();
-                            pose.addFloat64(leftFootprints[i](0));   //x
-                            pose.addFloat64(leftFootprints[i](1));   //y
-                            pose.addFloat64(leftFootprints[i](2));   //yaw
-                        }
-
-                        //right foot
-                        for (size_t j = 0; j < rightFootprints.size(); ++j)
-                        {
-                            auto& pose = rightFeet.addList();
-                            pose.addFloat64(rightFootprints[j](0));   //x
-                            pose.addFloat64(rightFootprints[j](1));   //y
-                            pose.addFloat64(rightFootprints[j](2));   //yaw
-                        }
-
-                        m_feetPort.write();
-                    }
-                }
+                
             }
 
             if(m_newTrajectoryMergeCounter == 2)
@@ -811,6 +796,8 @@ bool WalkingModule::updateModule()
                     yError() << "[WalkingModule::updateModule] Error while updating trajectories. They were not computed yet.";
                     return false;
                 }
+                m_debugMergeTime = yarp::os::Time::now() - m_debugMergeTime;
+                std::cout << "Elapsed time: " << m_debugMergeTime << std::endl;
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
             }
@@ -1068,7 +1055,39 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        
+        //Send footsteps info on port anyway (x, y, yaw) wrt root_link
+                std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
+                if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+                {
+
+                    if (leftFootprints.size()>0 && rightFootprints.size()>0)
+                    {
+                        //std::cout << "left footprints number: " << leftFootprints.size() << " Right footprints number: " << rightFootprints.size() << std::endl;
+                        auto& feetData = m_feetPort.prepare();
+                        feetData.clear();
+                        auto& rightFeet = feetData.addList();
+                        auto& leftFeet = feetData.addList();
+                        //left foot
+                        for (size_t i = 0; i < leftFootprints.size(); ++i)
+                        {
+                            auto& pose = leftFeet.addList();
+                            pose.addFloat64(leftFootprints[i](0));   //x
+                            pose.addFloat64(leftFootprints[i](1));   //y
+                            pose.addFloat64(leftFootprints[i](2));   //yaw
+                        }
+
+                        //right foot
+                        for (size_t j = 0; j < rightFootprints.size(); ++j)
+                        {
+                            auto& pose = rightFeet.addList();
+                            pose.addFloat64(rightFootprints[j](0));   //x
+                            pose.addFloat64(rightFootprints[j](1));   //y
+                            pose.addFloat64(rightFootprints[j](2));   //yaw
+                        }
+
+                        m_feetPort.write();
+                    }
+                }
         
         // send data to the logger
         if(m_dumpData)
@@ -1764,4 +1783,33 @@ bool WalkingModule::stopWalking()
 
     m_robotState = WalkingFSM::Stopped;
     return true;
+}
+
+void WalkingModule::computeVirtualUnicycleThread()
+{
+    int loopRate = 100;
+    while (true)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+        iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
+        std::string stanceFoot;
+        if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+        {
+            //send data
+            auto& data = m_unicyclePort.prepare();
+            auto& unicyclePose = data.addList();
+            unicyclePose.addFloat64(virtualUnicyclePose(0));
+            unicyclePose.addFloat64(virtualUnicyclePose(2));
+            unicyclePose.addFloat64(virtualUnicyclePose(0));
+            auto& referencePose = data.addList();
+            referencePose.addFloat64(virtualUnicycleReference(0));
+            referencePose.addFloat64(virtualUnicycleReference(2));
+            referencePose.addFloat64(virtualUnicycleReference(0));
+            data.addString(stanceFoot);
+        }
+        else
+        {
+            yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
+        }
+    }
 }

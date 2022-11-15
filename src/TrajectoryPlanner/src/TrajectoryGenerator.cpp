@@ -318,7 +318,8 @@ void TrajectoryGenerator::computeThread()
         Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
         unicyclePositionFromStanceFoot(0) = 0.0;
 
-        Eigen::Matrix2d unicycleRotation;
+        Eigen::Matrix2d unicycleRotation; //rotation world -> unicycle
+        Eigen::Matrix2d unicycleRotationInverse; //rotation unicycle -> world
         double unicycleAngle;
 
         if (correctLeft)
@@ -343,7 +344,49 @@ void TrajectoryGenerator::computeThread()
         unicycleRotation(1,1) = c_theta;
 
         unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+        //Use transforms
+        iDynTree::Position unicyclePos;
+        unicyclePos(0) = unicyclePosition(0);
+        unicyclePos(1) = unicyclePosition(1);
+        unicyclePos(2) = 0;
+        //3d Rot around Z (theta)
+        iDynTree::Rotation unicycleRot (c_theta,-s_theta, 0.0,
+                                        s_theta, c_theta, 0.0,
+                                        0.0, 0.0, 1);
+        //Transform from robot frame to world frame
+        iDynTree::Transform TfRobotToWorld(unicycleRot, unicyclePos);
+        //Transform from world frame to robot frame
+        iDynTree::Transform TfWorldToRobot = TfRobotToWorld.inverse();
+        std::vector<iDynTree::Vector2> transformedPath;
+        //prune the plan: transform it in the robot frame and eliminate the FIRST negative X poses (i.e. - the ones behind)
+        //in this case we suppose the planner of the unicycle driven like an akerman model
+        for (size_t i = 0; i < m_path.size(); ++i)
+        {
+            iDynTree::Position pos;
+            pos(0) = m_path.at(i)(0);
+            pos(1) = m_path.at(i)(1);
+            pos(2) = 0;
 
+            pos = TfWorldToRobot*pos;   //apply transform
+            iDynTree::Vector2 vector;
+            vector(0) = pos(0);
+            vector(1) = pos(1);
+            transformedPath.push_back(vector);
+        }
+        
+        //pruning
+        // Helper predicate lambda function to see what is the positive x-element in a vector of poses
+        // Warning: The robot needs to have a portion of the path that goes forward (positive X)
+        auto greaterThanZero = [](const iDynTree::Vector2 &i){
+            return i(0) > 0.0;
+        };
+        
+        transformedPath.erase(begin(transformedPath), 
+                                        std::find_if(transformedPath.begin(),
+                                                transformedPath.end(),
+                                                greaterThanZero));
+        std::cout << "Erased the first X poses: " << m_path.size() - transformedPath.size() << std::endl;
+        m_path = transformedPath;
         //addWaypoints contains this transformation
         // apply the homogeneous transformation w_H_{unicycle}
         //iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
@@ -364,7 +407,16 @@ void TrajectoryGenerator::computeThread()
         //    break;
         //}
         //std::cout << "addWaypoints" << std::endl;
-        if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
+
+        //if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
+        //{
+        //    // something goes wrong
+        //    std::lock_guard<std::mutex> guard(m_mutex);
+        //    m_generatorState = GeneratorState::Configured;
+        //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+        //    break;
+        //}
+        if(!addWaypointsOdom(initTime, endTime))
         {
             // something goes wrong
             std::lock_guard<std::mutex> guard(m_mutex);
@@ -731,6 +783,50 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
     return true;
 }
 
+bool TrajectoryGenerator::addWaypointsOdom(const double initTime, const double endTime)
+{   
+    iDynTree::Vector2 approxSpeed; //speed taken from the saturation values of the linear velocity of the unicycle controller, multiplied by a reducing factor
+    approxSpeed(0) = std::sqrt(std::pow(m_maxStepLength, 2) - std::pow(m_nominalWidth, 2)) / m_minStepDuration * 0.9 * 0.8; //TODO pass 0.8 via config file
+    approxSpeed(1) = .0;
+    auto planner = m_trajectoryGenerator.unicyclePlanner();
+
+    //check the number of poses
+    if (m_path.size() < 1)
+    {
+        //error
+        return false;
+    }
+    else
+    {
+        // clear current trajectory
+        planner->clearPersonFollowingDesiredTrajectory();
+        double elapsedTime = initTime;
+        size_t i = (m_path.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
+
+        for (size_t i = 1; i < m_path.size(); ++i)
+        {
+            // path is a vector of (x, y, theta) pose vectors in the robot frame
+            double relativePoseDistance = sqrt(pow(m_path.at(i)[0] - m_path.at(i-1)[0], 2) + 
+                                   pow(m_path.at(i)[1] - m_path.at(i-1)[1], 2));
+            double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
+            elapsedTime += eta;
+            if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
+            {
+                break;
+            }
+            // I need to prune the path in such a way to remove the poses that are behind the unicycle
+            iDynTree::Vector2 relativeFramePose;     //pose to be added to the planner
+            // transform in the offsetted frame in front of the robot i.e. m_referencePointDistance
+            //iDynTree::toEigen(absoluteFramePose) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
+            //                                                                    iDynTree::toEigen(m_path.at(i)));
+            planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, m_path.at(i), approxSpeed);
+        }
+        
+    }
+
+    return true;
+}
+
 bool TrajectoryGenerator::setFreeSpaceEllipse(const iDynTree::MatrixFixSize<2, 2> &imageMatrix, const iDynTree::VectorFixSize<2> &centerOffset)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
@@ -965,5 +1061,73 @@ bool TrajectoryGenerator::getFootprints(std::vector<iDynTree::Vector3>& leftFoot
         rightFootprints.push_back(pose);
     }
     
+    return true;
+}
+
+bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, std::string& stanceFoot)
+{
+    double nominalWidth;
+    bool correctLeft;
+    iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
+    iDynTree::Vector3 desiredDirectControl;
+    double measuredAngleLeft, measuredAngleRight;
+    double leftYawDeltaInRad, rightYawDeltaInRad;
+    // left foot
+    measuredPositionLeft(0) = m_measuredTransformLeft.getPosition()(0);
+    measuredPositionLeft(1) = m_measuredTransformLeft.getPosition()(1);
+    measuredAngleLeft = m_measuredTransformLeft.getRotation().asRPY()(2);
+    leftYawDeltaInRad = m_leftYawDeltaInRad;
+    // right foot
+    measuredPositionRight(0) = m_measuredTransformRight.getPosition()(0);
+    measuredPositionRight(1) = m_measuredTransformRight.getPosition()(1);
+    measuredAngleRight = m_measuredTransformRight.getRotation().asRPY()(2);
+    rightYawDeltaInRad = m_rightYawDeltaInRad;
+    correctLeft = m_correctLeft;
+    m_newFreeSpaceEllipse = false;
+    nominalWidth = m_nominalWidth;
+
+    iDynTree::Vector2 measuredPosition;
+    double measuredAngle;
+    measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
+    measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
+
+    Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
+    unicyclePositionFromStanceFoot(0) = 0.0;
+    Eigen::Matrix2d unicycleRotation; //rotation world -> unicycle
+    double unicycleAngle;
+
+    if (correctLeft)
+    {
+        unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
+        unicycleAngle = measuredAngleLeft - leftYawDeltaInRad;
+        footPosition = iDynTree::toEigen(measuredPositionLeft);
+        stanceFoot = "left";
+    }
+    else
+    {
+        unicyclePositionFromStanceFoot(1) = nominalWidth/2;
+        unicycleAngle = measuredAngleRight - rightYawDeltaInRad;
+        footPosition = iDynTree::toEigen(measuredPositionRight);
+        stanceFoot = "right";
+    }
+    double s_theta = std::sin(unicycleAngle);
+    double c_theta = std::cos(unicycleAngle);
+    unicycleRotation(0,0) = c_theta;
+    unicycleRotation(0,1) = -s_theta;
+    unicycleRotation(1,0) = s_theta;
+    unicycleRotation(1,1) = c_theta;
+    unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+    //Compose the output vector
+    virtualUnicyclePose(0) = unicyclePosition(0);
+    virtualUnicyclePose(1) = unicyclePosition(1);
+    virtualUnicyclePose(2) = unicycleAngle;
+
+    iDynTree::Vector2 referencePointInAbsoluteFrame;
+    // apply the homogeneous transformation w_H_{unicycle}
+    iDynTree::toEigen(referencePointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance)) + unicyclePosition;
+    referenceUnicyclePose(0) = referencePointInAbsoluteFrame(0);
+    referenceUnicyclePose(1) = referencePointInAbsoluteFrame(1);
+    referenceUnicyclePose(2) = unicycleAngle;
+
     return true;
 }

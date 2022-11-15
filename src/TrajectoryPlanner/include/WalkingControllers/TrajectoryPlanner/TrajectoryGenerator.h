@@ -77,7 +77,8 @@ namespace WalkingControllers
         FreeSpaceEllipse m_freeSpaceEllipse; /**< The free space ellipse object. */
         bool m_newFreeSpaceEllipse; /**< Check if the free space ellipse has been updated. */
 
-        std::vector<iDynTree::Vector2> m_path; /**< Path of 2D poses (x, y) in the robot reference frame */
+        std::vector<iDynTree::Vector2> m_path; /**< Path of 2D poses (x, y) in the odom reference frame */
+        std::vector<iDynTree::Vector2> m_transformedPath; /**< Path of 2D poses (x, y) in the robot reference frame */
 
         std::mutex m_mutex; /**< Mutex. */
 
@@ -87,7 +88,7 @@ namespace WalkingControllers
         void computeThread();
 
         /**
-         * Add each pose present in the path as a waypoint to the planner
+         * Add each pose present in the path as a waypoint to the planner in the robot frame
          * @param unicyclePosition the position of the robot wrt the world frame
          * @param unicycleRotation rotation matrix to transform the robot in the world frame
          * @param initTime initial time of the first pose of the path
@@ -95,6 +96,14 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime);
+
+        /**
+         * Add each pose present in the path as a waypoint to the planner in the odom frame
+         * @param initTime initial time of the first pose of the path
+         * @param endTime equal to initialTime plus the planner horizon
+         * @return true/false in case of success/failure.
+         */
+        bool addWaypointsOdom(const double initTime, const double endTime);
 
     public:
 
@@ -286,6 +295,15 @@ namespace WalkingControllers
          * @return true/false in case of success/failure.
          */
         bool getFootprints(std::vector<iDynTree::Vector3>& leftFootprints, std::vector<iDynTree::Vector3>& rightFootprints);
+
+        /**
+         * Get the unicycle state from the feet of the robot in the odom frame (aka world frame)
+         * @param virtualUnicyclePose pose of the virtual unicycle in the odom frame
+         * @param referenceUnicyclePose pose of the reference virtual unicycle in the odom frame
+         * @param stanceFoot returns a string with the stance foot used for the computation
+         * @return true/false in case of success/failure.
+         */
+        bool getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, std::string& stanceFoot);
     };
 };
 
