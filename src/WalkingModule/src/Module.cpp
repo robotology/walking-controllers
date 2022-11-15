@@ -1799,13 +1799,14 @@ void WalkingModule::computeVirtualUnicycleThread()
             auto& data = m_unicyclePort.prepare();
             auto& unicyclePose = data.addList();
             unicyclePose.addFloat64(virtualUnicyclePose(0));
+            unicyclePose.addFloat64(virtualUnicyclePose(1));
             unicyclePose.addFloat64(virtualUnicyclePose(2));
-            unicyclePose.addFloat64(virtualUnicyclePose(0));
             auto& referencePose = data.addList();
             referencePose.addFloat64(virtualUnicycleReference(0));
+            referencePose.addFloat64(virtualUnicycleReference(1));
             referencePose.addFloat64(virtualUnicycleReference(2));
-            referencePose.addFloat64(virtualUnicycleReference(0));
             data.addString(stanceFoot);
+            m_unicyclePort.write();
         }
         else
         {
