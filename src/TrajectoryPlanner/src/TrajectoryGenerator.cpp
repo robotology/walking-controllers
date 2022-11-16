@@ -1064,7 +1064,7 @@ bool TrajectoryGenerator::getFootprints(std::vector<iDynTree::Vector3>& leftFoot
     return true;
 }
 
-bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, std::string& stanceFoot)
+bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, const std::string& stanceFoot)
 {
     double nominalWidth;
     bool correctLeft;
@@ -1096,19 +1096,19 @@ bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePos
     Eigen::Matrix2d unicycleRotation; //rotation world -> unicycle
     double unicycleAngle;
 
-    if (correctLeft)
+    if (stanceFoot == "left")
     {
         unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
         unicycleAngle = measuredAngleLeft - leftYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionLeft);
-        stanceFoot = "left";
+        //stanceFoot = "left";
     }
     else
     {
         unicyclePositionFromStanceFoot(1) = nominalWidth/2;
         unicycleAngle = measuredAngleRight - rightYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionRight);
-        stanceFoot = "right";
+        //stanceFoot = "right";
     }
     double s_theta = std::sin(unicycleAngle);
     double c_theta = std::cos(unicycleAngle);

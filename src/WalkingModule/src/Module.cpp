@@ -1793,6 +1793,19 @@ void WalkingModule::computeVirtualUnicycleThread()
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
         std::string stanceFoot;
+        if (m_leftInContact.size() > 0)
+        {
+            if (m_leftInContact.at(0))
+        {
+            stanceFoot = "left";
+        }
+        else
+        {
+            stanceFoot = "right";
+        }
+        std::cout << "m_leftInContact.at(0): " << m_leftInContact.at(0) << " m_rightInContact.at(0): " << m_rightInContact.at(0) << std::endl;
+        
+        
         if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
         {
             //send data
@@ -1812,5 +1825,8 @@ void WalkingModule::computeVirtualUnicycleThread()
         {
             yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
         }
+        }
+        
+        
     }
 }

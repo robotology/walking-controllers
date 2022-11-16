@@ -303,7 +303,7 @@ namespace WalkingControllers
          * @param stanceFoot returns a string with the stance foot used for the computation
          * @return true/false in case of success/failure.
          */
-        bool getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, std::string& stanceFoot);
+        bool getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, const std::string& stanceFoot);
     };
 };
 
