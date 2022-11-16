@@ -1265,7 +1265,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     double totalZ = rightWrench.getLinearVec3()(2) * zmpRightDefined + leftWrench.getLinearVec3()(2) * zmpLeftDefined;
-    if((zmpLeftDefined + zmpRightDefined) < 0.5)
+    if((zmpLeftDefined + zmpRightDefined) < 0.1)
     {
         yError() << "[evaluateZMP] None of the two contacts is valid.";
         return false;

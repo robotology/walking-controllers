@@ -386,7 +386,7 @@ void TrajectoryGenerator::computeThread()
                                                 transformedPath.end(),
                                                 greaterThanZero));
         std::cout << "Erased the first X poses: " << m_path.size() - transformedPath.size() << std::endl;
-        m_path = transformedPath;
+        //m_path = transformedPath;
         //addWaypoints contains this transformation
         // apply the homogeneous transformation w_H_{unicycle}
         //iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
@@ -408,15 +408,7 @@ void TrajectoryGenerator::computeThread()
         //}
         //std::cout << "addWaypoints" << std::endl;
 
-        //if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
-        //{
-        //    // something goes wrong
-        //    std::lock_guard<std::mutex> guard(m_mutex);
-        //    m_generatorState = GeneratorState::Configured;
-        //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-        //    break;
-        //}
-        if(!addWaypointsOdom(initTime, endTime))
+        if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
         {
             // something goes wrong
             std::lock_guard<std::mutex> guard(m_mutex);
@@ -424,6 +416,14 @@ void TrajectoryGenerator::computeThread()
             yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
             break;
         }
+        //if(!addWaypointsOdom(initTime, endTime))
+        //{
+        //    // something goes wrong
+        //    std::lock_guard<std::mutex> guard(m_mutex);
+        //    m_generatorState = GeneratorState::Configured;
+        //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+        //    break;
+        //}
         
         unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
 
