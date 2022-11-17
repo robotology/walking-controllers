@@ -17,6 +17,7 @@
 #include <yarp/os/BufferedPort.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
+#include <yarp/os/Stamp.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -1788,45 +1789,90 @@ bool WalkingModule::stopWalking()
 void WalkingModule::computeVirtualUnicycleThread()
 {
     int loopRate = 100;
+    bool inContact = false;
     while (true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
         std::string stanceFoot;
+        iDynTree::Transform footTransformToWorld, root_linkTransform;
+        //Stance foot check
         if (m_leftInContact.size() > 0)
         {
             if (m_leftInContact.at(0))
+            {
+                stanceFoot = "left";
+                root_linkTransform = 
+                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
+            }
+            else
+            {
+                stanceFoot = "right";
+                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
+            }
+            inContact = true;
+        }
+        else if (m_rightInContact.size() > 0)
         {
-            stanceFoot = "left";
+            if (m_rightInContact.at(0))
+            {
+                stanceFoot = "right";
+                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
+            }
+            else
+            {
+                stanceFoot = "left";
+                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
+            }
+            inContact = true;
         }
         else
         {
-            stanceFoot = "right";
+            inContact = false;
         }
-        std::cout << "m_leftInContact.at(0): " << m_leftInContact.at(0) << " m_rightInContact.at(0): " << m_rightInContact.at(0) << std::endl;
-        
-        
-        if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+        root_linkTransform = m_FKSolver->getRootLinkToWorldTransform();   //world -> rootLink transform
+        //Data conversion and port writing
+        if (inContact)
         {
-            //send data
-            auto& data = m_unicyclePort.prepare();
-            auto& unicyclePose = data.addList();
-            unicyclePose.addFloat64(virtualUnicyclePose(0));
-            unicyclePose.addFloat64(virtualUnicyclePose(1));
-            unicyclePose.addFloat64(virtualUnicyclePose(2));
-            auto& referencePose = data.addList();
-            referencePose.addFloat64(virtualUnicycleReference(0));
-            referencePose.addFloat64(virtualUnicycleReference(1));
-            referencePose.addFloat64(virtualUnicycleReference(2));
-            data.addString(stanceFoot);
-            m_unicyclePort.write();
+            //std::cout << "m_leftInContact.at(0): " << m_leftInContact.at(0) << " m_rightInContact.at(0): " << m_rightInContact.at(0) << std::endl;
+            
+            if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+            {
+                //send data
+                yarp::os::Stamp stamp (0, yarp::os::Time::now());   //move to private member of the class
+                m_unicyclePort.setEnvelope(stamp);
+                auto& data = m_unicyclePort.prepare();
+                data.clear();
+                auto& unicyclePose = data.addList();
+                unicyclePose.addFloat64(virtualUnicyclePose(0));
+                unicyclePose.addFloat64(virtualUnicyclePose(1));
+                unicyclePose.addFloat64(virtualUnicyclePose(2));
+                auto& referencePose = data.addList();
+                referencePose.addFloat64(virtualUnicycleReference(0));
+                referencePose.addFloat64(virtualUnicycleReference(1));
+                referencePose.addFloat64(virtualUnicycleReference(2));
+                data.addString(stanceFoot);
+
+                //add root link stransform: X, Y, Z, r, p, yaw,
+                auto& transform = data.addList();
+                transform.addFloat64(root_linkTransform.getPosition()(0));
+                transform.addFloat64(root_linkTransform.getPosition()(1));
+                transform.addFloat64(root_linkTransform.getPosition()(2));
+                transform.addFloat64(root_linkTransform.getRotation().asRPY()(0));
+                transform.addFloat64(root_linkTransform.getRotation().asRPY()(1));
+                transform.addFloat64(root_linkTransform.getRotation().asRPY()(2));
+                m_unicyclePort.write();
+            }
+            else
+            {
+                yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
+            }            
         }
+    
         else
         {
-            yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
+            //std::cerr << "[WalkingModule::computeVirtualUnicycleThread] No valid contacts detected on both feet" << std::endl;
         }
-        }
-        
         
     }
 }

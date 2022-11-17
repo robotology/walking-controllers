@@ -1091,43 +1091,70 @@ bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePos
     measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
     measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
 
-    Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
+    Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition, unicycleOdom;
     unicyclePositionFromStanceFoot(0) = 0.0;
     Eigen::Matrix2d unicycleRotation; //rotation world -> unicycle
-    double unicycleAngle;
+    double unicycleAngle, unicycleAngleOdom;
 
     if (stanceFoot == "left")
     {
         unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
-        unicycleAngle = measuredAngleLeft - leftYawDeltaInRad;
+        unicycleAngle = measuredAngleLeft;  //- leftYawDeltaInRad
+        unicycleAngleOdom = measuredAngleLeft - leftYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionLeft);
         //stanceFoot = "left";
     }
-    else
+    else if (stanceFoot == "right")
     {
         unicyclePositionFromStanceFoot(1) = nominalWidth/2;
-        unicycleAngle = measuredAngleRight - rightYawDeltaInRad;
+        unicycleAngle = measuredAngleRight;    //- rightYawDeltaInRad
+        unicycleAngleOdom = measuredAngleRight - rightYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionRight);
         //stanceFoot = "right";
     }
-    double s_theta = std::sin(unicycleAngle);
-    double c_theta = std::cos(unicycleAngle);
+    else
+    {
+        return false;
+    }
+    
+
+    //double s_theta = std::sin(unicycleAngle);
+    //double c_theta = std::cos(unicycleAngle);
+    //unicycleRotation(0,0) = c_theta;
+    //unicycleRotation(0,1) = -s_theta;
+    //unicycleRotation(1,0) = s_theta;
+    //unicycleRotation(1,1) = c_theta;
+    //unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot;   //position with respect of the stance foot
+    ////Compose the output vector
+    //virtualUnicyclePose(0) = unicyclePosition(0);
+    //virtualUnicyclePose(1) = unicyclePosition(1);
+    //virtualUnicyclePose(2) = unicycleAngle;
+//
+    //iDynTree::Vector2 referencePointInAbsoluteFrame;
+    //// apply the homogeneous transformation w_H_{unicycle}
+    //iDynTree::toEigen(referencePointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance)) + unicyclePosition;
+    //referenceUnicyclePose(0) = referencePointInAbsoluteFrame(0);
+    //referenceUnicyclePose(1) = referencePointInAbsoluteFrame(1);
+    //referenceUnicyclePose(2) = unicycleAngle;
+
+    //Odom (expressed in odom frame)
+    double s_theta = std::sin(unicycleAngleOdom);
+    double c_theta = std::cos(unicycleAngleOdom);
     unicycleRotation(0,0) = c_theta;
     unicycleRotation(0,1) = -s_theta;
     unicycleRotation(1,0) = s_theta;
     unicycleRotation(1,1) = c_theta;
-    unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
-    //Compose the output vector
-    virtualUnicyclePose(0) = unicyclePosition(0);
-    virtualUnicyclePose(1) = unicyclePosition(1);
-    virtualUnicyclePose(2) = unicycleAngle;
+    unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot;   // position in respect to the support foot
+    unicycleOdom = unicyclePosition + footPosition;     //postion in odom frame
+    virtualUnicyclePose(0) = unicycleOdom(0);
+    virtualUnicyclePose(1) = unicycleOdom(1);
+    virtualUnicyclePose(2) = unicycleAngleOdom;
 
     iDynTree::Vector2 referencePointInAbsoluteFrame;
-    // apply the homogeneous transformation w_H_{unicycle}
-    iDynTree::toEigen(referencePointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance)) + unicyclePosition;
+    iDynTree::toEigen(referencePointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance)) + unicycleOdom;
     referenceUnicyclePose(0) = referencePointInAbsoluteFrame(0);
     referenceUnicyclePose(1) = referencePointInAbsoluteFrame(1);
-    referenceUnicyclePose(2) = unicycleAngle;
-
+    referenceUnicyclePose(2) = unicycleAngleOdom;
+    
     return true;
 }
