@@ -402,7 +402,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
 
     // open CoM planned trajectory port for navigation integration
-    std::string replanningTriggerPortPortName = "/planned_CoM/data:o";
+    std::string replanningTriggerPortPortName = "/" + getName() + "/replanning_trigger:o";
     if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
     {
         yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
@@ -828,6 +828,7 @@ bool WalkingModule::updateModule()
                 std::cout << "Elapsed time: " << m_debugMergeTime << std::endl;
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
+                m_newTrajectoryMerged = true;
             }
 
             m_newTrajectoryMergeCounter--;
@@ -1229,8 +1230,48 @@ bool WalkingModule::updateModule()
         double yawLeftp, yawRightp, meanYawp;
         yarp::sig::Vector& planned_poses = m_plannedCoMPositionPort.prepare();
         planned_poses.clear();
-        planned_poses.push_back(m_DCMPositionDesired.size());
+        //planned_poses.push_back(m_DCMPositionDesired.size()); //useless to start with the number of elements
 
+        bool saveCoM = false;
+        if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //consistency check
+        {
+            //evaluate the state of the contacts
+            if (m_leftInContact[0] && m_rightInContact[0])  //double support
+            {
+                if (!m_wasInDoubleSupport)
+                {
+                    saveCoM = true;
+                    m_wasInDoubleSupport = true;
+                }
+                else    //I still need to assign a value to the flag
+                {
+                    saveCoM = false;
+                }
+                
+                //override the previous state check if there has been a merge of a new trajectory on this thread cycle
+                //in this way we have the latest updated trajectory
+                if (m_newTrajectoryMerged)
+                {
+                    saveCoM = true;
+                    std::cout << "New Trajectory Merged!" << std::endl;
+                }
+            }
+            else
+            {
+                saveCoM = false;
+                if (m_wasInDoubleSupport)
+                {
+                    std::cout << "Resetting m_wasInDoubleSupport" << std::endl;
+                    m_wasInDoubleSupport = false;
+                }
+            }
+        }
+        
+        if (saveCoM)
+        {
+            std::cout << "Double Support! : Saving CoM trajectory" << std::endl;
+            m_desiredCoM_Trajectory.clear();
+        }
         for (auto i = 0; i < m_DCMPositionDesired.size(); i++)
         {
             m_stableDCMModel->setInput(m_DCMPositionDesired[i]);
@@ -1243,8 +1284,17 @@ bool WalkingModule::updateModule()
             planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[0]);
             planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[1]);
             planned_poses.push_back(meanYawp);
+            //saving data also internally -> should do this only once per double support
+            if (saveCoM)
+            {
+                iDynTree::Vector3 pose;
+                pose(0) = m_DCMPositionDesired[i](0);
+                pose(1) = m_DCMPositionDesired[i](1);;
+                pose(2) = meanYawp;
+                m_desiredCoM_Trajectory.push_back(pose);
+            }
         }
-
+        m_newTrajectoryMerged = false;  //reset flag
         m_plannedCoMPositionPort.write();
         m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
@@ -1321,7 +1371,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     double totalZ = rightWrench.getLinearVec3()(2) * zmpRightDefined + leftWrench.getLinearVec3()(2) * zmpLeftDefined;
-    if((zmpLeftDefined + zmpRightDefined) < 0.1)
+    if((zmpLeftDefined + zmpRightDefined) < 0.1)    //check for contacts on the feet
     {
         yError() << "[evaluateZMP] None of the two contacts is valid.";
         return false;
@@ -1934,5 +1984,16 @@ void WalkingModule::computeVirtualUnicycleThread()
 
 void WalkingModule::computeNavigationTrigger()
 {
+    int loopRate = 10;
+    while (true)
+    {
+        //get current CoM
+        iDynTree::Vector2 plannedCoMPosition = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
+        std::cout << "CoM Position X: " << plannedCoMPosition(0) << " Y: " << plannedCoMPosition(1) << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+    }
+    //Create transform from robot frame -> current CoM goal pose
 
+    //check by transforming the current CoM to obtain 0 0 0
+    
 }

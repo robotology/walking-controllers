@@ -119,6 +119,7 @@ namespace WalkingControllers
         std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
         std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
         std::deque<bool> m_isStancePhase; /**< if true the robot is not walking */
+        std::deque<iDynTree::Vector3> m_desiredCoM_Trajectory;  /**< Deque containing the desired CoM trajectory projected on the ground in pose x, y, theta. */
 
         std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                                 In general a main frame of a foot is the fix frame only during the
@@ -137,6 +138,7 @@ namespace WalkingControllers
         yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
+        bool m_newTrajectoryMerged; /**< true if a new trajectory has been just merged. */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
         bool m_useRootLinkForHeight;
@@ -152,6 +154,7 @@ namespace WalkingControllers
         std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
         yarp::os::BufferedPort<yarp::sig::Vector> m_plannedCoMPositionPort; /**< Desired CoM position port for naviagation purposes. */
         yarp::os::BufferedPort<yarp::sig::Vector> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
+        bool m_wasInDoubleSupport;  /**< Flag that symbolizes the previous status of the double support. */
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
