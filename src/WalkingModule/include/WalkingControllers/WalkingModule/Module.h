@@ -149,6 +149,9 @@ namespace WalkingControllers
         size_t m_plannerAdvanceTimeSteps; /** How many steps in advance the planner should be called. */
 
         std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
+        std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_plannedCoMPositionPort; /**< Desired CoM position port for naviagation purposes. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
@@ -273,6 +276,11 @@ namespace WalkingControllers
          * Parallel thread for publishing the unicycle status.
          */
         void computeVirtualUnicycleThread();
+
+        /**
+         * Parallel thread for publishing the trigger for the navigation's planner.
+         */
+        void computeNavigationTrigger();
 
     public:
 

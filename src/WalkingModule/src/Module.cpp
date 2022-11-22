@@ -393,6 +393,23 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    // open CoM planned trajectory port for navigation integration
+    std::string plannedCoMPositionPortName = "/planned_CoM/data:o";
+    if (!m_plannedCoMPositionPort.open(plannedCoMPositionPortName))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << plannedCoMPositionPortName << " port.";
+        return false;
+    }
+
+    // open CoM planned trajectory port for navigation integration
+    std::string replanningTriggerPortPortName = "/planned_CoM/data:o";
+    if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
+        return false;
+    }
+    
+
     // initialize the logger
     if(m_dumpData)
     {
@@ -457,6 +474,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
 
     // start the thread
     m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
+    m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);;
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -497,6 +515,10 @@ bool WalkingModule::close()
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
+    m_plannedCoMPositionPort.close();
+    m_feetPort.close();
+    m_unicyclePort.close();
+    m_replanningTriggerPort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
@@ -504,8 +526,7 @@ bool WalkingModule::close()
         yError() << "[WalkingModule::close] Unable to close the connection with the robot.";
         return false;
     }
-    m_feetPort.close();
-    m_unicyclePort.close();
+    
     // clear all the pointer
     m_trajectoryGenerator.reset(nullptr);
     m_walkingController.reset(nullptr);
@@ -519,6 +540,12 @@ bool WalkingModule::close()
     {
         m_virtualUnicyclePubliserThread.join();
         m_virtualUnicyclePubliserThread = std::thread();
+    }
+
+    if(m_navigationTriggerThread.joinable())
+    {
+        m_navigationTriggerThread.join();
+        m_navigationTriggerThread = std::thread();
     }
 
     return true;
@@ -1192,6 +1219,34 @@ bool WalkingModule::updateModule()
             m_loggerPort.write();
 
         }
+
+        // streaming CoM desired position and heading for Navigation algorithms         
+        if(!m_leftTrajectory.size() == m_DCMPositionDesired.size())
+        {
+            yWarning() << "[WalkingModule::updateModule] Inconsistent dimenstions. CoM planned poses will be augmented" ;
+        }
+
+        double yawLeftp, yawRightp, meanYawp;
+        yarp::sig::Vector& planned_poses = m_plannedCoMPositionPort.prepare();
+        planned_poses.clear();
+        planned_poses.push_back(m_DCMPositionDesired.size());
+
+        for (auto i = 0; i < m_DCMPositionDesired.size(); i++)
+        {
+            m_stableDCMModel->setInput(m_DCMPositionDesired[i]);
+            m_stableDCMModel->integrateModel();
+            yawLeftp =  m_leftTrajectory[i].getRotation().asRPY()(2);
+            yawLeftp =  m_rightTrajectory[i].getRotation().asRPY()(2);
+            meanYawp = std::atan2(std::sin(yawLeftp) + std::sin(yawRightp),
+                                    std::cos(yawLeftp) + std::cos(yawRightp));
+            
+            planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[0]);
+            planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[1]);
+            planned_poses.push_back(meanYawp);
+        }
+
+        m_plannedCoMPositionPort.write();
+        m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
         // in the approaching phase the robot should not move and the trajectories should not advance
         if(!m_retargetingClient->isApproachingPhase())
@@ -1875,4 +1930,9 @@ void WalkingModule::computeVirtualUnicycleThread()
         }
         
     }
+}
+
+void WalkingModule::computeNavigationTrigger()
+{
+
 }
