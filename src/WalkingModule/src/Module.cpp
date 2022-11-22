@@ -1985,11 +1985,54 @@ void WalkingModule::computeVirtualUnicycleThread()
 void WalkingModule::computeNavigationTrigger()
 {
     int loopRate = 10;
+    bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (true)
     {
-        //get current CoM
+        //get current CoM in odom frame
         iDynTree::Vector2 plannedCoMPosition = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
-        std::cout << "CoM Position X: " << plannedCoMPosition(0) << " Y: " << plannedCoMPosition(1) << std::endl;
+        //std::cout << "CoM Position X: " << plannedCoMPosition(0) << " Y: " << plannedCoMPosition(1) << std::endl;
+
+        //double support check
+        if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
+        {
+            if (m_leftInContact[0] && m_rightInContact[0])
+            {
+                if (exitDoubleSupport)
+                {
+                    enteredDoubleSupport = true;
+                    exitDoubleSupport = false;
+                }
+            }
+            else
+            {
+                exitDoubleSupport = true;
+            }
+        }
+        
+        //search the actual CoM on the trajectory
+        int index = -1;
+        for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
+        {
+            double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoMPosition(0), 2) + 
+                                        std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoMPosition(1), 2));
+            if (distance < 0.001)
+            {
+                index = i;
+                //std::cout << "Found planned CoM position at index: " << i << " with distance: " << distance << std::endl;
+                if (enteredDoubleSupport)
+                {
+                    enteredDoubleSupport = false;   //I have already elaborated the data
+                    std::cout << "Entered in double support at index: " << i << " with distance: " << distance << std::endl;
+                }
+                
+                break;
+            }
+        }
+        
+        if (index == -1)
+        {
+            std::cout << "Wasn't able to find any matching index for current planned CoM on CoM trajectory" << std::endl;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
     }
     //Create transform from robot frame -> current CoM goal pose
