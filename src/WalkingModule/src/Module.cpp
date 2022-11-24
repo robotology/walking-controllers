@@ -466,12 +466,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yError() << "[WalkingModule::configure] Could not open feet_positions port";
     }
-     if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
-     {
-        yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
-     }
-     
-
+    if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
+    {
+       yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
+    }
+    
     // start the thread
     m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
     m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);;
@@ -487,8 +486,6 @@ void WalkingModule::reset()
         m_walkingController->reset();
 
     m_trajectoryGenerator->reset();
-    m_feetPort.close();
-    m_unicyclePort.close();
     if(m_dumpData)
         m_loggerPort.close();
 }
@@ -1984,6 +1981,8 @@ void WalkingModule::computeVirtualUnicycleThread()
 
 void WalkingModule::computeNavigationTrigger()
 {
+    std::cout << "Starting computeNavigationTrigger" << std::endl;
+
     int loopRate = 10;
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (true)
@@ -2008,6 +2007,17 @@ void WalkingModule::computeNavigationTrigger()
                 exitDoubleSupport = true;
             }
         }
+        //std::cout << "m_desiredCoM_Trajectory.size() = " << m_desiredCoM_Trajectory.size() << std::endl;
+        //if (m_desiredCoM_Trajectory.size() <= 80)   //wrong
+        //{
+        //    //The robot is still avviating or staying still
+        //    auto& b = m_replanningTriggerPort.prepare();
+        //    b.clear();
+        //    b.add((yarp::os::Value)true);   //give always a trigger
+        //    m_replanningTriggerPort.write();
+        //    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //    continue;
+        //}
         
         //search the actual CoM on the trajectory
         int index = -1;
@@ -2023,20 +2033,23 @@ void WalkingModule::computeNavigationTrigger()
                 {
                     enteredDoubleSupport = false;   //I have already elaborated the data
                     std::cout << "Entered in double support at index: " << i << " with distance: " << distance << std::endl;
+                    auto& b = m_replanningTriggerPort.prepare();
+                    b.clear();
+                    b.add((yarp::os::Value)true);   //send the planning trigger
+                    m_replanningTriggerPort.write();
+                    break;
                 }
-                
-                break;
             }
         }
         
         if (index == -1)
         {
             std::cout << "Wasn't able to find any matching index for current planned CoM on CoM trajectory" << std::endl;
+            auto& b = m_replanningTriggerPort.prepare();
+            b.clear();
+            b.add((yarp::os::Value)false);   //send the stop trigger
+            m_replanningTriggerPort.write();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
     }
-    //Create transform from robot frame -> current CoM goal pose
-
-    //check by transforming the current CoM to obtain 0 0 0
-    
 }
