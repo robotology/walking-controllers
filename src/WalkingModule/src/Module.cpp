@@ -1963,6 +1963,12 @@ void WalkingModule::computeVirtualUnicycleThread()
                 transform.addFloat64(root_linkTransform.getRotation().asRPY()(0));
                 transform.addFloat64(root_linkTransform.getRotation().asRPY()(1));
                 transform.addFloat64(root_linkTransform.getRotation().asRPY()(2));
+
+                //planned velocity of the CoM
+                auto comVel = m_stableDCMModel->getCoMVelocity();
+                auto& velData = data.addList();
+                velData.addFloat64(comVel(0));
+                velData.addFloat64(comVel(1));
                 m_unicyclePort.write();
             }
             else
@@ -2007,18 +2013,7 @@ void WalkingModule::computeNavigationTrigger()
                 exitDoubleSupport = true;
             }
         }
-        //std::cout << "m_desiredCoM_Trajectory.size() = " << m_desiredCoM_Trajectory.size() << std::endl;
-        //if (m_desiredCoM_Trajectory.size() <= 80)   //wrong
-        //{
-        //    //The robot is still avviating or staying still
-        //    auto& b = m_replanningTriggerPort.prepare();
-        //    b.clear();
-        //    b.add((yarp::os::Value)true);   //give always a trigger
-        //    m_replanningTriggerPort.write();
-        //    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        //    continue;
-        //}
-        
+
         //search the actual CoM on the trajectory
         int index = -1;
         for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
