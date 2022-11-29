@@ -473,7 +473,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     
     // start the thread
     m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
-    m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);;
+    m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -1976,12 +1976,6 @@ void WalkingModule::computeVirtualUnicycleThread()
                 yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
             }            
         }
-    
-        else
-        {
-            //std::cerr << "[WalkingModule::computeVirtualUnicycleThread] No valid contacts detected on both feet" << std::endl;
-        }
-        
     }
 }
 
@@ -1989,14 +1983,26 @@ void WalkingModule::computeNavigationTrigger()
 {
     std::cout << "Starting computeNavigationTrigger" << std::endl;
 
-    int loopRate = 10;
+    int loopRate = 100;
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (true)
     {
+        if (m_robotState != WalkingFSM::Walking)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+            continue;
+        }
+        
         //get current CoM in odom frame
-        iDynTree::Vector2 plannedCoMPosition = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
+        iDynTree::Vector2 plannedCoM = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
         //std::cout << "CoM Position X: " << plannedCoMPosition(0) << " Y: " << plannedCoMPosition(1) << std::endl;
-
+        //******************************SEGFAULT*********************************
+        //iDynTree::Position measuredCoM = m_FKSolver->getCoMPosition();
+        //iDynTree::Vector2 measuredCoM;
+        //measuredCoM(0) = m_FKSolver->getCoMPosition()(0);
+        //measuredCoM(1) = m_FKSolver->getCoMPosition()(1);
+        //***********************************************************************
+        
         //double support check
         if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
         {
@@ -2014,35 +2020,27 @@ void WalkingModule::computeNavigationTrigger()
             }
         }
 
-        //search the actual CoM on the trajectory
+        //search the CoM on the trajectory
         int index = -1;
+        double min = 100;
         for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
         {
-            double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoMPosition(0), 2) + 
-                                        std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoMPosition(1), 2));
-            if (distance < 0.001)
+            double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoM(0), 2) + 
+                                        std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoM(1), 2));
+            if (distance < min)     //look for the min -> tracking error between 5 - 7 cm
             {
+                min = distance;
                 index = i;
-                //std::cout << "Found planned CoM position at index: " << i << " with distance: " << distance << std::endl;
-                if (enteredDoubleSupport)
-                {
-                    enteredDoubleSupport = false;   //I have already elaborated the data
-                    std::cout << "Entered in double support at index: " << i << " with distance: " << distance << std::endl;
-                    auto& b = m_replanningTriggerPort.prepare();
-                    b.clear();
-                    b.add((yarp::os::Value)true);   //send the planning trigger
-                    m_replanningTriggerPort.write();
-                    break;
-                }
             }
         }
-        
-        if (index == -1)
+        //std::cout << "Found closest CoM position at index: " << index << " with distance: " << min << std::endl;
+        if (index > 70 && enteredDoubleSupport)
         {
-            std::cout << "Wasn't able to find any matching index for current planned CoM on CoM trajectory" << std::endl;
+            enteredDoubleSupport = false;   //I have already elaborated the data
+            std::cout << "Trigger Navigation" << std::endl;
             auto& b = m_replanningTriggerPort.prepare();
             b.clear();
-            b.add((yarp::os::Value)false);   //send the stop trigger
+            b.add((yarp::os::Value)true);   //send the planning trigger
             m_replanningTriggerPort.write();
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
