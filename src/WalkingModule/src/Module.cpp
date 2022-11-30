@@ -18,6 +18,7 @@
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
 #include <yarp/os/Stamp.h>
+#include <yarp/os/NetworkClock.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -1981,10 +1982,14 @@ void WalkingModule::computeVirtualUnicycleThread()
 
 void WalkingModule::computeNavigationTrigger()
 {
+    bool use_clock = true;  //flag to whether use a straight timer for sending the navigation replanning trigger or searching the CoM position on its planned trajectory
+    bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
     std::cout << "Starting computeNavigationTrigger" << std::endl;
-
+    yarp::os::NetworkClock myClock;
+    myClock.open("/clock", "/navigationTriggerClock");
     int loopRate = 100;
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
+    double time = 0;
     while (true)
     {
         if (m_robotState != WalkingFSM::Walking)
@@ -1993,9 +1998,6 @@ void WalkingModule::computeNavigationTrigger()
             continue;
         }
         
-        //get current CoM in odom frame
-        iDynTree::Vector2 plannedCoM = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
-        //std::cout << "CoM Position X: " << plannedCoMPosition(0) << " Y: " << plannedCoMPosition(1) << std::endl;
         //******************************SEGFAULT*********************************
         //iDynTree::Position measuredCoM = m_FKSolver->getCoMPosition();
         //iDynTree::Vector2 measuredCoM;
@@ -2010,39 +2012,80 @@ void WalkingModule::computeNavigationTrigger()
             {
                 if (exitDoubleSupport)
                 {
+                    if (time != 0)
+                    {
+                        std::cout << "Periodicity of entering double support: " << myClock.now() - time << std::endl;
+                    }
+                    time = myClock.now();
                     enteredDoubleSupport = true;
                     exitDoubleSupport = false;
                 }
             }
             else
             {
+                if (! exitDoubleSupport)
+                {
+                    std::cout << "Duration of the double support: " << myClock.now() - time << std::endl;
+                    trigger = true; //in this way we have only one trigger each exit of double support
+                    std::vector<bool> left, right;
+                    m_trajectoryGenerator->getFeetStandingPeriods(left, right);
+                    if (left.at(0))
+                    {
+                        std::cout << "Left in contact -> Swinging Right" << std::endl;
+                    }
+                    if (right.at(0))
+                    {
+                        std::cout << "Right in contact -> Swinging Left" << std::endl;
+                    }
+                }
                 exitDoubleSupport = true;
             }
         }
-
-        //search the CoM on the trajectory
-        int index = -1;
-        double min = 100;
-        for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
+        //navigation trigger mode trigger mode
+        if (use_clock)
         {
-            double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoM(0), 2) + 
-                                        std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoM(1), 2));
-            if (distance < min)     //look for the min -> tracking error between 5 - 7 cm
+            //send the replanning trigger after a certain amount of seconds
+            if (trigger)
             {
-                min = distance;
-                index = i;
+                trigger = false;
+                //wait -> could make it dependant by the current swing step duration
+                myClock.delay(0.5);
+                std::cout << "Trigger Navigation" << std::endl;
+                auto& b = m_replanningTriggerPort.prepare();
+                b.clear();
+                b.add((yarp::os::Value)true);   //send the planning trigger
+                m_replanningTriggerPort.write();
+            }   
+        }
+        else
+        {
+            //get current CoM in odom frame
+            iDynTree::Vector2 plannedCoM = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
+            //search the CoM on the trajectory
+            int index = -1;
+            double min = 100;
+            for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
+            {
+                double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoM(0), 2) + 
+                                            std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoM(1), 2));
+                if (distance < min)     //look for the min -> tracking error between 5 - 7 cm
+                {
+                    min = distance;
+                    index = i;
+                }
+            }
+            //std::cout << "Found closest CoM position at index: " << index << " with distance: " << min << std::endl;
+            if (index > 70 && enteredDoubleSupport)
+            {
+                enteredDoubleSupport = false;   //I have already elaborated the data
+                std::cout << "Trigger Navigation" << std::endl;
+                auto& b = m_replanningTriggerPort.prepare();
+                b.clear();
+                b.add((yarp::os::Value)true);   //send the planning trigger
+                m_replanningTriggerPort.write();
             }
         }
-        //std::cout << "Found closest CoM position at index: " << index << " with distance: " << min << std::endl;
-        if (index > 70 && enteredDoubleSupport)
-        {
-            enteredDoubleSupport = false;   //I have already elaborated the data
-            std::cout << "Trigger Navigation" << std::endl;
-            auto& b = m_replanningTriggerPort.prepare();
-            b.clear();
-            b.add((yarp::os::Value)true);   //send the planning trigger
-            m_replanningTriggerPort.write();
-        }
+        
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
     }
 }
