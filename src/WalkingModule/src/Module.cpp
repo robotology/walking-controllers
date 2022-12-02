@@ -2028,12 +2028,12 @@ void WalkingModule::computeNavigationTrigger()
                     std::cout << "Duration of the double support: " << myClock.now() - time << std::endl;
                     trigger = true; //in this way we have only one trigger each exit of double support
                     std::vector<bool> left, right;
-                    m_trajectoryGenerator->getFeetStandingPeriods(left, right);
-                    if (left.at(0))
+                    // /m_trajectoryGenerator->getFeetStandingPeriods(left, right);
+                    if (m_leftInContact[0])
                     {
                         std::cout << "Left in contact -> Swinging Right" << std::endl;
                     }
-                    if (right.at(0))
+                    if (m_rightInContact[0])
                     {
                         std::cout << "Right in contact -> Swinging Left" << std::endl;
                     }
@@ -2049,7 +2049,7 @@ void WalkingModule::computeNavigationTrigger()
             {
                 trigger = false;
                 //wait -> could make it dependant by the current swing step duration
-                myClock.delay(0.5);
+                myClock.delay(0.9);
                 std::cout << "Trigger Navigation" << std::endl;
                 auto& b = m_replanningTriggerPort.prepare();
                 b.clear();
