@@ -33,6 +33,11 @@ namespace WalkingControllers
     enum class GeneratorState {NotConfigured, Configured, FirstStep, Called, Returned, Closing};
 
 /**
+ * Enumerator for tracking the possible states of the navigation setup: manual -> classic original footstep planner for joystick use ; navigation -> path following based
+ */
+    //enum class NavigationSetup {ManualMode, NavigationMode, NotConfigured};
+
+/**
  * TrajectoryGenerator class is used to handle the UnicycleTrajectoryGenerator library.
  */
     class TrajectoryGenerator
@@ -68,7 +73,7 @@ namespace WalkingControllers
         iDynTree::Transform m_measuredTransformLeft; /**< Measured transformation between the left foot and the world frame. (w_H_lf) */
         iDynTree::Transform m_measuredTransformRight; /**< Measured transformation between the right foot and the world frame. (w_H_rf) */
 
-        //iDynTree::VectorDynSize m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
+        iDynTree::VectorDynSize m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
         iDynTree::Vector3 m_desiredDirectControl; /**< Desired control input to send to the Unicycle Planner. */
 
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */
@@ -77,8 +82,12 @@ namespace WalkingControllers
         FreeSpaceEllipse m_freeSpaceEllipse; /**< The free space ellipse object. */
         bool m_newFreeSpaceEllipse; /**< Check if the free space ellipse has been updated. */
 
-        std::vector<iDynTree::Vector2> m_path; /**< Path of 2D poses (x, y) in the odom reference frame */
-        std::vector<iDynTree::Vector2> m_transformedPath; /**< Path of 2D poses (x, y) in the robot reference frame */
+        std::vector<iDynTree::Vector2> m_2Dpath; /**< Path of 2D poses (x, y) in the odom reference frame */
+        std::vector<iDynTree::Vector3> m_3Dpath; /**< Path of 3D poses (x, y, theta) in the odom reference frame */
+        std::vector<iDynTree::Vector2> m_transformed2DPath; /**< Path of 2D poses (x, y) in the robot reference frame */
+        std::vector<iDynTree::Vector3> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
+
+        NavigationSetup m_navigationConfig{NavigationSetup::ManualMode};
 
         std::mutex m_mutex; /**< Mutex. */
 

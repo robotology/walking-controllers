@@ -104,6 +104,30 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
         return false;
     }
 
+
+    std::string plannerMode = config.check("plannerMode", yarp::os::Value("manual")).asString();
+    if (plannerMode == "manual")
+    {
+        m_navigationConfig = NavigationSetup::ManualMode;
+        m_trajectoryGenerator.setPlannerMode(m_navigationConfig);
+        
+        std::cout << "Planner running in " << plannerMode << " mode" << std::endl;
+    }
+    else if (plannerMode == "navigation")
+    {
+        m_navigationConfig = NavigationSetup::NavigationMode;
+        m_trajectoryGenerator.setPlannerMode(m_navigationConfig);
+        std::cout << "Planner running in " << plannerMode << " mode" << std::endl;
+    }
+    else
+    {
+        yError() << "[configurePlanner] Initialization failed while reading plannerMode param. Cannot use"
+                 << plannerMode << "as plannerMode. Only manual and navigation are available.";
+        return false;
+    }
+    
+    
+
     double timeWeight = config.check("timeWeight", yarp::os::Value(2.5)).asFloat64();
     double positionWeight = config.check("positionWeight", yarp::os::Value(1.0)).asFloat64();
     double slowWhenTurningGain = config.check("slowWhenTurningGain", yarp::os::Value(0.0)).asFloat64();
@@ -213,6 +237,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_correctLeft = true;
 
     m_newFreeSpaceEllipse = false;
+
+    //TODO - add m_navigationConfig
 
     if(ok)
     {
@@ -360,11 +386,11 @@ void TrajectoryGenerator::computeThread()
         std::vector<iDynTree::Vector2> transformedPath;
         //prune the plan: transform it in the robot frame and eliminate the FIRST negative X poses (i.e. - the ones behind)
         //in this case we suppose the planner of the unicycle driven like an akerman model
-        for (size_t i = 0; i < m_path.size(); ++i)
+        for (size_t i = 0; i < m_2Dpath.size(); ++i)
         {
             iDynTree::Position pos;
-            pos(0) = m_path.at(i)(0);
-            pos(1) = m_path.at(i)(1);
+            pos(0) = m_2Dpath.at(i)(0);
+            pos(1) = m_2Dpath.at(i)(1);
             pos(2) = 0;
 
             pos = TfWorldToRobot*pos;   //apply transform
@@ -385,7 +411,7 @@ void TrajectoryGenerator::computeThread()
                                         std::find_if(transformedPath.begin(),
                                                 transformedPath.end(),
                                                 greaterThanZero));
-        std::cout << "Erased the first X poses: " << m_path.size() - transformedPath.size() << std::endl;
+        std::cout << "Erased the first X poses: " << m_2Dpath.size() - transformedPath.size() << std::endl;
         //m_path = transformedPath;
         //addWaypoints contains this transformation
         // apply the homogeneous transformation w_H_{unicycle}
@@ -650,73 +676,190 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
             return false;
         }
 
-        //m_personFollowingDesiredPoint.zero();
-        if (m_path.size() > 0)
+        m_personFollowingDesiredPoint.zero();
+        if (m_2Dpath.size() > 0)
         {
-            m_path.clear();
+            m_2Dpath.clear();
         }
+        if (m_3Dpath.size() > 0)
+        {
+            m_3Dpath.clear();
+        }
+        
         
         m_desiredDirectControl.zero();
 
-        if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
+
+        switch (m_navigationConfig)
         {
-            //if (plannerDesiredInput.size() < 2)
-            //{
-            //    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
-            //                        << ". Using zero input.";
-            //}
-            //else
-            //{
-            //    if (plannerDesiredInput.size() > 2)
-            //    {
-            //        yWarningOnce() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
-            //                            << ". Using only the first two inputs. This warning will be showed only once.";
-            //    }
-            //
-            //    m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
-            //    m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
-            //}
-            if (plannerDesiredInput.size() < 2)
+        case NavigationSetup::ManualMode:
+
+            if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
             {
-                yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
-                                    << ". Using zero input.";
-            }
-            else
-            {
-                //std::cout << "converting plannerDesiredInput to m-path" << std::endl;
-                //Here I should convert the data from VectroDynSize to std::vector<Vector2>
-                //m_personFollowingDesiredPoint = plannerDesiredInput;
-                if (plannerDesiredInput.size()%2 != 0) 
+                if (plannerDesiredInput.size() < 2)
                 {
-                    //not even
-                    yWarning() << "[updateTrajectories] plannerDesiredInput should be even, instead is: " << plannerDesiredInput.size()
-                               << "The last element will be ignored";
+                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+                                        << ". Using zero input.";
                 }
-                
-                for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
+                else
                 {
-                    iDynTree::Vector2 tmp_pose;
-                    tmp_pose(0) = plannerDesiredInput(i*2);     //x
-                    tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
-                    m_path.push_back(tmp_pose);
-                }
+                    if (plannerDesiredInput.size() > 2)
+                    {
+                        yWarningOnce() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+                                            << ". Using only the first two inputs. This warning will be showed only once.";
+                    }
                 
+                    m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
+                    m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
+                }
             }
-        }
-        else if (m_unicycleController == UnicycleController::DIRECT)
-        {
-            if (plannerDesiredInput.size() != 3)
+            else if (m_unicycleController == UnicycleController::DIRECT)
             {
-                yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 3, while it has dimension" << plannerDesiredInput.size()
-                                    << ". Using zero input.";
+                if (plannerDesiredInput.size() != 3)
+                {
+                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 3, while it has dimension" << plannerDesiredInput.size()
+                                        << ". Using zero input.";
+                }
+                else
+                {
+                    m_desiredDirectControl(0) = plannerDesiredInput(0);
+                    m_desiredDirectControl(1) = plannerDesiredInput(1);
+                    m_desiredDirectControl(2) = plannerDesiredInput(2);
+                }
             }
-            else
+            break;
+
+        case NavigationSetup::NavigationMode:
+
+            if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)   //Use path of 2D poses (x, y)
             {
-                m_desiredDirectControl(0) = plannerDesiredInput(0);
-                m_desiredDirectControl(1) = plannerDesiredInput(1);
-                m_desiredDirectControl(2) = plannerDesiredInput(2);
+                if (plannerDesiredInput.size() < 2)
+                {
+                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have at least dimension 2, while it has dimension" << plannerDesiredInput.size()
+                                        << ". Using zero input.";
+                }
+                else
+                {
+                    //std::cout << "converting plannerDesiredInput to m-path" << std::endl;
+                    //Here I should convert the data from VectroDynSize to std::vector<Vector2>
+                    //m_personFollowingDesiredPoint = plannerDesiredInput;
+                    if (plannerDesiredInput.size()%2 != 0) 
+                    {
+                        //not even
+                        yWarning() << "[updateTrajectories] plannerDesiredInput should be even, instead is: " << plannerDesiredInput.size()
+                                   << "The last element will be ignored";
+                    }
+
+                    for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
+                    {
+                        iDynTree::Vector2 tmp_pose;
+                        tmp_pose(0) = plannerDesiredInput(i*2);     //x
+                        tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
+                        m_2Dpath.push_back(tmp_pose);
+                    } 
+                }
             }
+            else if (m_unicycleController == UnicycleController::DIRECT)
+            {
+                if (plannerDesiredInput.size() < 3)
+                {
+                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
+                                        << ". Using zero input.";
+                }
+                else
+                {
+                    for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/3); ++i)
+                    {
+                        iDynTree::Vector3 tmp_pose;
+                        tmp_pose(0) = plannerDesiredInput(i*3);     //x
+                        tmp_pose(1) = plannerDesiredInput(i*3 + 1); //y
+                        tmp_pose(2) = plannerDesiredInput(i*3 + 2); //theta
+                        m_3Dpath.push_back(tmp_pose);
+                    }
+                } 
+                }
+            break;
+        
+        default:    //NotConfigured -> ERROR
+            yErrorThrottle(1.0) << "[updateTrajectories] The NavigationSetup is NotConfigured: please, update the config file." ;
+            break;
         }
+
+        
+        //if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
+        //{
+        //    //if (plannerDesiredInput.size() < 2)
+        //    //{
+        //    //    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+        //    //                        << ". Using zero input.";
+        //    //}
+        //    //else
+        //    //{
+        //    //    if (plannerDesiredInput.size() > 2)
+        //    //    {
+        //    //        yWarningOnce() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+        //    //                            << ". Using only the first two inputs. This warning will be showed only once.";
+        //    //    }
+        //    //
+        //    //    m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
+        //    //    m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
+        //    //}
+        //    if (plannerDesiredInput.size() < 2)
+        //    {
+        //        yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+        //                            << ". Using zero input.";
+        //    }
+        //    else
+        //    {
+        //        //std::cout << "converting plannerDesiredInput to m-path" << std::endl;
+        //        //Here I should convert the data from VectroDynSize to std::vector<Vector2>
+        //        //m_personFollowingDesiredPoint = plannerDesiredInput;
+        //        if (plannerDesiredInput.size()%2 != 0) 
+        //        {
+        //            //not even
+        //            yWarning() << "[updateTrajectories] plannerDesiredInput should be even, instead is: " << plannerDesiredInput.size()
+        //                       << "The last element will be ignored";
+        //        }
+        //        
+        //        for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
+        //        {
+        //            iDynTree::Vector2 tmp_pose;
+        //            tmp_pose(0) = plannerDesiredInput(i*2);     //x
+        //            tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
+        //            m_path.push_back(tmp_pose);
+        //        } 
+        //    }
+        //}
+        //else if (m_unicycleController == UnicycleController::DIRECT)
+        //{
+        //    //if (plannerDesiredInput.size() != 3)
+        //    //{
+        //    //    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 3, while it has dimension" << plannerDesiredInput.size()
+        //    //                        << ". Using zero input.";
+        //    //}
+        //    //else
+        //    //{
+        //    //    m_desiredDirectControl(0) = plannerDesiredInput(0);
+        //    //    m_desiredDirectControl(1) = plannerDesiredInput(1);
+        //    //    m_desiredDirectControl(2) = plannerDesiredInput(2);
+        //    //}
+//
+        //    if (plannerDesiredInput.size() < 3)
+        //    {
+        //        yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
+        //                            << ". Using zero input.";
+        //    }
+        //    else
+        //    {
+        //        for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
+        //        {
+        //            iDynTree::Vector2 tmp_pose;
+        //            tmp_pose(0) = plannerDesiredInput(i*2);     //x
+        //            tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
+        //            m_path.push_back(tmp_pose);
+        //        }
+        //    } 
+        //}
 
         m_initTime = initTime;
 
@@ -747,7 +890,7 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
     auto planner = m_trajectoryGenerator.unicyclePlanner();
 
     //check the number of poses
-    if (m_path.size() < 1)
+    if (m_2Dpath.size() < 1)
     {
         //error
         return false;
@@ -757,13 +900,13 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
         // clear current trajectory
         planner->clearPersonFollowingDesiredTrajectory();
         double elapsedTime = initTime;
-        size_t i = (m_path.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
+        size_t i = (m_2Dpath.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
 
-        for (size_t i = 1; i < m_path.size(); ++i)
+        for (size_t i = 1; i < m_2Dpath.size(); ++i)
         {
             // path is a vector of (x, y, theta) pose vectors in the robot frame
-            double relativePoseDistance = sqrt(pow(m_path.at(i)[0] - m_path.at(i-1)[0], 2) + 
-                                   pow(m_path.at(i)[1] - m_path.at(i-1)[1], 2));
+            double relativePoseDistance = sqrt(pow(m_2Dpath.at(i)[0] - m_2Dpath.at(i-1)[0], 2) + 
+                                   pow(m_2Dpath.at(i)[1] - m_2Dpath.at(i-1)[1], 2));
             double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
             elapsedTime += eta;
             if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
@@ -773,7 +916,7 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
             iDynTree::Vector2 absoluteFramePose;     //pose to be added to the planner
             // transform in the global frame
             iDynTree::toEigen(absoluteFramePose) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
-                                                                                iDynTree::toEigen(m_path.at(i)))
+                                                                                iDynTree::toEigen(m_2Dpath.at(i)))
                                                     + unicyclePosition;
             planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, absoluteFramePose, approxSpeed);
         }
@@ -791,7 +934,7 @@ bool TrajectoryGenerator::addWaypointsOdom(const double initTime, const double e
     auto planner = m_trajectoryGenerator.unicyclePlanner();
 
     //check the number of poses
-    if (m_path.size() < 1)
+    if (m_2Dpath.size() < 1)
     {
         //error
         return false;
@@ -801,13 +944,13 @@ bool TrajectoryGenerator::addWaypointsOdom(const double initTime, const double e
         // clear current trajectory
         planner->clearPersonFollowingDesiredTrajectory();
         double elapsedTime = initTime;
-        size_t i = (m_path.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
+        size_t i = (m_2Dpath.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
 
-        for (size_t i = 1; i < m_path.size(); ++i)
+        for (size_t i = 1; i < m_2Dpath.size(); ++i)
         {
             // path is a vector of (x, y, theta) pose vectors in the robot frame
-            double relativePoseDistance = sqrt(pow(m_path.at(i)[0] - m_path.at(i-1)[0], 2) + 
-                                   pow(m_path.at(i)[1] - m_path.at(i-1)[1], 2));
+            double relativePoseDistance = sqrt(pow(m_2Dpath.at(i)[0] - m_2Dpath.at(i-1)[0], 2) + 
+                                   pow(m_2Dpath.at(i)[1] - m_2Dpath.at(i-1)[1], 2));
             double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
             elapsedTime += eta;
             if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
@@ -819,7 +962,7 @@ bool TrajectoryGenerator::addWaypointsOdom(const double initTime, const double e
             // transform in the offsetted frame in front of the robot i.e. m_referencePointDistance
             //iDynTree::toEigen(absoluteFramePose) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
             //                                                                    iDynTree::toEigen(m_path.at(i)));
-            planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, m_path.at(i), approxSpeed);
+            planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, m_2Dpath.at(i), approxSpeed);
         }
         
     }
