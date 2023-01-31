@@ -126,7 +126,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
         return false;
     }
     
-    
 
     double timeWeight = config.check("timeWeight", yarp::os::Value(2.5)).asFloat64();
     double positionWeight = config.check("positionWeight", yarp::os::Value(1.0)).asFloat64();
@@ -178,7 +177,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();
     double innerEllipseSemiMajorOffset = ellipseMethodGroup.check("inner_offset_major", yarp::os::Value(0.0)).asFloat64();
     double innerEllipseSemiMinorOffset = ellipseMethodGroup.check("inner_offset_minor", yarp::os::Value(0.0)).asFloat64();
-
 
     // try to configure the planner
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
@@ -239,6 +237,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_newFreeSpaceEllipse = false;
 
     //TODO - add m_navigationConfig
+    
 
     if(ok)
     {
@@ -765,19 +764,39 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                 {
                     yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
                                         << ". Using zero input.";
+                    //pass a path with two poses of all zeroes
+                    std::vector<UnicycleState> tmp_vector;
+                    for (size_t i = 0; i < 2; ++i)
+                    {
+                        UnicycleState tmp_pose;
+                        tmp_pose.position(0) = .0;      //x
+                        tmp_pose.position(1) = .0;      //y
+                        tmp_pose.angle = .0;            //theta
+                        tmp_vector.push_back(tmp_pose);
+                    }
+                    if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
+                    {
+                        yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";
+                    }
                 }
                 else
                 {
+                    std::vector<UnicycleState> tmp_vector;
                     for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/3); ++i)
                     {
-                        iDynTree::Vector3 tmp_pose;
-                        tmp_pose(0) = plannerDesiredInput(i*3);     //x
-                        tmp_pose(1) = plannerDesiredInput(i*3 + 1); //y
-                        tmp_pose(2) = plannerDesiredInput(i*3 + 2); //theta
-                        m_3Dpath.push_back(tmp_pose);
+                        UnicycleState tmp_pose;
+                        tmp_pose.position(0) = plannerDesiredInput(i*3);     //x
+                        tmp_pose.position(1) = plannerDesiredInput(i*3 + 1); //y
+                        tmp_pose.angle = plannerDesiredInput(i*3 + 2);       //theta
+                        tmp_vector.push_back(tmp_pose);
+                    }
+                    //Pass path to planner
+                    if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
+                    {
+                        yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";
                     }
                 } 
-                }
+            }
             break;
         
         default:    //NotConfigured -> ERROR
