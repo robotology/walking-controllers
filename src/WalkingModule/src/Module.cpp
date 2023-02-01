@@ -1858,6 +1858,8 @@ bool WalkingModule::setGoal(const yarp::sig::Vector &plannerInput)
     if(m_robotState != WalkingFSM::Walking)
         return false;
 
+    std::cout << "[WalkingModule::setGoal] Received plannerInput of size: " << plannerInput.size() << std::endl;
+
     return setPlannerInput(plannerInput);
 }
 

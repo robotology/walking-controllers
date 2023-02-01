@@ -105,7 +105,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     }
 
 
-    std::string plannerMode = config.check("plannerMode", yarp::os::Value("manual")).asString();
+    std::string plannerMode = config.check("plannerMode", yarp::os::Value("navigation")).asString();
+    std::cout << "Found plannerMode: " << plannerMode << std::endl;
     if (plannerMode == "manual")
     {
         m_navigationConfig = NavigationSetup::ManualMode;
@@ -263,6 +264,7 @@ void TrajectoryGenerator::computeThread()
 {
     while (true)
     {
+        std::cout<<"init computeThread" << std::endl;
         double initTime;
         double endTime;
         double dT;
@@ -330,7 +332,7 @@ void TrajectoryGenerator::computeThread()
                 yInfo() << "[TrajectoryGenerator_Thread] Setting ellipsoid: " << freeSpaceEllipse.printInfo();
             }
         }
-
+        std::cout<<"wait passed in computeThread" << std::endl;
         iDynTree::Vector2 measuredPosition;
         double measuredAngle;
         measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
@@ -360,97 +362,91 @@ void TrajectoryGenerator::computeThread()
             footPosition = iDynTree::toEigen(measuredPositionRight);
         }
 
-        double s_theta = std::sin(unicycleAngle);
-        double c_theta = std::cos(unicycleAngle);
-
-        unicycleRotation(0,0) = c_theta;
-        unicycleRotation(0,1) = -s_theta;
-        unicycleRotation(1,0) = s_theta;
-        unicycleRotation(1,1) = c_theta;
-
-        unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
-        //Use transforms
-        iDynTree::Position unicyclePos;
-        unicyclePos(0) = unicyclePosition(0);
-        unicyclePos(1) = unicyclePosition(1);
-        unicyclePos(2) = 0;
-        //3d Rot around Z (theta)
-        iDynTree::Rotation unicycleRot (c_theta,-s_theta, 0.0,
-                                        s_theta, c_theta, 0.0,
-                                        0.0, 0.0, 1);
-        //Transform from robot frame to world frame
-        iDynTree::Transform TfRobotToWorld(unicycleRot, unicyclePos);
-        //Transform from world frame to robot frame
-        iDynTree::Transform TfWorldToRobot = TfRobotToWorld.inverse();
-        std::vector<iDynTree::Vector2> transformedPath;
-        //prune the plan: transform it in the robot frame and eliminate the FIRST negative X poses (i.e. - the ones behind)
-        //in this case we suppose the planner of the unicycle driven like an akerman model
-        for (size_t i = 0; i < m_2Dpath.size(); ++i)
+        if (m_navigationConfig == NavigationSetup::NavigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
-            iDynTree::Position pos;
-            pos(0) = m_2Dpath.at(i)(0);
-            pos(1) = m_2Dpath.at(i)(1);
-            pos(2) = 0;
+            double s_theta = std::sin(unicycleAngle);
+            double c_theta = std::cos(unicycleAngle);
 
-            pos = TfWorldToRobot*pos;   //apply transform
-            iDynTree::Vector2 vector;
-            vector(0) = pos(0);
-            vector(1) = pos(1);
-            transformedPath.push_back(vector);
+            unicycleRotation(0,0) = c_theta;
+            unicycleRotation(0,1) = -s_theta;
+            unicycleRotation(1,0) = s_theta;
+            unicycleRotation(1,1) = c_theta;
+
+            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+            //Use transforms
+            iDynTree::Position unicyclePos;
+            unicyclePos(0) = unicyclePosition(0);
+            unicyclePos(1) = unicyclePosition(1);
+            unicyclePos(2) = 0;
+            //3d Rot around Z (theta)
+            iDynTree::Rotation unicycleRot (c_theta,-s_theta, 0.0,
+                                            s_theta, c_theta, 0.0,
+                                            0.0, 0.0, 1);
+            //Transform from robot frame to world frame
+            iDynTree::Transform TfRobotToWorld(unicycleRot, unicyclePos);
+            //Transform from world frame to robot frame
+            iDynTree::Transform TfWorldToRobot = TfRobotToWorld.inverse();
+            std::vector<iDynTree::Vector2> transformedPath;
+            //prune the plan: transform it in the robot frame and eliminate the FIRST negative X poses (i.e. - the ones behind)
+            //in this case we suppose the planner of the unicycle driven like an akerman model
+            for (size_t i = 0; i < m_2Dpath.size(); ++i)
+            {
+                iDynTree::Position pos;
+                pos(0) = m_2Dpath.at(i)(0);
+                pos(1) = m_2Dpath.at(i)(1);
+                pos(2) = 0;
+
+                pos = TfWorldToRobot*pos;   //apply transform
+                iDynTree::Vector2 vector;
+                vector(0) = pos(0);
+                vector(1) = pos(1);
+                transformedPath.push_back(vector);
+            }
+
+            //pruning
+            // Helper predicate lambda function to see what is the positive x-element in a vector of poses
+            // Warning: The robot needs to have a portion of the path that goes forward (positive X)
+            auto greaterThanZero = [](const iDynTree::Vector2 &i){
+                return i(0) > 0.0;
+            };
+
+            transformedPath.erase(begin(transformedPath), 
+                                            std::find_if(transformedPath.begin(),
+                                                    transformedPath.end(),
+                                                    greaterThanZero));
+            std::cout << "Erased the first X poses: " << m_2Dpath.size() - transformedPath.size() << std::endl;
+            //m_path = transformedPath;
+            //addWaypoints contains this transformation
+            // apply the homogeneous transformation w_H_{unicycle}
+            //iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
+            //                                                                     iDynTree::toEigen(desiredPointInRelativeFrame))
+            //        + unicyclePosition;
+
+            // clear the old trajectory -> done inside addWaypoints
+            std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+
+            //std::cout << "addWaypoints" << std::endl;
+
+            if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
+            {
+                // something goes wrong
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+                break;
+            }
+            //if(!addWaypointsOdom(initTime, endTime))
+            //{
+            //    // something goes wrong
+            //    std::lock_guard<std::mutex> guard(m_mutex);
+            //    m_generatorState = GeneratorState::Configured;
+            //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+            //    break;
+            //}
+
+            unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
         }
-        
-        //pruning
-        // Helper predicate lambda function to see what is the positive x-element in a vector of poses
-        // Warning: The robot needs to have a portion of the path that goes forward (positive X)
-        auto greaterThanZero = [](const iDynTree::Vector2 &i){
-            return i(0) > 0.0;
-        };
-        
-        transformedPath.erase(begin(transformedPath), 
-                                        std::find_if(transformedPath.begin(),
-                                                transformedPath.end(),
-                                                greaterThanZero));
-        std::cout << "Erased the first X poses: " << m_2Dpath.size() - transformedPath.size() << std::endl;
-        //m_path = transformedPath;
-        //addWaypoints contains this transformation
-        // apply the homogeneous transformation w_H_{unicycle}
-        //iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
-        //                                                                     iDynTree::toEigen(desiredPointInRelativeFrame))
-        //        + unicyclePosition;
-
-        // clear the old trajectory -> done inside addWaypoints
-        std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
-        //unicyclePlanner->clearPersonFollowingDesiredTrajectory();
-
-        // add new point
-        //if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, desiredPointInAbsoluteFrame))
-        //{
-        //    // something goes wrong
-        //    std::lock_guard<std::mutex> guard(m_mutex);
-        //    m_generatorState = GeneratorState::Configured;
-        //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-        //    break;
-        //}
-        //std::cout << "addWaypoints" << std::endl;
-
-        if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
-        {
-            // something goes wrong
-            std::lock_guard<std::mutex> guard(m_mutex);
-            m_generatorState = GeneratorState::Configured;
-            yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-            break;
-        }
-        //if(!addWaypointsOdom(initTime, endTime))
-        //{
-        //    // something goes wrong
-        //    std::lock_guard<std::mutex> guard(m_mutex);
-        //    m_generatorState = GeneratorState::Configured;
-        //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-        //    break;
-        //}
-        
-        unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
+        //TODO do computations for manual mode
 
         if (!m_dcmGenerator->setDCMInitialState(initialState)) {
             // something goes wrong
@@ -680,14 +676,9 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         {
             m_2Dpath.clear();
         }
-        if (m_3Dpath.size() > 0)
-        {
-            m_3Dpath.clear();
-        }
         
         
         m_desiredDirectControl.zero();
-
 
         switch (m_navigationConfig)
         {
@@ -760,6 +751,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
             }
             else if (m_unicycleController == UnicycleController::DIRECT)
             {
+                std::cout<<"Navigation Direct Controller" << std::endl;
                 if (plannerDesiredInput.size() < 3)
                 {
                     yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
@@ -774,6 +766,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                         tmp_pose.angle = .0;            //theta
                         tmp_vector.push_back(tmp_pose);
                     }
+                    std::cout<<"Setting Navigation Path of size: " << tmp_vector.size() << std::endl;
                     if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
                     {
                         yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";

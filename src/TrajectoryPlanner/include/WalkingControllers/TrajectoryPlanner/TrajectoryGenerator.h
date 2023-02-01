@@ -83,9 +83,9 @@ namespace WalkingControllers
         bool m_newFreeSpaceEllipse; /**< Check if the free space ellipse has been updated. */
 
         std::vector<iDynTree::Vector2> m_2Dpath; /**< Path of 2D poses (x, y) in the odom reference frame */
-        std::vector<iDynTree::Vector3> m_3Dpath; /**< Path of 3D poses (x, y, theta) in the odom reference frame */
+        //std::vector<iDynTree::Vector3> m_3Dpath; /**< Path of 3D poses (x, y, theta) in the odom reference frame */
         std::vector<iDynTree::Vector2> m_transformed2DPath; /**< Path of 2D poses (x, y) in the robot reference frame */
-        std::vector<iDynTree::Vector3> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
+        //std::vector<iDynTree::Vector3> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
 
         NavigationSetup m_navigationConfig{NavigationSetup::ManualMode};
 
