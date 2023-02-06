@@ -1459,6 +1459,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         // evaluate the left to right transformation, the inertial frame is on the left foot
         iDynTree::Transform leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
 
+        std::cout << "generateFirstTrajectories(leftToRightTransform)" << std::endl;
         // evaluate the first trajectory. The robot does not move!
         if(!generateFirstTrajectories(leftToRightTransform))
         {
@@ -1468,6 +1469,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
     else
     {
+        std::cout << "generateFirstTrajectories()" << std::endl;
         // evaluate the first trajectory. The robot does not move! So the first trajectory
         if(!generateFirstTrajectories())
         {
