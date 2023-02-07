@@ -189,9 +189,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength);
     ok = ok && unicyclePlanner->setWidthSetting(minWidth, m_nominalWidth);
     ok = ok && unicyclePlanner->setMaxAngleVariation(maxAngleVariation);
-    ok = ok && unicyclePlanner->setCostWeights(positionWeight, timeWeight);
-    ok = ok && unicyclePlanner->setStepTimings(minStepDuration,
-                                               maxStepDuration, nominalDuration);
+
     ok = ok && unicyclePlanner->setPlannerPeriod(m_dT);
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
@@ -383,38 +381,38 @@ void TrajectoryGenerator::computeThread()
                                             s_theta, c_theta, 0.0,
                                             0.0, 0.0, 1);
             //Transform from robot frame to world frame
-            iDynTree::Transform TfRobotToWorld(unicycleRot, unicyclePos);
+            //iDynTree::Transform TfRobotToWorld(unicycleRot, unicyclePos);
             //Transform from world frame to robot frame
-            iDynTree::Transform TfWorldToRobot = TfRobotToWorld.inverse();
-            std::vector<iDynTree::Vector2> transformedPath;
+            //iDynTree::Transform TfWorldToRobot = TfRobotToWorld.inverse();
+            //std::vector<iDynTree::Vector2> transformedPath;
             //prune the plan: transform it in the robot frame and eliminate the FIRST negative X poses (i.e. - the ones behind)
             //in this case we suppose the planner of the unicycle driven like an akerman model
-            for (size_t i = 0; i < m_2Dpath.size(); ++i)
-            {
-                iDynTree::Position pos;
-                pos(0) = m_2Dpath.at(i)(0);
-                pos(1) = m_2Dpath.at(i)(1);
-                pos(2) = 0;
-
-                pos = TfWorldToRobot*pos;   //apply transform
-                iDynTree::Vector2 vector;
-                vector(0) = pos(0);
-                vector(1) = pos(1);
-                transformedPath.push_back(vector);
-            }
+            //for (size_t i = 0; i < m_2Dpath.size(); ++i)
+            //{
+            //    iDynTree::Position pos;
+            //    pos(0) = m_2Dpath.at(i)(0);
+            //    pos(1) = m_2Dpath.at(i)(1);
+            //    pos(2) = 0;
+//
+            //    pos = TfWorldToRobot*pos;   //apply transform
+            //    iDynTree::Vector2 vector;
+            //    vector(0) = pos(0);
+            //    vector(1) = pos(1);
+            //    transformedPath.push_back(vector);
+            //}
 
             //pruning
             // Helper predicate lambda function to see what is the positive x-element in a vector of poses
             // Warning: The robot needs to have a portion of the path that goes forward (positive X)
-            auto greaterThanZero = [](const iDynTree::Vector2 &i){
-                return i(0) > 0.0;
-            };
+            //auto greaterThanZero = [](const iDynTree::Vector2 &i){
+            //    return i(0) > 0.0;
+            //};
 
-            transformedPath.erase(begin(transformedPath), 
-                                            std::find_if(transformedPath.begin(),
-                                                    transformedPath.end(),
-                                                    greaterThanZero));
-            std::cout << "Erased the first X poses: " << m_2Dpath.size() - transformedPath.size() << std::endl;
+            //transformedPath.erase(begin(transformedPath), 
+            //                                std::find_if(transformedPath.begin(),
+            //                                        transformedPath.end(),
+            //                                        greaterThanZero));
+            //std::cout << "Erased the first X poses: " << m_2Dpath.size() - transformedPath.size() << std::endl;
             //m_path = transformedPath;
             //addWaypoints contains this transformation
             // apply the homogeneous transformation w_H_{unicycle}
@@ -426,7 +424,6 @@ void TrajectoryGenerator::computeThread()
             std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
 
             //std::cout << "addWaypoints" << std::endl;
-
             if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
             {
                 // something goes wrong
@@ -435,14 +432,6 @@ void TrajectoryGenerator::computeThread()
                 yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
                 break;
             }
-            //if(!addWaypointsOdom(initTime, endTime))
-            //{
-            //    // something goes wrong
-            //    std::lock_guard<std::mutex> guard(m_mutex);
-            //    m_generatorState = GeneratorState::Configured;
-            //    yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-            //    break;
-            //}
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
         }
