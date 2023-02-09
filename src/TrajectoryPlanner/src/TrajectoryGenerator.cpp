@@ -209,6 +209,8 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
     ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
 
+    ok = ok && unicyclePlanner->setStepTimings(m_minStepDuration, maxStepDuration, nominalDuration);  //added, not present before
+
     m_trajectoryGenerator.setPauseActive(isPauseActive);
 
     if (m_useMinimumJerk) {
@@ -434,6 +436,59 @@ void TrajectoryGenerator::computeThread()
             }
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
+        }
+        else if (m_navigationConfig == NavigationSetup::NavigationMode && m_unicycleController == UnicycleController::DIRECT)
+        {
+            //Substute the first path pose to all zeroes:
+            UnicycleState zeroPos;  //force the path from starting at 0,0,0 in robot frame
+            zeroPos.angle = .0;
+            zeroPos.position(0) = .0;
+            zeroPos.position(1) = .0;
+            m_3Dpath.at(0) = zeroPos;
+            //Transform path in "odom" frame -> it is the initial starting robot frame
+            double s_theta = std::sin(unicycleAngle);
+            double c_theta = std::cos(unicycleAngle);
+
+            unicycleRotation(0,0) = c_theta;
+            unicycleRotation(0,1) = -s_theta;
+            unicycleRotation(1,0) = s_theta;
+            unicycleRotation(1,1) = c_theta;
+
+            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+            //Use transforms
+            iDynTree::Position postion2D;
+            postion2D(0) = unicyclePosition(0);
+            postion2D(1) = unicyclePosition(1);
+            postion2D(2) = 0;
+            //3d Rot around Z (theta)
+            iDynTree::Rotation unicycleRot (c_theta,-s_theta, 0.0,
+                                            s_theta, c_theta, 0.0,
+                                            0.0, 0.0, 1);
+            //Transform from world frame to robot frame
+            iDynTree::Transform TF(unicycleRot, postion2D);
+            yDebug() << " TF.getRotation():" << TF.getRotation().asRPY()(2);
+            std::vector<UnicycleState> transformed3DPath;
+
+            for (size_t i = 0; i < m_3Dpath.size(); ++i)
+            {
+                iDynTree::Position pos;
+                pos(0) = m_3Dpath.at(i).position(0);    //x
+                pos(1) = m_3Dpath.at(i).position(1);    //y
+                pos(2) = 0;                             //z
+
+                pos = TF*pos;   //apply transform
+                UnicycleState transformedPose;
+                transformedPose.position(0) = pos(0);
+                transformedPose.position(1) = pos(1);
+                transformedPose.angle = m_3Dpath[i].angle + TF.getRotation().asRPY()(2);
+                yDebug() << "i: " << i << " X: " << transformedPose.position(0) << " Y: " << transformedPose.position(1) << " transformedPose.angle: " << transformedPose.angle;
+                transformed3DPath.push_back(transformedPose);
+            }
+            std::cout<<"Setting Navigation Transformed Path of size: " << transformed3DPath.size() << std::endl;
+            if (! m_trajectoryGenerator.setNavigationPath(transformed3DPath))
+            {
+                yErrorThrottle(1.0) << "[TrajectoryGenerator_Thread] Unable to set the navigation path to the planner.";
+            }
         }
         //TODO do computations for manual mode
 
@@ -671,6 +726,10 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         {
             m_2Dpath.clear();
         }
+        if (m_3Dpath.size() > 0)
+        {
+            m_3Dpath.clear();
+        }
         
         m_personFollowingDesiredPoint.zero();
         m_desiredDirectControl.zero();
@@ -752,7 +811,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                 std::cout<<"Navigation Direct Controller" << std::endl;
                 if (plannerDesiredInput.size() < 3)
                 {
-                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
+                    yInfo() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
                                         << ". Using zero input.";
                     //pass a path with two poses of all zeroes
                     std::vector<UnicycleState> tmp_vector;
@@ -762,13 +821,15 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                         tmp_pose.position(0) = .0;      //x
                         tmp_pose.position(1) = .0;      //y
                         tmp_pose.angle = .0;            //theta
-                        tmp_vector.push_back(tmp_pose);
+                        //tmp_pose.push_back(tmp_pose);
+                        m_3Dpath.push_back(tmp_pose);
                     }
-                    std::cout<<"Setting Navigation Path of size: " << tmp_vector.size() << std::endl;
-                    if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
-                    {
-                        yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";
-                    }
+                    
+                    std::cout<<"Setting Navigation Path of size: " << m_3Dpath.size() << std::endl;
+                    //if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
+                    //{
+                    //    yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";
+                    //}
                 }
                 else
                 {
@@ -779,13 +840,14 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                         tmp_pose.position(0) = plannerDesiredInput(i*3);     //x
                         tmp_pose.position(1) = plannerDesiredInput(i*3 + 1); //y
                         tmp_pose.angle = plannerDesiredInput(i*3 + 2);       //theta
-                        tmp_vector.push_back(tmp_pose);
+                        m_3Dpath.push_back(tmp_pose);
                     }
+                    std::cout<<"Setting Navigation Path of size: " << m_3Dpath.size() << std::endl;
                     //Pass path to planner
-                    if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
-                    {
-                        yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";
-                    }
+                    //if (! m_trajectoryGenerator.setNavigationPath(tmp_vector))
+                    //{
+                    //    yErrorThrottle(1.0) << "[updateTrajectories] Unable to set the navigation path to the planner.";
+                    //}
                 }
                 //Old code -> overwriting to zero to avoid conflicts
                 m_desiredDirectControl(0) = 0.0;    //=plannerDesiredInput(0);
