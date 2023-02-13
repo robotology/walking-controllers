@@ -47,7 +47,7 @@ bool RobotInterface::getWorstError(const iDynTree::VectorDynSize& desiredJointPo
     return true;
 }
 
-bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
+bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts, double attemptDelay)
 {
     if(!m_encodersInterface)
     {
@@ -187,7 +187,7 @@ bool RobotInterface::getFeedbacksRaw(unsigned int maxAttempts)
 
             return true;
         }
-        yarp::os::Time::delay(0.001);
+        yarp::os::Time::delay(attemptDelay);
         attempt++;
     } while (attempt < maxAttempts);
 
@@ -494,7 +494,7 @@ bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
     measuredWrench.port = std::make_unique<yarp::os::BufferedPort<yarp::sig::Vector>>();
     measuredWrench.port->open("/" + portPrefix + portInputName);
     // connect port
-    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
+    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName, "fast_tcp"))
     {
         yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
                  << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;
@@ -665,9 +665,9 @@ bool RobotInterface::configurePIDHandler(const yarp::os::Bottle& config)
 }
 
 
-bool RobotInterface::resetFilters()
+bool RobotInterface::resetFilters(unsigned int maxAttempts, double attemptDelay)
 {
-    if(!getFeedbacksRaw(100))
+    if(!getFeedbacksRaw(maxAttempts, attemptDelay))
     {
         yError() << "[RobotInterface::resetFilters] Unable to get the feedback from the robot";
         return false;
@@ -710,9 +710,9 @@ bool RobotInterface::resetFilters()
     return true;
 }
 
-bool RobotInterface::getFeedbacks(unsigned int maxAttempts)
+bool RobotInterface::getFeedbacks(unsigned int maxAttempts, double attemptDelay)
 {
-    if(!getFeedbacksRaw(maxAttempts))
+    if(!getFeedbacksRaw(maxAttempts, attemptDelay))
     {
         yError() << "[RobotInterface::getFeedbacks] Unable to get the feedback from the robot";
         return false;

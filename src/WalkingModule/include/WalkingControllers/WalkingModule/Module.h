@@ -148,10 +148,25 @@ namespace WalkingControllers
 
         size_t m_plannerAdvanceTimeSteps; /** How many steps in advance the planner should be called. */
 
+        size_t m_feedbackAttempts;
+        double m_feedbackAttemptDelay;
+
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
         yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
+
+        yarp::os::BufferedPort<yarp::sig::Vector> m_leftFTArmRotatedPort; /**< Desired robot position port. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_rightFTArmRotatedPort; /**< Desired robot position port. */
+
+        yarp::os::BufferedPort<yarp::sig::Vector> m_leftFTArmPort; /**< Desired robot position port. */
+        yarp::os::BufferedPort<yarp::sig::Vector> m_rightFTArmPort; /**< Desired robot position port. */
+
+        yarp::os::BufferedPort<yarp::sig::Matrix> m_rightHandPort;
+        yarp::os::BufferedPort<yarp::sig::Matrix> m_leftHandPort;
+
+        int m_sendInfoIndex{0};
+        int m_sendInfoMaxCounter{0};
 
         /**
          * Get the robot model from the resource finder and set it.

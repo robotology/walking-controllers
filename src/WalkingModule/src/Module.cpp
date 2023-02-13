@@ -12,8 +12,11 @@
 #include <algorithm>
 
 // YARP
+#include <yarp/eigen/Eigen.h>
+#include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
 #include <yarp/os/BufferedPort.h>
+#include <yarp/sig/Matrix.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
 
@@ -194,6 +197,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    double maxFBDelay = rf.check("max_feedback_delay_in_s", yarp::os::Value(1.0)).asFloat64();
+    m_feedbackAttemptDelay = m_dT / 10;
+    m_feedbackAttempts = maxFBDelay / m_feedbackAttemptDelay;
+
+    // we will send the data every 100ms
+    m_sendInfoMaxCounter = std::floor(0.01 / m_dT);
+
     double plannerAdvanceTimeInS = rf.check("planner_advance_time_in_s", yarp::os::Value(0.18)).asFloat64();
     m_plannerAdvanceTimeSteps = std::round(plannerAdvanceTimeInS / m_dT) + 2; //The additional 2 steps are because the trajectory from the planner is requested two steps in advance wrt the merge point
 
@@ -246,6 +256,56 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Could not open" << desiredUnyciclePositionPortName << " port.";
         return false;
     }
+
+    ///////////////// TODO remove this code. DONOT merge
+    std::string leftFTArmRoatedPort =  "/" + getName() + "/left_arm_inertial_ft";
+    if(!m_leftFTArmRotatedPort.open(leftFTArmRoatedPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << leftFTArmRoatedPort << " port.";
+        return false;
+    }
+
+    std::string rightFTArmRoatedPort =  "/" + getName() + "/right_arm_inertial_ft";
+    if(!m_rightFTArmRotatedPort.open(rightFTArmRoatedPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << rightFTArmRoatedPort << " port.";
+        return false;
+    }
+
+    std::string leftFTArmPort =  "/" + getName() + "/left_arm_filtered_ft";
+    if(!m_leftFTArmPort.open(leftFTArmPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << leftFTArmPort << " port.";
+        return false;
+    }
+
+
+    std::string rightFTArmPort =  "/" + getName() + "/right_arm_filtered_ft";
+    if(!m_rightFTArmPort.open(rightFTArmPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << rightFTArmPort << " port.";
+        return false;
+    }
+
+
+    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/l_arm_ft_sensor", leftFTArmPort, "fast_tcp");
+    yarp::os::Network::connect("/wholeBodyDynamics/filteredFT/r_arm_ft_sensor", rightFTArmPort, "fast_tcp");
+
+
+    std::string leftHandPort =  "/" + getName() + "/left_hand:o";
+    if(!m_leftHandPort.open(leftHandPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << leftHandPort << " port.";
+        return false;
+    }
+
+    std::string rightHandPort =  "/" + getName() + "/right_hand:o";
+    if(!m_rightHandPort.open(rightHandPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << rightHandPort << " port.";
+        return false;
+    }
+    /////////////////
 
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
@@ -396,7 +456,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
         // open and connect the data logger port
-        std::string portInput, portOutput;
+        std::string portOutput;
         // open the connect the data logger port
         if(!YarpUtilities::getStringFromSearchable(loggerOptions,
                                                    "dataLoggerOutputPort_name",
@@ -405,21 +465,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
         }
-        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
-                                                   "dataLoggerInputPort_name",
-                                                   portInput))
-        {
-            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
-            return false;
-        }
 
         m_loggerPort.open("/" + name + portOutput);
-
-        if(!yarp::os::Network::connect("/" + name + portOutput,  portInput))
-        {
-            yError() << "Unable to connect the ports " << "/" + name + portOutput << "and" << portInput;
-            return false;
-        }
     }
 
     // time profiler
@@ -618,7 +665,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
 
-        if(!m_robotControlHelper->getFeedbacksRaw(100))
+        if(!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
             {
                 yError() << "[updateModule] Unable to get the feedback.";
                 return false;
@@ -663,7 +710,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(100))
+            if(!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -724,6 +771,80 @@ bool WalkingModule::updateModule()
         bool resetTrajectory = false;
 
         m_profiler->setInitTime("Total");
+
+        /////////////////////////  TODO this part of the code should be removed. DONOT merge this
+        ///feature
+        if (m_sendInfoIndex == 0)
+        {
+            yarp::sig::Vector* leftFTData = m_leftFTArmPort.read(false);
+            yarp::sig::Vector& leftArmRotated = m_leftFTArmRotatedPort.prepare();
+            leftArmRotated.resize(3);
+            if (leftFTData == nullptr)
+            {
+                yarp::eigen::toEigen(leftArmRotated).setZero();
+            } else
+            {
+                iDynTree::Vector3 temp;
+                temp(0) = (*leftFTData)[0];
+                temp(1) = (*leftFTData)[1];
+                temp(2) = (*leftFTData)[2];
+
+                yarp::eigen::toEigen(leftArmRotated)
+                    = iDynTree::toEigen(m_FKSolver->getKinDyn()
+                                            ->getWorldTransform("l_arm_ft_sensor")
+                                            .getRotation())
+                      * iDynTree::toEigen(temp);
+            }
+            m_leftFTArmRotatedPort.write();
+
+            yarp::sig::Vector* rightFTData = m_rightFTArmPort.read(false);
+            yarp::sig::Vector& rightArmRotated = m_rightFTArmRotatedPort.prepare();
+            rightArmRotated.resize(3);
+            if (rightFTData == nullptr)
+            {
+                yarp::eigen::toEigen(rightArmRotated).setZero();
+            } else
+            {
+                iDynTree::Vector3 temp;
+                temp(0) = (*rightFTData)[0];
+                temp(1) = (*rightFTData)[1];
+                temp(2) = (*rightFTData)[2];
+
+                yarp::eigen::toEigen(rightArmRotated)
+                    = iDynTree::toEigen(m_FKSolver->getKinDyn()
+                                            ->getWorldTransform("r_arm_ft_sensor")
+                                            .getRotation())
+                      * iDynTree::toEigen(temp);
+            }
+            m_rightFTArmRotatedPort.write();
+
+            const iDynTree::Transform head_T_left_hand
+                = m_FKSolver->getHeadToWorldTransform().inverse()
+                  * m_FKSolver->getLeftHandToWorldTransform();
+
+            const iDynTree::Transform head_T_right_hand
+                = m_FKSolver->getHeadToWorldTransform().inverse()
+                  * m_FKSolver->getRightHandToWorldTransform();
+
+            yarp::sig::Matrix& matrixLeft = m_leftHandPort.prepare();
+            matrixLeft.resize(4, 4);
+            iDynTree::toYarp(head_T_left_hand, matrixLeft);
+            m_leftHandPort.write();
+
+            yarp::sig::Matrix& matrixRight = m_rightHandPort.prepare();
+            matrixRight.resize(4, 4);
+            iDynTree::toYarp(head_T_right_hand, matrixRight);
+            m_rightHandPort.write();
+        }
+
+    // send the data every m_sendInfoMaxCounter
+    m_sendInfoIndex++;
+        if (m_sendInfoIndex > m_sendInfoMaxCounter)
+        {
+            m_sendInfoIndex = 0;
+        }
+
+        //////////////////////////////////
 
         // check desired planner input
         yarp::sig::Vector* desiredUnicyclePosition = nullptr;
@@ -787,7 +908,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(100))
+        if(!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -1269,7 +1390,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(100))
+    if(!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1595,7 +1716,7 @@ bool WalkingModule::startWalking()
     // if the robot was only prepared the filters has to be reseted
     if(m_robotState == WalkingFSM::Prepared)
     {
-        m_robotControlHelper->resetFilters();
+        m_robotControlHelper->resetFilters(m_feedbackAttempts, m_feedbackAttemptDelay);
 
         updateFKSolver();
 

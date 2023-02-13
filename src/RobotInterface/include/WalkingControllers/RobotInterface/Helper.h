@@ -156,9 +156,9 @@ namespace WalkingControllers
          * Get all the feedback signal from the interfaces
          * @return true in case of success and false otherwise.
          */
-        bool getFeedbacks(unsigned int maxAttempts = 1);
+        bool getFeedbacks(unsigned int maxAttempts, double attemptDelay);
 
-        bool getFeedbacksRaw(unsigned int maxAttempts = 1);
+        bool getFeedbacksRaw(unsigned int maxAttempts, double attemptDelay);
 
         /**
          * Set the desired position reference. (The position will be sent using PositionControl mode)
@@ -190,7 +190,7 @@ namespace WalkingControllers
          * Reset filters.
          * @return true in case of success and false otherwise.
          */
-        bool resetFilters();
+        bool resetFilters(unsigned int maxAttempts, double attemptDelay);
 
         /**
          * Close the polydrives.
