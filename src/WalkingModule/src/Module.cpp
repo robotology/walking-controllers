@@ -12,8 +12,11 @@
 #include <algorithm>
 
 // YARP
+#include <yarp/eigen/Eigen.h>
+#include <yarp/os/Network.h>
 #include <yarp/os/RFModule.h>
 #include <yarp/os/BufferedPort.h>
+#include <yarp/sig/Matrix.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
 
@@ -193,6 +196,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] sampling_time is supposed to be strictly positive.";
         return false;
     }
+
+    double maxFBDelay = rf.check("max_feedback_delay_in_s", yarp::os::Value(1.0)).asFloat64();
+    m_feedbackAttemptDelay = m_dT / 10;
+    m_feedbackAttempts = maxFBDelay / m_feedbackAttemptDelay;
+
 
     double plannerAdvanceTimeInS = rf.check("planner_advance_time_in_s", yarp::os::Value(0.18)).asFloat64();
     m_plannerAdvanceTimeSteps = std::round(plannerAdvanceTimeInS / m_dT) + 2; //The additional 2 steps are because the trajectory from the planner is requested two steps in advance wrt the merge point
@@ -396,7 +404,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
         yarp::os::Bottle& loggerOptions = rf.findGroup("WALKING_LOGGER");
         // open and connect the data logger port
-        std::string portInput, portOutput;
+        std::string portOutput;
         // open the connect the data logger port
         if(!YarpUtilities::getStringFromSearchable(loggerOptions,
                                                    "dataLoggerOutputPort_name",
@@ -405,21 +413,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
         }
-        if(!YarpUtilities::getStringFromSearchable(loggerOptions,
-                                                   "dataLoggerInputPort_name",
-                                                   portInput))
-        {
-            yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
-            return false;
-        }
 
         m_loggerPort.open("/" + name + portOutput);
-
-        if(!yarp::os::Network::connect("/" + name + portOutput,  portInput))
-        {
-            yError() << "Unable to connect the ports " << "/" + name + portOutput << "and" << portInput;
-            return false;
-        }
     }
 
     // time profiler
@@ -618,7 +613,7 @@ bool WalkingModule::updateModule()
     if(m_robotState == WalkingFSM::Preparing)
     {
 
-        if(!m_robotControlHelper->getFeedbacksRaw(100))
+        if(!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
             {
                 yError() << "[updateModule] Unable to get the feedback.";
                 return false;
@@ -663,7 +658,7 @@ bool WalkingModule::updateModule()
             m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
             // reset the retargeting
-            if(!m_robotControlHelper->getFeedbacks(100))
+            if(!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
             {
                 yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
                 return false;
@@ -787,7 +782,7 @@ bool WalkingModule::updateModule()
         }
 
         // get feedbacks and evaluate useful quantities
-        if(!m_robotControlHelper->getFeedbacks(100))
+        if(!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
@@ -1269,7 +1264,7 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     // get the current state of the robot
     // this is necessary because the trajectories for the joints, CoM height and neck orientation
     // depend on the current state of the robot
-    if(!m_robotControlHelper->getFeedbacksRaw(100))
+    if(!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
     {
         yError() << "[WalkingModule::prepareRobot] Unable to get the feedback.";
         return false;
@@ -1595,7 +1590,7 @@ bool WalkingModule::startWalking()
     // if the robot was only prepared the filters has to be reseted
     if(m_robotState == WalkingFSM::Prepared)
     {
-        m_robotControlHelper->resetFilters();
+        m_robotControlHelper->resetFilters(m_feedbackAttempts, m_feedbackAttemptDelay);
 
         updateFKSolver();
 
