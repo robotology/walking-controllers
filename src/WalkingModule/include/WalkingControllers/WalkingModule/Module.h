@@ -11,6 +11,7 @@
 
 // std
 #include <WalkingControllers/WholeBodyControllers/BLFIK.h>
+#include <iDynTree/Core/Rotation.h>
 #include <memory>
 #include <deque>
 
@@ -76,8 +77,11 @@ namespace WalkingControllers
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
         bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
+        bool m_removeZMPOffset{false}; /**< If true the offset between the ZMP and CoM is removed */
 
         double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
+        iDynTree::Position m_zmpOffset; /** < Offset reading the zmp at the beginning*/
+        iDynTree::Position m_zmpOffsetLocal; /** < Offset in the local frame*/
 
         iDynTree::Vector2 m_previousZMP; /**< Previous ZMP value to check if the ZMP was constant for a while. */
         int m_constantZMPCounter; /**< Counter to check for how long the ZMP was constant. */
@@ -206,6 +210,12 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool evaluateZMP(iDynTree::Vector2& zmp);
+
+        /**
+         * Given the two planned feet, it computes the average yaw rotation
+         * @return the average Yaw rotation
+         */
+        iDynTree::Rotation computeAverageYawRotationFromPlannedFeet() const;
 
         /**
          * Generate the first trajectory.

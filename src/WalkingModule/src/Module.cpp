@@ -1,3 +1,4 @@
+
 /**
  * @file WalkingModule.cpp
  * @authors Giulio Romualdi <giulio.romualdi@iit.it>
@@ -179,7 +180,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         m_maxZMP[1] = localBot->get(1).asFloat64();
 
     }
+
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
+    m_removeZMPOffset   = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
 
     m_goalScaling.resize(3);
     if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
@@ -885,6 +888,7 @@ bool WalkingModule::updateModule()
         }
 
         // set feedback and the desired signal
+
         m_walkingZMPController->setFeedback(measuredZMP, m_FKSolver->getCoMPosition());
         m_walkingZMPController->setReferenceSignal(desiredZMP, m_stableDCMModel->getCoMPosition(),
                                                    m_stableDCMModel->getCoMVelocity());
@@ -929,14 +933,9 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate desired neck transformation
-        double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
-        double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
+        iDynTree::Rotation modifiedInertial;
+        iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
 
-        double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
-                                    std::cos(yawLeft) + std::cos(yawRight));
-        iDynTree::Rotation yawRotation, modifiedInertial;
-
-        yawRotation = iDynTree::Rotation::RotZ(meanYaw);
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
@@ -1204,13 +1203,25 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
         return false;
     }
 
+    // rotate the resulting zmp and offset
+    iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
+
+    m_zmpOffset = yawRotation * m_zmpOffsetLocal;
+
     zmpLeft = m_FKSolver->getLeftFootToWorldTransform() * zmpLeft;
     zmpRight = m_FKSolver->getRightFootToWorldTransform() * zmpRight;
 
+
     // the global zmp is given by a weighted average
-    iDynTree::toEigen(zmpWorld) = ((leftWrench.getLinearVec3()(2) * zmpLeftDefined) / totalZ)
-        * iDynTree::toEigen(zmpLeft) +
+    iDynTree::toEigen(zmpWorld) =
+        ((leftWrench.getLinearVec3()(2) * zmpLeftDefined) / totalZ) * iDynTree::toEigen(zmpLeft) +
         ((rightWrench.getLinearVec3()(2) * zmpRightDefined)/totalZ) * iDynTree::toEigen(zmpRight);
+
+    // remove rotated offset
+    if (m_removeZMPOffset)
+    {
+        iDynTree::toEigen(zmpWorld) += iDynTree::toEigen(m_zmpOffset);
+    }
 
     zmp(0) = zmpWorld(0);
     zmp(1) = zmpWorld(1);
@@ -1250,6 +1261,16 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     return true;
+}
+
+iDynTree::Rotation WalkingModule::computeAverageYawRotationFromPlannedFeet() const
+{
+    const double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
+    const double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
+
+    const double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
+                                      std::cos(yawLeft) + std::cos(yawRight));
+    return iDynTree::Rotation::RotZ(meanYaw);
 }
 
 bool WalkingModule::prepareRobot(bool onTheFly)
@@ -1325,17 +1346,9 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     if(m_IKSolver->usingAdditionalRotationTarget())
     {
-        // get the yow angle of both feet
-        double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
-        double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
-
-        // evaluate the mean of the angles
-        double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
-                                    std::cos(yawLeft) + std::cos(yawRight));
-        iDynTree::Rotation yawRotation, modifiedInertial;
-
         // it is important to notice that the inertial frames rotate with the robot
-        yawRotation = iDynTree::Rotation::RotZ(meanYaw);
+        iDynTree::Rotation modifiedInertial;
+        iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
 
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
@@ -1609,6 +1622,15 @@ bool WalkingModule::startWalking()
         return false;
     }
 
+    // Adjusting the offset on the ZMP at the begining with respect to CoM in the lateral direction
+    iDynTree::Vector2 measuredZMP;
+    iDynTree::Vector3 measuredCoM = m_FKSolver->getCoMPosition();
+    if(!evaluateZMP(measuredZMP))
+    {
+        yError() << "[WalkingModule::startWalking] Unable to evaluate the ZMP.";
+        return false;
+    }
+
     if (m_useBLFIK)
     {
         if (!m_BLFIKSolver->setRegularizationJointSetPoint(m_robotControlHelper->getJointPosition()))
@@ -1617,6 +1639,17 @@ bool WalkingModule::startWalking()
             return false;
         }
     }
+
+    // we evaluate the offset between the CoM and the ZMP. This quantities is used only if
+    // remove_zmp_offset is set to true.
+    m_zmpOffset.zero();
+    m_zmpOffsetLocal.zero();
+    if (m_removeZMPOffset)
+    {
+        m_zmpOffset(0) = measuredCoM(0) - measuredZMP(0);
+        m_zmpOffset(1) = measuredCoM(1) - measuredZMP(1);
+    }
+    m_zmpOffsetLocal = m_zmpOffset;
 
     // before running the controller the retargeting client goes in approaching phase this
     // guarantees a smooth transition
