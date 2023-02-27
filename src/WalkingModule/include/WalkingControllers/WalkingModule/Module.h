@@ -11,6 +11,7 @@
 
 // std
 #include <WalkingControllers/WholeBodyControllers/BLFIK.h>
+#include <iDynTree/Core/Rotation.h>
 #include <memory>
 #include <deque>
 
@@ -209,6 +210,12 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool evaluateZMP(iDynTree::Vector2& zmp);
+
+        /**
+         * Given the two planned feet, it computes the average yaw rotation
+         * @return the average Yaw rotation
+         */
+        iDynTree::Rotation computeAverageYawRotationFromPlannedFeet() const;
 
         /**
          * Generate the first trajectory.

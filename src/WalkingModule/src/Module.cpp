@@ -933,14 +933,9 @@ bool WalkingModule::updateModule()
         }
 
         // evaluate desired neck transformation
-        double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
-        double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
+        iDynTree::Rotation modifiedInertial;
+        iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
 
-        double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
-                                    std::cos(yawLeft) + std::cos(yawRight));
-        iDynTree::Rotation yawRotation, modifiedInertial;
-
-        yawRotation = iDynTree::Rotation::RotZ(meanYaw);
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
@@ -1209,13 +1204,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     // rotate the resulting zmp and offset
-    double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
-    double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
-
-    // evaluate the mean of the angles
-    double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
-                                std::cos(yawLeft) + std::cos(yawRight));
-    iDynTree::Rotation yawRotation = iDynTree::Rotation::RotZ(meanYaw);
+    iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
 
     m_zmpOffset = yawRotation * m_zmpOffsetLocal;
 
@@ -1272,6 +1261,16 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     return true;
+}
+
+iDynTree::Rotation WalkingModule::computeAverageYawRotationFromPlannedFeet() const
+{
+    const double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
+    const double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
+
+    const double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
+                                      std::cos(yawLeft) + std::cos(yawRight));
+    return iDynTree::Rotation::RotZ(meanYaw);
 }
 
 bool WalkingModule::prepareRobot(bool onTheFly)
@@ -1347,17 +1346,9 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 
     if(m_IKSolver->usingAdditionalRotationTarget())
     {
-        // get the yow angle of both feet
-        double yawLeft = m_leftTrajectory.front().getRotation().asRPY()(2);
-        double yawRight = m_rightTrajectory.front().getRotation().asRPY()(2);
-
-        // evaluate the mean of the angles
-        double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
-                                    std::cos(yawLeft) + std::cos(yawRight));
-        iDynTree::Rotation yawRotation, modifiedInertial;
-
         // it is important to notice that the inertial frames rotate with the robot
-        yawRotation = iDynTree::Rotation::RotZ(meanYaw);
+        iDynTree::Rotation modifiedInertial;
+        iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
 
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
