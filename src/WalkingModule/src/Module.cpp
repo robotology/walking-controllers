@@ -1656,6 +1656,8 @@ bool WalkingModule::startWalking()
     m_retargetingClient->setPhase(RetargetingClient::Phase::Approaching);
     m_robotState = WalkingFSM::Walking;
 
+    yInfo() << "[WalkingModule::startWalking] Started!";
+
     return true;
 }
 
