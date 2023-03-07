@@ -1,7 +1,47 @@
 # Changelog
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.7.0] - 2023-03-07
+### Added
+- Now the IK problem can be solved by `BipedaLocomotion::IK::QPInverseKinematics` (https://github.com/robotology/walking-controllers/pull/118)
+- Add the configuration files to run the walking controller on `ergoCubGazeboV1` (https://github.com/robotology/walking-controllers/pull/139)
+- Add the possibility to remove the ZMP-CoM offset when the controller is started (https://github.com/robotology/walking-controllers/pull/137)
+- Add the configuration files to run the walking controller (with and without reargeting) on `ergoCubSN000` (https://github.com/robotology/walking-controllers/pull/137 , https://github.com/robotology/walking-controllers/pull/140)
+
+### Changed
+- Add the possibility to control the root height instead of the CoM height (https://github.com/robotology/walking-controllers/pull/118)
+- [iCubGenova09] Tune the gains (https://github.com/robotology/walking-controllers/pull/118)
+- Print the timers status every 10 seconds (https://github.com/robotology/walking-controllers/pull/123)
+- Modify the interface with the planner to allow the walking to run at 500Hz (https://github.com/robotology/walking-controllers/pull/127, https://github.com/robotology/walking-controllers/pull/136)
+- Update vendored `AddUninstallTarget.cmake` to `YCM v0.15.1` version (https://github.com/robotology/walking-controllers/pull/141)
+
+### Fixed
+- Fix `WalkingModule::setPlannerInput()` when a new input is set from the joypad (https://github.com/robotology/walking-controllers/pull/129)
+
+## [0.6.1] - 2022-09-14
+### Added
+- Enable the lateral walking (https://github.com/robotology/walking-controllers/pull/119)
+
+### Changed
+- Remove the `Loggermodule` and the `LoggerClient` if favor of `YarpRobotLoggerDevice` (https://github.com/robotology/walking-controllers/pull/120)
+- Make all the dependencies required (https://github.com/robotology/walking-controllers/pull/120)
+
+### Fixed
+-  Fixes a compilation problem on Windows relative to the use of `std::min` (https://github.com/robotology/walking-controllers/pull/121)
+
+## [0.5.2] - 2022-09-05
+### Added
+- Enable the minimum jerk trajectory for the first DS phase (https://github.com/robotology/walking-controllers/pull/117)
+
+### Changed
+- [iCubGenova09] Update the configuration files (https://github.com/robotology/walking-controllers/pull/114)
+- Ask for `UnicyclePlanner v0.4.3` (https://github.com/robotology/walking-controllers/pull/117)
+
+## [0.5.1] - 2022-05-01
+### Fixed
+- [iCubGenova09] Fix the name of the torso frame in the forwardKinematics.ini
+- Remove logger from iCubGazeboV3 configuration (https://github.com/robotology/walking-controllers/pull/105)
+- Fix yarp deprecation of methods like asDouble (https://github.com/robotology/walking-controllers/pull/112)
 
 ## [0.5.0] - 2022-02-01
 ### Added
@@ -133,7 +173,10 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
-[Unreleased]: https://github.com/robotology/walking-controllers/compare/v0.5.0...devel
+[0.7.0]: https://github.com/robotology/walking-controllers/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/robotology/walking-controllers/compare/v0.5.2..v0.6.1
+[0.5.2]: https://github.com/robotology/walking-controllers/compare/v0.5.1..v0.5.2
+[0.5.1]: https://github.com/robotology/walking-controllers/compare/v0.5.0..v0.5.1
 [0.5.0]: https://github.com/robotology/walking-controllers/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/robotology/walking-controllers/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/robotology/walking-controllers/compare/v0.3.3...v0.4.0
