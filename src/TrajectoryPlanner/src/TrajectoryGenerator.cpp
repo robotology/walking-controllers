@@ -110,6 +110,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double slowWhenBackwardFactor = config.check("slowWhenBackwardFactor", yarp::os::Value(1.0)).asFloat64();
     double slowWhenSidewaysFactor = config.check("slowWhenSidewaysFactor", yarp::os::Value(1.0)).asFloat64();
     double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asFloat64();
+    double maxStepLengthBackwardMultiplier = config.check("maxLengthBackwardFactor", yarp::os::Value(1.0)).asFloat64();
     double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asFloat64();
     double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asFloat64();
     double maxAngleVariation = iDynTree::deg2rad(config.check("maxAngleVariation",
@@ -161,7 +162,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
                                                               m_referencePointDistance(1));
     ok = ok && unicyclePlanner->setPersonFollowingControllerGain(unicycleGain);
     ok = ok && unicyclePlanner->setMaximumIntegratorStepSize(m_dT);
-    ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength);
+    ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength, maxStepLengthBackwardMultiplier);
     ok = ok && unicyclePlanner->setWidthSetting(minWidth, m_nominalWidth);
     ok = ok && unicyclePlanner->setMaxAngleVariation(maxAngleVariation);
     ok = ok && unicyclePlanner->setCostWeights(positionWeight, timeWeight);
