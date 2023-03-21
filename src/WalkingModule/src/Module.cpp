@@ -409,7 +409,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
         return false;
     }
-    
 
     // initialize the logger
     if(m_dumpData)
@@ -463,6 +462,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+
+    // open ports for navigation
     if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
     {
         yError() << "[WalkingModule::configure] Could not open feet_positions port";
@@ -472,7 +473,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
        yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
     }
     
-    // start the thread
+    // start the threads used for computing navigation needed infos
     m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
     m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
     
@@ -779,7 +780,6 @@ bool WalkingModule::updateModule()
         {
             m_debugMergeTime = yarp::os::Time::now();
             //applyGoalScaling(*desiredUnicyclePosition);   //removed scaling since we have a variable number of poses
-            //std::cout << "Setting planner input" << std::endl;
             if(!setPlannerInput(*desiredUnicyclePosition))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
@@ -791,7 +791,6 @@ bool WalkingModule::updateModule()
         // the time to attach new one
         if(m_newTrajectoryRequired)
         {
-            //std::cout << "newTrajectoryRequired" << std::endl;
             // when we are near to the merge point the new trajectory is evaluated
             if(m_newTrajectoryMergeCounter == m_plannerAdvanceTimeSteps)
             {
@@ -804,7 +803,6 @@ bool WalkingModule::updateModule()
                     m_leftTrajectory[m_newTrajectoryMergeCounter];
 
                 // ask for a new trajectory
-                //std::cout << "askNewTrajectories" << std::endl;
                 if(!askNewTrajectories(initTimeTrajectory, !m_isLeftFixedFrame.front(),
                                        measuredTransform, m_newTrajectoryMergeCounter,
                                        m_plannerInput))
@@ -823,7 +821,7 @@ bool WalkingModule::updateModule()
                     return false;
                 }
                 m_debugMergeTime = yarp::os::Time::now() - m_debugMergeTime;
-                std::cout << "Elapsed time: " << m_debugMergeTime << std::endl;
+                yDebug() << "Elapsed time: " << m_debugMergeTime;
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
                 m_newTrajectoryMerged = true;
@@ -1089,7 +1087,6 @@ bool WalkingModule::updateModule()
 
                     if (leftFootprints.size()>0 && rightFootprints.size()>0)
                     {
-                        //std::cout << "left footprints number: " << leftFootprints.size() << " Right footprints number: " << rightFootprints.size() << std::endl;
                         auto& feetData = m_feetPort.prepare();
                         feetData.clear();
                         auto& rightFeet = feetData.addList();
@@ -1228,9 +1225,8 @@ bool WalkingModule::updateModule()
         double yawLeftp, yawRightp, meanYawp;
         yarp::sig::Vector& planned_poses = m_plannedCoMPositionPort.prepare();
         planned_poses.clear();
-        //planned_poses.push_back(m_DCMPositionDesired.size()); //useless to start with the number of elements
 
-        bool saveCoM = false;
+        bool saveCoM = false;   //flag to whether save the CoM trajectory only once each double support
         if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //consistency check
         {
             //evaluate the state of the contacts
@@ -1251,7 +1247,6 @@ bool WalkingModule::updateModule()
                 if (m_newTrajectoryMerged)
                 {
                     saveCoM = true;
-                    std::cout << "New Trajectory Merged!" << std::endl;
                 }
             }
             else
@@ -1259,7 +1254,6 @@ bool WalkingModule::updateModule()
                 saveCoM = false;
                 if (m_wasInDoubleSupport)
                 {
-                    std::cout << "Resetting m_wasInDoubleSupport" << std::endl;
                     m_wasInDoubleSupport = false;
                 }
             }
@@ -1267,7 +1261,6 @@ bool WalkingModule::updateModule()
         
         if (saveCoM)
         {
-            std::cout << "Double Support! : Saving CoM trajectory" << std::endl;
             m_desiredCoM_Trajectory.clear();
         }
         for (auto i = 0; i < m_DCMPositionDesired.size(); i++)
@@ -1369,7 +1362,7 @@ bool WalkingModule::evaluateZMP(iDynTree::Vector2& zmp)
     }
 
     double totalZ = rightWrench.getLinearVec3()(2) * zmpRightDefined + leftWrench.getLinearVec3()(2) * zmpLeftDefined;
-    if((zmpLeftDefined + zmpRightDefined) < 0.1)    //check for contacts on the feet
+    if((zmpLeftDefined + zmpRightDefined) < 0.5)
     {
         yError() << "[evaluateZMP] None of the two contacts is valid.";
         return false;
@@ -1459,7 +1452,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         // evaluate the left to right transformation, the inertial frame is on the left foot
         iDynTree::Transform leftToRightTransform = m_FKSolver->getRightFootToWorldTransform();
 
-        std::cout << "generateFirstTrajectories(leftToRightTransform)" << std::endl;
         // evaluate the first trajectory. The robot does not move!
         if(!generateFirstTrajectories(leftToRightTransform))
         {
@@ -1469,7 +1461,6 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
     else
     {
-        std::cout << "generateFirstTrajectories()" << std::endl;
         // evaluate the first trajectory. The robot does not move! So the first trajectory
         if(!generateFirstTrajectories())
         {
@@ -1638,7 +1629,6 @@ bool WalkingModule::askNewTrajectories(const double& initTime, const bool& isLef
         }
     }
 
-    //std::cout << "m_trajectoryGenerator->updateTrajectories" << std::endl;
     if(!m_trajectoryGenerator->updateTrajectories(initTime, m_DCMPositionDesired[mergePoint],
                                                   m_DCMVelocityDesired[mergePoint], isLeftSwinging,
                                                   measuredTransform, plannerDesiredInput))
@@ -1860,7 +1850,7 @@ bool WalkingModule::setGoal(const yarp::sig::Vector &plannerInput)
     if(m_robotState != WalkingFSM::Walking)
         return false;
 
-    std::cout << "[WalkingModule::setGoal] Received plannerInput of size: " << plannerInput.size() << std::endl;
+    yInfo() << "[WalkingModule::setGoal] Received plannerInput of size: " << plannerInput.size();
 
     return setPlannerInput(plannerInput);
 }
@@ -1941,8 +1931,6 @@ void WalkingModule::computeVirtualUnicycleThread()
         //Data conversion and port writing
         if (inContact)
         {
-            //std::cout << "m_leftInContact.at(0): " << m_leftInContact.at(0) << " m_rightInContact.at(0): " << m_rightInContact.at(0) << std::endl;
-            
             if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
             {
                 //send data
@@ -1986,9 +1974,8 @@ void WalkingModule::computeVirtualUnicycleThread()
 
 void WalkingModule::computeNavigationTrigger()
 {
-    bool use_clock = true;  //flag to whether use a straight timer for sending the navigation replanning trigger or searching the CoM position on its planned trajectory
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
-    std::cout << "Starting computeNavigationTrigger" << std::endl;
+    yInfo() << "Starting computeNavigationTrigger";
     yarp::os::NetworkClock myClock;
     myClock.open("/clock", "/navigationTriggerClock");
     int loopRate = 100;
@@ -2001,14 +1988,7 @@ void WalkingModule::computeNavigationTrigger()
             std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
             continue;
         }
-        
-        //******************************SEGFAULT*********************************
-        //iDynTree::Position measuredCoM = m_FKSolver->getCoMPosition();
-        //iDynTree::Vector2 measuredCoM;
-        //measuredCoM(0) = m_FKSolver->getCoMPosition()(0);
-        //measuredCoM(1) = m_FKSolver->getCoMPosition()(1);
-        //***********************************************************************
-        
+
         //double support check
         if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
         {
@@ -2029,10 +2009,9 @@ void WalkingModule::computeNavigationTrigger()
             {
                 if (! exitDoubleSupport)
                 {
-                    std::cout << "Duration of the double support: " << myClock.now() - time << std::endl;
                     trigger = true; //in this way we have only one trigger each exit of double support
-                    std::vector<bool> left, right;
-                    // /m_trajectoryGenerator->getFeetStandingPeriods(left, right);
+                    //Debug stuff
+                    std::cout << "Duration of the double support: " << myClock.now() - time << std::endl;
                     if (m_leftInContact[0])
                     {
                         std::cout << "Left in contact -> Swinging Right" << std::endl;
@@ -2045,50 +2024,19 @@ void WalkingModule::computeNavigationTrigger()
                 exitDoubleSupport = true;
             }
         }
-        //navigation trigger mode trigger mode
-        if (use_clock)
+
+        //send the replanning trigger after a certain amount of seconds
+        if (trigger)
         {
-            //send the replanning trigger after a certain amount of seconds
-            if (trigger)
-            {
-                trigger = false;
-                //wait -> could make it dependant by the current swing step duration
-                myClock.delay(0.9);
-                std::cout << "Trigger Navigation" << std::endl;
-                auto& b = m_replanningTriggerPort.prepare();
-                b.clear();
-                b.add((yarp::os::Value)true);   //send the planning trigger
-                m_replanningTriggerPort.write();
-            }   
-        }
-        else
-        {
-            //get current CoM in odom frame
-            iDynTree::Vector2 plannedCoM = m_stableDCMModel->getCoMPosition(); //actual planned CoM in the robot frame for the next dT (istant) of time
-            //search the CoM on the trajectory
-            int index = -1;
-            double min = 100;
-            for (size_t i = 0; i < m_desiredCoM_Trajectory.size(); ++i)
-            {
-                double distance = std::sqrt(std::pow(m_desiredCoM_Trajectory[i](0) - plannedCoM(0), 2) + 
-                                            std::pow(m_desiredCoM_Trajectory[i](1) - plannedCoM(1), 2));
-                if (distance < min)     //look for the min -> tracking error between 5 - 7 cm
-                {
-                    min = distance;
-                    index = i;
-                }
-            }
-            //std::cout << "Found closest CoM position at index: " << index << " with distance: " << min << std::endl;
-            if (index > 70 && enteredDoubleSupport)
-            {
-                enteredDoubleSupport = false;   //I have already elaborated the data
-                std::cout << "Trigger Navigation" << std::endl;
-                auto& b = m_replanningTriggerPort.prepare();
-                b.clear();
-                b.add((yarp::os::Value)true);   //send the planning trigger
-                m_replanningTriggerPort.write();
-            }
-        }
+            trigger = false;
+            //wait -> could make it dependant by the current swing step duration
+            myClock.delay(0.9); //TODO use config parameters also for this
+            yDebug() << "Trigger Navigation";
+            auto& b = m_replanningTriggerPort.prepare();
+            b.clear();
+            b.add((yarp::os::Value)true);   //send the planning trigger
+            m_replanningTriggerPort.write();
+        }   
         
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
     }
