@@ -1899,6 +1899,7 @@ bool WalkingModule::stopWalking()
 
 void WalkingModule::computeVirtualUnicycleThread()
 {
+    yInfo() << "[WalkingModule::computeVirtualUnicycleThread] Starting Thread";
     int loopRate = 100;
     bool inContact = false;
     while (true)
@@ -1913,7 +1914,6 @@ void WalkingModule::computeVirtualUnicycleThread()
             if (m_leftInContact.at(0))
             {
                 stanceFoot = "left";
-                root_linkTransform = 
                 footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
             }
             else
@@ -1981,7 +1981,7 @@ void WalkingModule::computeVirtualUnicycleThread()
             else
             {
                 yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
-            }            
+            }
         }
     }
 }
@@ -1989,13 +1989,13 @@ void WalkingModule::computeVirtualUnicycleThread()
 void WalkingModule::computeNavigationTrigger()
 {
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
-    yInfo() << "Starting computeNavigationTrigger";
+    yInfo() << "[WalkingModule::computeNavigationTrigger] Starting Thread";
     yarp::os::NetworkClock myClock;
     myClock.open("/clock", "/navigationTriggerClock");
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
-    double time = 0;
     while (true)
     {
+        // Block the thread until the robot is in the walking state
         if (m_robotState != WalkingFSM::Walking)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
@@ -2009,11 +2009,6 @@ void WalkingModule::computeNavigationTrigger()
             {
                 if (exitDoubleSupport)
                 {
-                    if (time != 0)
-                    {
-                        std::cout << "Periodicity of entering double support: " << myClock.now() - time << std::endl;
-                    }
-                    time = myClock.now();
                     enteredDoubleSupport = true;
                     exitDoubleSupport = false;
                 }
@@ -2023,16 +2018,6 @@ void WalkingModule::computeNavigationTrigger()
                 if (! exitDoubleSupport)
                 {
                     trigger = true; //in this way we have only one trigger each exit of double support
-                    //Debug stuff
-                    std::cout << "Duration of the double support: " << myClock.now() - time << std::endl;
-                    if (m_leftInContact[0])
-                    {
-                        std::cout << "Left in contact -> Swinging Right" << std::endl;
-                    }
-                    if (m_rightInContact[0])
-                    {
-                        std::cout << "Right in contact -> Swinging Left" << std::endl;
-                    }
                 }
                 exitDoubleSupport = true;
             }
@@ -2042,9 +2027,9 @@ void WalkingModule::computeNavigationTrigger()
         if (trigger)
         {
             trigger = false;
-            //wait -> could make it dependant by the current swing step duration
+            //waiting -> could make it dependant by the current swing step duration
             myClock.delay(m_navigationReplanningDelay);
-            yDebug() << "Trigger Navigation";
+            yDebug() << "[WalkingModule::computeNavigationTrigger] Triggering navigation replanning";
             auto& b = m_replanningTriggerPort.prepare();
             b.clear();
             b.add((yarp::os::Value)true);   //send the planning trigger
