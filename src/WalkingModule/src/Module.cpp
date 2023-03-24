@@ -1897,14 +1897,16 @@ bool WalkingModule::stopWalking()
     return true;
 }
 
+// This thread publishes the internal informations of the virtual unicycle extracted from the feet and the CoM speed
+// It's the internal odometry
 void WalkingModule::computeVirtualUnicycleThread()
 {
     yInfo() << "[WalkingModule::computeVirtualUnicycleThread] Starting Thread";
-    int loopRate = 100;
     bool inContact = false;
     while (true)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
         std::string stanceFoot;
         iDynTree::Transform footTransformToWorld, root_linkTransform;
@@ -1986,6 +1988,8 @@ void WalkingModule::computeVirtualUnicycleThread()
     }
 }
 
+// This thread synchronizes the walking-controller with the navigation stack.
+// Writes on a port a boolean value when to replan the path
 void WalkingModule::computeNavigationTrigger()
 {
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
