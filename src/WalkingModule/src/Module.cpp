@@ -1905,6 +1905,11 @@ void WalkingModule::computeVirtualUnicycleThread()
     bool inContact = false;
     while (true)
     {
+        if (m_robotState != WalkingFSM::Walking)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+            continue;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
 
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
