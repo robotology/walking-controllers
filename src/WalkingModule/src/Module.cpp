@@ -256,6 +256,20 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
+    m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
+    m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
+    // format check
+    if (m_navigationTriggerLoopRate<=0)
+    {
+        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
+        return false;
+    }
+    if (m_navigationReplanningDelay<0)
+    {
+        yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
+        return false;
+    }
+
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
@@ -1978,14 +1992,13 @@ void WalkingModule::computeNavigationTrigger()
     yInfo() << "Starting computeNavigationTrigger";
     yarp::os::NetworkClock myClock;
     myClock.open("/clock", "/navigationTriggerClock");
-    int loopRate = 100;
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     double time = 0;
     while (true)
     {
         if (m_robotState != WalkingFSM::Walking)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
             continue;
         }
 
@@ -2030,7 +2043,7 @@ void WalkingModule::computeNavigationTrigger()
         {
             trigger = false;
             //wait -> could make it dependant by the current swing step duration
-            myClock.delay(0.9); //TODO use config parameters also for this
+            myClock.delay(m_navigationReplanningDelay);
             yDebug() << "Trigger Navigation";
             auto& b = m_replanningTriggerPort.prepare();
             b.clear();
@@ -2038,6 +2051,6 @@ void WalkingModule::computeNavigationTrigger()
             m_replanningTriggerPort.write();
         }   
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000/loopRate));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
 }
