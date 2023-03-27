@@ -563,7 +563,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
     
-    //CANGED THIS
+    // 
     if (!(m_unicycleController == UnicycleController::PERSON_FOLLOWING && m_navigationConfig == NavigationSetup::NavigationMode))
     {
         m_personFollowingDesiredPoint.resize(2);   //resize the dynamic size
@@ -737,9 +737,6 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                         tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
                         m_2Dpath.push_back(tmp_pose);
                     } 
-                    //Old code 
-                    //m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
-                    //m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
                 }
             }
             else if (m_unicycleController == UnicycleController::DIRECT)    //Use path of 3D poses (x, y, theta)
@@ -847,50 +844,6 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
         }
         
     }
-    return true;
-}
-
-bool TrajectoryGenerator::addWaypointsOdom(const double initTime, const double endTime)
-{   
-    iDynTree::Vector2 approxSpeed; //speed taken from the saturation values of the linear velocity of the unicycle controller, multiplied by a reducing factor
-    approxSpeed(0) = std::sqrt(std::pow(m_maxStepLength, 2) - std::pow(m_nominalWidth, 2)) / m_minStepDuration * 0.9 * 0.8; //TODO pass 0.8 via config file
-    approxSpeed(1) = .0;
-    auto planner = m_trajectoryGenerator.unicyclePlanner();
-
-    //check the number of poses
-    if (m_2Dpath.size() < 1)
-    {
-        //error
-        return false;
-    }
-    else
-    {
-        // clear current trajectory
-        planner->clearPersonFollowingDesiredTrajectory();
-        double elapsedTime = initTime;
-        size_t i = (m_2Dpath.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
-
-        for (size_t i = 1; i < m_2Dpath.size(); ++i)
-        {
-            // path is a vector of (x, y, theta) pose vectors in the robot frame
-            double relativePoseDistance = sqrt(pow(m_2Dpath.at(i)[0] - m_2Dpath.at(i-1)[0], 2) + 
-                                   pow(m_2Dpath.at(i)[1] - m_2Dpath.at(i-1)[1], 2));
-            double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
-            elapsedTime += eta;
-            if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
-            {
-                break;
-            }
-            // I need to prune the path in such a way to remove the poses that are behind the unicycle
-            iDynTree::Vector2 relativeFramePose;     //pose to be added to the planner
-            // transform in the offsetted frame in front of the robot i.e. m_referencePointDistance
-            //iDynTree::toEigen(absoluteFramePose) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
-            //                                                                    iDynTree::toEigen(m_path.at(i)));
-            planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, m_2Dpath.at(i), approxSpeed);
-        }
-        
-    }
-
     return true;
 }
 

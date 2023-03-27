@@ -106,14 +106,6 @@ namespace WalkingControllers
          */
         bool addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime);
 
-        /**
-         * Add each pose present in the path as a waypoint to the planner in the odom frame
-         * @param initTime initial time of the first pose of the path
-         * @param endTime equal to initialTime plus the planner horizon
-         * @return true/false in case of success/failure.
-         */
-        bool addWaypointsOdom(const double initTime, const double endTime);
-
     public:
 
         /**
