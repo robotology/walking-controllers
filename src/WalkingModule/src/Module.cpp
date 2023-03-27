@@ -1095,37 +1095,34 @@ bool WalkingModule::updateModule()
         }
 
         //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-                std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
-                if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+        std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
+        if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+        {
+            if (leftFootprints.size()>0 && rightFootprints.size()>0)
+            {
+                auto& feetData = m_feetPort.prepare();
+                feetData.clear();
+                auto& rightFeet = feetData.addList();
+                auto& leftFeet = feetData.addList();
+                //left foot
+                for (size_t i = 0; i < leftFootprints.size(); ++i)
                 {
-
-                    if (leftFootprints.size()>0 && rightFootprints.size()>0)
-                    {
-                        auto& feetData = m_feetPort.prepare();
-                        feetData.clear();
-                        auto& rightFeet = feetData.addList();
-                        auto& leftFeet = feetData.addList();
-                        //left foot
-                        for (size_t i = 0; i < leftFootprints.size(); ++i)
-                        {
-                            auto& pose = leftFeet.addList();
-                            pose.addFloat64(leftFootprints[i](0));   //x
-                            pose.addFloat64(leftFootprints[i](1));   //y
-                            pose.addFloat64(leftFootprints[i](2));   //yaw
-                        }
-
-                        //right foot
-                        for (size_t j = 0; j < rightFootprints.size(); ++j)
-                        {
-                            auto& pose = rightFeet.addList();
-                            pose.addFloat64(rightFootprints[j](0));   //x
-                            pose.addFloat64(rightFootprints[j](1));   //y
-                            pose.addFloat64(rightFootprints[j](2));   //yaw
-                        }
-
-                        m_feetPort.write();
-                    }
+                    auto& pose = leftFeet.addList();
+                    pose.addFloat64(leftFootprints[i](0));   //x
+                    pose.addFloat64(leftFootprints[i](1));   //y
+                    pose.addFloat64(leftFootprints[i](2));   //yaw
                 }
+                //right foot
+                for (size_t j = 0; j < rightFootprints.size(); ++j)
+                {
+                    auto& pose = rightFeet.addList();
+                    pose.addFloat64(rightFootprints[j](0));   //x
+                    pose.addFloat64(rightFootprints[j](1));   //y
+                    pose.addFloat64(rightFootprints[j](2));   //yaw
+                }
+                m_feetPort.write();
+            }
+        }
         
         // send data to the logger
         if(m_dumpData)
@@ -1910,7 +1907,6 @@ void WalkingModule::computeVirtualUnicycleThread()
             std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
             continue;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
 
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
         std::string stanceFoot;
@@ -1990,6 +1986,7 @@ void WalkingModule::computeVirtualUnicycleThread()
                 yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
             }
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
 }
 

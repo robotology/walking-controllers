@@ -563,8 +563,8 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
     
-    // 
-    if (!(m_unicycleController == UnicycleController::PERSON_FOLLOWING && m_navigationConfig == NavigationSetup::NavigationMode))
+    // stop the robot only if I am in person following
+    if (!(m_unicycleController == UnicycleController::PERSON_FOLLOWING))
     {
         m_personFollowingDesiredPoint.resize(2);   //resize the dynamic size
         // at the beginning iCub has to stop
