@@ -486,8 +486,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     {
        yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
     }
-    
+
     // start the threads used for computing navigation needed infos
+    m_runThreads = true;
     m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
     m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
     
@@ -518,6 +519,22 @@ bool WalkingModule::close()
 {
     if(m_dumpData)
         m_loggerPort.close();
+    
+    //Close parallel threads
+    m_runThreads = false;
+    yInfo() << "Closing m_virtualUnicyclePubliserThread";
+    if(m_virtualUnicyclePubliserThread.joinable())
+    {
+        m_virtualUnicyclePubliserThread.join();
+        m_virtualUnicyclePubliserThread = std::thread();
+    }
+
+    yInfo() << "Closing m_navigationTriggerThread";
+    if(m_navigationTriggerThread.joinable())
+    {
+        m_navigationTriggerThread.join();
+        m_navigationTriggerThread = std::thread();
+    }
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -548,18 +565,6 @@ bool WalkingModule::close()
     m_QPIKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
-
-    if(m_virtualUnicyclePubliserThread.joinable())
-    {
-        m_virtualUnicyclePubliserThread.join();
-        m_virtualUnicyclePubliserThread = std::thread();
-    }
-
-    if(m_navigationTriggerThread.joinable())
-    {
-        m_navigationTriggerThread.join();
-        m_navigationTriggerThread = std::thread();
-    }
 
     return true;
 }
@@ -1900,7 +1905,7 @@ void WalkingModule::computeVirtualUnicycleThread()
 {
     yInfo() << "[WalkingModule::computeVirtualUnicycleThread] Starting Thread";
     bool inContact = false;
-    while (true)
+    while (m_runThreads)
     {
         if (m_robotState != WalkingFSM::Walking)
         {
@@ -1988,6 +1993,7 @@ void WalkingModule::computeVirtualUnicycleThread()
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
+    yInfo() << "[WalkingModule::computeVirtualUnicycleThread] Terminated thread";
 }
 
 // This thread synchronizes the walking-controller with the navigation stack.
@@ -1999,7 +2005,7 @@ void WalkingModule::computeNavigationTrigger()
     yarp::os::NetworkClock myClock;
     myClock.open("/clock", "/navigationTriggerClock");
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
-    while (true)
+    while (m_runThreads)
     {
         // Block the thread until the robot is in the walking state
         if (m_robotState != WalkingFSM::Walking)
@@ -2044,4 +2050,5 @@ void WalkingModule::computeNavigationTrigger()
         
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
+    yInfo() << "[WalkingModule::computeNavigationTrigger] Terminated thread";
 }
