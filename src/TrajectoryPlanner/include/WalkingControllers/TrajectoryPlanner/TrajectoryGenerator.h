@@ -73,7 +73,7 @@ namespace WalkingControllers
         iDynTree::Transform m_measuredTransformLeft; /**< Measured transformation between the left foot and the world frame. (w_H_lf) */
         iDynTree::Transform m_measuredTransformRight; /**< Measured transformation between the right foot and the world frame. (w_H_rf) */
 
-        iDynTree::VectorDynSize m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
+        iDynTree::Vector2 m_personFollowingDesiredPoint; /**< Desired final position of the x-y projection of the CoM. */
         iDynTree::Vector3 m_desiredDirectControl; /**< Desired control input to send to the Unicycle Planner. */
 
         iDynTree::Vector2 m_DCMBoundaryConditionAtMergePointPosition; /**< DCM position at the merge point. */

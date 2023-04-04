@@ -110,12 +110,17 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double slowWhenBackwardFactor = config.check("slowWhenBackwardFactor", yarp::os::Value(1.0)).asFloat64();
     double slowWhenSidewaysFactor = config.check("slowWhenSidewaysFactor", yarp::os::Value(1.0)).asFloat64();
     double maxStepLength = config.check("maxStepLength", yarp::os::Value(0.05)).asFloat64();
+    double maxStepLengthBackwardMultiplier = config.check("maxLengthBackwardFactor", yarp::os::Value(1.0)).asFloat64();
     double minStepLength = config.check("minStepLength", yarp::os::Value(0.005)).asFloat64();
     double minWidth = config.check("minWidth", yarp::os::Value(0.03)).asFloat64();
     double maxAngleVariation = iDynTree::deg2rad(config.check("maxAngleVariation",
                                                               yarp::os::Value(40.0)).asFloat64());
     double minAngleVariation = iDynTree::deg2rad(config.check("minAngleVariation",
                                                               yarp::os::Value(5.0)).asFloat64());
+    if (minAngleVariation == 0.0)   //configuration warning
+    {
+        yWarning() << "[configurePlanner] Setting minAngleVariation to 0.0 will make the robot jog in place in manual mode.";
+    }
     double maxStepDuration = config.check("maxStepDuration", yarp::os::Value(8.0)).asFloat64();
     double minStepDuration = config.check("minStepDuration", yarp::os::Value(2.9)).asFloat64();
     double stepHeight = config.check("stepHeight", yarp::os::Value(0.005)).asFloat64();
@@ -151,7 +156,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     }
 
     // Navigation or Manual mode of the planner
-    std::string plannerMode = config.check("plannerMode", yarp::os::Value("navigation")).asString();
+    std::string plannerMode = config.check("plannerMode", yarp::os::Value("manual")).asString();
     if (plannerMode == "manual")
     {
         m_navigationConfig = NavigationSetup::ManualMode;
@@ -164,7 +169,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     }
     else
     {
-        yError() << "[configurePlanner] Initialization failed while reading plannerMode param. Cannot use"
+        yError() << "[configurePlanner] Initialization failed while reading plannerMode param. Cannot use "
                  << plannerMode << "as plannerMode. Only manual and navigation are available.";
         return false;
     }
@@ -175,6 +180,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double innerEllipseSemiMajorOffset = ellipseMethodGroup.check("inner_offset_major", yarp::os::Value(0.0)).asFloat64();
     double innerEllipseSemiMinorOffset = ellipseMethodGroup.check("inner_offset_minor", yarp::os::Value(0.0)).asFloat64();
 
+
     // try to configure the planner
     std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
     bool ok = true;
@@ -182,10 +188,12 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
                                                               m_referencePointDistance(1));
     ok = ok && unicyclePlanner->setPersonFollowingControllerGain(unicycleGain);
     ok = ok && unicyclePlanner->setMaximumIntegratorStepSize(m_dT);
-    ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength);
+    ok = ok && unicyclePlanner->setMaxStepLength(maxStepLength, maxStepLengthBackwardMultiplier);
     ok = ok && unicyclePlanner->setWidthSetting(minWidth, m_nominalWidth);
     ok = ok && unicyclePlanner->setMaxAngleVariation(maxAngleVariation);
-
+    ok = ok && unicyclePlanner->setCostWeights(positionWeight, timeWeight);
+    ok = ok && unicyclePlanner->setStepTimings(minStepDuration,
+                                               maxStepDuration, nominalDuration);
     ok = ok && unicyclePlanner->setPlannerPeriod(m_dT);
     ok = ok && unicyclePlanner->setMinimumAngleForNewSteps(minAngleVariation);
     ok = ok && unicyclePlanner->setMinimumStepLength(minStepLength);
@@ -204,8 +212,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     ok = ok && m_trajectoryGenerator.setSwitchOverSwingRatio(switchOverSwingRatio);
     ok = ok && m_trajectoryGenerator.setTerminalHalfSwitchTime(lastStepSwitchTime);
     ok = ok && m_trajectoryGenerator.setPauseConditions(maxStepDuration, nominalDuration);
-
-    ok = ok && unicyclePlanner->setStepTimings(m_minStepDuration, maxStepDuration, nominalDuration);  //added, not present before
 
     m_trajectoryGenerator.setPauseActive(isPauseActive);
 
@@ -265,7 +271,7 @@ void TrajectoryGenerator::computeThread()
 
         bool correctLeft;
 
-        //iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
+        iDynTree::Vector2 desiredPointInRelativeFrame, desiredPointInAbsoluteFrame;
         iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
         iDynTree::Vector3 desiredDirectControl;
         double measuredAngleLeft, measuredAngleRight;
@@ -292,7 +298,7 @@ void TrajectoryGenerator::computeThread()
             endTime = initTime + m_plannerHorizon;
 
             // set desired point
-            //desiredPointInRelativeFrame = m_personFollowingDesiredPoint;
+            desiredPointInRelativeFrame = m_personFollowingDesiredPoint;
 
             desiredDirectControl = m_desiredDirectControl;
 
@@ -324,6 +330,7 @@ void TrajectoryGenerator::computeThread()
                 yInfo() << "[TrajectoryGenerator_Thread] Setting ellipsoid: " << freeSpaceEllipse.printInfo();
             }
         }
+
         iDynTree::Vector2 measuredPosition;
         double measuredAngle;
         measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
@@ -352,7 +359,40 @@ void TrajectoryGenerator::computeThread()
             footPosition = iDynTree::toEigen(measuredPositionRight);
         }
 
-        if (m_navigationConfig == NavigationSetup::NavigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
+        if (m_navigationConfig == NavigationSetup::ManualMode)
+        {
+            double s_theta = std::sin(unicycleAngle);
+            double c_theta = std::cos(unicycleAngle);
+
+            unicycleRotation(0,0) = c_theta;
+            unicycleRotation(0,1) = -s_theta;
+            unicycleRotation(1,0) = s_theta;
+            unicycleRotation(1,1) = c_theta;
+
+            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+
+            // apply the homogeneous transformation w_H_{unicycle}
+            iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
+                                                                             iDynTree::toEigen(desiredPointInRelativeFrame))
+                                                            + unicyclePosition;
+
+            // clear the old trajectory
+            std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
+            unicyclePlanner->clearPersonFollowingDesiredTrajectory();
+
+            // add new point
+            if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, desiredPointInAbsoluteFrame))
+            {
+                // something goes wrong
+                std::lock_guard<std::mutex> guard(m_mutex);
+                m_generatorState = GeneratorState::Configured;
+                yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
+                break;
+            }
+
+            unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
+        }
+        else if (m_navigationConfig == NavigationSetup::NavigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
             double s_theta = std::sin(unicycleAngle);
             double c_theta = std::cos(unicycleAngle);
@@ -429,7 +469,12 @@ void TrajectoryGenerator::computeThread()
                 yErrorThrottle(1.0) << "[TrajectoryGenerator_Thread] Unable to set the navigation path to the planner.";
             }
         }
-        //TODO do computations for manual mode
+        else
+        {
+            yError() << "[TrajectoryGenerator_Thread] Configuration of m_navigationConfig and m_unicycleController not handled!";
+            break;
+        }
+        
 
         if (!m_dcmGenerator->setDCMInitialState(initialState)) {
             // something goes wrong
@@ -508,19 +553,18 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& in
     double endTime = initTime + m_plannerHorizon;
 
     // at the beginning iCub has to stop
-    iDynTree::Vector2 desiredPositionInGlobalFrame; //removed m_personFollowingDesiredPoint and substituted with desiredPositionInGlobalFrame
-    desiredPositionInGlobalFrame(0) = m_referencePointDistance(0) + initialBasePosition(0);
-    desiredPositionInGlobalFrame(1) = m_referencePointDistance(1) + initialBasePosition(1);
+    m_personFollowingDesiredPoint(0) = m_referencePointDistance(0) + initialBasePosition(0);
+    m_personFollowingDesiredPoint(1) = m_referencePointDistance(1) + initialBasePosition(1);
 
     // add the initial point
-    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, desiredPositionInGlobalFrame))
+    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, m_personFollowingDesiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the first reference.";
         return false;
     }
 
     // add the final point
-    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, desiredPositionInGlobalFrame))
+    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, m_personFollowingDesiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
         return false;
@@ -562,15 +606,10 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     // set initial and final times
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
-    
-    // stop the robot only if I am in person following
-    if (!(m_unicycleController == UnicycleController::PERSON_FOLLOWING))
-    {
-        m_personFollowingDesiredPoint.resize(2);   //resize the dynamic size
-        // at the beginning iCub has to stop
-        m_personFollowingDesiredPoint(0) = m_referencePointDistance(0);
-        m_personFollowingDesiredPoint(1) = m_referencePointDistance(1);
-    }
+
+    // at the beginning iCub has to stop
+    m_personFollowingDesiredPoint(0) = m_referencePointDistance(0);
+    m_personFollowingDesiredPoint(1) = m_referencePointDistance(1);
 
     // add the initial point
     if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(initTime, m_referencePointDistance))
@@ -580,7 +619,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
     }
 
     // add the final point
-    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, m_referencePointDistance))   //swapped m_personFollowingDesiredPoint with m_referencePointDistance since it's the same
+    if(!unicyclePlanner->addPersonFollowingDesiredTrajectoryPoint(endTime, m_personFollowingDesiredPoint))
     {
         yError() << "[generateFirstTrajectories] Error while setting the new reference.";
         return false;
