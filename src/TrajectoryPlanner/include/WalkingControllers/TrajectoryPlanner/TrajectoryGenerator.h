@@ -33,11 +33,6 @@ namespace WalkingControllers
     enum class GeneratorState {NotConfigured, Configured, FirstStep, Called, Returned, Closing};
 
 /**
- * Enumerator for tracking the possible states of the navigation setup: manual -> classic original footstep planner for joystick use ; navigation -> path following based
- */
-    //enum class NavigationSetup {ManualMode, NavigationMode, NotConfigured};
-
-/**
  * TrajectoryGenerator class is used to handle the UnicycleTrajectoryGenerator library.
  */
     class TrajectoryGenerator
@@ -87,7 +82,7 @@ namespace WalkingControllers
         std::vector<iDynTree::Vector2> m_transformed2DPath; /**< Path of 2D poses (x, y) in the robot reference frame */
         std::vector<UnicycleState> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
 
-        NavigationSetup m_navigationConfig{NavigationSetup::ManualMode};
+        bool m_navigationMode;  /**< Flag that indicates if the controller is running in navigation mode */
 
         std::mutex m_mutex; /**< Mutex. */
 

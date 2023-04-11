@@ -157,23 +157,22 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
 
     // Navigation or Manual mode of the planner
     std::string plannerMode = config.check("plannerMode", yarp::os::Value("manual")).asString();
-    if (plannerMode == "manual")
+    if (plannerMode == "navigation")
     {
-        m_navigationConfig = NavigationSetup::ManualMode;
-        m_trajectoryGenerator.setPlannerMode(m_navigationConfig);
-    }
-    else if (plannerMode == "navigation")
-    {
-        m_navigationConfig = NavigationSetup::NavigationMode;
-        m_trajectoryGenerator.setPlannerMode(m_navigationConfig);
+        m_navigationMode = true;
     }
     else
     {
+        m_navigationMode = false;
+    }
+    
+    if (!m_trajectoryGenerator.setPlannerMode(plannerMode))
+    {
         yError() << "[configurePlanner] Initialization failed while reading plannerMode param. Cannot use "
-                 << plannerMode << "as plannerMode. Only manual and navigation are available.";
+                 << plannerMode << " as plannerMode. Only manual and navigation are available.";
         return false;
     }
-    yInfo() << "[configurePlanner] Planner running in " << plannerMode << "mode";
+    yInfo() << "[configurePlanner] Planner running in " << plannerMode << " mode";
 
     yarp::os::Bottle ellipseMethodGroup = config.findGroup("ELLIPSE_METHOD_SETTINGS");
     double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();
@@ -359,7 +358,7 @@ void TrajectoryGenerator::computeThread()
             footPosition = iDynTree::toEigen(measuredPositionRight);
         }
 
-        if (m_navigationConfig == NavigationSetup::ManualMode)
+        if (m_navigationMode == false)  //Manual mode
         {
             double s_theta = std::sin(unicycleAngle);
             double c_theta = std::cos(unicycleAngle);
@@ -392,7 +391,7 @@ void TrajectoryGenerator::computeThread()
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
         }
-        else if (m_navigationConfig == NavigationSetup::NavigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
+        else if (m_navigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
             double s_theta = std::sin(unicycleAngle);
             double c_theta = std::cos(unicycleAngle);
@@ -418,7 +417,7 @@ void TrajectoryGenerator::computeThread()
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
         }
-        else if (m_navigationConfig == NavigationSetup::NavigationMode && m_unicycleController == UnicycleController::DIRECT)
+        else if (m_navigationMode && m_unicycleController == UnicycleController::DIRECT)
         {
             //Substute the first path pose to all zeroes:
             UnicycleState zeroPos;  //force the path from starting at 0,0,0 in robot frame
@@ -471,7 +470,7 @@ void TrajectoryGenerator::computeThread()
         }
         else
         {
-            yError() << "[TrajectoryGenerator_Thread] Configuration of m_navigationConfig and m_unicycleController not handled!";
+            yError() << "[TrajectoryGenerator_Thread] Configuration of m_navigationMode and m_unicycleController not handled!";
             break;
         }
         
@@ -710,10 +709,9 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         m_personFollowingDesiredPoint.zero();
         m_desiredDirectControl.zero();
 
-        switch (m_navigationConfig)
+        if (!m_navigationMode)
         {
-        case NavigationSetup::ManualMode:
-
+            //Manual Mode
             if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
             {
                 if (plannerDesiredInput.size() < 2)
@@ -747,10 +745,9 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                     m_desiredDirectControl(2) = plannerDesiredInput(2);
                 }
             }
-            break;
-
-        case NavigationSetup::NavigationMode:
-
+        }
+        else    //Navigation Mode
+        {
             if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)   //Use path of 2D poses (x, y)
             {
                 if (plannerDesiredInput.size() < 2)
@@ -814,11 +811,6 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                 m_desiredDirectControl(1) = 0.0;
                 m_desiredDirectControl(2) = 0.0;
             }
-            break;
-        
-        default:    //NotConfigured -> ERROR
-            yErrorThrottle(1.0) << "[updateTrajectories] The NavigationSetup is NotConfigured: please, update the config file." ;
-            break;
         }
 
         m_initTime = initTime;
