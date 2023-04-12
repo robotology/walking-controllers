@@ -267,7 +267,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
-    trajectoryPlannerOptions.append(ellipseMangerOptions);
+    trajectoryPlannerOptions.append(navigationOptions);
 
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
