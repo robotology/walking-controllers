@@ -141,6 +141,7 @@ namespace WalkingControllers
         yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
+        bool m_newTrajectoryMerged; /**< true if a new trajectory has been just merged. */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
         bool m_useRootLinkForHeight;
@@ -155,6 +156,12 @@ namespace WalkingControllers
         size_t m_feedbackAttempts;
         double m_feedbackAttemptDelay;
 
+        std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
+        bool m_runThreads;
+        yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
+        double m_navigationReplanningDelay;   /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
+        int m_navigationTriggerLoopRate;    /**< Loop rate for the thread computing the navigation trigger*/
+        
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
@@ -276,6 +283,11 @@ namespace WalkingControllers
          * @param plannerInput The raw data read from the goal port.
          */
         void applyGoalScaling(yarp::sig::Vector &plannerInput);
+
+        /**
+         * Parallel thread for publishing the trigger for the navigation's planner.
+         */
+        void computeNavigationTrigger();
 
     public:
 

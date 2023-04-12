@@ -11,6 +11,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <chrono>
 
 // YARP
 #include <yarp/eigen/Eigen.h>
@@ -20,6 +21,8 @@
 #include <yarp/sig/Matrix.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
+#include <yarp/os/Stamp.h>
+#include <yarp/os/NetworkClock.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -264,6 +267,20 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
+    m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
+    m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
+    // format check
+    if (m_navigationTriggerLoopRate<=0)
+    {
+        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
+        return false;
+    }
+    if (m_navigationReplanningDelay<0)
+    {
+        yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
+        return false;
+    }
+
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
@@ -442,6 +459,18 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
+    // open port for navigation trigger
+    std::string replanningTriggerPortPortName = "/" + getName() + "/replanning_trigger:o";
+    if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
+        return false;
+    }
+
+    // start the threads used for computing navigation needed infos
+    m_runThreads = true;
+    m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
+    
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
     return true;
@@ -470,6 +499,14 @@ bool WalkingModule::close()
 {
     if(m_dumpData)
         m_loggerPort.close();
+    //Close parallel threads
+    m_runThreads = false;
+    yInfo() << "Closing m_navigationTriggerThread";
+    if(m_navigationTriggerThread.joinable())
+    {
+        m_navigationTriggerThread.join();
+        m_navigationTriggerThread = std::thread();
+    }
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -480,6 +517,7 @@ bool WalkingModule::close()
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
+    m_replanningTriggerPort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
@@ -770,6 +808,7 @@ bool WalkingModule::updateModule()
                 }
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
+                m_newTrajectoryMerged = true;
             }
 
             m_newTrajectoryMergeCounter--;
@@ -1750,4 +1789,61 @@ bool WalkingModule::stopWalking()
 
     m_robotState = WalkingFSM::Stopped;
     return true;
+}
+
+// This thread synchronizes the walking-controller with the navigation stack.
+// Writes on a port a boolean value when to replan the path
+void WalkingModule::computeNavigationTrigger()
+{
+    bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
+    yInfo() << "[WalkingModule::computeNavigationTrigger] Starting Thread";
+    yarp::os::NetworkClock myClock;
+    myClock.open("/clock", "/navigationTriggerClock");
+    bool enteredDoubleSupport = false, exitDoubleSupport = true;
+    while (m_runThreads)
+    {
+        // Block the thread until the robot is in the walking state
+        if (m_robotState != WalkingFSM::Walking)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+            continue;
+        }
+
+        //double support check
+        if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
+        {
+            if (m_leftInContact[0] && m_rightInContact[0])
+            {
+                if (exitDoubleSupport)
+                {
+                    enteredDoubleSupport = true;
+                    exitDoubleSupport = false;
+                }
+            }
+            else
+            {
+                if (! exitDoubleSupport)
+                {
+                    trigger = true; //in this way we have only one trigger each exit of double support
+                }
+                exitDoubleSupport = true;
+            }
+        }
+
+        //send the replanning trigger after a certain amount of seconds
+        if (trigger)
+        {
+            trigger = false;
+            //waiting -> could make it dependant by the current swing step duration
+            myClock.delay(m_navigationReplanningDelay);
+            yDebug() << "[WalkingModule::computeNavigationTrigger] Triggering navigation replanning";
+            auto& b = m_replanningTriggerPort.prepare();
+            b.clear();
+            b.add((yarp::os::Value)true);   //send the planning trigger
+            m_replanningTriggerPort.write();
+        }   
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+    }
+    yInfo() << "[WalkingModule::computeNavigationTrigger] Terminating thread";
 }
