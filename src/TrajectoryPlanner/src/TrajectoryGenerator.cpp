@@ -853,3 +853,104 @@ bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &
     desiredZMP = m_dcmGenerator->getZMPPosition();
     return true;
 }
+
+//TODO improve conversion
+bool TrajectoryGenerator::getFootprints(std::vector<iDynTree::Vector3>& leftFootprints, std::vector<iDynTree::Vector3>& rightFootprints)
+{
+    auto leftDequeue = m_trajectoryGenerator.getLeftFootPrint()->getSteps();
+    for (size_t i = 0; i < leftDequeue.size(); ++i)
+    {
+        iDynTree::Vector3 pose;
+        pose(0) = leftDequeue.at(i).position(0);
+        pose(1) = leftDequeue.at(i).position(1);
+        pose(2) = leftDequeue.at(i).angle;
+        leftFootprints.push_back(pose);
+    }
+
+    auto rightDeque = m_trajectoryGenerator.getRightFootPrint()->getSteps();
+    for (size_t i = 0; i < rightDeque.size(); ++i)
+    {
+        iDynTree::Vector3 pose;
+        pose(0) = rightDeque.at(i).position(0);
+        pose(1) = rightDeque.at(i).position(1);
+        pose(2) = rightDeque.at(i).angle;
+        rightFootprints.push_back(pose);
+    }
+    
+    return true;
+}
+
+bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, const std::string& stanceFoot)
+{
+    double nominalWidth;
+    bool correctLeft;
+    iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
+    iDynTree::Vector3 desiredDirectControl;
+    double measuredAngleLeft, measuredAngleRight;
+    double leftYawDeltaInRad, rightYawDeltaInRad;
+    // left foot
+    measuredPositionLeft(0) = m_measuredTransformLeft.getPosition()(0);
+    measuredPositionLeft(1) = m_measuredTransformLeft.getPosition()(1);
+    measuredAngleLeft = m_measuredTransformLeft.getRotation().asRPY()(2);
+    leftYawDeltaInRad = m_leftYawDeltaInRad;
+    // right foot
+    measuredPositionRight(0) = m_measuredTransformRight.getPosition()(0);
+    measuredPositionRight(1) = m_measuredTransformRight.getPosition()(1);
+    measuredAngleRight = m_measuredTransformRight.getRotation().asRPY()(2);
+    rightYawDeltaInRad = m_rightYawDeltaInRad;
+    correctLeft = m_correctLeft;
+    m_newFreeSpaceEllipse = false;
+    nominalWidth = m_nominalWidth;
+
+    iDynTree::Vector2 measuredPosition;
+    double measuredAngle;
+    measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
+    measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
+
+    Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition, unicycleOdom;
+    unicyclePositionFromStanceFoot(0) = 0.0;
+    Eigen::Matrix2d unicycleRotation; //rotation world -> unicycle
+    double unicycleAngle, unicycleAngleOdom;
+
+    if (stanceFoot == "left")
+    {
+        unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
+        unicycleAngle = measuredAngleLeft;  //- leftYawDeltaInRad
+        unicycleAngleOdom = measuredAngleLeft - leftYawDeltaInRad;
+        footPosition = iDynTree::toEigen(measuredPositionLeft);
+        //stanceFoot = "left";
+    }
+    else if (stanceFoot == "right")
+    {
+        unicyclePositionFromStanceFoot(1) = nominalWidth/2;
+        unicycleAngle = measuredAngleRight;    //- rightYawDeltaInRad
+        unicycleAngleOdom = measuredAngleRight - rightYawDeltaInRad;
+        footPosition = iDynTree::toEigen(measuredPositionRight);
+        //stanceFoot = "right";
+    }
+    else
+    {
+        return false;
+    }
+
+    //Odom (expressed in odom frame)
+    double s_theta = std::sin(unicycleAngleOdom);
+    double c_theta = std::cos(unicycleAngleOdom);
+    unicycleRotation(0,0) = c_theta;
+    unicycleRotation(0,1) = -s_theta;
+    unicycleRotation(1,0) = s_theta;
+    unicycleRotation(1,1) = c_theta;
+    unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot;   // position in respect to the support foot
+    unicycleOdom = unicyclePosition + footPosition;     //postion in odom frame
+    virtualUnicyclePose(0) = unicycleOdom(0);
+    virtualUnicyclePose(1) = unicycleOdom(1);
+    virtualUnicyclePose(2) = unicycleAngleOdom;
+
+    iDynTree::Vector2 referencePointInAbsoluteFrame;
+    iDynTree::toEigen(referencePointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance)) + unicycleOdom;
+    referenceUnicyclePose(0) = referencePointInAbsoluteFrame(0);
+    referenceUnicyclePose(1) = referencePointInAbsoluteFrame(1);
+    referenceUnicyclePose(2) = unicycleAngleOdom;
+    
+    return true;
+}

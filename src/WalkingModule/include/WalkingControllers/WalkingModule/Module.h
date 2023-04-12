@@ -123,6 +123,7 @@ namespace WalkingControllers
         std::deque<double> m_comHeightVelocity; /**< Deque containing the CoM height velocity. */
         std::deque<size_t> m_mergePoints; /**< Deque containing the time position of the merge points. */
         std::deque<bool> m_isStancePhase; /**< if true the robot is not walking */
+        std::deque<iDynTree::Vector3> m_desiredCoM_Trajectory;  /**< Deque containing the desired CoM trajectory projected on the ground in pose x, y, theta. */
 
         std::deque<bool> m_isLeftFixedFrame; /**< Deque containing when the main frame of the left foot is the fixed frame
                                                 In general a main frame of a foot is the fix frame only during the
@@ -141,6 +142,7 @@ namespace WalkingControllers
         yarp::os::BufferedPort<yarp::sig::Vector> m_desiredUnyciclePositionPort; /**< Desired robot position port. */
 
         bool m_newTrajectoryRequired; /**< if true a new trajectory will be merged soon. (after m_newTrajectoryMergeCounter - 2 cycles). */
+        bool m_newTrajectoryMerged; /**< true if a new trajectory has been just merged. */
         size_t m_newTrajectoryMergeCounter; /**< The new trajectory will be merged after m_newTrajectoryMergeCounter - 2 cycles. */
 
         bool m_useRootLinkForHeight;
@@ -155,10 +157,19 @@ namespace WalkingControllers
         size_t m_feedbackAttempts;
         double m_feedbackAttemptDelay;
 
+        std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
+        bool m_runThreads;
+        yarp::os::BufferedPort<yarp::sig::Vector> m_plannedCoMPositionPort; /**< Desired CoM position port for naviagation purposes. */
+        yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
+        bool m_wasInDoubleSupport;  /**< Flag that symbolizes the previous status of the double support. */
+        int m_navigationTriggerLoopRate;    /**< Loop rate for the thread computing the navigation trigger*/
+        
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
         yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
+        yarp::os::BufferedPort<yarp::os::Bottle> m_feetPort; /**< Feet port vector of feet positions (left, right). */
+        yarp::os::BufferedPort<yarp::os::Bottle> m_unicyclePort; /**< Feet port vector of feet positions (left, right). */
 
         /**
          * Get the robot model from the resource finder and set it.
@@ -276,6 +287,11 @@ namespace WalkingControllers
          * @param plannerInput The raw data read from the goal port.
          */
         void applyGoalScaling(yarp::sig::Vector &plannerInput);
+
+        /**
+         * Parallel thread for publishing the unicycle status.
+         */
+        void computeVirtualUnicycleThread();
 
     public:
 

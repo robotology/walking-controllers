@@ -264,6 +264,23 @@ namespace WalkingControllers
          * Reset the planner
          */
         void reset();
+
+        /**
+         * Get the footprints planned by the unicycle generator
+         * @param leftFootprints vector containing the desired poses of the left foot on the xy plane
+         * @param rightFootprints vector containing the desired poses of the right foot on the xy plane
+         * @return true/false in case of success/failure.
+         */
+        bool getFootprints(std::vector<iDynTree::Vector3>& leftFootprints, std::vector<iDynTree::Vector3>& rightFootprints);
+
+        /**
+         * Get the unicycle state from the feet of the robot in the odom frame (aka world frame)
+         * @param virtualUnicyclePose pose of the virtual unicycle in the odom frame
+         * @param referenceUnicyclePose pose of the reference virtual unicycle in the odom frame
+         * @param stanceFoot returns a string with the stance foot used for the computation
+         * @return true/false in case of success/failure.
+         */
+        bool getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, const std::string& stanceFoot);
     };
 };
 
