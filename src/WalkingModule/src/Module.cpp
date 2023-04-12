@@ -264,21 +264,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
+    yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
-    m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
-    m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
-    // format check
-    if (m_navigationTriggerLoopRate<=0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
-        return false;
-    }
-    if (m_navigationReplanningDelay<0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
-        return false;
-    }
+    trajectoryPlannerOptions.append(ellipseMangerOptions);
 
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
@@ -487,20 +476,38 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
-    // open ports for navigation
-    if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
+    //NAVIGATION
+    if (trajectoryPlannerOptions.check("plannerMode", yarp::os::Value("manual")).asString() == "navigation")
     {
-        yError() << "[WalkingModule::configure] Could not open feet_positions port";
-    }
-    if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
-    {
-       yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
-    }
+        yInfo() << "Found navigation setup.";
+        m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
+        m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
+        // format check
+        if (m_navigationTriggerLoopRate<=0)
+        {
+            yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
+            return false;
+        }
+        if (m_navigationReplanningDelay<0)
+        {
+            yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
+            return false;
+        }
+        // open ports for navigation
+        if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
+        {
+            yError() << "[WalkingModule::configure] Could not open feet_positions port";
+        }
+        if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
+        {
+           yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
+        }
 
-    // start the threads used for computing navigation needed infos
-    m_runThreads = true;
-    m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
-    m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
+        // start the threads used for computing navigation needed infos
+        m_runThreads = true;
+        m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
+        m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
+    }
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -532,19 +539,27 @@ bool WalkingModule::close()
         m_loggerPort.close();
     
     //Close parallel threads
-    m_runThreads = false;
-    yInfo() << "Closing m_virtualUnicyclePubliserThread";
-    if(m_virtualUnicyclePubliserThread.joinable())
+    if (m_runThreads)
     {
-        m_virtualUnicyclePubliserThread.join();
-        m_virtualUnicyclePubliserThread = std::thread();
-    }
+        m_runThreads = false;
+        yInfo() << "Closing m_virtualUnicyclePubliserThread";
+        if(m_virtualUnicyclePubliserThread.joinable())
+        {
+            m_virtualUnicyclePubliserThread.join();
+            m_virtualUnicyclePubliserThread = std::thread();
+        }
 
-    yInfo() << "Closing m_navigationTriggerThread";
-    if(m_navigationTriggerThread.joinable())
-    {
-        m_navigationTriggerThread.join();
-        m_navigationTriggerThread = std::thread();
+        yInfo() << "Closing m_navigationTriggerThread";
+        if(m_navigationTriggerThread.joinable())
+        {
+            m_navigationTriggerThread.join();
+            m_navigationTriggerThread = std::thread();
+        }
+
+        m_plannedCoMPositionPort.close();
+        m_feetPort.close();
+        m_unicyclePort.close();
+        m_replanningTriggerPort.close();
     }
 
     // restore PID
@@ -556,10 +571,6 @@ bool WalkingModule::close()
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
-    m_plannedCoMPositionPort.close();
-    m_feetPort.close();
-    m_unicyclePort.close();
-    m_replanningTriggerPort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
