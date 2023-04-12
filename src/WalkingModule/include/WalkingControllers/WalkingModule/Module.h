@@ -159,7 +159,7 @@ namespace WalkingControllers
 
         std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
         std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
-        bool m_runThreads;
+        std::atomic<bool> m_runThreads{false};
         yarp::os::BufferedPort<yarp::sig::Vector> m_plannedCoMPositionPort; /**< Desired CoM position port for naviagation purposes. */
         yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
         bool m_wasInDoubleSupport;  /**< Flag that symbolizes the previous status of the double support. */
