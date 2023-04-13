@@ -17,15 +17,12 @@
 
 using namespace WalkingControllers;
 
-NavigationHelper::NavigationHelper(std::deque<bool> &leftInContact, std::deque<bool> &rightInContact)
+NavigationHelper::NavigationHelper()
 {
-    m_leftInContact = &leftInContact;
-    m_rightInContact = &rightInContact;
 }
     
 NavigationHelper::~NavigationHelper()
 {
-    
 }
 
 bool NavigationHelper::setThreads(bool status)
@@ -79,8 +76,10 @@ bool NavigationHelper::closeHelper()
     return true;
 }
 
-bool NavigationHelper::init(const yarp::os::Searchable& config)
+bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact)
 {
+    m_leftInContact = &leftInContact;
+    m_rightInContact = &rightInContact;
     //ports for navigation integration
     std::string unicyclePortPortName = "/virtual_unicycle_states:o";
     if (!m_unicyclePort.open(unicyclePortPortName))
@@ -173,4 +172,104 @@ void NavigationHelper::computeNavigationTrigger()
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
     yInfo() << "[NavigationHelper::computeNavigationTrigger] Terminated thread";
+}
+
+// This thread publishes the internal informations of the virtual unicycle extracted from the feet and the CoM speed
+// It's the internal odometry
+void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &m_FKSolver, 
+                                                    std::unique_ptr<StableDCMModel> &m_stableDCMModel, 
+                                                    std::unique_ptr<TrajectoryGenerator> &m_trajectoryGenerator,
+                                                    int &m_robotState)
+{
+    yInfo() << "[NavigationHelper::computeVirtualUnicycleThread] Starting Thread";
+    bool inContact = false;
+    while (m_runThreads)
+    {
+        if (m_robotState != 4)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+            continue;
+        }
+
+        iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
+        std::string stanceFoot;
+        iDynTree::Transform footTransformToWorld, root_linkTransform;
+        //Stance foot check
+        if (m_leftInContact->size() > 0)
+        {
+            if (m_leftInContact->at(0))
+            {
+                stanceFoot = "left";
+                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
+            }
+            else
+            {
+                stanceFoot = "right";
+                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
+            }
+            inContact = true;
+        }
+        else if (m_rightInContact->size() > 0)
+        {
+            if (m_rightInContact->at(0))
+            {
+                stanceFoot = "right";
+                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
+            }
+            else
+            {
+                stanceFoot = "left";
+                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
+            }
+            inContact = true;
+        }
+        else
+        {
+            inContact = false;
+        }
+        root_linkTransform = m_FKSolver->getRootLinkToWorldTransform();   //world -> rootLink transform
+        //Data conversion and port writing
+        if (inContact)
+        {
+            if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+            {
+                //send data
+                yarp::os::Stamp stamp (0, yarp::os::Time::now());   //move to private member of the class
+                m_unicyclePort.setEnvelope(stamp);
+                auto& data = m_unicyclePort.prepare();
+                data.clear();
+                auto& unicyclePose = data.addList();
+                unicyclePose.addFloat64(virtualUnicyclePose(0));
+                unicyclePose.addFloat64(virtualUnicyclePose(1));
+                unicyclePose.addFloat64(virtualUnicyclePose(2));
+                auto& referencePose = data.addList();
+                referencePose.addFloat64(virtualUnicycleReference(0));
+                referencePose.addFloat64(virtualUnicycleReference(1));
+                referencePose.addFloat64(virtualUnicycleReference(2));
+                data.addString(stanceFoot);
+
+                //add root link stransform: X, Y, Z, r, p, yaw,
+                auto& transform = data.addList();
+                transform.addFloat64(root_linkTransform.getPosition()(0));
+                transform.addFloat64(root_linkTransform.getPosition()(1));
+                transform.addFloat64(root_linkTransform.getPosition()(2));
+                transform.addFloat64(root_linkTransform.getRotation().asRPY()(0));
+                transform.addFloat64(root_linkTransform.getRotation().asRPY()(1));
+                transform.addFloat64(root_linkTransform.getRotation().asRPY()(2));
+
+                //planned velocity of the CoM
+                auto comVel = m_stableDCMModel->getCoMVelocity();
+                auto& velData = data.addList();
+                velData.addFloat64(comVel(0));
+                velData.addFloat64(comVel(1));
+                m_unicyclePort.write();
+            }
+            else
+            {
+                yError() << "[NavigationHelper::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+    }
+    yInfo() << "[NavigationHelper::computeVirtualUnicycleThread] Terminated thread";
 }

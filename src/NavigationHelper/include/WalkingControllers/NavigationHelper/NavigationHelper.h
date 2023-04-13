@@ -16,7 +16,9 @@
 #include <deque>
 
 //#include <WalkingControllers/WalkingModule/Module.h>
-
+#include <WalkingControllers/KinDynWrapper/Wrapper.h>
+#include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
+#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 
 namespace WalkingControllers
 {
@@ -35,19 +37,20 @@ namespace WalkingControllers
         std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
 
     public:
-        NavigationHelper(std::deque<bool> &leftInContact, std::deque<bool> &rightInContact);
+        NavigationHelper();
         ~NavigationHelper();
 
         bool setThreads(bool status);
         bool closeThreads();
         bool closeHelper();
-        bool init(const yarp::os::Searchable& config);
+        bool init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact);
         void computeNavigationTrigger();
+        void computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &m_FKSolver, 
+                                            std::unique_ptr<StableDCMModel> &m_stableDCMModel, 
+                                            std::unique_ptr<TrajectoryGenerator> &m_trajectoryGenerator,
+                                            int &m_robotState);
     };
     
-    
-    
-
 }
 
 #endif
