@@ -506,7 +506,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         // start the threads used for computing navigation needed infos
         m_runThreads = true;
         m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
-        m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
+        //m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
+        m_navHelper.init(trajectoryPlannerOptions, m_leftInContact, m_rightInContact);
     }
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
@@ -538,6 +539,8 @@ bool WalkingModule::close()
     if(m_dumpData)
         m_loggerPort.close();
     
+    m_navHelper.closeHelper();
+
     //Close parallel threads
     if (m_runThreads)
     {
