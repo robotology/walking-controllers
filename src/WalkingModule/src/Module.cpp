@@ -447,10 +447,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
     yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
-    if (/* condition */)
-    {
-        /* code */
-    }
     
     // start the threads used for computing navigation needed infos
     if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact))
@@ -1769,61 +1765,4 @@ bool WalkingModule::stopWalking()
 
     m_robotState = WalkingFSM::Stopped;
     return true;
-}
-
-// This thread synchronizes the walking-controller with the navigation stack.
-// Writes on a port a boolean value when to replan the path
-void WalkingModule::computeNavigationTrigger()
-{
-    bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
-    yInfo() << "[WalkingModule::computeNavigationTrigger] Starting Thread";
-    yarp::os::NetworkClock myClock;
-    myClock.open("/clock", "/navigationTriggerClock");
-    bool enteredDoubleSupport = false, exitDoubleSupport = true;
-    while (m_runThreads)
-    {
-        // Block the thread until the robot is in the walking state
-        if (m_robotState != WalkingFSM::Walking)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
-            continue;
-        }
-
-        //double support check
-        if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
-        {
-            if (m_leftInContact[0] && m_rightInContact[0])
-            {
-                if (exitDoubleSupport)
-                {
-                    enteredDoubleSupport = true;
-                    exitDoubleSupport = false;
-                }
-            }
-            else
-            {
-                if (! exitDoubleSupport)
-                {
-                    trigger = true; //in this way we have only one trigger each exit of double support
-                }
-                exitDoubleSupport = true;
-            }
-        }
-
-        //send the replanning trigger after a certain amount of seconds
-        if (trigger)
-        {
-            trigger = false;
-            //waiting -> could make it dependant by the current swing step duration
-            myClock.delay(m_navigationReplanningDelay);
-            yDebug() << "[WalkingModule::computeNavigationTrigger] Triggering navigation replanning";
-            auto& b = m_replanningTriggerPort.prepare();
-            b.clear();
-            b.add((yarp::os::Value)true);   //send the planning trigger
-            m_replanningTriggerPort.write();
-        }   
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
-    }
-    yInfo() << "[WalkingModule::computeNavigationTrigger] Terminating thread";
 }
