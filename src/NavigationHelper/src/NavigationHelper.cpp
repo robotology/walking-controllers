@@ -21,15 +21,9 @@ using namespace WalkingControllers;
 NavigationHelper::NavigationHelper()
 {
 }
-    
+
 NavigationHelper::~NavigationHelper()
 {
-}
-
-bool NavigationHelper::setThreads(bool status)
-{
-    m_runThreads = status;
-    return true;
 }
 
 bool NavigationHelper::closeThreads()
@@ -113,7 +107,7 @@ void NavigationHelper::computeNavigationTrigger()
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (m_runThreads)
     {
-        // Block the thread until the robot is in the walking state
+        //ptr check to avoid coredump
         if (m_leftInContact == nullptr || m_rightInContact == nullptr)
         {
             //kill thread
