@@ -493,11 +493,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
             yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
             return false;
         }
-        // open ports for navigation
-        if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
-        {
-            yError() << "[WalkingModule::configure] Could not open feet_positions port";
-        }
+        //// open ports for navigation
+        //if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
+        //{
+        //    yError() << "[WalkingModule::configure] Could not open feet_positions port";
+        //}
         if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
         {
            yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
@@ -1121,33 +1121,9 @@ bool WalkingModule::updateModule()
         }
 
         //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-        std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
-        if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+        if(!m_navHelper.publishPlannedFootsteps(m_trajectoryGenerator))
         {
-            if (leftFootprints.size()>0 && rightFootprints.size()>0)
-            {
-                auto& feetData = m_feetPort.prepare();
-                feetData.clear();
-                auto& rightFeet = feetData.addList();
-                auto& leftFeet = feetData.addList();
-                //left foot
-                for (size_t i = 0; i < leftFootprints.size(); ++i)
-                {
-                    auto& pose = leftFeet.addList();
-                    pose.addFloat64(leftFootprints[i](0));   //x
-                    pose.addFloat64(leftFootprints[i](1));   //y
-                    pose.addFloat64(leftFootprints[i](2));   //yaw
-                }
-                //right foot
-                for (size_t j = 0; j < rightFootprints.size(); ++j)
-                {
-                    auto& pose = rightFeet.addList();
-                    pose.addFloat64(rightFootprints[j](0));   //x
-                    pose.addFloat64(rightFootprints[j](1));   //y
-                    pose.addFloat64(rightFootprints[j](2));   //yaw
-                }
-                m_feetPort.write();
-            }
+            yWarning() << "[WalkingModule::updateModule] Unable to publish footsteps";
         }
         
         // send data to the logger
