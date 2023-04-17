@@ -1,9 +1,8 @@
 {
     "files.associations": {
-        "cmath": "cpp",
-        "complex": "cpp",
         "cctype": "cpp",
         "clocale": "cpp",
+        "cmath": "cpp",
         "csignal": "cpp",
         "cstdarg": "cpp",
         "cstddef": "cpp",
@@ -22,6 +21,7 @@
         "chrono": "cpp",
         "cinttypes": "cpp",
         "compare": "cpp",
+        "complex": "cpp",
         "concepts": "cpp",
         "condition_variable": "cpp",
         "cstdint": "cpp",
@@ -72,7 +72,6 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "valarray": "cpp",
-        "variant": "cpp",
-        "*.ipp": "cpp"
+        "variant": "cpp"
     }
 }

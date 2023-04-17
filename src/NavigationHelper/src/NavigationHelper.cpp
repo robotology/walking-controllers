@@ -69,6 +69,8 @@ bool NavigationHelper::closeHelper()
             m_unicyclePort.close();
         if(!m_replanningTriggerPort.isClosed())
             m_replanningTriggerPort.close();
+        if(!m_feetPort.isClosed())
+            m_feetPort.close();
     }
     catch(const std::exception& e)
     {
@@ -98,6 +100,12 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     {
         yError() << "[NavigationHelper::init] Could not open" << replanningTriggerPortPortName << " port.";
         return false;
+    }
+
+    std::string feetPositionsPortPortName = "/feet_positions:o";
+    if (!m_feetPort.open(feetPositionsPortPortName))
+    {
+        yError() << "[WalkingModule::configure] Could not open feet_positions port";
     }
 
     yarp::os::Bottle& trajectoryPlannerOptions = config.findGroup("NAVIGATION");
@@ -283,4 +291,44 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
     yInfo() << "[NavigationHelper::computeVirtualUnicycleThread] Terminated thread";
+}
+
+bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator)
+{
+    if (m_feetPort.isClosed())
+    {
+        yError() << "[NavigationHelper::publishPlannedFootsteps] Feet port closed (no data sent).";
+        return false;
+    }
+    
+    //Send footsteps info on port anyway (x, y, yaw) wrt root_link
+    std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
+    if (trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+    {
+        if (leftFootprints.size()>0 && rightFootprints.size()>0)
+        {
+            auto& feetData = m_feetPort.prepare();
+            feetData.clear();
+            auto& rightFeet = feetData.addList();
+            auto& leftFeet = feetData.addList();
+            //left foot
+            for (size_t i = 0; i < leftFootprints.size(); ++i)
+            {
+                auto& pose = leftFeet.addList();
+                pose.addFloat64(leftFootprints[i](0));   //x
+                pose.addFloat64(leftFootprints[i](1));   //y
+                pose.addFloat64(leftFootprints[i](2));   //yaw
+            }
+            //right foot
+            for (size_t j = 0; j < rightFootprints.size(); ++j)
+            {
+                auto& pose = rightFeet.addList();
+                pose.addFloat64(rightFootprints[j](0));   //x
+                pose.addFloat64(rightFootprints[j](1));   //y
+                pose.addFloat64(rightFootprints[j](2));   //yaw
+            }
+            m_feetPort.write();
+        }
+    }
+    return true;
 }

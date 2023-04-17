@@ -27,6 +27,7 @@ namespace WalkingControllers
     private:
         yarp::os::BufferedPort<yarp::os::Bottle> m_unicyclePort; /**< Port that streams odometry info of the virtual unicycle. */
         yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
+        yarp::os::BufferedPort<yarp::os::Bottle> m_feetPort; /**< Feet port vector of feet positions (left, right). */
         std::atomic<bool> m_runThreads{false};
         std::deque<bool>* m_leftInContact;
         std::deque<bool>* m_rightInContact;
@@ -53,6 +54,8 @@ namespace WalkingControllers
                                             std::unique_ptr<StableDCMModel> &stableDCMModel, 
                                             std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator
                                             );
+
+        bool publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator);
     };
 }
 
