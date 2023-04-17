@@ -7,6 +7,7 @@
  */
 
 #include <iostream>
+#include <thread>
 #include <WalkingControllers/NavigationHelper/NavigationHelper.h>
 
 #include <yarp/os/Stamp.h>
@@ -72,11 +73,15 @@ bool NavigationHelper::closeHelper()
     catch(const std::exception& e)
     {
         std::cerr << e.what() << std::endl;
+        return false;
     }
     return true;
 }
 
-bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact)
+bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact,
+                        std::unique_ptr<WalkingFK> &FKSolver, 
+                        std::unique_ptr<StableDCMModel> &stableDCMModel, 
+                        std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator)
 {
     m_leftInContact = &leftInContact;
     m_rightInContact = &rightInContact;
@@ -111,7 +116,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     }
 
     m_runThreads = true;
-    //m_virtualUnicyclePubliserThread = std::thread(&computeVirtualUnicycleThread, this);
+    m_virtualUnicyclePubliserThread = std::thread(&NavigationHelper::computeVirtualUnicycleThread, this, std::ref(FKSolver), std::ref(stableDCMModel), std::ref(trajectoryGenerator));
     m_navigationTriggerThread = std::thread(&NavigationHelper::computeNavigationTrigger, this);
     return true;
 }
@@ -176,20 +181,20 @@ void NavigationHelper::computeNavigationTrigger()
 
 // This thread publishes the internal informations of the virtual unicycle extracted from the feet and the CoM speed
 // It's the internal odometry
-void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &m_FKSolver, 
-                                                    std::unique_ptr<StableDCMModel> &m_stableDCMModel, 
-                                                    std::unique_ptr<TrajectoryGenerator> &m_trajectoryGenerator,
-                                                    int &m_robotState)
+void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &FKSolver, 
+                                                    std::unique_ptr<StableDCMModel> &stableDCMModel, 
+                                                    std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator
+                                                    )
 {
     yInfo() << "[NavigationHelper::computeVirtualUnicycleThread] Starting Thread";
     bool inContact = false;
     while (m_runThreads)
     {
-        if (m_robotState != 4)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
-            continue;
-        }
+        //if (m_robotState != 4)
+        //{
+        //    std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
+        //    continue;
+        //}
 
         iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
         std::string stanceFoot;
@@ -200,12 +205,12 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
             if (m_leftInContact->at(0))
             {
                 stanceFoot = "left";
-                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
+                footTransformToWorld = FKSolver->getLeftFootToWorldTransform();
             }
             else
             {
                 stanceFoot = "right";
-                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
+                footTransformToWorld = FKSolver->getRightFootToWorldTransform();
             }
             inContact = true;
         }
@@ -214,12 +219,12 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
             if (m_rightInContact->at(0))
             {
                 stanceFoot = "right";
-                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
+                footTransformToWorld = FKSolver->getRightFootToWorldTransform();
             }
             else
             {
                 stanceFoot = "left";
-                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
+                footTransformToWorld = FKSolver->getLeftFootToWorldTransform();
             }
             inContact = true;
         }
@@ -227,11 +232,11 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
         {
             inContact = false;
         }
-        root_linkTransform = m_FKSolver->getRootLinkToWorldTransform();   //world -> rootLink transform
+        root_linkTransform = FKSolver->getRootLinkToWorldTransform();   //world -> rootLink transform
         //Data conversion and port writing
         if (inContact)
         {
-            if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+            if (trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
             {
                 //send data
                 yarp::os::Stamp stamp (0, yarp::os::Time::now());   //move to private member of the class
@@ -258,7 +263,7 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
                 transform.addFloat64(root_linkTransform.getRotation().asRPY()(2));
 
                 //planned velocity of the CoM
-                auto comVel = m_stableDCMModel->getCoMVelocity();
+                auto comVel = stableDCMModel->getCoMVelocity();
                 auto& velData = data.addList();
                 velData.addFloat64(comVel(0));
                 velData.addFloat64(comVel(1));

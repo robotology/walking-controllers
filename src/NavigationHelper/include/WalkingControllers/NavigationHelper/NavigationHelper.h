@@ -43,14 +43,17 @@ namespace WalkingControllers
         bool setThreads(bool status);
         bool closeThreads();
         bool closeHelper();
-        bool init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact);
+        bool init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact,
+                    std::unique_ptr<WalkingFK> &FKSolver, 
+                    std::unique_ptr<StableDCMModel> &stableDCMModel, 
+                    std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator
+                    );
         void computeNavigationTrigger();
-        void computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &m_FKSolver, 
-                                            std::unique_ptr<StableDCMModel> &m_stableDCMModel, 
-                                            std::unique_ptr<TrajectoryGenerator> &m_trajectoryGenerator,
-                                            int &m_robotState);
+        void computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &FKSolver, 
+                                            std::unique_ptr<StableDCMModel> &stableDCMModel, 
+                                            std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator
+                                            );
     };
-    
 }
 
 #endif

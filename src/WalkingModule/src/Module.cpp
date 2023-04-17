@@ -504,10 +504,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         }
 
         // start the threads used for computing navigation needed infos
-        m_runThreads = true;
-        m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
+        //m_runThreads = true;
+        //m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
         //m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
-        m_navHelper.init(trajectoryPlannerOptions, m_leftInContact, m_rightInContact);
+        if(!m_navHelper.init(trajectoryPlannerOptions, m_leftInContact, m_rightInContact, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
+        {
+            yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+        }
     }
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
