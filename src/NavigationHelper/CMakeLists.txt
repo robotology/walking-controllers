@@ -6,5 +6,5 @@ add_walking_controllers_library(
   NAME NavigationHelper
   SOURCES src/NavigationHelper.cpp
   PUBLIC_HEADERS include/WalkingControllers/NavigationHelper/NavigationHelper.h
-  PUBLIC_LINK_LIBRARIES WalkingControllers::YarpUtilities WalkingControllers::iDynTreeUtilities WalkingControllers::KinDynWrapper WalkingControllers::TrajectoryPlanner WalkingControllers::StdUtilities ctrlLib
+  PUBLIC_LINK_LIBRARIES WalkingControllers::YarpUtilities WalkingControllers::iDynTreeUtilities WalkingControllers::StdUtilities ctrlLib
   PRIVATE_LINK_LIBRARIES Eigen3::Eigen)
