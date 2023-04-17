@@ -50,6 +50,8 @@
 
 #include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
+#include <WalkingControllers/NavigationHelper/NavigationHelper.h>
+
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
 
@@ -156,12 +158,8 @@ namespace WalkingControllers
         size_t m_feedbackAttempts;
         double m_feedbackAttemptDelay;
 
-        std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
-        bool m_runThreads;
-        yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
-        double m_navigationReplanningDelay;   /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
-        int m_navigationTriggerLoopRate;    /**< Loop rate for the thread computing the navigation trigger*/
-        
+        NavigationHelper m_navHelper;
+
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 

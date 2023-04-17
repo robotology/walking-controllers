@@ -267,19 +267,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
-    m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
-    m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
-    // format check
-    if (m_navigationTriggerLoopRate<=0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
-        return false;
-    }
-    if (m_navigationReplanningDelay<0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
-        return false;
-    }
 
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
@@ -459,17 +446,17 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
-    // open port for navigation trigger
-    std::string replanningTriggerPortPortName = "/" + getName() + "/replanning_trigger:o";
-    if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
+    yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
+    if (/* condition */)
     {
-        yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
-        return false;
+        /* code */
     }
-
+    
     // start the threads used for computing navigation needed infos
-    m_runThreads = true;
-    m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
+    if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact))
+    {
+        yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+    }
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -499,14 +486,8 @@ bool WalkingModule::close()
 {
     if(m_dumpData)
         m_loggerPort.close();
-    //Close parallel threads
-    m_runThreads = false;
-    yInfo() << "Closing m_navigationTriggerThread";
-    if(m_navigationTriggerThread.joinable())
-    {
-        m_navigationTriggerThread.join();
-        m_navigationTriggerThread = std::thread();
-    }
+    
+    m_navHelper.closeHelper();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -517,7 +498,6 @@ bool WalkingModule::close()
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
-    m_replanningTriggerPort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
