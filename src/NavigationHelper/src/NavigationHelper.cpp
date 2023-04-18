@@ -69,16 +69,20 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     m_leftInContact = &leftInContact;
     m_rightInContact = &rightInContact;
 
-    std::string replanningTriggerPortPortName = "/replanning_trigger:o";
-    if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
+    m_navigationReplanningDelay = config.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
+    m_navigationTriggerLoopRate = config.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
+    m_publishInfo = config.check("publishNavigationInfo", yarp::os::Value(false)).asBool();
+    if (config.check("plannerMode", yarp::os::Value("manual")).asString() == "navigation")
     {
-        yError() << "[NavigationHelper::init] Could not open" << replanningTriggerPortPortName << " port.";
-        return false;
+        //if in navigation mode we need this parameter to be true
+        m_publishInfo = true;
+    }
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        yInfo() << "[NavigationHelper::init] Configuring NavigationHelper without publishing infos on ports ";
+        return true;
     }
 
-    yarp::os::Bottle& options = config.findGroup("NAVIGATION");
-    m_navigationReplanningDelay = options.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
-    m_navigationTriggerLoopRate = options.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
     // format check
     if (m_navigationTriggerLoopRate<=0)
     {
@@ -91,6 +95,13 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
         return false;
     }
 
+    std::string replanningTriggerPortPortName = m_portPrefix + "/replanning_trigger:o";
+    if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
+    {
+        yError() << "[NavigationHelper::init] Could not open" << replanningTriggerPortPortName << " port.";
+        return false;
+    }
+
     m_runThreads = true;
     m_navigationTriggerThread = std::thread(&NavigationHelper::computeNavigationTrigger, this);
     return true;
@@ -100,6 +111,10 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
 // Writes on a port a boolean value when to replan the path
 void NavigationHelper::computeNavigationTrigger()
 {
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        return;
+    }
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
     yInfo() << "[NavigationHelper::computeNavigationTrigger] Starting Thread";
     yarp::os::NetworkClock myClock;

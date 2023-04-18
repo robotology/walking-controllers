@@ -26,9 +26,11 @@ namespace WalkingControllers
         std::deque<bool>* m_rightInContact;     /**< Pointer to the deques in Module of the left feet contacts status. */
         double m_navigationReplanningDelay;     /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
         int m_navigationTriggerLoopRate;        /**< Loop rate for the thread computing the navigation trigger*/
-
+        bool m_publishInfo;
         std::thread m_navigationTriggerThread;  /**< Thread for publishing the flag triggering the navigation's global planner. */
 
+        const std::string m_portPrefix = "/navigation_helper";
+        
     public:
         NavigationHelper();
         ~NavigationHelper();
