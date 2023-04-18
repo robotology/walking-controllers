@@ -14,6 +14,7 @@
 #include <yarp/os/NetworkClock.h>
 
 #include <WalkingControllers/YarpUtilities/Helper.h>
+#include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 
 
 using namespace WalkingControllers;
@@ -339,7 +340,7 @@ bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerat
     }
     
     //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-    std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
+    std::vector<TrajectoryGenerator::Pose> leftFootprints, rightFootprints;
     if (trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
     {
         if (leftFootprints.size()>0 && rightFootprints.size()>0)
@@ -352,17 +353,17 @@ bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerat
             for (size_t i = 0; i < leftFootprints.size(); ++i)
             {
                 auto& pose = leftFeet.addList();
-                pose.addFloat64(leftFootprints[i](0));   //x
-                pose.addFloat64(leftFootprints[i](1));   //y
-                pose.addFloat64(leftFootprints[i](2));   //yaw
+                pose.addFloat64(leftFootprints[i].x);   //x
+                pose.addFloat64(leftFootprints[i].y);   //y
+                pose.addFloat64(leftFootprints[i].theta);   //yaw
             }
             //right foot
             for (size_t j = 0; j < rightFootprints.size(); ++j)
             {
                 auto& pose = rightFeet.addList();
-                pose.addFloat64(rightFootprints[j](0));   //x
-                pose.addFloat64(rightFootprints[j](1));   //y
-                pose.addFloat64(rightFootprints[j](2));   //yaw
+                pose.addFloat64(rightFootprints[j].x);   //x
+                pose.addFloat64(rightFootprints[j].y);   //y
+                pose.addFloat64(rightFootprints[j].theta);   //yaw
             }
             m_feetPort.write();
         }

@@ -83,7 +83,7 @@ namespace WalkingControllers
         std::vector<UnicycleState> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
 
         bool m_navigationMode;  /**< Flag that indicates if the controller is running in navigation mode */
-
+        
         std::mutex m_mutex; /**< Mutex. */
 
         /**
@@ -284,13 +284,20 @@ namespace WalkingControllers
          */
         void reset();
 
+        struct Pose     /**< Struct representing a pose in a plane 2.5D */
+        {
+            double x;
+            double y;
+            double theta;
+        };
+
         /**
          * Get the footprints planned by the unicycle generator
          * @param leftFootprints vector containing the desired poses of the left foot on the xy plane
          * @param rightFootprints vector containing the desired poses of the right foot on the xy plane
          * @return true/false in case of success/failure.
          */
-        bool getFootprints(std::vector<iDynTree::Vector3>& leftFootprints, std::vector<iDynTree::Vector3>& rightFootprints);
+        bool getFootprints(std::vector<Pose>& leftFootprints, std::vector<Pose>& rightFootprints);
 
         /**
          * Get the unicycle state from the feet of the robot in the odom frame (aka world frame)
