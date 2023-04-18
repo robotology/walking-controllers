@@ -265,15 +265,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
+    yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
-    m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
-    // format check
-    if (m_navigationTriggerLoopRate<=0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
-        return false;
-    }
+    trajectoryPlannerOptions.append(navigationOptions);
 
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
@@ -412,14 +407,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Failed to configure the retargeting";
         return false;
     }
-
-    // open CoM planned trajectory port for navigation integration
-    std::string plannedCoMPositionPortName = "/planned_CoM/data:o";
-    if (!m_plannedCoMPositionPort.open(plannedCoMPositionPortName))
-    {
-        yError() << "[WalkingModule::configure] Could not open" << plannedCoMPositionPortName << " port.";
-        return false;
-    }
     
     // initialize the logger
     if(m_dumpData)
@@ -461,19 +448,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
-    // open ports for navigation
-    if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
-    {
-        yError() << "[WalkingModule::configure] Could not open feet_positions port";
-    }
-    if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
-    {
-       yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
-    }
 
-    // start the threads used for computing navigation needed infos
-    m_runThreads = true;
-    m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
+    if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
+    {
+        yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+    }
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -504,14 +483,7 @@ bool WalkingModule::close()
     if(m_dumpData)
         m_loggerPort.close();
     
-    //Close parallel threads
-    m_runThreads = false;
-    yInfo() << "Closing m_virtualUnicyclePubliserThread";
-    if(m_virtualUnicyclePubliserThread.joinable())
-    {
-        m_virtualUnicyclePubliserThread.join();
-        m_virtualUnicyclePubliserThread = std::thread();
-    }
+    m_navHelper.closeHelper();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -522,9 +494,6 @@ bool WalkingModule::close()
     // close the ports
     m_rpcPort.close();
     m_desiredUnyciclePositionPort.close();
-    m_plannedCoMPositionPort.close();
-    m_feetPort.close();
-    m_unicyclePort.close();
 
     // close the connection with robot
     if(!m_robotControlHelper->close())
@@ -1068,33 +1037,9 @@ bool WalkingModule::updateModule()
         }
 
         //Send footsteps info on port anyway (x, y, yaw) wrt root_link
-        std::vector<iDynTree::Vector3> leftFootprints, rightFootprints;
-        if (m_trajectoryGenerator->getFootprints(leftFootprints, rightFootprints))
+        if(!m_navHelper.publishPlannedFootsteps(m_trajectoryGenerator))
         {
-            if (leftFootprints.size()>0 && rightFootprints.size()>0)
-            {
-                auto& feetData = m_feetPort.prepare();
-                feetData.clear();
-                auto& rightFeet = feetData.addList();
-                auto& leftFeet = feetData.addList();
-                //left foot
-                for (size_t i = 0; i < leftFootprints.size(); ++i)
-                {
-                    auto& pose = leftFeet.addList();
-                    pose.addFloat64(leftFootprints[i](0));   //x
-                    pose.addFloat64(leftFootprints[i](1));   //y
-                    pose.addFloat64(leftFootprints[i](2));   //yaw
-                }
-                //right foot
-                for (size_t j = 0; j < rightFootprints.size(); ++j)
-                {
-                    auto& pose = rightFeet.addList();
-                    pose.addFloat64(rightFootprints[j](0));   //x
-                    pose.addFloat64(rightFootprints[j](1));   //y
-                    pose.addFloat64(rightFootprints[j](2));   //yaw
-                }
-                m_feetPort.write();
-            }
+            yWarning() << "[WalkingModule::updateModule] Unable to publish footsteps";
         }
         
         // send data to the logger
@@ -1199,79 +1144,6 @@ bool WalkingModule::updateModule()
             m_loggerPort.write();
 
         }
-
-        // streaming CoM desired position and heading for Navigation algorithms         
-        if(!m_leftTrajectory.size() == m_DCMPositionDesired.size())
-        {
-            yWarning() << "[WalkingModule::updateModule] Inconsistent dimenstions. CoM planned poses will be augmented" ;
-        }
-
-        double yawLeftp, yawRightp, meanYawp;
-        yarp::sig::Vector& planned_poses = m_plannedCoMPositionPort.prepare();
-        planned_poses.clear();
-
-        bool saveCoM = false;   //flag to whether save the CoM trajectory only once each double support
-        if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //consistency check
-        {
-            //evaluate the state of the contacts
-            if (m_leftInContact[0] && m_rightInContact[0])  //double support
-            {
-                if (!m_wasInDoubleSupport)
-                {
-                    saveCoM = true;
-                    m_wasInDoubleSupport = true;
-                }
-                else    //I still need to assign a value to the flag
-                {
-                    saveCoM = false;
-                }
-                
-                //override the previous state check if there has been a merge of a new trajectory on this thread cycle
-                //in this way we have the latest updated trajectory
-                if (m_newTrajectoryMerged)
-                {
-                    saveCoM = true;
-                }
-            }
-            else
-            {
-                saveCoM = false;
-                if (m_wasInDoubleSupport)
-                {
-                    m_wasInDoubleSupport = false;
-                }
-            }
-        }
-        
-        if (saveCoM)
-        {
-            m_desiredCoM_Trajectory.clear();
-        }
-        for (auto i = 0; i < m_DCMPositionDesired.size(); i++)
-        {
-            m_stableDCMModel->setInput(m_DCMPositionDesired[i]);
-            m_stableDCMModel->integrateModel();
-            yawLeftp =  m_leftTrajectory[i].getRotation().asRPY()(2);
-            yawLeftp =  m_rightTrajectory[i].getRotation().asRPY()(2);
-            meanYawp = std::atan2(std::sin(yawLeftp) + std::sin(yawRightp),
-                                    std::cos(yawLeftp) + std::cos(yawRightp));
-            
-            planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[0]);
-            planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[1]);
-            planned_poses.push_back(meanYawp);
-            //saving data also internally -> should do this only once per double support
-            if (saveCoM)
-            {
-                iDynTree::Vector3 pose;
-                pose(0) = m_DCMPositionDesired[i](0);
-                pose(1) = m_DCMPositionDesired[i](1);;
-                pose(2) = meanYawp;
-                m_desiredCoM_Trajectory.push_back(pose);
-            }
-        }
-        m_newTrajectoryMerged = false;  //reset flag
-        m_plannedCoMPositionPort.write();
-        m_stableDCMModel->reset(m_DCMPositionDesired.front());
 
         // in the approaching phase the robot should not move and the trajectories should not advance
         if(!m_retargetingClient->isApproachingPhase())
@@ -1899,101 +1771,4 @@ bool WalkingModule::stopWalking()
 
     m_robotState = WalkingFSM::Stopped;
     return true;
-}
-
-// This thread publishes the internal informations of the virtual unicycle extracted from the feet and the CoM speed
-// It's the internal odometry
-void WalkingModule::computeVirtualUnicycleThread()
-{
-    yInfo() << "[WalkingModule::computeVirtualUnicycleThread] Starting Thread";
-    bool inContact = false;
-    while (m_runThreads)
-    {
-        if (m_robotState != WalkingFSM::Walking)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
-            continue;
-        }
-
-        iDynTree::Vector3 virtualUnicyclePose, virtualUnicycleReference;
-        std::string stanceFoot;
-        iDynTree::Transform footTransformToWorld, root_linkTransform;
-        //Stance foot check
-        if (m_leftInContact.size() > 0)
-        {
-            if (m_leftInContact.at(0))
-            {
-                stanceFoot = "left";
-                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
-            }
-            else
-            {
-                stanceFoot = "right";
-                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
-            }
-            inContact = true;
-        }
-        else if (m_rightInContact.size() > 0)
-        {
-            if (m_rightInContact.at(0))
-            {
-                stanceFoot = "right";
-                footTransformToWorld = m_FKSolver->getRightFootToWorldTransform();
-            }
-            else
-            {
-                stanceFoot = "left";
-                footTransformToWorld = m_FKSolver->getLeftFootToWorldTransform();
-            }
-            inContact = true;
-        }
-        else
-        {
-            inContact = false;
-        }
-        root_linkTransform = m_FKSolver->getRootLinkToWorldTransform();   //world -> rootLink transform
-        //Data conversion and port writing
-        if (inContact)
-        {
-            if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
-            {
-                //send data
-                yarp::os::Stamp stamp (0, yarp::os::Time::now());   //move to private member of the class
-                m_unicyclePort.setEnvelope(stamp);
-                auto& data = m_unicyclePort.prepare();
-                data.clear();
-                auto& unicyclePose = data.addList();
-                unicyclePose.addFloat64(virtualUnicyclePose(0));
-                unicyclePose.addFloat64(virtualUnicyclePose(1));
-                unicyclePose.addFloat64(virtualUnicyclePose(2));
-                auto& referencePose = data.addList();
-                referencePose.addFloat64(virtualUnicycleReference(0));
-                referencePose.addFloat64(virtualUnicycleReference(1));
-                referencePose.addFloat64(virtualUnicycleReference(2));
-                data.addString(stanceFoot);
-
-                //add root link stransform: X, Y, Z, r, p, yaw,
-                auto& transform = data.addList();
-                transform.addFloat64(root_linkTransform.getPosition()(0));
-                transform.addFloat64(root_linkTransform.getPosition()(1));
-                transform.addFloat64(root_linkTransform.getPosition()(2));
-                transform.addFloat64(root_linkTransform.getRotation().asRPY()(0));
-                transform.addFloat64(root_linkTransform.getRotation().asRPY()(1));
-                transform.addFloat64(root_linkTransform.getRotation().asRPY()(2));
-
-                //planned velocity of the CoM
-                auto comVel = m_stableDCMModel->getCoMVelocity();
-                auto& velData = data.addList();
-                velData.addFloat64(comVel(0));
-                velData.addFloat64(comVel(1));
-                m_unicyclePort.write();
-            }
-            else
-            {
-                yError() << "[WalkingModule::computeVirtualUnicycleThread] Could not getUnicycleState from m_trajectoryGenerator (no data sent).";
-            }
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
-    }
-    yInfo() << "[WalkingModule::computeVirtualUnicycleThread] Terminated thread";
 }

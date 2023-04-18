@@ -117,6 +117,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
                                                               yarp::os::Value(40.0)).asFloat64());
     double minAngleVariation = iDynTree::deg2rad(config.check("minAngleVariation",
                                                               yarp::os::Value(5.0)).asFloat64());
+    if (minAngleVariation == 0.0)   //configuration warning
+    {
+        yWarning() << "[configurePlanner] Setting minAngleVariation to 0.0 will make the robot jog in place in manual mode.";
+    }
     double maxStepDuration = config.check("maxStepDuration", yarp::os::Value(8.0)).asFloat64();
     double minStepDuration = config.check("minStepDuration", yarp::os::Value(2.9)).asFloat64();
     double stepHeight = config.check("stepHeight", yarp::os::Value(0.005)).asFloat64();
@@ -854,33 +858,34 @@ bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &
     return true;
 }
 
-//TODO improve conversion
-bool TrajectoryGenerator::getFootprints(std::vector<iDynTree::Vector3>& leftFootprints, std::vector<iDynTree::Vector3>& rightFootprints)
+bool TrajectoryGenerator::getFootprints(std::vector<Pose>& leftFootprints, std::vector<Pose>& rightFootprints)
 {
     auto leftDequeue = m_trajectoryGenerator.getLeftFootPrint()->getSteps();
+    leftFootprints.resize(leftDequeue.size());
     for (size_t i = 0; i < leftDequeue.size(); ++i)
     {
-        iDynTree::Vector3 pose;
-        pose(0) = leftDequeue.at(i).position(0);
-        pose(1) = leftDequeue.at(i).position(1);
-        pose(2) = leftDequeue.at(i).angle;
-        leftFootprints.push_back(pose);
+        Pose pose;
+        pose.x = leftDequeue.at(i).position(0);
+        pose.y = leftDequeue.at(i).position(1);
+        pose.theta = leftDequeue.at(i).angle;
+        leftFootprints[i] = pose;
     }
 
     auto rightDeque = m_trajectoryGenerator.getRightFootPrint()->getSteps();
+    rightFootprints.resize(rightDeque.size());
     for (size_t i = 0; i < rightDeque.size(); ++i)
     {
-        iDynTree::Vector3 pose;
-        pose(0) = rightDeque.at(i).position(0);
-        pose(1) = rightDeque.at(i).position(1);
-        pose(2) = rightDeque.at(i).angle;
-        rightFootprints.push_back(pose);
+        Pose pose;
+        pose.x = rightDeque.at(i).position(0);
+        pose.y = rightDeque.at(i).position(1);
+        pose.theta = rightDeque.at(i).angle;
+        rightFootprints[i] = pose;
     }
     
     return true;
 }
 
-bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, const std::string& stanceFoot)
+bool TrajectoryGenerator::getUnicycleState(const std::string& stanceFoot, iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose)
 {
     double nominalWidth;
     bool correctLeft;
@@ -918,7 +923,6 @@ bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePos
         unicycleAngle = measuredAngleLeft;  //- leftYawDeltaInRad
         unicycleAngleOdom = measuredAngleLeft - leftYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionLeft);
-        //stanceFoot = "left";
     }
     else if (stanceFoot == "right")
     {
@@ -926,7 +930,6 @@ bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePos
         unicycleAngle = measuredAngleRight;    //- rightYawDeltaInRad
         unicycleAngleOdom = measuredAngleRight - rightYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionRight);
-        //stanceFoot = "right";
     }
     else
     {

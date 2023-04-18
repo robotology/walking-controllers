@@ -50,6 +50,8 @@
 
 #include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
+#include <WalkingControllers/NavigationHelper/NavigationHelper.h>
+
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
 
@@ -157,18 +159,12 @@ namespace WalkingControllers
         size_t m_feedbackAttempts;
         double m_feedbackAttemptDelay;
 
-        std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
-        bool m_runThreads;
-        yarp::os::BufferedPort<yarp::sig::Vector> m_plannedCoMPositionPort; /**< Desired CoM position port for naviagation purposes. */
-        bool m_wasInDoubleSupport;  /**< Flag that symbolizes the previous status of the double support. */
-        int m_navigationTriggerLoopRate;    /**< Loop rate for the thread computing the navigation trigger*/
+        NavigationHelper m_navHelper;
         
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
         yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
-        yarp::os::BufferedPort<yarp::os::Bottle> m_feetPort; /**< Feet port vector of feet positions (left, right). */
-        yarp::os::BufferedPort<yarp::os::Bottle> m_unicyclePort; /**< Feet port vector of feet positions (left, right). */
 
         /**
          * Get the robot model from the resource finder and set it.
@@ -286,11 +282,6 @@ namespace WalkingControllers
          * @param plannerInput The raw data read from the goal port.
          */
         void applyGoalScaling(yarp::sig::Vector &plannerInput);
-
-        /**
-         * Parallel thread for publishing the unicycle status.
-         */
-        void computeVirtualUnicycleThread();
 
     public:
 
