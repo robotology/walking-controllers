@@ -1089,27 +1089,28 @@ bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &
     return true;
 }
 
-//TODO improve conversion
 bool TrajectoryGenerator::getFootprints(std::vector<Pose>& leftFootprints, std::vector<Pose>& rightFootprints)
 {
     auto leftDequeue = m_trajectoryGenerator.getLeftFootPrint()->getSteps();
+    leftFootprints.resize(leftDequeue.size());
     for (size_t i = 0; i < leftDequeue.size(); ++i)
     {
         Pose pose;
         pose.x = leftDequeue.at(i).position(0);
         pose.y = leftDequeue.at(i).position(1);
         pose.theta = leftDequeue.at(i).angle;
-        leftFootprints.push_back(pose);
+        leftFootprints[i] = pose;
     }
 
     auto rightDeque = m_trajectoryGenerator.getRightFootPrint()->getSteps();
+    rightFootprints.resize(rightDeque.size());
     for (size_t i = 0; i < rightDeque.size(); ++i)
     {
         Pose pose;
         pose.x = rightDeque.at(i).position(0);
         pose.y = rightDeque.at(i).position(1);
         pose.theta = rightDeque.at(i).angle;
-        rightFootprints.push_back(pose);
+        rightFootprints[i] = pose;
     }
     
     return true;
