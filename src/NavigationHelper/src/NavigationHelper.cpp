@@ -90,6 +90,33 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
 {
     m_leftInContact = &leftInContact;
     m_rightInContact = &rightInContact;
+
+    m_navigationReplanningDelay = config.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
+    m_navigationTriggerLoopRate = config.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
+    m_publishInfo = config.check("publishNavigationInfo", yarp::os::Value(false)).asBool();
+    if (config.check("plannerMode", yarp::os::Value("manual")).asString() == "navigation")
+    {
+        //if in navigation mode we need this parameter to be true
+        m_publishInfo = true;
+    }
+    
+    // format check
+    if (m_navigationTriggerLoopRate<=0)
+    {
+        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
+        return false;
+    }
+    if (m_navigationReplanningDelay<0)
+    {
+        yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
+        return false;
+    }
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        yInfo() << "[NavigationHelper::init] Configuring NavigationHelper without publishing infos on ports ";
+        return true;
+    }
+    
     //ports for navigation integration
     std::string unicyclePortPortName = m_portPrefix + "/virtual_unicycle_states:o";
     if (!m_unicyclePort.open(unicyclePortPortName))
@@ -120,21 +147,6 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
         return false;
     }
 
-    yarp::os::Bottle& trajectoryPlannerOptions = config.findGroup("NAVIGATION");
-    m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
-    m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
-    // format check
-    if (m_navigationTriggerLoopRate<=0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
-        return false;
-    }
-    if (m_navigationReplanningDelay<0)
-    {
-        yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
-        return false;
-    }
-
     m_runThreads = true;
     m_virtualUnicyclePubliserThread = std::thread(&NavigationHelper::computeVirtualUnicycleThread, this, std::ref(FKSolver), std::ref(stableDCMModel), std::ref(trajectoryGenerator));
     m_navigationTriggerThread = std::thread(&NavigationHelper::computeNavigationTrigger, this);
@@ -145,6 +157,10 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
 // Writes on a port a boolean value when to replan the path
 void NavigationHelper::computeNavigationTrigger()
 {
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        return;
+    }
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
     yInfo() << "[NavigationHelper::computeNavigationTrigger] Starting Thread";
     yarp::os::NetworkClock myClock;
@@ -212,6 +228,11 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
                                                     std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator
                                                     )
 {
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        return;
+    }
+    
     yInfo() << "[NavigationHelper::computeVirtualUnicycleThread] Starting Thread";
     bool inContact = false;
     while (m_runThreads)
@@ -307,6 +328,10 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
 
 bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerator> &trajectoryGenerator)
 {
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        return true;
+    }
     if (m_feetPort.isClosed())
     {
         yError() << "[NavigationHelper::publishPlannedFootsteps] Feet port closed (no data sent).";
@@ -350,6 +375,11 @@ bool NavigationHelper::publishCoM(bool newTrajectoryMerged, std::deque<iDynTree:
                                 std::deque<iDynTree::Transform> &m_leftTrajectory,
                                 std::deque<iDynTree::Transform> &m_rightTrajectory)
 {
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        return true;
+    }
+    
     // streaming CoM desired position and heading for Navigation algorithms         
     //if(!m_leftTrajectory.size() == m_DCMPositionDesired.size())
     //{

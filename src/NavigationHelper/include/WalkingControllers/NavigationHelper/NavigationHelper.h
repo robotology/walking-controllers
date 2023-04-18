@@ -35,8 +35,8 @@ namespace WalkingControllers
         double m_navigationReplanningDelay;   /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
         int m_navigationTriggerLoopRate;    /**< Loop rate for the thread computing the navigation trigger*/
         bool m_wasInDoubleSupport;
+        bool m_publishInfo;
         std::deque<iDynTree::Vector3> m_desiredCoM_Trajectory;  /**< Deque containing the desired CoM trajectory projected on the ground in pose x, y, theta. */
-
 
         std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
         std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */

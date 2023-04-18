@@ -507,7 +507,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         //m_runThreads = true;
         //m_virtualUnicyclePubliserThread = std::thread(&WalkingModule::computeVirtualUnicycleThread, this);
         //m_navigationTriggerThread = std::thread(&WalkingModule::computeNavigationTrigger, this);
-        if(!m_navHelper.init(trajectoryPlannerOptions, m_leftInContact, m_rightInContact, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
+        if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
         {
             yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
         }
