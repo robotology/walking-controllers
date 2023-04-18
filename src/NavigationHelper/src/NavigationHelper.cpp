@@ -20,6 +20,7 @@ using namespace WalkingControllers;
 
 NavigationHelper::NavigationHelper()
 {
+    m_wasInDoubleSupport = false;
 }
     
 NavigationHelper::~NavigationHelper()
@@ -71,6 +72,8 @@ bool NavigationHelper::closeHelper()
             m_replanningTriggerPort.close();
         if(!m_feetPort.isClosed())
             m_feetPort.close();
+        if(!m_plannedCoMPositionPort.isClosed())
+            m_plannedCoMPositionPort.close();
     }
     catch(const std::exception& e)
     {
@@ -106,6 +109,15 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     if (!m_feetPort.open(feetPositionsPortPortName))
     {
         yError() << "[WalkingModule::configure] Could not open feet_positions port";
+        return false;
+    }
+
+    // open CoM planned trajectory port for navigation integration
+    std::string plannedCoMPositionPortName = "/planned_CoM/data:o";
+    if (!m_plannedCoMPositionPort.open(plannedCoMPositionPortName))
+    {
+        yError() << "[WalkingModule::configure] Could not open " << plannedCoMPositionPortName << " port.";
+        return false;
     }
 
     yarp::os::Bottle& trajectoryPlannerOptions = config.findGroup("NAVIGATION");
@@ -330,5 +342,85 @@ bool NavigationHelper::publishPlannedFootsteps(std::unique_ptr<TrajectoryGenerat
             m_feetPort.write();
         }
     }
+    return true;
+}
+
+bool NavigationHelper::publishCoM(bool newTrajectoryMerged, std::deque<iDynTree::Vector2> &m_DCMPositionDesired, 
+                                std::unique_ptr<StableDCMModel> &m_stableDCMModel,
+                                std::deque<iDynTree::Transform> &m_leftTrajectory,
+                                std::deque<iDynTree::Transform> &m_rightTrajectory)
+{
+    // streaming CoM desired position and heading for Navigation algorithms         
+    //if(!m_leftTrajectory.size() == m_DCMPositionDesired.size())
+    //{
+    //    yWarning() << "[WalkingModule::updateModule] Inconsistent dimenstions. CoM planned poses will be augmented" ;
+    //}
+
+    double yawLeftp, yawRightp, meanYawp;
+    yarp::sig::Vector& planned_poses = m_plannedCoMPositionPort.prepare();
+    planned_poses.clear();
+
+    bool saveCoM = false;   //flag to whether save the CoM trajectory only once each double support
+    if (m_leftInContact->size()>0 && m_rightInContact->size()>0)  //consistency check
+    {
+        //evaluate the state of the contacts
+        if (m_leftInContact->at(0) && m_rightInContact->at(0))  //double support
+        {
+            if (!m_wasInDoubleSupport)
+            {
+                saveCoM = true;
+                m_wasInDoubleSupport = true;
+            }
+            else    //I still need to assign a value to the flag
+            {
+                saveCoM = false;
+            }
+                
+            //override the previous state check if there has been a merge of a new trajectory on this thread cycle
+            //in this way we have the latest updated trajectory
+            if (newTrajectoryMerged)
+            {
+                saveCoM = true;
+            }
+        }
+        else
+        {
+            saveCoM = false;
+            if (m_wasInDoubleSupport)
+            {
+                m_wasInDoubleSupport = false;
+            }
+        }
+    }
+        
+    if (saveCoM)
+    {
+        m_desiredCoM_Trajectory.clear();
+    }
+    for (auto i = 0; i < m_DCMPositionDesired.size(); i++)
+    {
+        m_stableDCMModel->setInput(m_DCMPositionDesired[i]);
+        m_stableDCMModel->integrateModel();
+        yawLeftp =  m_leftTrajectory[i].getRotation().asRPY()(2);
+        yawLeftp =  m_rightTrajectory[i].getRotation().asRPY()(2);
+        meanYawp = std::atan2(std::sin(yawLeftp) + std::sin(yawRightp),
+                                std::cos(yawLeftp) + std::cos(yawRightp));
+        
+        planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[0]);
+        planned_poses.push_back(m_stableDCMModel->getCoMPosition().data()[1]);
+        planned_poses.push_back(meanYawp);
+        //saving data also internally -> should do this only once per double support
+        if (saveCoM)
+        {
+            iDynTree::Vector3 pose;
+            pose(0) = m_DCMPositionDesired[i](0);
+            pose(1) = m_DCMPositionDesired[i](1);;
+            pose(2) = meanYawp;
+            m_desiredCoM_Trajectory.push_back(pose);
+        }
+    }
+    //m_newTrajectoryMerged = false;  //reset flag
+    m_plannedCoMPositionPort.write();
+    m_stableDCMModel->reset(m_DCMPositionDesired.front());
     return true;
 }
