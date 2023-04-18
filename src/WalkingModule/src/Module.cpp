@@ -408,20 +408,20 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     }
 
     // open CoM planned trajectory port for navigation integration
-    std::string plannedCoMPositionPortName = "/planned_CoM/data:o";
-    if (!m_plannedCoMPositionPort.open(plannedCoMPositionPortName))
-    {
-        yError() << "[WalkingModule::configure] Could not open" << plannedCoMPositionPortName << " port.";
-        return false;
-    }
+    //std::string plannedCoMPositionPortName = "/planned_CoM/data:o";
+    //if (!m_plannedCoMPositionPort.open(plannedCoMPositionPortName))
+    //{
+    //    yError() << "[WalkingModule::configure] Could not open" << plannedCoMPositionPortName << " port.";
+    //    return false;
+    //}
 
     // open CoM planned trajectory port for navigation integration
-    std::string replanningTriggerPortPortName = "/" + getName() + "/replanning_trigger:o";
-    if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
-    {
-        yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
-        return false;
-    }
+    //std::string replanningTriggerPortPortName = "/" + getName() + "/replanning_trigger:o";
+    //if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
+    //{
+    //    yError() << "[WalkingModule::configure] Could not open" << replanningTriggerPortPortName << " port.";
+    //    return false;
+    //}
 
     // initialize the logger
     if(m_dumpData)
@@ -480,28 +480,28 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     if (trajectoryPlannerOptions.check("plannerMode", yarp::os::Value("manual")).asString() == "navigation")
     {
         yInfo() << "Found navigation setup.";
-        m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
-        m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
-        // format check
-        if (m_navigationTriggerLoopRate<=0)
-        {
-            yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
-            return false;
-        }
-        if (m_navigationReplanningDelay<0)
-        {
-            yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
-            return false;
-        }
+        //m_navigationReplanningDelay = trajectoryPlannerOptions.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
+        //m_navigationTriggerLoopRate = trajectoryPlannerOptions.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
+        //// format check
+        //if (m_navigationTriggerLoopRate<=0)
+        //{
+        //    yError() << "[configure] navigationTriggerLoopRate must be strictly positive, instead is: " << m_navigationTriggerLoopRate;
+        //    return false;
+        //}
+        //if (m_navigationReplanningDelay<0)
+        //{
+        //    yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
+        //    return false;
+        //}
         //// open ports for navigation
         //if (!m_feetPort.open("/" + getName() + "/" + "feet_positions:o"))
         //{
         //    yError() << "[WalkingModule::configure] Could not open feet_positions port";
         //}
-        if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
-        {
-           yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
-        }
+        //if (!m_unicyclePort.open("/" + getName() + "/" + "virtual_unicycle_states:o"))
+        //{
+        //   yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
+        //}
 
         // start the threads used for computing navigation needed infos
         //m_runThreads = true;
@@ -562,10 +562,10 @@ bool WalkingModule::close()
             m_navigationTriggerThread = std::thread();
         }
 
-        m_plannedCoMPositionPort.close();
-        m_feetPort.close();
-        m_unicyclePort.close();
-        m_replanningTriggerPort.close();
+        //m_plannedCoMPositionPort.close();
+        //m_feetPort.close();
+        //m_unicyclePort.close();
+        //m_replanningTriggerPort.close();
     }
 
     // restore PID
@@ -1229,6 +1229,7 @@ bool WalkingModule::updateModule()
 
         }
 
+        /*
         // streaming CoM desired position and heading for Navigation algorithms         
         if(!m_leftTrajectory.size() == m_DCMPositionDesired.size())
         {
@@ -1301,6 +1302,7 @@ bool WalkingModule::updateModule()
         m_newTrajectoryMerged = false;  //reset flag
         m_plannedCoMPositionPort.write();
         m_stableDCMModel->reset(m_DCMPositionDesired.front());
+        */
 
         // in the approaching phase the robot should not move and the trajectories should not advance
         if(!m_retargetingClient->isApproachingPhase())
@@ -1913,7 +1915,7 @@ bool WalkingModule::pauseWalking()
     // close the logger
     if(m_dumpData)
         m_loggerPort.close();
-    m_feetPort.close();
+    //m_feetPort.close();
     m_robotState = WalkingFSM::Paused;
     return true;
 }

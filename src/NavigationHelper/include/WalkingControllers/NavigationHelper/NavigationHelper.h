@@ -41,6 +41,8 @@ namespace WalkingControllers
         std::thread m_virtualUnicyclePubliserThread; /**< Thread for publishing the state of the unicycle used in the TrajectoryGenerator. */
         std::thread m_navigationTriggerThread; /**< Thread for publishing the flag triggering the navigation's global planner. */
 
+        const std::string m_portPrefix = "/navigation_helper";
+
     public:
         NavigationHelper();
         ~NavigationHelper();

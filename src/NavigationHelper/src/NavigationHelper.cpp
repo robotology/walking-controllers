@@ -91,21 +91,21 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     m_leftInContact = &leftInContact;
     m_rightInContact = &rightInContact;
     //ports for navigation integration
-    std::string unicyclePortPortName = "/virtual_unicycle_states:o";
+    std::string unicyclePortPortName = m_portPrefix + "/virtual_unicycle_states:o";
     if (!m_unicyclePort.open(unicyclePortPortName))
     {
         yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
         return false;
     }
 
-    std::string replanningTriggerPortPortName = "/replanning_trigger:o";
+    std::string replanningTriggerPortPortName = m_portPrefix + "/replanning_trigger:o";
     if (!m_replanningTriggerPort.open(replanningTriggerPortPortName))
     {
         yError() << "[NavigationHelper::init] Could not open" << replanningTriggerPortPortName << " port.";
         return false;
     }
 
-    std::string feetPositionsPortPortName = "/feet_positions:o";
+    std::string feetPositionsPortPortName = m_portPrefix + "/feet_positions:o";
     if (!m_feetPort.open(feetPositionsPortPortName))
     {
         yError() << "[WalkingModule::configure] Could not open feet_positions port";
@@ -113,7 +113,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     }
 
     // open CoM planned trajectory port for navigation integration
-    std::string plannedCoMPositionPortName = "/planned_CoM/data:o";
+    std::string plannedCoMPositionPortName = m_portPrefix + "/planned_CoM/data:o";
     if (!m_plannedCoMPositionPort.open(plannedCoMPositionPortName))
     {
         yError() << "[WalkingModule::configure] Could not open " << plannedCoMPositionPortName << " port.";
