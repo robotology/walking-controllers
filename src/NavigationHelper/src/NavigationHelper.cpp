@@ -284,7 +284,7 @@ void NavigationHelper::computeVirtualUnicycleThread(std::unique_ptr<WalkingFK> &
         //Data conversion and port writing
         if (inContact)
         {
-            if (trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+            if (trajectoryGenerator->getUnicycleState(stanceFoot, virtualUnicyclePose, virtualUnicycleReference))
             {
                 //send data
                 yarp::os::Stamp stamp (0, yarp::os::Time::now());   //move to private member of the class

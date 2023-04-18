@@ -1116,7 +1116,7 @@ bool TrajectoryGenerator::getFootprints(std::vector<Pose>& leftFootprints, std::
     return true;
 }
 
-bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose, const std::string& stanceFoot)
+bool TrajectoryGenerator::getUnicycleState(const std::string& stanceFoot, iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose)
 {
     double nominalWidth;
     bool correctLeft;
@@ -1154,7 +1154,6 @@ bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePos
         unicycleAngle = measuredAngleLeft;  //- leftYawDeltaInRad
         unicycleAngleOdom = measuredAngleLeft - leftYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionLeft);
-        //stanceFoot = "left";
     }
     else if (stanceFoot == "right")
     {
@@ -1162,7 +1161,6 @@ bool TrajectoryGenerator::getUnicycleState(iDynTree::Vector3& virtualUnicyclePos
         unicycleAngle = measuredAngleRight;    //- rightYawDeltaInRad
         unicycleAngleOdom = measuredAngleRight - rightYawDeltaInRad;
         footPosition = iDynTree::toEigen(measuredPositionRight);
-        //stanceFoot = "right";
     }
     else
     {

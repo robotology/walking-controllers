@@ -1987,7 +1987,7 @@ void WalkingModule::computeVirtualUnicycleThread()
         //Data conversion and port writing
         if (inContact)
         {
-            if (m_trajectoryGenerator->getUnicycleState(virtualUnicyclePose, virtualUnicycleReference, stanceFoot))
+            if (m_trajectoryGenerator->getUnicycleState(stanceFoot, virtualUnicyclePose, virtualUnicycleReference))
             {
                 //send data
                 yarp::os::Stamp stamp (0, yarp::os::Time::now());   //move to private member of the class
