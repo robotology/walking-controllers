@@ -100,7 +100,12 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
         //if in navigation mode we need this parameter to be true
         m_publishInfo = true;
     }
-    
+    if (!m_publishInfo)
+    {   //exit the funnction if the infos are not needed
+        yInfo() << "[NavigationHelper::init] Configuring NavigationHelper without publishing infos on ports ";
+        return true;
+    }
+
     // format check
     if (m_navigationTriggerLoopRate<=0)
     {
@@ -111,11 +116,6 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     {
         yError() << "[configure] navigationTriggerLoopRate must be positive, instead is: " << m_navigationReplanningDelay;
         return false;
-    }
-    if (!m_publishInfo)
-    {   //exit the funnction if the infos are not needed
-        yInfo() << "[NavigationHelper::init] Configuring NavigationHelper without publishing infos on ports ";
-        return true;
     }
     
     //ports for navigation integration
@@ -169,7 +169,7 @@ void NavigationHelper::computeNavigationTrigger()
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (m_runThreads)
     {
-        // Block the thread until the robot is in the walking state
+        //ptr check to avoid coredump
         if (m_leftInContact == nullptr || m_rightInContact == nullptr)
         {
             //kill thread
