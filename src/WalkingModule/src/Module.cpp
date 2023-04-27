@@ -11,7 +11,6 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
-#include <chrono>
 
 // YARP
 #include <yarp/eigen/Eigen.h>
@@ -784,7 +783,6 @@ bool WalkingModule::updateModule()
                 }
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
-                m_newTrajectoryMerged = true;
             }
 
             m_newTrajectoryMergeCounter--;
