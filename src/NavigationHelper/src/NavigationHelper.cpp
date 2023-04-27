@@ -10,9 +10,6 @@
 #include <thread>
 #include <WalkingControllers/NavigationHelper/NavigationHelper.h>
 
-#include <yarp/os/Stamp.h>
-#include <yarp/os/NetworkClock.h>
-
 #include <WalkingControllers/YarpUtilities/Helper.h>
 
 
