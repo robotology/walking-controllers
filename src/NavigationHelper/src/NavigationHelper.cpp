@@ -112,7 +112,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
 void NavigationHelper::computeNavigationTrigger()
 {
     if (!m_publishInfo)
-    {   //exit the funnction if the infos are not needed
+    {   //exit the function if the infos are not needed
         return;
     }
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
