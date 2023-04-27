@@ -448,9 +448,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
     
     // start the threads used for computing navigation needed infos
-    if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact))
+    if (!navigationOptions.isNull())
     {
-        yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+        if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact))
+        {
+            yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+        }
     }
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
