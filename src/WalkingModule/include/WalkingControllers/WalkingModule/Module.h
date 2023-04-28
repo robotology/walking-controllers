@@ -158,6 +158,7 @@ namespace WalkingControllers
         double m_feedbackAttemptDelay;
 
         NavigationHelper m_navHelper;
+        bool m_navHelperUsed;
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};

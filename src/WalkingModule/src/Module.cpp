@@ -450,11 +450,17 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     // start the threads used for computing navigation needed infos
     if (!navigationOptions.isNull())
     {
+        m_navHelperUsed = true;
         if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact))
         {
             yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
         }
     }
+    else
+    {
+        m_navHelperUsed = false;
+    }
+    
     
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -485,7 +491,8 @@ bool WalkingModule::close()
     if(m_dumpData)
         m_loggerPort.close();
     
-    m_navHelper.closeHelper();
+    if(m_navHelperUsed)
+        m_navHelper.closeHelper();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -1562,6 +1569,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdUtilities::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
     StdUtilities::appendVectorToDeque(rightInContact, m_rightInContact, mergePoint);
 
+    if (m_navHelperUsed)
+        m_navHelper.updateFeetDeques(m_leftInContact, m_rightInContact);
+    
     StdUtilities::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
 

@@ -63,8 +63,8 @@ bool NavigationHelper::closeHelper()
 
 bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact )
 {
-    m_leftInContact = &leftInContact;
-    m_rightInContact = &rightInContact;
+    m_leftInContact = leftInContact;
+    m_rightInContact = rightInContact;
 
     m_navigationReplanningDelay = config.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
     m_navigationTriggerLoopRate = config.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
@@ -119,38 +119,33 @@ void NavigationHelper::computeNavigationTrigger()
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (m_runThreads)
     {
-        //ptr check to avoid coredump
-        if (m_leftInContact == nullptr || m_rightInContact == nullptr)
-        {
-            //kill thread
-            yError() << "[NavigationHelper::computeNavigationTrigger] null pointer to m_leftInContact or m_rightInContact. Killing thread.";
-            return;
-        }
-
         //double support check
-        if (m_leftInContact->size()>0 && m_rightInContact->size()>0)  //external consistency check
         {
-            if (m_leftInContact->at(0) && m_rightInContact->at(0))
+            const std::lock_guard<std::mutex> lock(m_updateFeetMutex);
+            if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
             {
-                if (exitDoubleSupport)
+                if (m_leftInContact.at(0) && m_rightInContact.at(0))
                 {
-                    enteredDoubleSupport = true;
-                    exitDoubleSupport = false;
+                    if (exitDoubleSupport)
+                    {
+                        enteredDoubleSupport = true;
+                        exitDoubleSupport = false;
+                    }
+                }
+                else
+                {
+                    if (! exitDoubleSupport)
+                    {
+                        trigger = true; //in this way we have only one trigger each exit of double support
+                    }
+                    exitDoubleSupport = true;
                 }
             }
             else
             {
-                if (! exitDoubleSupport)
-                {
-                    trigger = true; //in this way we have only one trigger each exit of double support
-                }
-                exitDoubleSupport = true;
+                trigger = false;
             }
-        }
-        else
-        {
-            trigger = false;
-        }
+            }
         
         //send the replanning trigger after a certain amount of seconds
         if (trigger)
@@ -168,4 +163,13 @@ void NavigationHelper::computeNavigationTrigger()
         std::this_thread::sleep_for(std::chrono::milliseconds(1000/m_navigationTriggerLoopRate));
     }
     yInfo() << "[NavigationHelper::computeNavigationTrigger] Terminated thread";
+}
+
+
+bool NavigationHelper::updateFeetDeques(std::deque<bool> left, std::deque<bool> right)
+{
+    const std::lock_guard<std::mutex> lock(m_updateFeetMutex);
+    m_leftInContact = left;
+    m_rightInContact = right;
+    return true;
 }

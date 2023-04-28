@@ -14,6 +14,7 @@
 #include <atomic>
 #include <thread>
 #include <deque>
+#include <mutex>
 
 namespace WalkingControllers
 {
@@ -22,12 +23,13 @@ namespace WalkingControllers
     private:
         yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
         std::atomic<bool> m_runThreads{false};  /**< Global flag that allows the looping of the threads. */
-        std::deque<bool>* m_leftInContact;      /**< Pointer to the deques in Module of the left feet contacts status. */
-        std::deque<bool>* m_rightInContact;     /**< Pointer to the deques in Module of the left feet contacts status. */
+        std::deque<bool> m_leftInContact;      /**< Pointer to the deques in Module of the left feet contacts status. */
+        std::deque<bool> m_rightInContact;     /**< Pointer to the deques in Module of the left feet contacts status. */
         double m_navigationReplanningDelay;     /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
         int m_navigationTriggerLoopRate;        /**< Loop rate for the thread computing the navigation trigger*/
         bool m_publishInfo;
         std::thread m_navigationTriggerThread;  /**< Thread for publishing the flag triggering the navigation's global planner. */
+        std::mutex m_updateFeetMutex;                     
 
         const std::string m_portPrefix = "/navigation_helper";
         
@@ -63,6 +65,8 @@ namespace WalkingControllers
          * Function launched by the looping thread
          */
         void computeNavigationTrigger();
+
+        bool updateFeetDeques(std::deque<bool> left, std::deque<bool> right);
     };
 }
 
