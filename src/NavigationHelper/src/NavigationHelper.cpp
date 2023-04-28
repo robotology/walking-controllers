@@ -134,7 +134,7 @@ void NavigationHelper::computeNavigationTrigger()
                 }
                 else
                 {
-                    if (! exitDoubleSupport)
+                    if (!exitDoubleSupport)
                     {
                         trigger = true; //in this way we have only one trigger each exit of double support
                     }
