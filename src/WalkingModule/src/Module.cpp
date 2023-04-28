@@ -80,6 +80,9 @@ bool WalkingModule::advanceReferenceSignals()
 
     m_leftInContact.pop_front();
     m_leftInContact.push_back(m_leftInContact.back());
+    
+    if (m_navHelperUsed)
+        m_navHelper.updateFeetDeques(m_leftInContact, m_rightInContact);
 
     m_isLeftFixedFrame.pop_front();
     m_isLeftFixedFrame.push_back(m_isLeftFixedFrame.back());
@@ -455,6 +458,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         {
             yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
         }
+        yInfo() << "[WalkingModule::configure] Configured Navigation Helper.";
     }
     else
     {
