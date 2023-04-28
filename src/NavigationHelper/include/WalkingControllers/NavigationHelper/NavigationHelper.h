@@ -29,7 +29,8 @@ namespace WalkingControllers
         int m_navigationTriggerLoopRate;        /**< Loop rate for the thread computing the navigation trigger*/
         bool m_publishInfo;
         std::thread m_navigationTriggerThread;  /**< Thread for publishing the flag triggering the navigation's global planner. */
-        std::mutex m_updateFeetMutex;                     
+        std::mutex m_updateFeetMutex;    
+        bool m_simulationMode{false};                 
 
         const std::string m_portPrefix = "/navigation_helper";
         

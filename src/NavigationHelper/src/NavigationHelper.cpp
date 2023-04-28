@@ -69,6 +69,7 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     m_navigationReplanningDelay = config.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
     m_navigationTriggerLoopRate = config.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
     m_publishInfo = config.check("publishNavigationInfo", yarp::os::Value(false)).asBool();
+    m_simulationMode = config.check("simulationMode", yarp::os::Value(false)).asBool();
     if (config.check("plannerMode", yarp::os::Value("manual")).asString() == "navigation")
     {
         //if in navigation mode we need this parameter to be true
@@ -115,7 +116,10 @@ void NavigationHelper::computeNavigationTrigger()
     bool trigger = false;   //flag used to fire the wait for sending the navigation replanning trigger
     yInfo() << "[NavigationHelper::computeNavigationTrigger] Starting Thread";
     yarp::os::NetworkClock myClock;
-    myClock.open("/clock", "/navigationTriggerClock");
+    if (m_simulationMode)
+    {
+        myClock.open("/clock", "/navigationTriggerClock");
+    }
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (m_runThreads)
     {
@@ -152,7 +156,15 @@ void NavigationHelper::computeNavigationTrigger()
         {
             trigger = false;
             //waiting -> could make it dependant by the current swing step duration
-            myClock.delay(m_navigationReplanningDelay);
+            //if in simulation we need to sync the clock, we can't use the system clock
+            if (m_simulationMode)
+            {
+                myClock.delay(m_navigationReplanningDelay);
+            }
+            else
+            {
+                std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(m_navigationReplanningDelay*1000));
+            }
             yDebug() << "[NavigationHelper::computeNavigationTrigger] Triggering navigation replanning";
             auto& b = m_replanningTriggerPort.prepare();
             b.clear();
