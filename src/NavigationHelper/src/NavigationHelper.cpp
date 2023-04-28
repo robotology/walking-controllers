@@ -61,11 +61,8 @@ bool NavigationHelper::closeHelper()
     return true;
 }
 
-bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool> &leftInContact, std::deque<bool> &rightInContact )
+bool NavigationHelper::init(const yarp::os::Searchable& config)
 {
-    m_leftInContact = leftInContact;
-    m_rightInContact = rightInContact;
-
     m_navigationReplanningDelay = config.check("navigationReplanningDelay", yarp::os::Value(0.9)).asFloat64();
     m_navigationTriggerLoopRate = config.check("navigationTriggerLoopRate", yarp::os::Value(100)).asInt32();
     m_publishInfo = config.check("publishNavigationInfo", yarp::os::Value(false)).asBool();
@@ -123,12 +120,11 @@ void NavigationHelper::computeNavigationTrigger()
     bool enteredDoubleSupport = false, exitDoubleSupport = true;
     while (m_runThreads)
     {
-        //double support check
         {
-            const std::lock_guard<std::mutex> lock(m_updateFeetMutex);
+            std::unique_lock<std::mutex> lock(m_updateFeetMutex);
             if (m_leftInContact.size()>0 && m_rightInContact.size()>0)  //external consistency check
             {
-                if (m_leftInContact.at(0) && m_rightInContact.at(0))
+                if (m_leftInContact.at(0) && m_rightInContact.at(0))    //double support check
                 {
                     if (exitDoubleSupport)
                     {
@@ -149,7 +145,7 @@ void NavigationHelper::computeNavigationTrigger()
             {
                 trigger = false;
             }
-            }
+        }
         
         //send the replanning trigger after a certain amount of seconds
         if (trigger)
@@ -165,7 +161,7 @@ void NavigationHelper::computeNavigationTrigger()
             {
                 std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(m_navigationReplanningDelay*1000));
             }
-            yDebug() << "[NavigationHelper::computeNavigationTrigger] Triggering navigation replanning";
+            yInfo() << "[NavigationHelper::computeNavigationTrigger] Triggering navigation replanning";
             auto& b = m_replanningTriggerPort.prepare();
             b.clear();
             b.add((yarp::os::Value)true);   //send the planning trigger
@@ -178,9 +174,9 @@ void NavigationHelper::computeNavigationTrigger()
 }
 
 
-bool NavigationHelper::updateFeetDeques(std::deque<bool> left, std::deque<bool> right)
+bool NavigationHelper::updateFeetDeques(const std::deque<bool> &left, const std::deque<bool> &right)
 {
-    const std::lock_guard<std::mutex> lock(m_updateFeetMutex);
+    std::unique_lock<std::mutex> lock(m_updateFeetMutex);
     m_leftInContact = left;
     m_rightInContact = right;
     return true;

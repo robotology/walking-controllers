@@ -22,18 +22,23 @@ namespace WalkingControllers
     {
     private:
         yarp::os::BufferedPort<yarp::os::Bottle> m_replanningTriggerPort; /**< Publishes the flag triggering the navigation's global planner. */
-        std::atomic<bool> m_runThreads{false};  /**< Global flag that allows the looping of the threads. */
-        std::deque<bool> m_leftInContact;      /**< Pointer to the deques in Module of the left feet contacts status. */
-        std::deque<bool> m_rightInContact;     /**< Pointer to the deques in Module of the left feet contacts status. */
-        double m_navigationReplanningDelay;     /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
-        int m_navigationTriggerLoopRate;        /**< Loop rate for the thread computing the navigation trigger*/
-        bool m_publishInfo;
-        std::thread m_navigationTriggerThread;  /**< Thread for publishing the flag triggering the navigation's global planner. */
+        std::atomic<bool> m_runThreads{false};      /**< Global flag that allows the looping of the threads. */
+        std::deque<bool> m_leftInContact;           /**< Copy of the deques in Module of the left feet contacts status. */
+        std::deque<bool> m_rightInContact;          /**< Copy of the deques in Module of the left feet contacts status. */
+        double m_navigationReplanningDelay;         /**< Delay in seconds of how much to wait before sending the trigger to the navigation stack after exiting double support. */
+        int m_navigationTriggerLoopRate;            /**< Loop rate for the thread computing the navigation trigger*/
+        bool m_publishInfo;                         /**< Flag to whether publish information. */
+        std::thread m_navigationTriggerThread;      /**< Thread for publishing the flag triggering the navigation's global planner. */
         std::mutex m_updateFeetMutex;    
-        bool m_simulationMode{false};                 
+        bool m_simulationMode{false};               /**< Flag that syncs the trigger delay with the external clock if in simulation. */  
 
         const std::string m_portPrefix = "/navigation_helper";
         
+        /**
+         * Function launched by the looping thread
+         */
+        void computeNavigationTrigger();
+
     public:
         NavigationHelper();
         ~NavigationHelper();
@@ -53,21 +58,11 @@ namespace WalkingControllers
         /**
          * Initialize the Navigation Helper
          * @param config yarp searchable object of the configuration.
-         * @param leftInContact deque in Module.cpp of the left feet contacts status.
-         * @param rightInContact deque in Module.cpp of the right feet contacts status.
          * @return true/false in case of success/failure.
          */
-        bool init(const yarp::os::Searchable& config, 
-                    std::deque<bool> &leftInContact, 
-                    std::deque<bool> &rightInContact
-                    );
+        bool init(const yarp::os::Searchable& config);
 
-        /**
-         * Function launched by the looping thread
-         */
-        void computeNavigationTrigger();
-
-        bool updateFeetDeques(std::deque<bool> left, std::deque<bool> right);
+        bool updateFeetDeques(const std::deque<bool> &left, const std::deque<bool> &right);
     };
 }
 
