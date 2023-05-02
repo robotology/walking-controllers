@@ -29,7 +29,7 @@ namespace WalkingControllers
         int m_navigationTriggerLoopRate;            /**< Loop rate for the thread computing the navigation trigger*/
         bool m_publishInfo;                         /**< Flag to whether publish information. */
         std::thread m_navigationTriggerThread;      /**< Thread for publishing the flag triggering the navigation's global planner. */
-        std::mutex m_updateFeetMutex;    
+        std::mutex m_updateFeetMutex;               /**< Mutex that regulates the access to m_leftInContact and m_rightInContact. */
         bool m_simulationMode{false};               /**< Flag that syncs the trigger delay with the external clock if in simulation. */  
 
         const std::string m_portPrefix = "/navigation_helper";
@@ -39,15 +39,22 @@ namespace WalkingControllers
          */
         void computeNavigationTrigger();
 
-    public:
-        NavigationHelper();
-        ~NavigationHelper();
-
         /**
-         * Close the Navigation Helper Threads and ports
+         * Close the Navigation Helper Threads
          * @return true/false in case of success/failure.
          */
         bool closeThreads();
+
+    public:
+        /**
+         * Default constructor
+         */
+        NavigationHelper();
+
+        /**
+         * Default destructor
+         */
+        ~NavigationHelper();
 
         /**
          * Close the Navigation Helper Threads and ports
@@ -62,6 +69,12 @@ namespace WalkingControllers
          */
         bool init(const yarp::os::Searchable& config);
 
+        /**
+         * Updates the internal variables containing the relative feet contacts status
+         * @param left left feet contact status deque.
+         * @param right right feet contact status deque.
+         * @return true/false in case of success/failure.
+         */
         bool updateFeetDeques(const std::deque<bool> &left, const std::deque<bool> &right);
     };
 }
