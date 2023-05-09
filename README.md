@@ -234,3 +234,8 @@ Currently the supported robots are only:
 Yet, it is possible to use these controllers provided that the robot has V2.5 legs. In this case, the user should define the robot specific configuration files (those of ``iCubGenova04`` are a good starting point).
 
 :warning: The STRAIN F/T sensors normally mounted on iCub may suffer from saturations due to the strong impacts the robot has with the ground, which may lead to a failure of the controller. It is suggested to use these controllers with STRAIN2 sensors only (as in ``iCubGenova04``) to avoid such saturations.
+
+## Mantainers
+
+* Stefano Dafarra ([@S-Dafarra](https://github.com/S-Dafarra))
+* Giulio Romualdi ([@GiulioRomualdi](https://github.com/GiulioRomualdi))
