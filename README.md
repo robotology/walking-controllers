@@ -237,5 +237,5 @@ Yet, it is possible to use these controllers provided that the robot has V2.5 le
 
 ## Mantainers
 
-* Stefano Dafarra ([@S-Dafarra](https://github.com/S-Dafarra))
 * Giulio Romualdi ([@GiulioRomualdi](https://github.com/GiulioRomualdi))
+* Stefano Dafarra ([@S-Dafarra](https://github.com/S-Dafarra))
