@@ -79,10 +79,6 @@ namespace WalkingControllers
 
         std::vector<iDynTree::Vector2> m_2Dpath; /**< Path of 2D poses (x, y) in the odom reference frame */
         std::vector<UnicycleState> m_3Dpath; /**< Path of 3D poses (x, y, theta) in the odom reference frame */
-        std::vector<iDynTree::Vector2> m_transformed2DPath; /**< Path of 2D poses (x, y) in the robot reference frame */
-        std::vector<UnicycleState> m_transformed3DPath; /**< Path of 3D poses (x, y, theta) in the robot reference frame */
-
-        bool m_navigationMode;  /**< Flag that indicates if the controller is running in navigation mode */
         
         std::mutex m_mutex; /**< Mutex. */
 

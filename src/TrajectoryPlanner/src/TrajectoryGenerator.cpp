@@ -97,6 +97,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     {
         m_unicycleController = UnicycleController::DIRECT;
     }
+    else if (unicycleController == "navigation")
+    {
+        m_unicycleController = UnicycleController::NAVIGATION;
+    }
     else
     {
         yError() << "[configurePlanner] Initialization failed while reading controlType vector. Cannot use"
@@ -154,25 +158,6 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
         yError() << "[configurePlanner] Initialization failed while reading mergePointRatios vector.";
         return false;
     }
-
-    // Navigation or Manual mode of the planner
-    std::string plannerMode = config.check("plannerMode", yarp::os::Value("manual")).asString();
-    if (plannerMode == "navigation")
-    {
-        m_navigationMode = true;
-    }
-    else
-    {
-        m_navigationMode = false;
-    }
-    
-    if (!m_trajectoryGenerator.setPlannerMode(plannerMode))
-    {
-        yError() << "[configurePlanner] Initialization failed while reading plannerMode param. Cannot use "
-                 << plannerMode << " as plannerMode. Only manual and navigation are available.";
-        return false;
-    }
-    yInfo() << "[configurePlanner] Planner running in " << plannerMode << " mode";
 
     yarp::os::Bottle ellipseMethodGroup = config.findGroup("ELLIPSE_METHOD_SETTINGS");
     double freeSpaceConservativeFactor = ellipseMethodGroup.check("conservative_factor", yarp::os::Value(2.0)).asFloat64();
@@ -358,18 +343,18 @@ void TrajectoryGenerator::computeThread()
             footPosition = iDynTree::toEigen(measuredPositionRight);
         }
 
-        if (m_navigationMode == false)  //Manual mode
+        double s_theta = std::sin(unicycleAngle);
+        double c_theta = std::cos(unicycleAngle);
+
+        unicycleRotation(0,0) = c_theta;
+        unicycleRotation(0,1) = -s_theta;
+        unicycleRotation(1,0) = s_theta;
+        unicycleRotation(1,1) = c_theta;
+
+        unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+
+        if (m_unicycleController != UnicycleController::NAVIGATION)  //Manual mode
         {
-            double s_theta = std::sin(unicycleAngle);
-            double c_theta = std::cos(unicycleAngle);
-
-            unicycleRotation(0,0) = c_theta;
-            unicycleRotation(0,1) = -s_theta;
-            unicycleRotation(1,0) = s_theta;
-            unicycleRotation(1,1) = c_theta;
-
-            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
-
             // apply the homogeneous transformation w_H_{unicycle}
             iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
                                                                              iDynTree::toEigen(desiredPointInRelativeFrame))
@@ -391,7 +376,7 @@ void TrajectoryGenerator::computeThread()
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
         }
-        else if (m_navigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
+        /*else if (m_navigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
             double s_theta = std::sin(unicycleAngle);
             double c_theta = std::cos(unicycleAngle);
@@ -416,25 +401,16 @@ void TrajectoryGenerator::computeThread()
             }
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
-        }
-        else if (m_navigationMode && m_unicycleController == UnicycleController::DIRECT)
+        }*/
+        else    //UnicycleController::NAVIGATION
         {
             //Substute the first path pose to all zeroes:
             UnicycleState zeroPos;  //force the path from starting at 0,0,0 in robot frame
             zeroPos.angle = .0;
             zeroPos.position(0) = .0;
             zeroPos.position(1) = .0;
-            m_3Dpath.at(0) = zeroPos;
+            m_3Dpath.at(0) = zeroPos;   //overwrite first pose
             //Transform path in "odom" frame -> it is the initial starting robot frame
-            double s_theta = std::sin(unicycleAngle);
-            double c_theta = std::cos(unicycleAngle);
-
-            unicycleRotation(0,0) = c_theta;
-            unicycleRotation(0,1) = -s_theta;
-            unicycleRotation(1,0) = s_theta;
-            unicycleRotation(1,1) = c_theta;
-
-            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
             //Use transforms
             iDynTree::Position postion2D;
             postion2D(0) = unicyclePosition(0);
@@ -468,12 +444,6 @@ void TrajectoryGenerator::computeThread()
                 yErrorThrottle(1.0) << "[TrajectoryGenerator_Thread] Unable to set the navigation path to the planner.";
             }
         }
-        else
-        {
-            yError() << "[TrajectoryGenerator_Thread] Configuration of m_navigationMode and m_unicycleController not handled!";
-            break;
-        }
-        
 
         if (!m_dcmGenerator->setDCMInitialState(initialState)) {
             // something goes wrong
@@ -550,6 +520,29 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& in
     // set initial and final times
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
+
+    //set dummy path for generating first trajectory -TODO
+    //pass a path with poses of all zeroes
+    if (m_unicycleController == UnicycleController::NAVIGATION)
+    {
+        endTime = initTime + m_dT;  //we don't want the robot to step in place
+        m_3Dpath.clear();
+        std::vector<UnicycleState> tmp_vector;
+        for (size_t i = 0; i < 3; ++i)
+        {
+            UnicycleState tmp_pose;
+            tmp_pose.position(0) = .0;      //x
+            tmp_pose.position(1) = .0;      //y
+            tmp_pose.angle = .0;            //theta
+            //tmp_pose.push_back(tmp_pose);
+            m_3Dpath.push_back(tmp_pose);
+        }
+        if (! m_trajectoryGenerator.setNavigationPath(m_3Dpath))
+        {
+            yErrorThrottle(1.0) << "[generateFirstTrajectories] Unable to set the navigation path to the planner.";
+            return false;
+        }
+    }
 
     // at the beginning iCub has to stop
     m_personFollowingDesiredPoint(0) = m_referencePointDistance(0) + initialBasePosition(0);
@@ -661,6 +654,29 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Transform &l
         right->addStep(rightPosition, rightAngle, 0.0);
     }
 
+    //set dummy path for generating first trajectory -TODO
+    //pass a path with poses of all zeroes
+    if (m_unicycleController == UnicycleController::NAVIGATION)
+    {
+        endTime = initTime + m_dT;  //we don't want the robot to step in place
+        m_3Dpath.clear();
+        std::vector<UnicycleState> tmp_vector;
+        for (size_t i = 0; i < 3; ++i)
+        {
+            UnicycleState tmp_pose;
+            tmp_pose.position(0) = .0;      //x
+            tmp_pose.position(1) = .0;      //y
+            tmp_pose.angle = .0;            //theta
+            //tmp_pose.push_back(tmp_pose);
+            m_3Dpath.push_back(tmp_pose);
+        }
+        if (! m_trajectoryGenerator.setNavigationPath(m_3Dpath))
+        {
+            yErrorThrottle(1.0) << "[generateFirstTrajectories] Unable to set the navigation path to the planner.";
+            return false;
+        }
+    }
+
     // generate the first trajectories
     if(!m_trajectoryGenerator.generate(initTime, m_dT, endTime))
     {
@@ -697,10 +713,10 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         }
 
         m_personFollowingDesiredPoint.zero();
-        if (m_2Dpath.size() > 0)
-        {
-            m_2Dpath.clear();
-        }
+        //if (m_2Dpath.size() > 0)
+        //{
+        //    m_2Dpath.clear();
+        //}
         if (m_3Dpath.size() > 0)
         {
             m_3Dpath.clear();
@@ -709,8 +725,8 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         m_personFollowingDesiredPoint.zero();
         m_desiredDirectControl.zero();
 
-        if (!m_navigationMode)
-        {
+        //if (!m_navigationMode)
+        //{
             //Manual Mode
             if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
             {
@@ -745,8 +761,40 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                     m_desiredDirectControl(2) = plannerDesiredInput(2);
                 }
             }
-        }
-        else    //Navigation Mode
+            else if (m_unicycleController == UnicycleController::NAVIGATION)
+            {
+                if (plannerDesiredInput.size() < 3)
+                {
+                    yWarning() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension " << plannerDesiredInput.size()
+                                        << ". Using zero input.";
+                    //pass a path with two poses of all zeroes
+                    std::vector<UnicycleState> tmp_vector;
+                    for (size_t i = 0; i < 2; ++i)
+                    {
+                        UnicycleState tmp_pose;
+                        tmp_pose.position(0) = .0;      //x
+                        tmp_pose.position(1) = .0;      //y
+                        tmp_pose.angle = .0;            //theta
+                        //tmp_pose.push_back(tmp_pose);
+                        m_3Dpath.push_back(tmp_pose);
+                    }
+                }
+                else
+                {
+                    std::vector<UnicycleState> tmp_vector;
+                    for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/3); ++i)
+                    {
+                        UnicycleState tmp_pose;
+                        tmp_pose.position(0) = plannerDesiredInput(i*3);     //x
+                        tmp_pose.position(1) = plannerDesiredInput(i*3 + 1); //y
+                        tmp_pose.angle = plannerDesiredInput(i*3 + 2);       //theta
+                        m_3Dpath.push_back(tmp_pose);
+                    }
+                }
+                yInfo()<<"Setting Navigation Path of size: " << m_3Dpath.size();
+            }
+        //}
+        /*else    //Navigation Mode
         {
             if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)   //Use path of 2D poses (x, y)
             {
@@ -811,7 +859,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
                 m_desiredDirectControl(1) = 0.0;
                 m_desiredDirectControl(2) = 0.0;
             }
-        }
+        }*/
 
         m_initTime = initTime;
 
@@ -834,6 +882,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
     return true;
 }
 
+/*
 bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime)
 {   
     iDynTree::Vector2 approxSpeed; //speed taken from the saturation values of the linear velocity of the unicycle controller, multiplied by a reducing factor
@@ -876,7 +925,7 @@ bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, 
         
     }
     return true;
-}
+}*/
 
 bool TrajectoryGenerator::setFreeSpaceEllipse(const iDynTree::MatrixFixSize<2, 2> &imageMatrix, const iDynTree::VectorFixSize<2> &centerOffset)
 {
