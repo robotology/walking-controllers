@@ -376,32 +376,6 @@ void TrajectoryGenerator::computeThread()
 
             unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
         }
-        /*else if (m_navigationMode && m_unicycleController == UnicycleController::PERSON_FOLLOWING)
-        {
-            double s_theta = std::sin(unicycleAngle);
-            double c_theta = std::cos(unicycleAngle);
-
-            unicycleRotation(0,0) = c_theta;
-            unicycleRotation(0,1) = -s_theta;
-            unicycleRotation(1,0) = s_theta;
-            unicycleRotation(1,1) = c_theta;
-
-            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
-
-            // clear the old trajectory -> done inside addWaypoints
-            std::shared_ptr<UnicyclePlanner> unicyclePlanner = m_trajectoryGenerator.unicyclePlanner();
-
-            if(!addWaypoints(unicyclePosition, unicycleRotation, initTime, endTime))
-            {
-                // something went wrong
-                std::lock_guard<std::mutex> guard(m_mutex);
-                m_generatorState = GeneratorState::Configured;
-                yError() << "[TrajectoryGenerator_Thread] Error while setting the new reference.";
-                break;
-            }
-
-            unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
-        }*/
         else    //UnicycleController::NAVIGATION
         {
             //Substute the first path pose to all zeroes:
@@ -438,7 +412,7 @@ void TrajectoryGenerator::computeThread()
                 yDebug() << "i: " << i << " X: " << transformedPose.position(0) << " Y: " << transformedPose.position(1) << " transformedPose.angle: " << transformedPose.angle;
                 transformed3DPath.push_back(transformedPose);
             }
-            yDebug()<<"Setting Navigation Transformed Path of size: " << transformed3DPath.size();
+            
             if (! m_trajectoryGenerator.setNavigationPath(transformed3DPath))
             {
                 yErrorThrottle(1.0) << "[TrajectoryGenerator_Thread] Unable to set the navigation path to the planner.";
@@ -521,7 +495,7 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& in
     double initTime = 0;
     double endTime = initTime + m_plannerHorizon;
 
-    //set dummy path for generating first trajectory -TODO
+    //set dummy path for generating first trajectory
     //pass a path with poses of all zeroes
     if (m_unicycleController == UnicycleController::NAVIGATION)
     {
@@ -534,7 +508,6 @@ bool TrajectoryGenerator::generateFirstTrajectories(const iDynTree::Position& in
             tmp_pose.position(0) = .0;      //x
             tmp_pose.position(1) = .0;      //y
             tmp_pose.angle = .0;            //theta
-            //tmp_pose.push_back(tmp_pose);
             m_3Dpath.push_back(tmp_pose);
         }
         if (! m_trajectoryGenerator.setNavigationPath(m_3Dpath))
@@ -713,10 +686,7 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         }
 
         m_personFollowingDesiredPoint.zero();
-        //if (m_2Dpath.size() > 0)
-        //{
-        //    m_2Dpath.clear();
-        //}
+
         if (m_3Dpath.size() > 0)
         {
             m_3Dpath.clear();
@@ -725,141 +695,70 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
         m_personFollowingDesiredPoint.zero();
         m_desiredDirectControl.zero();
 
-        //if (!m_navigationMode)
-        //{
-            //Manual Mode
-            if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
-            {
-                if (plannerDesiredInput.size() < 2)
-                {
-                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
-                                        << ". Using zero input.";
-                }
-                else
-                {
-                    if (plannerDesiredInput.size() > 2)
-                    {
-                        yWarningOnce() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
-                                            << ". Using only the first two inputs. This warning will be showed only once.";
-                    }
-                
-                    m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
-                    m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
-                }
-            }
-            else if (m_unicycleController == UnicycleController::DIRECT)
-            {
-                if (plannerDesiredInput.size() != 3)
-                {
-                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 3, while it has dimension" << plannerDesiredInput.size()
-                                        << ". Using zero input.";
-                }
-                else
-                {
-                    m_desiredDirectControl(0) = plannerDesiredInput(0);
-                    m_desiredDirectControl(1) = plannerDesiredInput(1);
-                    m_desiredDirectControl(2) = plannerDesiredInput(2);
-                }
-            }
-            else if (m_unicycleController == UnicycleController::NAVIGATION)
-            {
-                if (plannerDesiredInput.size() < 3)
-                {
-                    yWarning() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension " << plannerDesiredInput.size()
-                                        << ". Using zero input.";
-                    //pass a path with two poses of all zeroes
-                    std::vector<UnicycleState> tmp_vector;
-                    for (size_t i = 0; i < 2; ++i)
-                    {
-                        UnicycleState tmp_pose;
-                        tmp_pose.position(0) = .0;      //x
-                        tmp_pose.position(1) = .0;      //y
-                        tmp_pose.angle = .0;            //theta
-                        //tmp_pose.push_back(tmp_pose);
-                        m_3Dpath.push_back(tmp_pose);
-                    }
-                }
-                else
-                {
-                    std::vector<UnicycleState> tmp_vector;
-                    for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/3); ++i)
-                    {
-                        UnicycleState tmp_pose;
-                        tmp_pose.position(0) = plannerDesiredInput(i*3);     //x
-                        tmp_pose.position(1) = plannerDesiredInput(i*3 + 1); //y
-                        tmp_pose.angle = plannerDesiredInput(i*3 + 2);       //theta
-                        m_3Dpath.push_back(tmp_pose);
-                    }
-                }
-                yInfo()<<"Setting Navigation Path of size: " << m_3Dpath.size();
-            }
-        //}
-        /*else    //Navigation Mode
+        if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)
         {
-            if (m_unicycleController == UnicycleController::PERSON_FOLLOWING)   //Use path of 2D poses (x, y)
+            if (plannerDesiredInput.size() < 2)
             {
-                if (plannerDesiredInput.size() < 2)
+                yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+                                    << ". Using zero input.";
+            }
+            else
+            {
+                if (plannerDesiredInput.size() > 2)
                 {
-                    yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have at least dimension 2, while it has dimension" << plannerDesiredInput.size()
-                                        << ". Using zero input.";
+                    yWarningOnce() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 2, while it has dimension" << plannerDesiredInput.size()
+                                        << ". Using only the first two inputs. This warning will be showed only once.";
                 }
-                else
+            
+                m_personFollowingDesiredPoint(0) = plannerDesiredInput(0);
+                m_personFollowingDesiredPoint(1) = plannerDesiredInput(1);
+            }
+        }
+        else if (m_unicycleController == UnicycleController::DIRECT)
+        {
+            if (plannerDesiredInput.size() != 3)
+            {
+                yErrorThrottle(1.0) << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension 3, while it has dimension" << plannerDesiredInput.size()
+                                    << ". Using zero input.";
+            }
+            else
+            {
+                m_desiredDirectControl(0) = plannerDesiredInput(0);
+                m_desiredDirectControl(1) = plannerDesiredInput(1);
+                m_desiredDirectControl(2) = plannerDesiredInput(2);
+            }
+        }
+        else if (m_unicycleController == UnicycleController::NAVIGATION)
+        {
+            if (plannerDesiredInput.size() < 3)
+            {
+                yWarning() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension " << plannerDesiredInput.size()
+                                    << ". Using zero input.";
+                //pass a path with two poses of all zeroes
+                std::vector<UnicycleState> tmp_vector;
+                for (size_t i = 0; i < 2; ++i)
                 {
-                    //Here I should convert the data from VectroDynSize to std::vector<Vector2>
-                    //m_personFollowingDesiredPoint = plannerDesiredInput;
-                    if (plannerDesiredInput.size()%2 != 0) 
-                    {
-                        //not even
-                        yWarning() << "[updateTrajectories] plannerDesiredInput should be even, instead is: " << plannerDesiredInput.size()
-                                   << "The last element will be ignored";
-                    }
-
-                    for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/2); ++i)
-                    {
-                        iDynTree::Vector2 tmp_pose;
-                        tmp_pose(0) = plannerDesiredInput(i*2);     //x
-                        tmp_pose(1) = plannerDesiredInput(i*2 + 1); //y
-                        m_2Dpath.push_back(tmp_pose);
-                    } 
+                    UnicycleState tmp_pose;
+                    tmp_pose.position(0) = .0;      //x
+                    tmp_pose.position(1) = .0;      //y
+                    tmp_pose.angle = .0;            //theta
+                    m_3Dpath.push_back(tmp_pose);
                 }
             }
-            else if (m_unicycleController == UnicycleController::DIRECT)    //Use path of 3D poses (x, y, theta)
+            else
             {
-                if (plannerDesiredInput.size() < 3)
+                std::vector<UnicycleState> tmp_vector;
+                for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/3); ++i)
                 {
-                    yWarning() << "[updateTrajectories] The plannerDesiredInput is supposed to have dimension bigger or equal to 3, while it has dimension" << plannerDesiredInput.size()
-                                        << ". Using zero input.";
-                    //pass a path with two poses of all zeroes
-                    std::vector<UnicycleState> tmp_vector;
-                    for (size_t i = 0; i < 2; ++i)
-                    {
-                        UnicycleState tmp_pose;
-                        tmp_pose.position(0) = .0;      //x
-                        tmp_pose.position(1) = .0;      //y
-                        tmp_pose.angle = .0;            //theta
-                        //tmp_pose.push_back(tmp_pose);
-                        m_3Dpath.push_back(tmp_pose);
-                    }
+                    UnicycleState tmp_pose;
+                    tmp_pose.position(0) = plannerDesiredInput(i*3);     //x
+                    tmp_pose.position(1) = plannerDesiredInput(i*3 + 1); //y
+                    tmp_pose.angle = plannerDesiredInput(i*3 + 2);       //theta
+                    m_3Dpath.push_back(tmp_pose);
                 }
-                else
-                {
-                    std::vector<UnicycleState> tmp_vector;
-                    for (size_t i = 0; i < std::trunc(plannerDesiredInput.size()/3); ++i)
-                    {
-                        UnicycleState tmp_pose;
-                        tmp_pose.position(0) = plannerDesiredInput(i*3);     //x
-                        tmp_pose.position(1) = plannerDesiredInput(i*3 + 1); //y
-                        tmp_pose.angle = plannerDesiredInput(i*3 + 2);       //theta
-                        m_3Dpath.push_back(tmp_pose);
-                    }
-                }
-                yInfo()<<"Setting Navigation Path of size: " << m_3Dpath.size();
-                //Old code -> overwriting to zero to avoid conflicts
-                m_desiredDirectControl(0) = 0.0;    //=plannerDesiredInput(0);
-                m_desiredDirectControl(1) = 0.0;
-                m_desiredDirectControl(2) = 0.0;
             }
-        }*/
+            yInfo()<<"Setting Navigation Path of size: " << m_3Dpath.size();
+        }
 
         m_initTime = initTime;
 
@@ -881,51 +780,6 @@ bool TrajectoryGenerator::updateTrajectories(double initTime, const iDynTree::Ve
 
     return true;
 }
-
-/*
-bool TrajectoryGenerator::addWaypoints(const Eigen::Vector2d &unicyclePosition, const Eigen::Matrix2d &unicycleRotation, const double initTime, const double endTime)
-{   
-    iDynTree::Vector2 approxSpeed; //speed taken from the saturation values of the linear velocity of the unicycle controller, multiplied by a reducing factor
-    approxSpeed(0) = std::sqrt(std::pow(m_maxStepLength, 2) - std::pow(m_nominalWidth, 2)) / m_minStepDuration * 0.9 * 0.8; //TODO pass 0.8 via config file
-    approxSpeed(1) = .0;
-    auto planner = m_trajectoryGenerator.unicyclePlanner();
-
-    //check the number of poses
-    if (m_2Dpath.size() < 2)
-    {
-        //error
-        yError() << "[addWaypoints] m_2Dpath has size < 2";
-        return false;
-    }
-    else
-    {
-        // clear current trajectory
-        planner->clearPersonFollowingDesiredTrajectory();
-        double elapsedTime = initTime;
-        size_t i = (m_2Dpath.size() == 1) ? 0 : 1;    //index initialization -> it determines if I skip the first pose or not.
-
-        for (size_t i = 1; i < m_2Dpath.size(); ++i)
-        {
-            // path is a vector of (x, y, theta) pose vectors in the robot frame
-            double relativePoseDistance = sqrt(pow(m_2Dpath.at(i)[0] - m_2Dpath.at(i-1)[0], 2) + 
-                                   pow(m_2Dpath.at(i)[1] - m_2Dpath.at(i-1)[1], 2));
-            double eta = relativePoseDistance / approxSpeed(0); // expected time passing between two consecutive poses
-            elapsedTime += eta;
-            if (elapsedTime > endTime)   // exit condition -> if I am exceeding the time horizon
-            {
-                break;
-            }
-            iDynTree::Vector2 absoluteFramePose;     //pose to be added to the planner
-            // transform in the global frame
-            iDynTree::toEigen(absoluteFramePose) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
-                                                                                iDynTree::toEigen(m_2Dpath.at(i)))
-                                                    + unicyclePosition;
-            planner->addPersonFollowingDesiredTrajectoryPoint(elapsedTime, absoluteFramePose, approxSpeed);
-        }
-        
-    }
-    return true;
-}*/
 
 bool TrajectoryGenerator::setFreeSpaceEllipse(const iDynTree::MatrixFixSize<2, 2> &imageMatrix, const iDynTree::VectorFixSize<2> &centerOffset)
 {
@@ -1170,7 +1024,6 @@ bool TrajectoryGenerator::getUnicycleState(const std::string& stanceFoot, iDynTr
     double nominalWidth;
     bool correctLeft;
     iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
-    iDynTree::Vector3 desiredDirectControl;
     double measuredAngleLeft, measuredAngleRight;
     double leftYawDeltaInRad, rightYawDeltaInRad;
     // left foot
