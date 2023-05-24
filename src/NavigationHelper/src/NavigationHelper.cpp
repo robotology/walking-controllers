@@ -200,7 +200,6 @@ void NavigationHelper::computeNavigationTrigger()
         else
         {
             trigger = false;
-            yWarning() << "[NavigationHelper::computeNavigationTrigger] one of the feet deques is empty" ;
         }
         
 
