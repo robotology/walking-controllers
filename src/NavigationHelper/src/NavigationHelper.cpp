@@ -12,6 +12,7 @@
 
 #include <yarp/os/Stamp.h>
 #include <yarp/os/NetworkClock.h>
+#include <yarp/os/Contact.h>
 
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
@@ -120,7 +121,8 @@ bool NavigationHelper::init(const yarp::os::Searchable& config, std::deque<bool>
     
     //ports for navigation integration
     std::string unicyclePortPortName = m_portPrefix + "/virtual_unicycle_states:o";
-    if (!m_unicyclePort.open(unicyclePortPortName))
+    yarp::os::Contact unicyclePortContact{unicyclePortPortName, "shmem" };
+    if (!m_unicyclePort.open(unicyclePortContact, true))
     {
         yError() << "[WalkingModule::configure] Could not open virtual_unicycle_states port";
         return false;
