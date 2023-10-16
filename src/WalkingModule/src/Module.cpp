@@ -927,7 +927,13 @@ bool WalkingModule::updateModule()
 
             if (comVelocityNorm > m_maxInitialCoMVelocity)
             {
-                yError() << "[WalkingModule::updateModule] The initial CoM velocity is too high.";
+                yError() << "[WalkingModule::updateModule] The initial CoM velocity is too high (desired:"
+                         << comVelocityNorm << "limit:" << m_maxInitialCoMVelocity << ")."
+                         << "ZMP measured: " << measuredZMP.toString()
+                         << "Desired ZMP"<< desiredZMP.toString()
+                         << "measured com position" << m_FKSolver->getCoMPosition().toString()
+                         << "desired com position" << m_stableDCMModel->getCoMPosition().toString()
+                         << "desired com velocity" << m_stableDCMModel->getCoMVelocity().toString();
                 return false;
             }
         }
@@ -1640,6 +1646,11 @@ bool WalkingModule::startWalking()
         return false;
     }
 
+    // we evaluate the offset between the CoM and the ZMP. This quantities is used only if
+    // remove_zmp_offset is set to true.
+    m_zmpOffset.zero();
+    m_zmpOffsetLocal.zero();
+
     // Adjusting the offset on the ZMP at the begining with respect to CoM in the lateral direction
     iDynTree::Vector2 measuredZMP;
     iDynTree::Vector3 measuredCoM = m_FKSolver->getCoMPosition();
@@ -1658,10 +1669,6 @@ bool WalkingModule::startWalking()
         }
     }
 
-    // we evaluate the offset between the CoM and the ZMP. This quantities is used only if
-    // remove_zmp_offset is set to true.
-    m_zmpOffset.zero();
-    m_zmpOffsetLocal.zero();
     if (m_removeZMPOffset)
     {
         m_zmpOffset(0) = measuredCoM(0) - measuredZMP(0);
