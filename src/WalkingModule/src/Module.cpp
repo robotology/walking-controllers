@@ -20,6 +20,8 @@
 #include <yarp/sig/Matrix.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
+#include <yarp/os/Stamp.h>
+#include <yarp/os/NetworkClock.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -78,6 +80,9 @@ bool WalkingModule::advanceReferenceSignals()
 
     m_leftInContact.pop_front();
     m_leftInContact.push_back(m_leftInContact.back());
+    
+    if (m_navHelperUsed)
+        m_navHelper.updateFeetDeques(m_leftInContact, m_rightInContact);
 
     m_isLeftFixedFrame.pop_front();
     m_isLeftFixedFrame.push_back(m_isLeftFixedFrame.back());
@@ -264,6 +269,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
+
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
@@ -442,6 +448,24 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
+    yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
+    
+    // start the threads used for computing navigation needed infos
+    if (!navigationOptions.isNull())
+    {
+        m_navHelperUsed = true;
+        if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact))
+        {
+            yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+        }
+        yInfo() << "[WalkingModule::configure] Configured Navigation Helper.";
+    }
+    else
+    {
+        m_navHelperUsed = false;
+    }
+    
+    
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
     return true;
@@ -470,6 +494,9 @@ bool WalkingModule::close()
 {
     if(m_dumpData)
         m_loggerPort.close();
+    
+    if(m_navHelperUsed)
+        m_navHelper.closeHelper();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -1570,6 +1597,9 @@ bool WalkingModule::updateTrajectories(const size_t& mergePoint)
     StdUtilities::appendVectorToDeque(leftInContact, m_leftInContact, mergePoint);
     StdUtilities::appendVectorToDeque(rightInContact, m_rightInContact, mergePoint);
 
+    if (m_navHelperUsed)
+        m_navHelper.updateFeetDeques(m_leftInContact, m_rightInContact);
+    
     StdUtilities::appendVectorToDeque(comHeightTrajectory, m_comHeightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(comHeightVelocity, m_comHeightVelocity, mergePoint);
 

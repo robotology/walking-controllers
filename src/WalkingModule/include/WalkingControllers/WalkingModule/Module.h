@@ -50,6 +50,8 @@
 
 #include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
+#include <WalkingControllers/NavigationHelper/NavigationHelper.h>
+
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
 
@@ -154,6 +156,9 @@ namespace WalkingControllers
 
         size_t m_feedbackAttempts;
         double m_feedbackAttemptDelay;
+
+        NavigationHelper m_navHelper;
+        bool m_navHelperUsed{false};
 
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
