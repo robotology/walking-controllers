@@ -11,6 +11,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <chrono>
 
 // YARP
 #include <yarp/eigen/Eigen.h>
@@ -20,6 +21,8 @@
 #include <yarp/sig/Matrix.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/os/LogStream.h>
+#include <yarp/os/Stamp.h>
+#include <yarp/os/NetworkClock.h>
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -262,8 +265,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle& trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
     yarp::os::Bottle ellipseMangerOptions = rf.findGroup("FREE_SPACE_ELLIPSE_MANAGER");
+    yarp::os::Bottle navigationOptions = rf.findGroup("NAVIGATION");
     trajectoryPlannerOptions.append(generalOptions);
     trajectoryPlannerOptions.append(ellipseMangerOptions);
+    trajectoryPlannerOptions.append(navigationOptions);
+
     if(!m_trajectoryGenerator->initialize(trajectoryPlannerOptions))
     {
         yError() << "[configure] Unable to initialize the planner.";
@@ -401,7 +407,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
         yError() << "[WalkingModule::configure] Failed to configure the retargeting";
         return false;
     }
-
+    
     // initialize the logger
     if(m_dumpData)
     {
@@ -442,6 +448,12 @@ bool WalkingModule::configure(yarp::os::ResourceFinder& rf)
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
 
+
+    if(!m_navHelper.init(navigationOptions, m_leftInContact, m_rightInContact, m_FKSolver, m_stableDCMModel, m_trajectoryGenerator))
+    {
+        yError() << "[WalkingModule::configure] Could not initialize the Navigation Helper";
+    }
+    
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
     return true;
@@ -470,6 +482,8 @@ bool WalkingModule::close()
 {
     if(m_dumpData)
         m_loggerPort.close();
+    
+    m_navHelper.closeHelper();
 
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
@@ -770,6 +784,7 @@ bool WalkingModule::updateModule()
                 }
                 m_newTrajectoryRequired = false;
                 resetTrajectory = true;
+                m_newTrajectoryMerged = true;
             }
 
             m_newTrajectoryMergeCounter--;
@@ -1027,6 +1042,12 @@ bool WalkingModule::updateModule()
             return false;
         }
 
+        //Send footsteps info on port anyway (x, y, yaw) wrt root_link
+        if(!m_navHelper.publishPlannedFootsteps(m_trajectoryGenerator))
+        {
+            yWarning() << "[WalkingModule::updateModule] Unable to publish footsteps";
+        }
+        
         // send data to the logger
         if(m_dumpData)
         {

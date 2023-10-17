@@ -117,6 +117,10 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
                                                               yarp::os::Value(40.0)).asFloat64());
     double minAngleVariation = iDynTree::deg2rad(config.check("minAngleVariation",
                                                               yarp::os::Value(5.0)).asFloat64());
+    if (minAngleVariation == 0.0)   //configuration warning
+    {
+        yWarning() << "[configurePlanner] Setting minAngleVariation to 0.0 will make the robot jog in place in manual mode.";
+    }
     double maxStepDuration = config.check("maxStepDuration", yarp::os::Value(8.0)).asFloat64();
     double minStepDuration = config.check("minStepDuration", yarp::os::Value(2.9)).asFloat64();
     double stepHeight = config.check("stepHeight", yarp::os::Value(0.005)).asFloat64();
@@ -851,5 +855,105 @@ bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &
     }
 
     desiredZMP = m_dcmGenerator->getZMPPosition();
+    return true;
+}
+
+bool TrajectoryGenerator::getFootprints(std::vector<Pose>& leftFootprints, std::vector<Pose>& rightFootprints)
+{
+    auto leftDequeue = m_trajectoryGenerator.getLeftFootPrint()->getSteps();
+    leftFootprints.resize(leftDequeue.size());
+    for (size_t i = 0; i < leftDequeue.size(); ++i)
+    {
+        Pose pose;
+        pose.x = leftDequeue.at(i).position(0);
+        pose.y = leftDequeue.at(i).position(1);
+        pose.theta = leftDequeue.at(i).angle;
+        leftFootprints[i] = pose;
+    }
+
+    auto rightDeque = m_trajectoryGenerator.getRightFootPrint()->getSteps();
+    rightFootprints.resize(rightDeque.size());
+    for (size_t i = 0; i < rightDeque.size(); ++i)
+    {
+        Pose pose;
+        pose.x = rightDeque.at(i).position(0);
+        pose.y = rightDeque.at(i).position(1);
+        pose.theta = rightDeque.at(i).angle;
+        rightFootprints[i] = pose;
+    }
+    
+    return true;
+}
+
+bool TrajectoryGenerator::getUnicycleState(const std::string& stanceFoot, iDynTree::Vector3& virtualUnicyclePose, iDynTree::Vector3& referenceUnicyclePose)
+{
+    double nominalWidth;
+    bool correctLeft;
+    iDynTree::Vector2 measuredPositionLeft, measuredPositionRight;
+    iDynTree::Vector3 desiredDirectControl;
+    double measuredAngleLeft, measuredAngleRight;
+    double leftYawDeltaInRad, rightYawDeltaInRad;
+    // left foot
+    measuredPositionLeft(0) = m_measuredTransformLeft.getPosition()(0);
+    measuredPositionLeft(1) = m_measuredTransformLeft.getPosition()(1);
+    measuredAngleLeft = m_measuredTransformLeft.getRotation().asRPY()(2);
+    leftYawDeltaInRad = m_leftYawDeltaInRad;
+    // right foot
+    measuredPositionRight(0) = m_measuredTransformRight.getPosition()(0);
+    measuredPositionRight(1) = m_measuredTransformRight.getPosition()(1);
+    measuredAngleRight = m_measuredTransformRight.getRotation().asRPY()(2);
+    rightYawDeltaInRad = m_rightYawDeltaInRad;
+    correctLeft = m_correctLeft;
+    m_newFreeSpaceEllipse = false;
+    nominalWidth = m_nominalWidth;
+
+    iDynTree::Vector2 measuredPosition;
+    double measuredAngle;
+    measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
+    measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
+
+    Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition, unicycleOdom;
+    unicyclePositionFromStanceFoot(0) = 0.0;
+    Eigen::Matrix2d unicycleRotation; //rotation world -> unicycle
+    double unicycleAngle, unicycleAngleOdom;
+
+    if (stanceFoot == "left")
+    {
+        unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
+        unicycleAngle = measuredAngleLeft;  //- leftYawDeltaInRad
+        unicycleAngleOdom = measuredAngleLeft - leftYawDeltaInRad;
+        footPosition = iDynTree::toEigen(measuredPositionLeft);
+    }
+    else if (stanceFoot == "right")
+    {
+        unicyclePositionFromStanceFoot(1) = nominalWidth/2;
+        unicycleAngle = measuredAngleRight;    //- rightYawDeltaInRad
+        unicycleAngleOdom = measuredAngleRight - rightYawDeltaInRad;
+        footPosition = iDynTree::toEigen(measuredPositionRight);
+    }
+    else
+    {
+        return false;
+    }
+
+    //Odom (expressed in odom frame)
+    double s_theta = std::sin(unicycleAngleOdom);
+    double c_theta = std::cos(unicycleAngleOdom);
+    unicycleRotation(0,0) = c_theta;
+    unicycleRotation(0,1) = -s_theta;
+    unicycleRotation(1,0) = s_theta;
+    unicycleRotation(1,1) = c_theta;
+    unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot;   // position in respect to the support foot
+    unicycleOdom = unicyclePosition + footPosition;     //postion in odom frame
+    virtualUnicyclePose(0) = unicycleOdom(0);
+    virtualUnicyclePose(1) = unicycleOdom(1);
+    virtualUnicyclePose(2) = unicycleAngleOdom;
+
+    iDynTree::Vector2 referencePointInAbsoluteFrame;
+    iDynTree::toEigen(referencePointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance)) + unicycleOdom;
+    referenceUnicyclePose(0) = referencePointInAbsoluteFrame(0);
+    referenceUnicyclePose(1) = referencePointInAbsoluteFrame(1);
+    referenceUnicyclePose(2) = unicycleAngleOdom;
+    
     return true;
 }
