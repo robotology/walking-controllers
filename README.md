@@ -8,11 +8,25 @@ The suite includes:
 * **WalkingLogger_module**: an module that can be useful to dump data coming from the Walking Module
 
 # Overview
- - [:orange_book: Some theory behind the code](#orange_book-some-theory-behind-the-code)
- - [:page_facing_up: Dependencies](#page_facing_up-dependencies)
- - [:hammer: Build the suite](#hammer-build-the-suite)
- - [:computer: How to run the simulation](#computer-how-to-run-the-simulation)
- - [:running: How to test on iCub](#running-how-to-test-on-icub)
+- [walking-controllers](#walking-controllers)
+- [Overview](#overview)
+- [:orange\_book: Some theory behind the code](#orange_book-some-theory-behind-the-code)
+  - [Reference paper](#reference-paper)
+- [:page\_facing\_up: Dependencies](#page_facing_up-dependencies)
+- [:hammer: Build the suite](#hammer-build-the-suite)
+  - [Linux/macOs](#linuxmacos)
+- [:computer: How to run the simulation](#computer-how-to-run-the-simulation)
+      - [Additional Dependencies](#additional-dependencies)
+      - [How to run](#how-to-run)
+  - [How to run the Joypad Module](#how-to-run-the-joypad-module)
+  - [How to walk sideways](#how-to-walk-sideways)
+  - [How to control the robot from YARP port](#how-to-control-the-robot-from-yarp-port)
+  - [How to dump data](#how-to-dump-data)
+  - [Some interesting parameters](#some-interesting-parameters)
+    - [Inverse Kinematics configuration](#inverse-kinematics-configuration)
+- [:running: How to test on iCub](#running-how-to-test-on-icub)
+  - [:warning: Warning](#warning-warning)
+  - [Mantainers](#mantainers)
 
 # :orange_book: Some theory behind the code
 This module allows iCub walking using the position control interface.
@@ -83,35 +97,35 @@ In order to run the simulation, the following additional dependency are required
 * [`gazebo-yarp-plugins`](https://github.com/robotology/gazebo-yarp-plugins)
 * [`whole-body-estimators`](https://github.com/robotology/whole-body-estimators)
 * [`icub-models`](https://github.com/robotology/icub-models)
+* [`ergocub-software`](https://github.com/icub-tech-iit/ergocub-software)
 
 #### How to run
-1. Set the `YARP_ROBOT_NAME` environment variable according to the chosen Gazebo model:
-   ```sh
-   export YARP_ROBOT_NAME="icubGazeboSim"
+1. Set the `YARP_ROBOT_NAME` environment variable according to the chosen Gazebo model for instance for the model `ergoCubGazeboV1`:
+   ```console
+   export YARP_ROBOT_NAME="ergoCubGazeboV1"
    ```
 2. Run `yarpserver`
-   ``` sh
+   ```console
    yarpserver --write
    ```
-3. Run gazebo and drag and drop iCub (e.g. icubGazeboSim or iCubGazeboV2_5):
+3. Run gazebo and drag and drop robot model (e.g. `ergoCubGazeboV1`):
 
-    ``` sh
+    ```console
     export YARP_CLOCK=/clock
     gazebo -slibgazebo_yarp_clock.so
     ```
-4. Run `yarprobotinterface`
+4. Run `whole-body-dynamics`, for instance for the model `ergoCubGazeboV1`:
 
-    ``` sh
-     YARP_CLOCK=/clock yarprobotinterface --config launch-wholebodydynamics.xml
+    ```console
+   yarprobotinterface --config conf/launch_wholebodydynamics_ecub.xml
     ```
 5. Reset the offset of the FT sensors. Open a terminal and write
-
-   ```
+   ```console
    yarp rpc /wholeBodyDynamics/rpc
    >> resetOffset all
    ```
 6. Run the walking module
-    ``` sh
+    ```console
     YARP_CLOCK=/clock WalkingModule
     ```
 7. communicate with the `WalkingModule`:
@@ -125,14 +139,14 @@ In order to run the simulation, the following additional dependency are required
      controller sending `startWalking` command;
    * `stopWalking`: the controller is stopped, in order to start again the
      controller you have to prepare again the robot.
-   * `setGoal x y`: send the desired input to the planner. Send this command after `startWalking`.
+   * `setGoal (x y)`: send the desired input to the planner. Send this command after `startWalking`.
 
    Example sequence:
    ```
    prepareRobot
    startWalking
-   setGoal (1.0 0.0)
-   setGoal (1.0 0.0)
+   setGoal (1.0, 0.0)
+   setGoal (1.0, 0.0)
    stopWalking
    ```
 
@@ -191,22 +205,13 @@ The range of the numbers is expected to be ``[-1, +1]``. Some scaling can be app
 
 ## How to dump data
 
-Before running `WalkingModule` check if `dump_data` is set to 1. This parameter is set in a configuration `ini` file depending on the control mode:
-* controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L12)
-* control using the human retargeting: in the same folder `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}`, the configuration files `dcm_walking_hand_retargeting.ini` and `dcm_walking_joint_retargeting.ini`.
-
-Run the Logger Module `WalkingLoggerModule` before the Walking Module `WalkingModule`.
-``` sh
-YARP_CLOCK=/clock WalkingLoggerModule
-```
-
-All the data will be saved in the current folder inside a `txt` named `Dataset_YYYY_MM_DD_HH_MM_SS.txt`
+Before running `WalkingModule` check if `dump_data` is set to 1. This parameter is set in a configuration `ini` file depending on the control mode, for instance controlling from the joypad: `src/WalkingModule/app/robots/${YARP_ROBOT_NAME}/dcm_walking_with_joypad.ini`. [Example for the model `iCubGazeboV2_5`](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L12) Then you can log your data with [`YarpRobotLoggerDevice`](https://github.com/ami-iit/bipedal-locomotion-framework/tree/master/devices/YarpRobotLoggerDevice).
 
 ## Some interesting parameters
 You can change the DCM controller and the inverse kinematics solver by editing [these parameters](src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking_with_joypad.ini#L22-L57).
 
 ### Inverse Kinematics configuration
-The Inverse Kinematics block configuration can be set through the file src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joint_retargeting/inverseKinematics.ini.
+The Inverse Kinematics block configuration can be set through the file `src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joint_retargeting/inverseKinematics.ini`.
 
 The Inverse Kinematics block uses an open source package for large-scale optimisation, IPOPT (Interior Point Optimizer), which requires other packages like BLAS (Basic Linear Algebra Sub-routines), LAPACK (Linear Algebra PACKage) and a sparse symmetric indefinite linear solver ([MAxx, HSLMAxx](http://www.hsl.rl.ac.uk/), MUMPS, PARDISO etc). Further documentation can be found at https://coin-or.github.io/Ipopt and https://coin-or.github.io/Ipopt/INSTALL.html#EXTERNALCODE. The package IPOPT installed with the superbuild (via homebrew or conda) is built with the solver [MUMPS](http://mumps.enseeiht.fr/) by default, which is reflected in the default configuration of the Inverse Kinematics block src/WalkingModule/app/robots/iCubGazeboV2_5/dcm_walking/joypad_control/inverseKinematics.ini#L14-L17:
 ```sh
@@ -227,9 +232,9 @@ In case you encounter issues when starting the Walking Module with the selected 
 You can follows the same instructions of the simulation section without using `YARP_CLOCK=/clock`. Make sure your `YARP_ROBOT_NAME` is coherent with the name of the robot (e.g. iCubGenova04)
 ## :warning: Warning
 Currently the supported robots are only:
-- ``iCubGenova04``
-- ``icubGazeboSim``
-- ``icubGazeboV2_5``
+- ``iCubGazeboV3``
+- ``ergoCubGazeboV1``
+- ``ergoCubSN000``
 
 Yet, it is possible to use these controllers provided that the robot has V2.5 legs. In this case, the user should define the robot specific configuration files (those of ``iCubGenova04`` are a good starting point).
 
