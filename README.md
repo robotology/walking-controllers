@@ -233,7 +233,7 @@ You can follows the same instructions of the simulation section without using `Y
 ## :warning: Warning
 Currently the supported robots are only:
 - ``iCubGazeboV3``
-- ``ergoCubeGazeboV1``
+- ``ergoCubGazeboV1``
 - ``ergoCubSN000``
 
 Yet, it is possible to use these controllers provided that the robot has V2.5 legs. In this case, the user should define the robot specific configuration files (those of ``iCubGenova04`` are a good starting point).
