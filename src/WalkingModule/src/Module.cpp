@@ -326,7 +326,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
 
     if (m_useQPIK)
     {
-        yarp::os::Bottle &inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_BLF_QP_SOLVER");
+        yarp::os::Bottle &inverseKinematicsQPSolverOptions = rf.findGroup("INVERSE_KINEMATICS_QP_SOLVER");
         // TODO check if this is required
         inverseKinematicsQPSolverOptions.append(generalOptions);
         m_BLFIKSolver = std::make_unique<BLFIK>();
@@ -838,6 +838,8 @@ bool WalkingModule::updateModule()
                 yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
             }
+
+            yawRotation = yawRotation * m_trajectoryGenerator->getChestAdditionalRotation();
 
             if (!solveBLFIK(desiredCoMPosition,
                             desiredCoMVelocity,

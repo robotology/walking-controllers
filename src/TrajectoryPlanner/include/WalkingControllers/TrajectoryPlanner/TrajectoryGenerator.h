@@ -77,6 +77,8 @@ namespace WalkingControllers
 
         std::mutex m_mutex; /**< Mutex. */
 
+        iDynTree::Rotation m_chestAdditionalRotation; /**< Additional rotation to be applied to the chest. */
+
         /**
          * Main thread method.
          */
@@ -264,6 +266,12 @@ namespace WalkingControllers
          * Reset the planner
          */
         void reset();
+
+        /**
+         * Get the chest additional rotation
+         * @return the chest additional rotation
+         */
+        const iDynTree::Rotation& getChestAdditionalRotation() const;
     };
 };
 
