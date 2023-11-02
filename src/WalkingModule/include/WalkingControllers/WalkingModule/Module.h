@@ -40,9 +40,6 @@
 #include <WalkingControllers/SimplifiedModelControllers/ZMPController.h>
 
 #include <WalkingControllers/WholeBodyControllers/InverseKinematics.h>
-#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics.h>
-#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_osqp.h>
-#include <WalkingControllers/WholeBodyControllers/QPInverseKinematics_qpOASES.h>
 
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>
 
@@ -72,8 +69,6 @@ namespace WalkingControllers
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
-        bool m_useBLFIK; /**< True if the BLF-IK is used. */
-        bool m_useOSQP; /**< True if osqp is used to QP-IK problem. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
         bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
@@ -97,7 +92,6 @@ namespace WalkingControllers
         std::unique_ptr<WalkingDCMReactiveController> m_walkingDCMReactiveController; /**< Pointer to the walking DCM reactive controller object. */
         std::unique_ptr<WalkingZMPController> m_walkingZMPController; /**< Pointer to the walking ZMP controller object. */
         std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
-        std::unique_ptr<WalkingQPIK> m_QPIKSolver; /**< Pointer to the inverse kinematics solver. */
         std::unique_ptr<BLFIK> m_BLFIKSolver; /**< Pointer to the integration based ik. */
         std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
@@ -187,23 +181,17 @@ namespace WalkingControllers
 
         /**
          * Set the QP-IK problem.
-         * @param solver is the pointer to the solver (osqp or qpOASES)
          * @param desiredCoMPosition desired CoM position;
          * @param desiredCoMVelocity desired CoM velocity;
          * @param desiredNeckOrientation desired neck orientation (rotation matrix);
          * @param output is the output of the solver (i.e. the desired joint velocity)
          * @return true in case of success and false otherwise.
          */
-        bool solveQPIK(const std::unique_ptr<WalkingQPIK>& solver,
-                       const iDynTree::Position& desiredCoMPosition,
-                       const iDynTree::Vector3& desiredCoMVelocity,
-                       const iDynTree::Rotation& desiredNeckOrientation,
-                       iDynTree::VectorDynSize &output);
-
         bool solveBLFIK(const iDynTree::Position& desiredCoMPosition,
                         const iDynTree::Vector3& desiredCoMVelocity,
                         const iDynTree::Rotation& desiredNeckOrientation,
                         iDynTree::VectorDynSize &output);
+
         /**
          * Evaluate the position of Zero momentum point.
          * @param zmp zero momentum point.
