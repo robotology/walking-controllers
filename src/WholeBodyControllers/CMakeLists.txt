@@ -7,4 +7,10 @@ add_walking_controllers_library(
   SOURCES src/InverseKinematics.cpp src/BLFIK.cpp
   PUBLIC_HEADERS include/WalkingControllers/WholeBodyControllers/InverseKinematics.h
                  include/WalkingControllers/WholeBodyControllers/BLFIK.h
-  PUBLIC_LINK_LIBRARIES BipedalLocomotion::IK BipedalLocomotion::ContinuousDynamicalSystem WalkingControllers::YarpUtilities WalkingControllers::iDynTreeUtilities WalkingControllers::KinDynWrapper OsqpEigen::OsqpEigen ${qpOASES_LIBRARIES} Eigen3::Eigen ctrlLib)
+  PUBLIC_LINK_LIBRARIES BipedalLocomotion::IK
+                        BipedalLocomotion::ContinuousDynamicalSystem
+                        WalkingControllers::YarpUtilities
+                        WalkingControllers::iDynTreeUtilities
+                        WalkingControllers::KinDynWrapper
+                        Eigen3::Eigen
+                        ctrlLib)
