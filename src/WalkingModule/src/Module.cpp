@@ -31,6 +31,8 @@
 // blf
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
 #include <BipedalLocomotion/ParametersHandler/YarpImplementation.h>
+#include <BipedalLocomotion/Contacts/Contact.h>
+#include <BipedalLocomotion/Conversions/ManifConversions.h>
 
 // walking-controllers
 #include <WalkingControllers/WalkingModule/Module.h>
@@ -139,39 +141,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asFloat64();
-    m_constantZMPTolerance = rf.check("constant_ZMP_tolerance", yarp::os::Value(0.0)).asFloat64();
-    m_constantZMPMaxCounter = rf.check("constant_ZMP_counter", yarp::os::Value(100)).asInt32();
-    m_minimumNormalForceZMP = rf.check("minimum_normal_force_ZMP", yarp::os::Value(0.001)).asFloat64();
-    m_maxZMP[0] = 1.0;
-    m_maxZMP[1] = 1.0;
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
-
-    yarp::os::Value maxLocalZMP = rf.find("maximum_local_zmp");
-    if (maxLocalZMP.isList())
-    {
-        yarp::os::Bottle *localBot = maxLocalZMP.asList();
-        if (localBot->size() != 2)
-        {
-            yError() << "[WalkingModule::configure] maximum_local_zmp is supposed to have two elements.";
-            return false;
-        }
-
-        if (!localBot->get(0).isFloat64())
-        {
-            yError() << "[WalkingModule::configure] The first element of maximum_local_zmp is not a double.";
-            return false;
-        }
-
-        if (!localBot->get(1).isFloat64())
-        {
-            yError() << "[WalkingModule::configure] The second element of maximum_local_zmp is not a double.";
-            return false;
-        }
-
-        m_maxZMP[0] = localBot->get(0).asFloat64();
-        m_maxZMP[1] = localBot->get(1).asFloat64();
-    }
-
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
 
@@ -223,6 +193,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     if (!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
     {
         yError() << "[WalkingModule::configure] Unable to configure the Force Torque sensors.";
+        return false;
+    }
+
+    yarp::os::Bottle &globalCoPEvaluatorOptions = rf.findGroup("COP_EVALUATOR");
+    globalCoPEvaluatorOptions.append(generalOptions);
+    if (!m_globalCoPEvaluator.initialize(std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>(globalCoPEvaluatorOptions)))
+    {
+        yError() << "[WalkingModule::configure] Unable to configure the global CoP Evaluator.";
         return false;
     }
 
@@ -397,8 +375,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // initialize some variables
     m_newTrajectoryRequired = false;
     m_newTrajectoryMergeCounter = -1;
-    m_constantZMPCounter = 0;
-    m_previousZMP.zero();
     m_robotState = WalkingFSM::Configured;
 
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
@@ -494,6 +470,32 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     }
 
     return ok;
+}
+
+bool WalkingModule::computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP)
+{
+    BipedalLocomotion::Contacts::ContactWrench leftFootContact, rightFootContact;
+    leftFootContact.wrench = iDynTree::toEigen(m_robotControlHelper->getLeftWrench().asVector());
+    leftFootContact.pose = BipedalLocomotion::Conversions::toManifPose(m_FKSolver->getLeftFootToWorldTransform());
+
+    rightFootContact.wrench = iDynTree::toEigen(m_robotControlHelper->getRightWrench().asVector());
+    rightFootContact.pose = BipedalLocomotion::Conversions::toManifPose(m_FKSolver->getRightFootToWorldTransform());
+
+    if (!m_globalCoPEvaluator.setInput({leftFootContact, rightFootContact}))
+    {
+        yError() << "[WalkingModule::computeGlobalCoP] Unable to set the contact wrenches to globalCoPEvaluator.";
+        return false;
+    }
+
+    if (!m_globalCoPEvaluator.advance())
+    {
+        yError() << "[WalkingModule::computeGlobalCoP] Unable to compute the global CoP.";
+        return false;
+    }
+
+    globalCoP = m_globalCoPEvaluator.getOutput().head<2>();
+
+    return true;
 }
 
 bool WalkingModule::updateModule()
@@ -693,10 +695,20 @@ bool WalkingModule::updateModule()
             return false;
         }
 
-        if (!evaluateZMP(measuredZMP))
+        // compute the global CoP
+        if (!computeGlobalCoP(iDynTree::toEigen(measuredZMP)))
         {
-            yError() << "[WalkingModule::updateModule] Unable to evaluate the ZMP.";
+            yError() << "[WalkingModule::updateModule] Unable to compute the global CoP.";
             return false;
+        }
+
+        // remove the ZMP offset if required
+        if (m_removeZMPOffset)
+        {
+            // remove rotated offset
+            iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
+            m_zmpOffset = yawRotation * m_zmpOffsetLocal;
+            iDynTree::toEigen(measuredZMP) += iDynTree::toEigen(m_zmpOffset).head<2>();
         }
 
         // evaluate 3D-LIPM reference signal
@@ -1034,122 +1046,6 @@ bool WalkingModule::updateModule()
         // print timings
         m_profiler->profiling();
     }
-    return true;
-}
-
-bool WalkingModule::evaluateZMP(iDynTree::Vector2 &zmp)
-{
-    if (m_FKSolver == nullptr)
-    {
-        yError() << "[evaluateZMP] The FK solver is not ready.";
-        return false;
-    }
-
-    iDynTree::Position zmpLeft, zmpRight, zmpWorld;
-    zmpLeft.zero();
-    zmpRight.zero();
-    double zmpLeftDefined = 0.0, zmpRightDefined = 0.0;
-
-    const iDynTree::Wrench &rightWrench = m_robotControlHelper->getRightWrench();
-    if (rightWrench.getLinearVec3()(2) < m_minimumNormalForceZMP)
-        zmpRightDefined = 0.0;
-    else
-    {
-        zmpRight(0) = -rightWrench.getAngularVec3()(1) / rightWrench.getLinearVec3()(2);
-        zmpRight(1) = rightWrench.getAngularVec3()(0) / rightWrench.getLinearVec3()(2);
-        zmpRight(2) = 0.0;
-
-        if ((std::fabs(zmpRight(0)) < m_maxZMP[0]) && (std::fabs(zmpRight(1)) < m_maxZMP[1]))
-        {
-            zmpRightDefined = 1.0;
-        }
-        else
-        {
-            zmpRightDefined = 0.0;
-        }
-    }
-
-    const iDynTree::Wrench &leftWrench = m_robotControlHelper->getLeftWrench();
-    if (leftWrench.getLinearVec3()(2) < m_minimumNormalForceZMP)
-        zmpLeftDefined = 0.0;
-    else
-    {
-        zmpLeft(0) = -leftWrench.getAngularVec3()(1) / leftWrench.getLinearVec3()(2);
-        zmpLeft(1) = leftWrench.getAngularVec3()(0) / leftWrench.getLinearVec3()(2);
-        zmpLeft(2) = 0.0;
-
-        if ((std::fabs(zmpLeft(0)) < m_maxZMP[0]) && (std::fabs(zmpLeft(1)) < m_maxZMP[1]))
-        {
-            zmpLeftDefined = 1.0;
-        }
-        else
-        {
-            zmpLeftDefined = 0.0;
-        }
-    }
-
-    double totalZ = rightWrench.getLinearVec3()(2) * zmpRightDefined + leftWrench.getLinearVec3()(2) * zmpLeftDefined;
-    if ((zmpLeftDefined + zmpRightDefined) < 0.5)
-    {
-        yError() << "[evaluateZMP] None of the two contacts is valid.";
-        return false;
-    }
-
-    // rotate the resulting zmp and offset
-    iDynTree::Rotation yawRotation = this->computeAverageYawRotationFromPlannedFeet();
-
-    m_zmpOffset = yawRotation * m_zmpOffsetLocal;
-
-    zmpLeft = m_FKSolver->getLeftFootToWorldTransform() * zmpLeft;
-    zmpRight = m_FKSolver->getRightFootToWorldTransform() * zmpRight;
-
-    // the global zmp is given by a weighted average
-    iDynTree::toEigen(zmpWorld) =
-        ((leftWrench.getLinearVec3()(2) * zmpLeftDefined) / totalZ) * iDynTree::toEigen(zmpLeft) +
-        ((rightWrench.getLinearVec3()(2) * zmpRightDefined) / totalZ) * iDynTree::toEigen(zmpRight);
-
-    // remove rotated offset
-    if (m_removeZMPOffset)
-    {
-        iDynTree::toEigen(zmpWorld) += iDynTree::toEigen(m_zmpOffset);
-    }
-
-    zmp(0) = zmpWorld(0);
-    zmp(1) = zmpWorld(1);
-
-    if (((zmpLeftDefined + zmpRightDefined) > 1.0) && (m_constantZMPMaxCounter > 0)) // i.e. we are in double support
-    {
-        double zmpDifference = (iDynTree::toEigen(zmp) - iDynTree::toEigen(m_previousZMP)).norm();
-
-        if (zmpDifference < m_constantZMPTolerance)
-        {
-            m_constantZMPCounter++;
-
-            if (m_constantZMPCounter >= m_constantZMPMaxCounter / 2)
-            {
-                yWarning() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
-                           << m_constantZMPCounter << " times.";
-            }
-
-            if (m_constantZMPCounter >= m_constantZMPMaxCounter)
-            {
-                yError() << "[evaluateZMP] The ZMP was constant (in a " << m_constantZMPTolerance << " radius) for "
-                         << m_constantZMPCounter << " times.";
-                return false;
-            }
-        }
-        else
-        {
-            m_constantZMPCounter = 0;
-            m_previousZMP = zmp;
-        }
-    }
-    else
-    {
-        m_constantZMPCounter = 0;
-        m_previousZMP = zmp;
-    }
-
     return true;
 }
 
@@ -1517,9 +1413,10 @@ bool WalkingModule::startWalking()
     // Adjusting the offset on the ZMP at the begining with respect to CoM in the lateral direction
     iDynTree::Vector2 measuredZMP;
     iDynTree::Vector3 measuredCoM = m_FKSolver->getCoMPosition();
-    if (!evaluateZMP(measuredZMP))
+
+    if (!computeGlobalCoP(iDynTree::toEigen(measuredZMP)))
     {
-        yError() << "[WalkingModule::startWalking] Unable to evaluate the ZMP.";
+        yError() << "[WalkingModule::updateModule] Unable to compute the global CoP.";
         return false;
     }
 
