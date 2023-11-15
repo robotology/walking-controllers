@@ -1,6 +1,22 @@
 # Changelog
 All notable changes to this project are documented in this file.
 
+## [0.8.0] - 2023-11-15
+### Added
+- Add the configuration files to run the walking controller on `ergoCubGazeboV1_1` (https://github.com/robotology/walking-controllers/pull/152)
+- Add the configuration files to run the walking controller on `ergoCubSN001` (https://github.com/robotology/walking-controllers/pull/153) 
+
+### Changed
+- Implement `populateData` lambda function to easily populate the `BipedalLocomotion::VectorsCollection` (https://github.com/robotology/walking-controllers/pull/147)
+- Tune the parameters for `ergoCubSN000` (https://github.com/robotology/walking-controllers/pull/149 https://github.com/robotology/walking-controllers/pull/157)
+
+### Fixed
+- Fix non initialized variable used to remove the ZMP offset (https://github.com/robotology/walking-controllers/pull/149)
+
+### Removed
+- Removed deprecated IK solvers (https://github.com/robotology/walking-controllers/pull/150)
+- Remove qpOASES dependency (https://github.com/robotology/walking-controllers/pull/156)
+
 ## [0.7.0] - 2023-03-07
 ### Added
 - Now the IK problem can be solved by `BipedaLocomotion::IK::QPInverseKinematics` (https://github.com/robotology/walking-controllers/pull/118)
@@ -173,6 +189,7 @@ All notable changes to this project are documented in this file.
 - Implement the first version of the `WalkingLoggerModule`
 - Implement the first version of the `WalkingJoypadModule`
 
+[0.8.0]: https://github.com/robotology/walking-controllers/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/robotology/walking-controllers/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/robotology/walking-controllers/compare/v0.5.2..v0.6.1
 [0.5.2]: https://github.com/robotology/walking-controllers/compare/v0.5.1..v0.5.2
