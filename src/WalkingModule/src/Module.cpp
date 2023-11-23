@@ -348,8 +348,24 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // initialize the logger
     if (m_dumpData)
     {
-        auto loggerOption = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>(rf);
-        if (!m_vectorsCollectionServer.initialize(loggerOption->getGroup("WALKING_LOGGER")))
+        auto loggerOption = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>(rf)->getGroup("WALKING_LOGGER").lock();
+        if (loggerOption == nullptr)
+        {
+            yError() << "[WalkingModule::configure] Unable to get the group WALKING_LOGGER.";
+            return false;
+        }
+
+        std::string logPort;
+        if(!loggerOption->getParameter("remote", logPort))
+        {
+            yError() << "[WalkingModule::configure] Unable to get the remote from the group WALKING_LOGGER.";
+            return false;
+        }
+
+        // prepend the module name to the port name
+        logPort = "/" + getName() + logPort;
+        loggerOption->setParameter("remote", logPort);
+        if (!m_vectorsCollectionServer.initialize(loggerOption))
         {
             yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
@@ -375,7 +391,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("left_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::position::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::orientation::measured", {"roll", "pitch", "yaw"});
-        m_vectorsCollectionServer.populateMetadata("left_foot::orientation::desired",  {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::orientation::desired", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_velocity::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_force::measured", {"x", "y", "z"});
@@ -385,7 +401,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("right_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::position::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::orientation::measured", {"roll", "pitch", "yaw"});
-        m_vectorsCollectionServer.populateMetadata("right_foot::orientation::desired",  {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::orientation::desired", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("right_foot::linear_velocity::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::linear_force::measured", {"x", "y", "z"});
@@ -967,8 +983,6 @@ bool WalkingModule::updateModule()
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
-            m_vectorsCollectionServer.clear();
-
             // DCM
             m_vectorsCollectionServer.populateData("dcm::position::measured", m_FKSolver->getDCM());
             m_vectorsCollectionServer.populateData("dcm::position::desired", m_DCMPositionDesired.front());
@@ -1060,7 +1074,7 @@ bool WalkingModule::updateModule()
             const double isLeftFootFixed = m_isLeftFixedFrame.front() ? 1.0 : 0.0;
             m_vectorsCollectionServer.populateData("stance_foot::is_left", std::array<double, 1>{isLeftFootFixed});
 
-            m_vectorsCollectionServer.write();
+            m_vectorsCollectionServer.sendData();
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
