@@ -22,7 +22,7 @@
 #include <yarp/os/RpcClient.h>
 
 
-#include <BipedalLocomotion/YarpUtilities/VectorsCollection.h>
+#include <BipedalLocomotion/YarpUtilities/VectorsCollectionServer.h>
 #include <BipedalLocomotion/Contacts/GlobalCoPEvaluator.h>
 
 // iDynTree
@@ -147,7 +147,7 @@ namespace WalkingControllers
         // debug
         std::unique_ptr<iCub::ctrl::Integrator> m_velocityIntegral{nullptr};
 
-        yarp::os::BufferedPort<BipedalLocomotion::YarpUtilities::VectorsCollection> m_loggerPort; /**< Logger port. */
+        BipedalLocomotion::YarpUtilities::VectorsCollectionServer m_vectorsCollectionServer; /**< Logger server. */
 
         /**
          * Get the robot model from the resource finder and set it.

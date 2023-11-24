@@ -348,19 +348,82 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // initialize the logger
     if (m_dumpData)
     {
-        yarp::os::Bottle &loggerOptions = rf.findGroup("WALKING_LOGGER");
-        // open and connect the data logger port
-        std::string portOutput;
-        // open the connect the data logger port
-        if (!YarpUtilities::getStringFromSearchable(loggerOptions,
-                                                    "dataLoggerOutputPort_name",
-                                                    portOutput))
+        auto loggerOption = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>(rf)->getGroup("WALKING_LOGGER").lock();
+        if (loggerOption == nullptr)
+        {
+            yError() << "[WalkingModule::configure] Unable to get the group WALKING_LOGGER.";
+            return false;
+        }
+
+        std::string logPort;
+        if(!loggerOption->getParameter("remote", logPort))
+        {
+            yError() << "[WalkingModule::configure] Unable to get the remote from the group WALKING_LOGGER.";
+            return false;
+        }
+
+        // prepend the module name to the port name
+        logPort = "/" + getName() + logPort;
+        loggerOption->setParameter("remote", logPort);
+        if (!m_vectorsCollectionServer.initialize(loggerOption))
         {
             yError() << "[WalkingModule::configure] Unable to get the string from searchable.";
             return false;
         }
 
-        m_loggerPort.open("/" + name + portOutput);
+        m_vectorsCollectionServer.populateMetadata("dcm::position::measured", {"x", "y"});
+        m_vectorsCollectionServer.populateMetadata("dcm::position::desired", {"x", "y"});
+        m_vectorsCollectionServer.populateMetadata("dcm::velocity::desired", {"x", "y"});
+
+        // ZMP
+        m_vectorsCollectionServer.populateMetadata("zmp::measured", {"x", "y"});
+        m_vectorsCollectionServer.populateMetadata("zmp::desired", {"x", "y"});
+
+        m_vectorsCollectionServer.populateMetadata("zmp::desired_planner", {"x", "y"});
+
+        // COM
+        m_vectorsCollectionServer.populateMetadata("com::position::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::position::CoM_ZMP_controller", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::velocity::desired", {"x", "y", "z"});
+
+        // Left foot
+        m_vectorsCollectionServer.populateMetadata("left_foot::position::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::orientation::measured", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::orientation::desired", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::linear_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::linear_force::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::angular_torque::measured", {"x", "y", "z"});
+
+        // Right foot
+        m_vectorsCollectionServer.populateMetadata("right_foot::position::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::orientation::measured", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::orientation::desired", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::linear_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::linear_force::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::angular_torque::measured", {"x", "y", "z"});
+
+        // Joint
+        m_vectorsCollectionServer.populateMetadata("joints_state::positions::measured", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::positions::retargeting", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::velocities::measured", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::velocities::retargeting", m_robotControlHelper->getAxesList());
+
+        // root link information
+        m_vectorsCollectionServer.populateMetadata("root_link::position::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("root_link::orientation::measured", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("root_link::linear_velocity::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("root_link::angular_velocity::measured", {"x", "y", "z"});
+
+        // collect the stance foot information
+        m_vectorsCollectionServer.populateMetadata("stance_foot::is_left", {"scalar"});
+
+        m_vectorsCollectionServer.finalizeMetadata();
     }
 
     // time profiler
@@ -394,9 +457,6 @@ void WalkingModule::reset()
         m_walkingController->reset();
 
     m_trajectoryGenerator->reset();
-
-    if (m_dumpData)
-        m_loggerPort.close();
 }
 
 void WalkingModule::applyGoalScaling(yarp::sig::Vector &plannerInput)
@@ -409,9 +469,6 @@ void WalkingModule::applyGoalScaling(yarp::sig::Vector &plannerInput)
 
 bool WalkingModule::close()
 {
-    if (m_dumpData)
-        m_loggerPort.close();
-
     // restore PID
     m_robotControlHelper->getPIDHandler().restorePIDs();
 
@@ -926,29 +983,21 @@ bool WalkingModule::updateModule()
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
-            BipedalLocomotion::YarpUtilities::VectorsCollection &data = m_loggerPort.prepare();
-            data.vectors.clear();
-
-            auto populateData = [&](const std::string &name, const auto &signal)
-            {
-                data.vectors[name].assign(signal.data(), signal.data() + signal.size());
-            };
-
             // DCM
-            populateData("dcm::position::measured", m_FKSolver->getDCM());
-            populateData("dcm::position::desired", m_DCMPositionDesired.front());
-            populateData("dcm::velocity::desired", m_DCMVelocityDesired.front());
+            m_vectorsCollectionServer.populateData("dcm::position::measured", m_FKSolver->getDCM());
+            m_vectorsCollectionServer.populateData("dcm::position::desired", m_DCMPositionDesired.front());
+            m_vectorsCollectionServer.populateData("dcm::velocity::desired", m_DCMVelocityDesired.front());
 
             // ZMP
-            populateData("zmp::measured", measuredZMP);
-            populateData("zmp::desired", desiredZMP);
+            m_vectorsCollectionServer.populateData("zmp::measured", measuredZMP);
+            m_vectorsCollectionServer.populateData("zmp::desired", desiredZMP);
 
             // "zmp_des_planner_x", "zmp_des_planner_y",
             const iDynTree::Vector2 &desiredZMPPlanner = m_desiredZMP.front();
-            populateData("zmp::desired_planner", desiredZMPPlanner);
+            m_vectorsCollectionServer.populateData("zmp::desired_planner", desiredZMPPlanner);
 
             // COM
-            populateData("com::position::measured", measuredCoM);
+            m_vectorsCollectionServer.populateData("com::position::measured", measuredCoM);
 
             // Manual definition of this value to add also the planned CoM height
             std::vector<double> CoMPositionDesired(3);
@@ -956,8 +1005,8 @@ bool WalkingModule::updateModule()
             CoMPositionDesired[1] = m_stableDCMModel->getCoMPosition().data()[1];
             CoMPositionDesired[2] = m_retargetingClient->comHeight() + m_comHeightOffset;
 
-            populateData("com::position::desired", CoMPositionDesired);
-            populateData("com::position::CoM_ZMP_controller", desiredCoMPosition);
+            m_vectorsCollectionServer.populateData("com::position::desired", CoMPositionDesired);
+            m_vectorsCollectionServer.populateData("com::position::CoM_ZMP_controller", desiredCoMPosition);
 
             // Manual definition of this value to add also the planned CoM height velocity
             std::vector<double> CoMVelocityDesired(3);
@@ -965,67 +1014,67 @@ bool WalkingModule::updateModule()
             CoMVelocityDesired[1] = m_stableDCMModel->getCoMVelocity().data()[1];
             CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
 
-            populateData("com::velocity::desired", CoMVelocityDesired);
+            m_vectorsCollectionServer.populateData("com::velocity::desired", CoMVelocityDesired);
 
             // Left foot position
-            populateData("left_foot::position::measured", leftFoot.getPosition());
-            populateData("left_foot::position::desired", m_leftTrajectory.front().getPosition());
+            m_vectorsCollectionServer.populateData("left_foot::position::measured", leftFoot.getPosition());
+            m_vectorsCollectionServer.populateData("left_foot::position::desired", m_leftTrajectory.front().getPosition());
 
             // Left foot orientation
             const iDynTree::Vector3 leftFootOrientationMeasured = leftFoot.getRotation().asRPY();
-            populateData("left_foot::orientation::measured", leftFootOrientationMeasured);
+            m_vectorsCollectionServer.populateData("left_foot::orientation::measured", leftFootOrientationMeasured);
 
             const iDynTree::Vector3 leftFootOrientationDesired = m_leftTrajectory.front().getRotation().asRPY();
-            populateData("left_foot::orientation::desired", leftFootOrientationDesired);
+            m_vectorsCollectionServer.populateData("left_foot::orientation::desired", leftFootOrientationDesired);
 
             // "lf_des_dx", "lf_des_dy", "lf_des_dz",
             // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
-            populateData("left_foot::linear_velocity::desired", m_leftTwistTrajectory.front().getLinearVec3());
-            populateData("left_foot::angular_velocity::desired", m_leftTwistTrajectory.front().getAngularVec3());
+            m_vectorsCollectionServer.populateData("left_foot::linear_velocity::desired", m_leftTwistTrajectory.front().getLinearVec3());
+            m_vectorsCollectionServer.populateData("left_foot::angular_velocity::desired", m_leftTwistTrajectory.front().getAngularVec3());
 
             // "lf_force_x", "lf_force_y", "lf_force_z",
             // "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
-            populateData("left_foot::linear_force::measured", m_robotControlHelper->getLeftWrench().getLinearVec3());
-            populateData("left_foot::angular_torque::measured", m_robotControlHelper->getLeftWrench().getAngularVec3());
+            m_vectorsCollectionServer.populateData("left_foot::linear_force::measured", m_robotControlHelper->getLeftWrench().getLinearVec3());
+            m_vectorsCollectionServer.populateData("left_foot::angular_torque::measured", m_robotControlHelper->getLeftWrench().getAngularVec3());
 
             // Right foot position
-            populateData("right_foot::position::measured", rightFoot.getPosition());
-            populateData("right_foot::position::desired", m_rightTrajectory.front().getPosition());
+            m_vectorsCollectionServer.populateData("right_foot::position::measured", rightFoot.getPosition());
+            m_vectorsCollectionServer.populateData("right_foot::position::desired", m_rightTrajectory.front().getPosition());
 
             // Right foot orientation
             const iDynTree::Vector3 rightFootOrientationMeasured = rightFoot.getRotation().asRPY();
-            populateData("right_foot::orientation::measured", rightFootOrientationMeasured);
+            m_vectorsCollectionServer.populateData("right_foot::orientation::measured", rightFootOrientationMeasured);
             const iDynTree::Vector3 rightFootOrientationDesired = m_rightTrajectory.front().getRotation().asRPY();
-            populateData("right_foot::orientation::desired", rightFootOrientationDesired);
+            m_vectorsCollectionServer.populateData("right_foot::orientation::desired", rightFootOrientationDesired);
 
             // "rf_des_dx", "rf_des_dy", "rf_des_dz",
             // "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
-            populateData("right_foot::linear_velocity::desired", m_rightTwistTrajectory.front().getLinearVec3());
-            populateData("right_foot::angular_velocity::desired", m_rightTwistTrajectory.front().getAngularVec3());
+            m_vectorsCollectionServer.populateData("right_foot::linear_velocity::desired", m_rightTwistTrajectory.front().getLinearVec3());
+            m_vectorsCollectionServer.populateData("right_foot::angular_velocity::desired", m_rightTwistTrajectory.front().getAngularVec3());
 
             // "rf_force_x", "rf_force_y", "rf_force_z",
             // "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
-            populateData("right_foot::linear_force::measured", m_robotControlHelper->getRightWrench().getLinearVec3());
-            populateData("right_foot::angular_torque::measured", m_robotControlHelper->getRightWrench().getAngularVec3());
+            m_vectorsCollectionServer.populateData("right_foot::linear_force::measured", m_robotControlHelper->getRightWrench().getLinearVec3());
+            m_vectorsCollectionServer.populateData("right_foot::angular_torque::measured", m_robotControlHelper->getRightWrench().getAngularVec3());
 
             // Joint
-            populateData("joints_state::positions::measured", m_robotControlHelper->getJointPosition());
-            populateData("joints_state::positions::desired", m_qDesired);
-            populateData("joints_state::positions::retargeting", m_retargetingClient->jointPositions());
-            populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
-            populateData("joints_state::velocities::retargeting", m_retargetingClient->jointVelocities());
+            m_vectorsCollectionServer.populateData("joints_state::positions::measured", m_robotControlHelper->getJointPosition());
+            m_vectorsCollectionServer.populateData("joints_state::positions::desired", m_qDesired);
+            m_vectorsCollectionServer.populateData("joints_state::positions::retargeting", m_retargetingClient->jointPositions());
+            m_vectorsCollectionServer.populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
+            m_vectorsCollectionServer.populateData("joints_state::velocities::retargeting", m_retargetingClient->jointVelocities());
 
             // root link information
-            populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());
-            populateData("root_link::orientation::measured", m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
-            populateData("root_link::linear_velocity::measured", m_FKSolver->getRootLinkVelocity().getLinearVec3());
-            populateData("root_link::angular_velocity::measured", m_FKSolver->getRootLinkVelocity().getAngularVec3());
+            m_vectorsCollectionServer.populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());
+            m_vectorsCollectionServer.populateData("root_link::orientation::measured", m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
+            m_vectorsCollectionServer.populateData("root_link::linear_velocity::measured", m_FKSolver->getRootLinkVelocity().getLinearVec3());
+            m_vectorsCollectionServer.populateData("root_link::angular_velocity::measured", m_FKSolver->getRootLinkVelocity().getAngularVec3());
 
             // collect the stance foot information
             const double isLeftFootFixed = m_isLeftFixedFrame.front() ? 1.0 : 0.0;
-            populateData("stance_foot::is_left", std::array<double, 1>{isLeftFootFixed});
+            m_vectorsCollectionServer.populateData("stance_foot::is_left", std::array<double, 1>{isLeftFootFixed});
 
-            m_loggerPort.write();
+            m_vectorsCollectionServer.sendData();
         }
 
         // in the approaching phase the robot should not move and the trajectories should not advance
@@ -1513,10 +1562,6 @@ bool WalkingModule::pauseWalking()
 
     if (m_robotState != WalkingFSM::Walking)
         return false;
-
-    // close the logger
-    if (m_dumpData)
-        m_loggerPort.close();
 
     m_robotState = WalkingFSM::Paused;
     return true;
