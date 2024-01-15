@@ -983,6 +983,9 @@ bool WalkingModule::updateModule()
             auto leftFoot = m_FKSolver->getLeftFootToWorldTransform();
             auto rightFoot = m_FKSolver->getRightFootToWorldTransform();
 
+            m_vectorsCollectionServer.prepareData();
+            m_vectorsCollectionServer.clearData();
+
             // DCM
             m_vectorsCollectionServer.populateData("dcm::position::measured", m_FKSolver->getDCM());
             m_vectorsCollectionServer.populateData("dcm::position::desired", m_DCMPositionDesired.front());
