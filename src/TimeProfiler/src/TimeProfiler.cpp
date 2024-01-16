@@ -31,7 +31,7 @@ void Timer::setInitTime()
 
 void Timer::setEndTime()
 {
-    m_endTime = std::chrono::system_clock::now();
+    m_endTime = std::chrono::steady_clock::now();
 }
 
 void Timer::evaluateDuration()
