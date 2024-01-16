@@ -1378,14 +1378,48 @@ bool WalkingModule::prepareRobot(bool onTheFly)
         }
     }
 
-    if(!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
+
+// [2023-09-08 18:51:55.192] [thread: 33493] [blf] [info] [CentroidalMPCBlock::initialize] Right foot pose  0.0025892 -0.0988973          0          0          0          0          1.
+// [2023-09-08 18:51:55.192] [thread: 33493] [blf] [info] [CentroidalMPCBlock::initialize] Left foot pose 0.0175504 0.0834096         0         0         0         0         1.
+
+    iDynTree::Transform leftFoot = iDynTree::Transform::Identity();
+    iDynTree::Transform rightFoot = iDynTree::Transform::Identity();
+    //  rightFoot.setPosition(iDynTree::Position{0.0025892, -0.0988973, 0});
+    // leftFoot.setPosition(iDynTree::Position{0.0175504, 0.0834096,  0 });
+
+//  Right foot pose   0.00196076    -0.100129            0  -0.00046538 -5.59872e-05   -0.0699633     0.997549.
+// [2023-09-11 19:21:59.105] [thread: 31698] [blf] [info] [CentroidalMPCBlock::initialize] Left foot pose  0.016981 0.0792777         0         0         0         0         1.
+
+
+    rightFoot.setPosition(iDynTree::Position{0.00196076, -0.100129,  0});
+    leftFoot.setPosition(iDynTree::Position{0.016981, 0.0792777,  0 });
+
+    iDynTree::Vector4  quat;
+    iDynTree::toEigen(quat) << 0.997549, -0.00046538 -5.59872e-05   -0.0699633;
+    iDynTree::Rotation R;
+    R.fromQuaternion(quat);
+    auto rpyTemp = R.asRPY();
+    std::cerr << "0----------------> " << rpyTemp.toString() << std::endl;
+
+    rightFoot.setRotation(iDynTree::Rotation::RPY(0, 0, rpyTemp(0)));
+
+
+    std::cerr << "right foot " << rightFoot.toString() << std::endl;
+
+    //leftFoot.setPosition(iDynTree::Position{0.0111399, 0.0802379, 0});
+    //rightFoot.setPosition(iDynTree::Position{0.00125174, -0.108023,  0 });
+
+
+    std::cerr << "cooommm" <<  desiredCoMPosition.toString() << std::endl;
+
+    if(!m_IKSolver->computeIK(leftFoot, rightFoot,
                               desiredCoMPosition, m_qDesired))
     {
         yError() << "[WalkingModule::prepareRobot] Inverse Kinematics failed while computing the initial position.";
         return false;
     }
 
-    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesired) * 180 / M_PI).transpose() << std::endl;
+    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesired)).transpose() << std::endl;
 
     if(!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
     {

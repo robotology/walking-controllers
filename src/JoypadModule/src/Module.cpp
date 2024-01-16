@@ -184,14 +184,16 @@ bool JoypadModule::updateModule()
     m_joypadController->getButton(7, r1Button);
 
     // get the values from stick
-    double x, y, z;
+    double x, y, z, w;
     m_joypadController->getAxis(0, y);
     m_joypadController->getAxis(1, x);
     m_joypadController->getAxis(2, z);
+    m_joypadController->getAxis(3, w);
 
     x = -deadzone(x);
     y = -deadzone(y);
     z = -deadzone(z);
+    w = -deadzone(w);
 
     if(aButton > 0)
     {
@@ -227,6 +229,7 @@ bool JoypadModule::updateModule()
         goal.clear();
         goal.push_back(x);
         goal.push_back(y);
+        goal.push_back(w);
         goal.push_back(z);
         m_robotGoalPort.write();
     }
