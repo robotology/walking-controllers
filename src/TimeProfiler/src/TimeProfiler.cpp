@@ -26,7 +26,7 @@ void Timer::resetAverageDuration()
 
 void Timer::setInitTime()
 {
-    m_initTime = std::chrono::system_clock::now();
+    m_initTime = std::chrono::steady_clock::now();
 }
 
 void Timer::setEndTime()
