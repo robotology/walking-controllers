@@ -22,8 +22,8 @@ namespace WalkingControllers
      */
     class Timer
     {
-        std::chrono::time_point<std::chrono::system_clock> m_initTime; /**< Init time. */
-        std::chrono::time_point<std::chrono::system_clock> m_endTime; /**< End time. */
+        std::chrono::time_point<std::chrono::steady_clock> m_initTime; /**< Init time. */
+        std::chrono::time_point<std::chrono::steady_clock> m_endTime; /**< End time. */
         double m_averageDuration; /**< Average duration. */
 
     public:
