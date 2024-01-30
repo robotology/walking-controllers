@@ -88,7 +88,7 @@ Notice: `sudo` is not necessary if you specify the `CMAKE_INSTALL_PREFIX`. In th
 ```sh
 export WalkingControllers_INSTALL_DIR=/path/where/you/installed/
 export PATH=$PATH:$WalkingControllers_INSTALL_DIR/bin
-export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
+export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/ICUBcontrib
 ```
 
 # :computer: How to run the simulation
