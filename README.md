@@ -80,7 +80,7 @@ The dependencies can be installed either using the [robotology-superbuild](https
 It's possible to create the environment via the following command:
 
 ```sh
-mamba create -n walking  -c robotology -c conda-forge bipedal-locomotion-framework=0.18.0 idyntree yarp icub-contrib-common icub-main osqp-eigen qpoases libunicycle-footstep-planner gazebo catch2 gazebo-yarp-plugins whole-body-estimators icub-models ergocub-software
+mamba create -n walking  -c robotology -c conda-forge bipedal-locomotion-framework idyntree yarp icub-contrib-common icub-main osqp-eigen qpoases libunicycle-footstep-planner gazebo catch2 gazebo-yarp-plugins whole-body-estimators icub-models ergocub-software
 ```
 
 This will create an environment called `walking` that can be activated via:
