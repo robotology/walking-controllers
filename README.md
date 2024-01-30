@@ -74,6 +74,24 @@ Eprint = {arXiv:1809.02167},
 * [Catch2](https://github.com/catchorg/Catch2): to compile the tests.
 
 # :hammer: Build the suite
+
+The dependencies can be installed either using the [robotology-superbuild](https://github.com/robotology/robotology-superbuild) or via an isolated environment (see [here](https://github.com/robotology/robotology-superbuild/blob/master/doc/install-mambaforge.md) to learn how to install mambaforge).
+
+It's possible to create the environment via the following command:
+
+```sh
+mamba create -n walking  -c robotology -c conda-forge bipedal-locomotion-framework=0.18.0 idyntree yarp icub-contrib-common icub-main osqp-eigen qpoases libunicycle-footstep-planner gazebo catch2 gazebo-yarp-plugins whole-body-estimators icub-models ergocub-software
+```
+
+This will create an environment called `walking` that can be activated via:
+
+```sh
+mamba activate walking
+```
+
+> [!NOTE]
+> Remember to activate this environment in every terminal used to run the simulation.
+
 ## Linux/macOs
 
 ```sh
@@ -84,6 +102,8 @@ cmake ../
 make
 [sudo] make install
 ```
+If using an environment, remember to set `CMAKE_INSTALL_PREFIX` to the value of `$CONDA_PREFIX`.
+
 Notice: `sudo` is not necessary if you specify the `CMAKE_INSTALL_PREFIX`. In this case it is necessary to add in the `.bashrc` or `.bash_profile` the following lines:
 ```sh
 export WalkingControllers_INSTALL_DIR=/path/where/you/installed/
