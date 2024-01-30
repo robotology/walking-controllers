@@ -88,7 +88,7 @@ Notice: `sudo` is not necessary if you specify the `CMAKE_INSTALL_PREFIX`. In th
 ```sh
 export WalkingControllers_INSTALL_DIR=/path/where/you/installed/
 export PATH=$PATH:$WalkingControllers_INSTALL_DIR/bin
-export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/yarp
+export YARP_DATA_DIRS=$YARP_DATA_DIRS:$WalkingControllers_INSTALL_DIR/share/ICUBcontrib
 ```
 
 # :computer: How to run the simulation
@@ -139,14 +139,14 @@ In order to run the simulation, the following additional dependency are required
      controller sending `startWalking` command;
    * `stopWalking`: the controller is stopped, in order to start again the
      controller you have to prepare again the robot.
-   * `setGoal (x y)`: send the desired input to the planner. Send this command after `startWalking`.
+   * `setGoal (x, y, k)`: send the desired input to the planner. Send this command after `startWalking`.
 
    Example sequence:
    ```
    prepareRobot
    startWalking
-   setGoal (1.0, 0.0)
-   setGoal (1.0, 0.0)
+   setGoal (1.0, 0.0, 0.0)
+   setGoal (1.0, 0.0, 0.0)
    stopWalking
    ```
 
