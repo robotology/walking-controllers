@@ -75,7 +75,7 @@ Eprint = {arXiv:1809.02167},
 
 # :hammer: Build the suite
 
-The dependencies can be installed either using the [robotology-superbuild](https://github.com/robotology/robotology-superbuild) or via an isolated environment (see [here](https://github.com/robotology/robotology-superbuild/blob/master/doc/install-mambaforge.md) to learn how to install mambaforge).
+The dependencies can be installed either using the [robotology-superbuild](https://github.com/robotology/robotology-superbuild) (that installs also this repo) or via an isolated environment (see [here](https://github.com/robotology/robotology-superbuild/blob/master/doc/install-mambaforge.md) to learn how to install mambaforge).
 
 It's possible to create the environment via the following command:
 
