@@ -102,6 +102,24 @@ bool BLFIK::initialize(
                            lowPriority,
                            m_jointRegularizationWeight);
 
+    m_angularMomentumTask = std::make_shared<BipedalLocomotion::IK::AngularMomentumTask>();
+    ok = ok && m_angularMomentumTask->setKinDyn(kinDyn);
+    ok = ok && m_angularMomentumTask->initialize(ptr->getGroup("ANGULAR_MOMENTUM_TASK"));
+
+    Eigen::VectorXd angularMomentumWeight;
+    ok = ok && ptr->getGroup("ANGULAR_MOMENTUM_TASK").lock()->getParameter("weight", angularMomentumWeight);
+
+    ok = ok
+         && m_qpIK.addTask(m_angularMomentumTask,
+                           "angular_momentum_task",
+                           lowPriority,
+                           angularMomentumWeight);
+    if (!ok)
+    {
+        BipedalLocomotion::log()->error("{} Unable to initialize the angular momentum task.", prefix);
+        return false;
+    }
+    
     if (m_usejointRetargeting)
     {
         m_jointRetargetingTask = std::make_shared<BipedalLocomotion::IK::JointTrackingTask>();
@@ -123,6 +141,9 @@ bool BLFIK::initialize(
     }
 
     ok = ok && m_qpIK.finalize(m_variableHandler);
+
+    m_angularMomentumTask->setSetPoint(Eigen::Vector3d::Zero());
+
 
     BipedalLocomotion::log()->info("[BLFIK::initialize] {}", m_qpIK.toString());
 

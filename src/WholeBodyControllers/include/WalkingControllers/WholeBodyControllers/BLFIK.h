@@ -18,6 +18,7 @@
 #include <BipedalLocomotion/IK/R3Task.h>
 #include <BipedalLocomotion/IK/SE3Task.h>
 #include <BipedalLocomotion/IK/SO3Task.h>
+#include <BipedalLocomotion/IK/AngularMomentumTask.h>
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
 #include <BipedalLocomotion/System/VariablesHandler.h>
 
@@ -68,6 +69,7 @@ private:
     std::shared_ptr<BipedalLocomotion::IK::R3Task> m_rootTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRetargetingTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRegularizationTask;
+    std::shared_ptr<BipedalLocomotion::IK::AngularMomentumTask> m_angularMomentumTask;
 
     iDynTree::VectorDynSize m_jointVelocity;
     bool m_usejointRetargeting{false};
