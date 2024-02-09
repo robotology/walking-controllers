@@ -49,7 +49,10 @@ public:
     bool setCoMSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);
     bool setRootSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);
     bool setTorsoSetPoint(const iDynTree::Rotation& rotation);
+    bool setAngularMomentumSetPoint(const iDynTree::Vector3& angularMomentum);
     const iDynTree::VectorDynSize& getDesiredJointVelocity() const;
+
+    iDynTree::Twist getDesiredTorsoVelocity() const;
 
 private:
     std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>

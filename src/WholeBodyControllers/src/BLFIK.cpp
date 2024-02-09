@@ -142,9 +142,6 @@ bool BLFIK::initialize(
 
     ok = ok && m_qpIK.finalize(m_variableHandler);
 
-    m_angularMomentumTask->setSetPoint(Eigen::Vector3d::Zero());
-
-
     BipedalLocomotion::log()->info("[BLFIK::initialize] {}", m_qpIK.toString());
 
     m_jointVelocity.resize(kinDyn->getNrOfDegreesOfFreedom());
@@ -221,6 +218,11 @@ bool BLFIK::setRegularizationJointSetPoint(const iDynTree::VectorDynSize& jointP
     return m_jointRegularizationTask->setSetPoint(iDynTree::toEigen(jointPosition));
 }
 
+bool BLFIK::setAngularMomentumSetPoint(const iDynTree::Vector3& angularMomentum)
+{
+    return m_angularMomentumTask->setSetPoint(iDynTree::toEigen(angularMomentum));
+}
+
 bool BLFIK::setCoMSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity)
 {
     return m_comTask->setSetPoint(iDynTree::toEigen(position), iDynTree::toEigen(velocity));
@@ -243,4 +245,12 @@ bool BLFIK::setTorsoSetPoint(const iDynTree::Rotation& rotation)
 const iDynTree::VectorDynSize& BLFIK::getDesiredJointVelocity() const
 {
     return m_jointVelocity;
+}
+
+iDynTree::Twist BLFIK::getDesiredTorsoVelocity() const
+{
+    iDynTree::Twist tmp;
+    tmp.zero();
+    iDynTree::toEigen(tmp.getAngularVec3()) = m_torsoTask->getB();
+    return tmp;
 }

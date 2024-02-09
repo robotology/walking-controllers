@@ -371,6 +371,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
             return false;
         }
 
+        m_vectorsCollectionServer.populateMetadata("angular_momentum::measured", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("angular_momentum::desired", {"x", "y", "z"});
+
         m_vectorsCollectionServer.populateMetadata("dcm::position::measured", {"x", "y"});
         m_vectorsCollectionServer.populateMetadata("dcm::position::desired", {"x", "y"});
         m_vectorsCollectionServer.populateMetadata("dcm::velocity::desired", {"x", "y"});
@@ -502,6 +505,7 @@ bool WalkingModule::close()
 bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
                                const iDynTree::Vector3 &desiredCoMVelocity,
                                const iDynTree::Rotation &desiredNeckOrientation,
+                               const iDynTree::SpatialMomentum &centroidalMomentumDesired,
                                iDynTree::VectorDynSize &output)
 {
     const std::string phase = m_isStancePhase.front() ? "stance" : "walking";
@@ -515,6 +519,8 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     ok = ok && m_BLFIKSolver->setCoMSetPoint(desiredCoMPosition, desiredCoMVelocity);
     ok = ok && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointPositions(),
                                                           m_retargetingClient->jointVelocities());
+
+    ok = ok && m_BLFIKSolver->setAngularMomentumSetPoint(centroidalMomentumDesired.getAngularVec3());
 
     if (m_useRootLinkForHeight)
     {
@@ -902,6 +908,10 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
+        // compute the desired torso velocity
+        auto torsoVelocity = m_BLFIKSolver->getDesiredTorsoVelocity();
+        auto centroidalMomentumDesired = m_FKSolver->getKinDyn()->getCentroidalRobotLockedInertia() * torsoVelocity;
+
         if (m_useQPIK)
         {
             // integrate dq because velocity control mode seems not available
@@ -919,6 +929,7 @@ bool WalkingModule::updateModule()
             if (!solveBLFIK(desiredCoMPosition,
                             desiredCoMVelocity,
                             yawRotation,
+                            centroidalMomentumDesired,
                             m_dqDesired))
             {
                 yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with "
@@ -1023,6 +1034,8 @@ bool WalkingModule::updateModule()
             CoMVelocityDesired[1] = m_stableDCMModel->getCoMVelocity().data()[1];
             CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
 
+            m_vectorsCollectionServer.prepareData();
+            m_vectorsCollectionServer.clearData();
             m_vectorsCollectionServer.populateData("com::velocity::desired", CoMVelocityDesired);
 
             // Left foot position
@@ -1082,6 +1095,9 @@ bool WalkingModule::updateModule()
             // collect the stance foot information
             const double isLeftFootFixed = m_isLeftFixedFrame.front() ? 1.0 : 0.0;
             m_vectorsCollectionServer.populateData("stance_foot::is_left", std::array<double, 1>{isLeftFootFixed});
+
+            m_vectorsCollectionServer.populateData("angular_momentum::measured", m_FKSolver->getKinDyn()->getCentroidalTotalMomentum().getAngularVec3());
+            m_vectorsCollectionServer.populateData("angular_momentum::desired", centroidalMomentumDesired.getAngularVec3());            
 
             m_vectorsCollectionServer.sendData();
         }
