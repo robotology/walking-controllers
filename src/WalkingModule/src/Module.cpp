@@ -909,8 +909,8 @@ bool WalkingModule::updateModule()
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
         // compute the desired torso velocity
-        auto torsoVelocity = m_BLFIKSolver->getDesiredTorsoVelocity();
-        auto centroidalMomentumDesired = m_FKSolver->getKinDyn()->getCentroidalRobotLockedInertia() * torsoVelocity;
+        const iDynTree::Twist desiredTorsoVelocity = this->computeAverageTwistFromPlannedFeet();
+        auto centroidalMomentumDesired = m_FKSolver->getKinDyn()->getCentroidalRobotLockedInertia() * desiredTorsoVelocity;
 
         if (m_useQPIK)
         {
@@ -1138,6 +1138,21 @@ iDynTree::Rotation WalkingModule::computeAverageYawRotationFromPlannedFeet() con
     const double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
                                       std::cos(yawLeft) + std::cos(yawRight));
     return iDynTree::Rotation::RotZ(meanYaw);
+}
+
+iDynTree::Twist WalkingModule::computeAverageTwistFromPlannedFeet() const
+{
+    iDynTree::Twist twist;
+    iDynTree::Vector3 meanLinearVelocity, meanAngularVelocity;
+    iDynTree::toEigen(meanLinearVelocity) = (iDynTree::toEigen(m_leftTwistTrajectory.front().getLinearVec3()) +
+                                            iDynTree::toEigen(m_rightTwistTrajectory.front().getLinearVec3())) / 2.0;
+    iDynTree::toEigen(meanAngularVelocity) = (iDynTree::toEigen(m_leftTwistTrajectory.front().getAngularVec3()) +
+                                          iDynTree::toEigen(m_rightTwistTrajectory.front().getAngularVec3())) / 2.0;
+
+    twist.setLinearVec3(meanLinearVelocity);
+    twist.setAngularVec3(meanAngularVelocity);
+
+    return twist;
 }
 
 bool WalkingModule::prepareRobot(bool onTheFly)

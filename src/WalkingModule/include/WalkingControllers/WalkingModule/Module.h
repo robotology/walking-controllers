@@ -200,6 +200,8 @@ namespace WalkingControllers
          */
         iDynTree::Rotation computeAverageYawRotationFromPlannedFeet() const;
 
+        iDynTree::Twist computeAverageTwistFromPlannedFeet() const;
+
         /**
          * Generate the first trajectory.
          * This method has to be called before updateTrajectories() method.
