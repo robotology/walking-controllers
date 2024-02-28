@@ -5,5 +5,9 @@ build/*
 *~
 \#*\#
 
-#Qtcreator
+# Qtcreator
 *.user*
+
+# Visual Studio
+.vs/*
+CMakeSettings.json
