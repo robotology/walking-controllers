@@ -12,6 +12,7 @@
 // std
 #include <map>
 #include <memory>
+#include <chrono>
 
 namespace WalkingControllers
 {
@@ -21,8 +22,8 @@ namespace WalkingControllers
      */
     class Timer
     {
-        clock_t m_initTime; /**< Init time. */
-        clock_t m_endTime; /**< End time. */
+        std::chrono::time_point<std::chrono::steady_clock> m_initTime; /**< Init time. */
+        std::chrono::time_point<std::chrono::steady_clock> m_endTime; /**< End time. */
         double m_averageDuration; /**< Average duration. */
 
     public:

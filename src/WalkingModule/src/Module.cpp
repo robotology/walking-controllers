@@ -428,12 +428,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
 
     // time profiler
     m_profiler = std::make_unique<TimeProfiler>();
-    m_profiler->setPeriod(round(10 / m_dT));
+    m_profiler->setPeriod(round(1 / m_dT));
     if (m_useMPC)
         m_profiler->addTimer("MPC");
 
     m_profiler->addTimer("IK");
     m_profiler->addTimer("Total");
+    m_profiler->addTimer("Loop");
+    m_profiler->addTimer("Feedback");
 
     // initialize some variables
     m_newTrajectoryRequired = false;
@@ -726,12 +728,16 @@ bool WalkingModule::updateModule()
             }
         }
 
+        m_profiler->setInitTime("Feedback");
+
         // get feedbacks and evaluate useful quantities
         if (!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
             return false;
         }
+
+        m_profiler->setEndTime("Feedback");
 
         // if the retargeting is not in the approaching phase we can set the stance/walking phase
         if (!m_retargetingClient->isApproachingPhase())
@@ -1091,12 +1097,19 @@ bool WalkingModule::updateModule()
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
 
+        if (!m_firstRun)
+        {
+            m_profiler->setEndTime("Loop");
+        }
+
         m_firstRun = false;
 
         m_profiler->setEndTime("Total");
 
         // print timings
         m_profiler->profiling();
+
+        m_profiler->setInitTime("Loop");
     }
     return true;
 }

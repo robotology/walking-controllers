@@ -26,18 +26,18 @@ void Timer::resetAverageDuration()
 
 void Timer::setInitTime()
 {
-    m_initTime = clock();
+    m_initTime = std::chrono::steady_clock::now();
 }
 
 void Timer::setEndTime()
 {
-    m_endTime = clock();
+    m_endTime = std::chrono::steady_clock::now();
 }
 
 void Timer::evaluateDuration()
 {
-    clock_t duration = m_endTime - m_initTime;
-    m_averageDuration += static_cast<double>(duration) / CLOCKS_PER_SEC * 1000.0;
+    auto duration_ms = std::chrono::duration_cast<std::chrono::microseconds>(m_endTime - m_initTime).count() / 1000.0;
+    m_averageDuration += duration_ms;
 }
 
 void TimeProfiler::setPeriod(int maxCounter)
