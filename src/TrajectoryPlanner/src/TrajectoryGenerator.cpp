@@ -130,6 +130,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     double switchOverSwingRatio = config.check("switchOverSwingRatio",
                                                yarp::os::Value(0.4)).asFloat64();
     double lastStepDCMOffset = config.check("lastStepDCMOffset", yarp::os::Value(0.0)).asFloat64();
+    double lastStepDCMStillPercentage = config.check("lastStepDCMStillPercentage", yarp::os::Value(0.1)).asFloat64();
     m_leftYawDeltaInRad = iDynTree::deg2rad(config.check("leftYawDeltaInDeg", yarp::os::Value(0.0)).asFloat64());
     m_rightYawDeltaInRad = iDynTree::deg2rad(config.check("rightYawDeltaInDeg", yarp::os::Value(0.0)).asFloat64());
 
@@ -209,6 +210,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
     m_dcmGenerator->setOmega(sqrt(9.81/comHeight));
     m_dcmGenerator->setFirstDCMTrajectoryMode(FirstDCMTrajectoryMode::FifthOrderPoly);
     ok = ok && m_dcmGenerator->setLastStepDCMOffsetPercentage(lastStepDCMOffset);
+    ok = ok && m_dcmGenerator->setStillnessPercentage(lastStepDCMStillPercentage);
 
     m_correctLeft = true;
 
