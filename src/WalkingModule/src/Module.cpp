@@ -710,7 +710,7 @@ bool WalkingModule::updateModule()
                 m_comHeightOffset = 0.0;
             }
 
-            m_robotState = WalkingFSM::Prepared;
+            m_robotState = WalkingFSM::Configured;
 
             yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
         }
@@ -1391,17 +1391,22 @@ bool WalkingModule::prepareRobot(bool onTheFly)
 // [2023-09-11 19:21:59.105] [thread: 31698] [blf] [info] [CentroidalMPCBlock::initialize] Left foot pose  0.016981 0.0792777         0         0         0         0         1.
 
 
-    rightFoot.setPosition(iDynTree::Position{0.00196076, -0.100129,  0});
-    leftFoot.setPosition(iDynTree::Position{0.016981, 0.0792777,  0 });
+    rightFoot.setPosition(iDynTree::Position{0.00124648,  -0.105198,  0});
+    leftFoot.setPosition(iDynTree::Position{0.016981,  0.0792777,  0 });
 
     iDynTree::Vector4  quat;
-    iDynTree::toEigen(quat) << 0.997549, -0.00046538 -5.59872e-05   -0.0699633;
+    iDynTree::toEigen(quat) << 0.997559,  -0,         -0, -0.0699633;
+    iDynTree::toEigen(quat).normalize();
     iDynTree::Rotation R;
     R.fromQuaternion(quat);
     auto rpyTemp = R.asRPY();
     std::cerr << "0----------------> " << rpyTemp.toString() << std::endl;
 
-    rightFoot.setRotation(iDynTree::Rotation::RPY(0, 0, rpyTemp(0)));
+    rightFoot.setRotation(R);
+
+    // desiredCoMPosition(0) = -0.000944397;
+    // desiredCoMPosition(1) = -0.000863175;
+    // desiredCoMPosition(2) =   0.718248;
 
 
     std::cerr << "right foot " << rightFoot.toString() << std::endl;
