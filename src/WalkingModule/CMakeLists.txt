@@ -13,7 +13,6 @@ add_walking_controllers_application(
   LINK_LIBRARIES WalkingControllers::YarpUtilities
                  WalkingControllers::iDynTreeUtilities
                  WalkingControllers::StdUtilities
-                 WalkingControllers::TimeProfiler
                  WalkingControllers::RobotInterface
                  WalkingControllers::KinDynWrapper
                  WalkingControllers::TrajectoryPlanner
@@ -24,6 +23,7 @@ add_walking_controllers_application(
                  BipedalLocomotion::ParametersHandlerYarpImplementation
                  BipedalLocomotion::Contacts
                  BipedalLocomotion::ManifConversions
+                 BipedalLocomotion::System
                  ctrlLib
   SUBDIRECTORIES app)
 
