@@ -427,7 +427,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     }
 
     // time profiler
-    m_profiler = std::make_unique<TimeProfiler>();
+    m_profiler = std::make_unique<BipedalLocomotion::System::TimeProfiler>();
     m_profiler->setPeriod(round(1 / m_dT));
     if (m_useMPC)
         m_profiler->addTimer("MPC");

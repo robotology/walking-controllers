@@ -24,6 +24,8 @@
 
 #include <BipedalLocomotion/YarpUtilities/VectorsCollectionServer.h>
 #include <BipedalLocomotion/Contacts/GlobalCoPEvaluator.h>
+#include <BipedalLocomotion/System/TimeProfiler.h>
+
 
 // iDynTree
 #include <iDynTree/Core/VectorFixSize.h>
@@ -45,8 +47,6 @@
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>
 
 #include <WalkingControllers/RetargetingHelper/Helper.h>
-
-#include <WalkingControllers/TimeProfiler/TimeProfiler.h>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -91,7 +91,7 @@ namespace WalkingControllers
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
-        std::unique_ptr<TimeProfiler> m_profiler; /**< Time profiler. */
+        std::unique_ptr<BipedalLocomotion::System::TimeProfiler> m_profiler; /**< Time profiler. */
         BipedalLocomotion::Contacts::GlobalCoPEvaluator m_globalCoPEvaluator;
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
