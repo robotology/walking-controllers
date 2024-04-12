@@ -51,46 +51,12 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    // set the polydriver
-    yarp::os::Property conf;
-    std::string deviceName;
-    if(!YarpUtilities::getStringFromSearchable(rf, "device", deviceName))
+    yarp::os::Bottle& conf = rf.findGroup("JOYPAD_DEVICE");
+
+    if (conf.isNull())
     {
-        yError() << "[configure] Unable to get a string from searchable";
+        yError() << "[configure] Unable to get the group JOYPAD_DEVICE from the configuration file.";
         return false;
-    }
-
-    conf.put("device", deviceName);
-
-    if(deviceName == "JoypadControlClient")
-    {
-        std::string local;
-        if(!YarpUtilities::getStringFromSearchable(rf, "local", local))
-        {
-            yError() << "[configure] Unable to get a string from searchable";
-            return false;
-        }
-
-        std::string remote;
-        if(!YarpUtilities::getStringFromSearchable(rf, "remote", remote))
-        {
-            yError() << "[configure] Unable to get a string from searchable";
-            return false;
-        }
-
-        conf.put("local", local);
-        conf.put("remote", remote);
-    }
-    else
-    {
-        int sticks;
-        if(!YarpUtilities::getNumberFromSearchable(rf, "sticks", sticks))
-        {
-            yError() << "[configure] Unable to get a number from searchable";
-            return false;
-        }
-
-        conf.put("sticks", sticks);
     }
 
     // Open joypad polydriver
@@ -165,7 +131,9 @@ bool JoypadModule::close()
 bool JoypadModule::updateModule()
 {
     yarp::os::Bottle cmd, outcome;
-    float aButton, bButton, xButton, yButton, l1Button, r1Button;
+    float aButton{ 0.0 }, bButton{ 0.0 },
+          xButton{ 0.0 }, yButton{ 0.0 },
+          l1Button{ 0.0 }, r1Button{ 0.0 };
 
     // prepare robot (A button)
     m_joypadController->getButton(0, aButton);
@@ -184,7 +152,7 @@ bool JoypadModule::updateModule()
     m_joypadController->getButton(7, r1Button);
 
     // get the values from stick
-    double x, y, z;
+    double x{ 0.0 }, y{ 0.0 }, z{ 0.0 };
     m_joypadController->getAxis(0, y);
     m_joypadController->getAxis(1, x);
     m_joypadController->getAxis(2, z);
@@ -195,27 +163,32 @@ bool JoypadModule::updateModule()
 
     if(aButton > 0)
     {
+        yInfo() << "[updateModule] Prepare robot";
         cmd.addString("prepareRobot");
         m_rpcClientPort.write(cmd, outcome);
     }
     else if(bButton > 0)
     {
+        yInfo() << "[updateModule] Start walking";
         cmd.addString("startWalking");
         m_rpcClientPort.write(cmd, outcome);
     }
     else if(yButton > 0)
     {
+        yInfo() << "[updateModule] Pause walking";
         cmd.addString("pauseWalking");
         m_rpcClientPort.write(cmd, outcome);
     }
     else if(xButton > 0)
     {
+        yInfo() << "[updateModule] Stop walking";
         cmd.addString("stopWalking");
         m_rpcClientPort.write(cmd, outcome);
     }
     // connect the ports
     else if(l1Button > 0 && r1Button > 0)
     {
+        yInfo() << "[updateModule] Connecting";
         if(!yarp::os::Network::isConnected(m_rpcClientPortName, m_rpcServerPortName))
             yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
         if(!yarp::os::Network::isConnected(m_robotGoalOutputPortName, m_robotGoalInputPortName))
