@@ -35,6 +35,19 @@ namespace WalkingControllers
         double m_scaleX; /**< Scale of the joypad x-axis. */
         double m_scaleY; /**< Scale of the joypad y-axis. */
 
+        bool m_connectPortsSeparately; /**< Flag to separate the connection of ports */
+
+        int m_forwardAxis; /**< Axis index to go forward/backward. */
+        int m_rotationAxis; /**< Axis index to rotate in place. */
+        int m_sideAxis; /**< Axis index to move sideways. */
+        int m_prepareButton; /**< Button index to prepare the robot. */
+        int m_startButton; /**< Button to start the robot. */
+        int m_pauseButton; /**< Button to pause the robot. */
+        int m_stopButton; /**< Button to stop the robot. */
+        int m_connectGoalButton; /**< Button to connect the goal port. */
+        int m_connectRpcButton; /**< Button to connect the RPC port. */
+        int m_disconnectButton; /**< Button to disconnect the ports. */
+
         yarp::os::RpcClient m_rpcClientPort; /**< RPC port. */
         std::string m_rpcServerPortName; /**< Name of the walking-module RPC port. */
         std::string m_rpcClientPortName; /**< Name of the joypad-module RPC port */
