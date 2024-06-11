@@ -293,6 +293,17 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     return true;
 }
 
+void RetargetingClient::enableApproachingIfNecessary()
+{
+
+    if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
+    {
+        this->setPhase(Phase::Approaching);
+    } 
+    m_isFirstDataArrived = true;
+    m_timestampLastDataArrived = yarp::os::Time::now();
+}
+
 bool RetargetingClient::getFeedback()
 {
     if(m_useHandRetargeting)
@@ -302,6 +313,7 @@ bool RetargetingClient::getFeedback()
             auto desiredHandPose = hand.port.read(false);
             if(desiredHandPose != nullptr)
             {
+                this->enableApproachingIfNecessary();
                 hand.smoother.smoother->computeNextValues(*desiredHandPose);
             }
             convertYarpVectorPoseIntoTransform(hand.smoother.smoother->getPos(), hand.transform);
@@ -316,6 +328,7 @@ bool RetargetingClient::getFeedback()
         const auto HDEData = m_hdeRetargeting.port.read(false);
         if (HDEData != nullptr)
         {
+            this->enableApproachingIfNecessary();
             if (m_useCoMHeightRetargeting)
             {
                 if (m_phase == Phase::Walking)
@@ -381,7 +394,7 @@ bool RetargetingClient::getFeedback()
     }
 
     // check if the approaching phase is finished
-    if(m_phase == Phase::Approaching)
+    if(m_phase == Phase::Approaching && m_isFirstDataArrived)
     {
         double now = yarp::os::Time::now();
         if(now - m_startingApproachingPhaseTime > m_approachPhaseDuration)
@@ -448,6 +461,11 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
 
 void RetargetingClient::setPhase(Phase phase)
 {
+    if (phase != Phase::Approaching && m_phase == Phase::Approaching)
+    {
+        return;
+    }
+
     if (phase == Phase::Approaching)
     {
         startApproachingPhase();

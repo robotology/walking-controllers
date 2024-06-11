@@ -739,12 +739,8 @@ bool WalkingModule::updateModule()
 
         m_profiler->setEndTime("Feedback");
 
-        // if the retargeting is not in the approaching phase we can set the stance/walking phase
-        if (!m_retargetingClient->isApproachingPhase())
-        {
-            auto retargetingPhase = m_isStancePhase.front() ? RetargetingClient::Phase::Stance : RetargetingClient::Phase::Walking;
-            m_retargetingClient->setPhase(retargetingPhase);
-        }
+        auto retargetingPhase = m_isStancePhase.front() ? RetargetingClient::Phase::Stance : RetargetingClient::Phase::Walking;
+        m_retargetingClient->setPhase(retargetingPhase);
 
         if (!m_retargetingClient->getFeedback())
         {
@@ -1086,14 +1082,12 @@ bool WalkingModule::updateModule()
             m_vectorsCollectionServer.sendData();
         }
 
-        // in the approaching phase the robot should not move and the trajectories should not advance
-        if (!m_retargetingClient->isApproachingPhase())
-        {
-            propagateTime();
 
-            // advance all the signals
-            advanceReferenceSignals();
-        }
+        propagateTime();
+
+        // advance all the signals
+        advanceReferenceSignals();
+
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
 
@@ -1498,9 +1492,6 @@ bool WalkingModule::startWalking()
     }
     m_zmpOffsetLocal = m_zmpOffset;
 
-    // before running the controller the retargeting client goes in approaching phase this
-    // guarantees a smooth transition
-    m_retargetingClient->setPhase(RetargetingClient::Phase::Approaching);
     m_robotState = WalkingFSM::Walking;
 
     yInfo() << "[WalkingModule::startWalking] Started!";
@@ -1511,12 +1502,6 @@ bool WalkingModule::startWalking()
 bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
 {
     m_plannerInput = plannerInput;
-
-    // in the approaching phase the robot should not move
-    // as soon as the approaching phase is finished the user
-    // can move the robot
-    if (m_retargetingClient->isApproachingPhase())
-        return true;
 
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if (m_mergePoints.empty())
