@@ -300,7 +300,7 @@ void RetargetingClient::enableApproachingIfNecessary()
     if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
     {
         this->setPhase(Phase::Approaching);
-    } 
+    }
     m_isFirstDataArrived = true;
     m_timestampLastDataArrived = yarp::os::Time::now();
 }
@@ -382,7 +382,7 @@ bool RetargetingClient::getFeedback()
 
                 if (m_phase == Phase::Approaching)
                 {
-                    iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.position);
+                    iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.initialState);
                 }
             }
         }
