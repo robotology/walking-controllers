@@ -66,6 +66,7 @@ private:
     template <typename T> struct KinematicState
     {
         Smoother smoother;
+        T initialState;
         T position;
         T velocity;
     };

@@ -247,6 +247,7 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
 
     // joint retargeting
     m_hdeRetargeting.joints.position = kinDynWrapper.getJointPos();
+    m_hdeRetargeting.joints.initialState = m_hdeRetargeting.joints.position;
     m_hdeRetargeting.joints.velocity.zero();
     iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.position);
     if (m_useJointRetargeting)
@@ -368,6 +369,20 @@ bool RetargetingClient::getFeedback()
                 for (const auto& [joint, index] : m_retargetedJointsToControlJoints)
                 {
                     m_hdeRetargeting.joints.smoother.yarpBuffer(index) = HDEData->positions[m_retargetedJointsToHDEJoints[joint]];
+                }
+            }
+        } else
+        {
+            if (m_phase != Phase::Approaching)
+            {
+                if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
+                {
+                    this->setPhase(Phase::Approaching);
+                }
+
+                if (m_phase == Phase::Approaching)
+                {
+                    iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.position);
                 }
             }
         }
