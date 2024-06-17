@@ -378,6 +378,7 @@ bool RetargetingClient::getFeedback()
                 if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
                 {
                     this->setPhase(Phase::Approaching);
+                    m_retargetedJointsToHDEJoints.clear();
                 }
 
                 if (m_phase == Phase::Approaching)
