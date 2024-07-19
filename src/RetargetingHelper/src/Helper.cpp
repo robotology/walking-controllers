@@ -43,6 +43,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     m_useJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
     m_useCoMHeightRetargeting = config.check("use_com_retargeting", yarp::os::Value(false)).asBool();
+    m_dataArrivedTimeout = config.check("data_arrived_timeout", yarp::os::Value(1.0)).asFloat64();
 
     if(m_useJointRetargeting && m_useHandRetargeting)
     {
