@@ -67,6 +67,7 @@ private:
     {
         Smoother smoother;
         T initialState;
+        T rawPosition;
         T position;
         T velocity;
     };
@@ -187,6 +188,11 @@ public:
      * Get the velocity of the retargeting joints
      */
     const iDynTree::VectorDynSize& jointVelocities() const;
+
+    /**
+     * Get the position of the retargeting joints unfiltered, as they come from the HDE
+     */
+    const iDynTree::VectorDynSize& rawJointPositions() const;
 
     /**
      * Get the CoM height
