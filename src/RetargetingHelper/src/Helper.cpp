@@ -383,10 +383,6 @@ bool RetargetingClient::getFeedback()
                 {
                     this->setPhase(Phase::Approaching);
                     m_retargetedJointsToHDEJoints.clear();
-                }
-
-                if (m_phase == Phase::Approaching)
-                {
                     iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.initialState);
                 }
             }
