@@ -66,6 +66,7 @@ private:
     template <typename T> struct KinematicState
     {
         Smoother smoother;
+        T initialState;
         T position;
         T velocity;
     };
@@ -112,9 +113,15 @@ private:
     yarp::os::BufferedPort<yarp::sig::Vector> m_robotOrientationPort; /**< Average orientation of
                                                                          the robot.*/
 
-    Phase m_phase{Phase::Approaching};
+    Phase m_phase{Phase::Stance};
     double m_startingApproachingPhaseTime; /**< Initial time of the approaching phase (seconds) */
     double m_approachPhaseDuration; /**< Duration of the approaching phase (seconds) */
+
+    bool m_isFirstDataArrived{false};
+    double m_dataArrivedTimeout{1};
+    double m_timestampLastDataArrived;
+
+    void enableApproachingIfNecessary();
 
     /**
      * Convert a yarp vector containing position + rpy into an iDynTree homogeneous transform

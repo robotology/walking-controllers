@@ -247,6 +247,7 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
 
     // joint retargeting
     m_hdeRetargeting.joints.position = kinDynWrapper.getJointPos();
+    m_hdeRetargeting.joints.initialState = m_hdeRetargeting.joints.position;
     m_hdeRetargeting.joints.velocity.zero();
     iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.position);
     if (m_useJointRetargeting)
@@ -293,6 +294,17 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     return true;
 }
 
+void RetargetingClient::enableApproachingIfNecessary()
+{
+
+    if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
+    {
+        this->setPhase(Phase::Approaching);
+    }
+    m_isFirstDataArrived = true;
+    m_timestampLastDataArrived = yarp::os::Time::now();
+}
+
 bool RetargetingClient::getFeedback()
 {
     if(m_useHandRetargeting)
@@ -302,6 +314,7 @@ bool RetargetingClient::getFeedback()
             auto desiredHandPose = hand.port.read(false);
             if(desiredHandPose != nullptr)
             {
+                this->enableApproachingIfNecessary();
                 hand.smoother.smoother->computeNextValues(*desiredHandPose);
             }
             convertYarpVectorPoseIntoTransform(hand.smoother.smoother->getPos(), hand.transform);
@@ -316,6 +329,7 @@ bool RetargetingClient::getFeedback()
         const auto HDEData = m_hdeRetargeting.port.read(false);
         if (HDEData != nullptr)
         {
+            this->enableApproachingIfNecessary();
             if (m_useCoMHeightRetargeting)
             {
                 if (m_phase == Phase::Walking)
@@ -357,6 +371,21 @@ bool RetargetingClient::getFeedback()
                     m_hdeRetargeting.joints.smoother.yarpBuffer(index) = HDEData->positions[m_retargetedJointsToHDEJoints[joint]];
                 }
             }
+        } else
+        {
+            if (m_phase != Phase::Approaching)
+            {
+                if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
+                {
+                    this->setPhase(Phase::Approaching);
+                    m_retargetedJointsToHDEJoints.clear();
+                }
+
+                if (m_phase == Phase::Approaching)
+                {
+                    iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.initialState);
+                }
+            }
         }
     }
 
@@ -381,7 +410,7 @@ bool RetargetingClient::getFeedback()
     }
 
     // check if the approaching phase is finished
-    if(m_phase == Phase::Approaching)
+    if(m_phase == Phase::Approaching && m_isFirstDataArrived)
     {
         double now = yarp::os::Time::now();
         if(now - m_startingApproachingPhaseTime > m_approachPhaseDuration)
@@ -448,6 +477,11 @@ void RetargetingClient::setRobotBaseOrientation(const iDynTree::Rotation& rotati
 
 void RetargetingClient::setPhase(Phase phase)
 {
+    if (phase != Phase::Approaching && m_phase == Phase::Approaching)
+    {
+        return;
+    }
+
     if (phase == Phase::Approaching)
     {
         startApproachingPhase();
