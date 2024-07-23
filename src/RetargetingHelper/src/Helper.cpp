@@ -43,6 +43,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     m_useJointRetargeting = config.check("use_joint_retargeting", yarp::os::Value(false)).asBool();
     m_useVirtualizer = config.check("use_virtualizer", yarp::os::Value(false)).asBool();
     m_useCoMHeightRetargeting = config.check("use_com_retargeting", yarp::os::Value(false)).asBool();
+    m_dataArrivedTimeout = config.check("data_arrived_timeout", yarp::os::Value(1.0)).asFloat64();
 
     if(m_useJointRetargeting && m_useHandRetargeting)
     {
@@ -50,6 +51,8 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         return false;
     }
 
+    m_hdeRetargeting.joints.initialState.resize(controlledJointNames.size());
+    m_hdeRetargeting.joints.rawPosition.resize(controlledJointNames.size());
     m_hdeRetargeting.joints.position.resize(controlledJointNames.size());
     m_hdeRetargeting.joints.velocity.resize(controlledJointNames.size());
     m_hdeRetargeting.joints.smoother.yarpBuffer.resize(controlledJointNames.size());
@@ -248,6 +251,7 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     // joint retargeting
     m_hdeRetargeting.joints.position = kinDynWrapper.getJointPos();
     m_hdeRetargeting.joints.initialState = m_hdeRetargeting.joints.position;
+    m_hdeRetargeting.joints.rawPosition = m_hdeRetargeting.joints.position;
     m_hdeRetargeting.joints.velocity.zero();
     iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.position);
     if (m_useJointRetargeting)
@@ -368,7 +372,8 @@ bool RetargetingClient::getFeedback()
                 const auto& HDEJoints = HDEData->positions;
                 for (const auto& [joint, index] : m_retargetedJointsToControlJoints)
                 {
-                    m_hdeRetargeting.joints.smoother.yarpBuffer(index) = HDEData->positions[m_retargetedJointsToHDEJoints[joint]];
+                    m_hdeRetargeting.joints.rawPosition(index) = HDEJoints[m_retargetedJointsToHDEJoints[joint]];
+                    m_hdeRetargeting.joints.smoother.yarpBuffer(index) = m_hdeRetargeting.joints.rawPosition(index);
                 }
             }
         } else
@@ -379,10 +384,6 @@ bool RetargetingClient::getFeedback()
                 {
                     this->setPhase(Phase::Approaching);
                     m_retargetedJointsToHDEJoints.clear();
-                }
-
-                if (m_phase == Phase::Approaching)
-                {
                     iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.initialState);
                 }
             }
@@ -438,6 +439,11 @@ const iDynTree::VectorDynSize& RetargetingClient::jointPositions() const
 const iDynTree::VectorDynSize& RetargetingClient::jointVelocities() const
 {
     return m_hdeRetargeting.joints.velocity;
+}
+
+const iDynTree::VectorDynSize& WalkingControllers::RetargetingClient::rawJointPositions() const
+{
+    return m_hdeRetargeting.joints.rawPosition;
 }
 
 double RetargetingClient::comHeight() const
