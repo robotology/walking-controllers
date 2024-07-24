@@ -17,7 +17,7 @@
 
 //iDynTree
 #include <iDynTree/KinDynComputations.h>
-#include <iDynTree/Model/FreeFloatingState.h>
+#include <iDynTree/FreeFloatingState.h>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>

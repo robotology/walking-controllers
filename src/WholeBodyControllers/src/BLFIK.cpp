@@ -14,10 +14,10 @@
 
 #include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/Core/Position.h>
-#include <iDynTree/Core/Twist.h>
-#include <iDynTree/Core/VectorFixSize.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/Position.h>
+#include <iDynTree/Twist.h>
+#include <iDynTree/VectorFixSize.h>
 #include <iDynTree/KinDynComputations.h>
 
 #include <manif/manif.h>

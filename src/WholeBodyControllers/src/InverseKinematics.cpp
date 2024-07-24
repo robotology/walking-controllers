@@ -13,14 +13,14 @@
 #include <yarp/sig/all.h>
 
 //iDynTree
-#include <iDynTree/Model/Model.h>
-#include <iDynTree/Core/Transform.h>
-#include <iDynTree/Core/VectorFixSize.h>
-#include <iDynTree/Core/VectorDynSize.h>
-#include <iDynTree/Core/MatrixDynSize.h>
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/ModelIO/ModelLoader.h>
-#include <iDynTree/yarp/YARPConfigurationsLoader.h>
+#include <iDynTree/Model.h>
+#include <iDynTree/Transform.h>
+#include <iDynTree/VectorFixSize.h>
+#include <iDynTree/VectorDynSize.h>
+#include <iDynTree/MatrixDynSize.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/ModelLoader.h>
+#include <iDynTree/YARPConfigurationsLoader.h>
 #include <iDynTree/KinDynComputations.h>
 
 // Eigen

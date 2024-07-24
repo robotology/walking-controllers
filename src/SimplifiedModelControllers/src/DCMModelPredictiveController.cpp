@@ -7,15 +7,17 @@
  */
 
 // std
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <algorithm>
 
 // yarp
 #include <yarp/os/LogStream.h>
 
 // iDynTree
-#include <iDynTree/Core/EigenSparseHelpers.h>
-#include <iDynTree/Core/Direction.h>
+#include <iDynTree/EigenSparseHelpers.h>
+#include <iDynTree/Direction.h>
 
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>
@@ -187,7 +189,7 @@ bool WalkingController::initializeMatrices(const yarp::os::Searchable& config)
     // evaluate the controller horizon
     double controllerHorizonSeconds = config.check("controllerHorizon",
                                                    yarp::os::Value(2.0)).asFloat64();
-    m_controllerHorizon = round(controllerHorizonSeconds / dT);
+    m_controllerHorizon = static_cast<int>(std::round(controllerHorizonSeconds / dT));
 
     // get the state weight matrix
     tempValue = config.find("stateWeightTriplets");
@@ -412,7 +414,7 @@ bool WalkingController::setConvexHullConstraint(const std::deque<iDynTree::Trans
         return false;
     }
 
-    int numberOfConstraints = m_convexHullComputer.A.rows();
+    int numberOfConstraints = static_cast<int>(m_convexHullComputer.A.rows());
 
     // is it possible to reuse the old solver??
     m_currentController = std::make_shared<MPCSolver>(m_stateSize, m_inputSize,

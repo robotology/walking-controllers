@@ -9,8 +9,8 @@
 #include <yarp/os/LogStream.h>
 #include <yarp/sig/Vector.h>
 
-#include <iDynTree/yarp/YARPEigenConversions.h>
-#include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/YARPEigenConversions.h>
+#include <iDynTree/EigenHelpers.h>
 
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/RetargetingHelper/Helper.h>
@@ -142,7 +142,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
                          << joint << " in the list of the controlled joints.";
                 return false;
             }
-            m_retargetedJointsToControlJoints[joint] = std::distance(controlledJointNames.begin(), element);
+            m_retargetedJointsToControlJoints[joint] = static_cast<int>(std::distance(controlledJointNames.begin(), element));
         }
 
         if(!YarpUtilities::getNumberFromSearchable(option, "smoothing_time_approaching",
@@ -161,7 +161,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
         }
 
         m_hdeRetargeting.joints.smoother.smoother
-            = std::make_unique<iCub::ctrl::minJerkTrajGen>(controlledJointNames.size(),
+            = std::make_unique<iCub::ctrl::minJerkTrajGen>(static_cast<unsigned int>(controlledJointNames.size()),
                                                            period,
                                                            m_hdeRetargeting.joints.smoother.smoothingTimeInApproaching);
     }
@@ -301,7 +301,7 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
 void RetargetingClient::enableApproachingIfNecessary()
 {
 
-    if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
+    if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_dataArrivedTimeout)
     {
         this->setPhase(Phase::Approaching);
     }
@@ -365,7 +365,7 @@ bool RetargetingClient::getFeedback()
                                      << joint << " in the list of the HDE joints.";
                             return false;
                         }
-                        m_retargetedJointsToHDEJoints[joint] = std::distance(HDEJointNames.begin(), element);
+                        m_retargetedJointsToHDEJoints[joint] = static_cast<int>(std::distance(HDEJointNames.begin(), element));
                     }
                 }
 
@@ -380,7 +380,7 @@ bool RetargetingClient::getFeedback()
         {
             if (m_phase != Phase::Approaching)
             {
-                if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_isFirstDataArrived)
+                if (!m_isFirstDataArrived || yarp::os::Time::now() - m_timestampLastDataArrived > m_dataArrivedTimeout)
                 {
                     this->setPhase(Phase::Approaching);
                     m_retargetedJointsToHDEJoints.clear();

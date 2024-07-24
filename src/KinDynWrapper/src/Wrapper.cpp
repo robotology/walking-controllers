@@ -16,10 +16,10 @@
 #include <yarp/os/Value.h>
 
 // iDynTree
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/yarp/YARPConversions.h>
-#include <iDynTree/yarp/YARPEigenConversions.h>
-#include <iDynTree/Model/Model.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/YARPConversions.h>
+#include <iDynTree/YARPEigenConversions.h>
+#include <iDynTree/Model.h>
 
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>

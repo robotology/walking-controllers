@@ -20,7 +20,7 @@
 #include <iCub/ctrl/pids.h>
 
 //iDynTree
-#include <iDynTree/Core/VectorFixSize.h>
+#include <iDynTree/VectorFixSize.h>
 
 namespace WalkingControllers
 {

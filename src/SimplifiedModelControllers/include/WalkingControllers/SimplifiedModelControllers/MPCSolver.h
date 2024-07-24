@@ -13,8 +13,8 @@
 #include <deque>
 
 // iDynTree
-#include <iDynTree/Core/SparseMatrix.h>
-#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/SparseMatrix.h>
+#include <iDynTree/VectorDynSize.h>
 
 // osqp-eigen
 #include <OsqpEigen/OsqpEigen.h>

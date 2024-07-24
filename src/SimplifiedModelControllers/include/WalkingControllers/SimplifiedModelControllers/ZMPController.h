@@ -20,8 +20,8 @@
 #include <iCub/ctrl/minJerkCtrl.h>
 
 // iDynTree
-#include <iDynTree/Core/VectorFixSize.h>
-#include <iDynTree/Core/Position.h>
+#include <iDynTree/VectorFixSize.h>
+#include <iDynTree/Position.h>
 
 namespace WalkingControllers
 {

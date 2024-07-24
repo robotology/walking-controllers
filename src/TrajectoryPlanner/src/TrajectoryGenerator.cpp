@@ -11,8 +11,8 @@
 #include <yarp/os/Value.h>
 
 // iDynTree
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/yarp/YARPConfigurationsLoader.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/YARPConfigurationsLoader.h>
 
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>

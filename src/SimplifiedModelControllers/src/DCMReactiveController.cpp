@@ -10,9 +10,9 @@
 #include <yarp/os/LogStream.h>
 
 // iDynTree
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/yarp/YARPConversions.h>
-#include <iDynTree/yarp/YARPEigenConversions.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/YARPConversions.h>
+#include <iDynTree/YARPEigenConversions.h>
 
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/SimplifiedModelControllers/DCMReactiveController.h>
