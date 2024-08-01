@@ -66,6 +66,7 @@ add_install_rpath_support(BIN_DIRS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BIND
   DEPENDS ENABLE_RPATH
   USE_LINK_PATH)
 
+
 include(AddWalkingControllersLibrary)
 include(AddWalkingControllersYARPThrift)
 include(AddWalkingControllersApplication)
@@ -83,6 +84,7 @@ install_basic_package_files(${PROJECT_NAME}
 option(BUILD_TESTING "Create tests using CMake" OFF)
 include(CTest)
 if(BUILD_TESTING)
+  include(FetchCatch2)
   add_subdirectory(tests)
 endif()
 
