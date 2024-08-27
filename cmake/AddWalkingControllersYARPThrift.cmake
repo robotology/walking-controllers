@@ -33,7 +33,7 @@ function(add_walking_controllers_yarp_thrift)
 
   add_library(${name} ${AUTOGENERATE_SRC} ${AUTOGENERATE_HDR})
 
-  target_link_libraries(${name} PUBLIC YARP::YARP_OS)
+  target_link_libraries(${name} PUBLIC YARP::YARP_os)
 
   add_library(WalkingControllers::${name} ALIAS ${name})
 

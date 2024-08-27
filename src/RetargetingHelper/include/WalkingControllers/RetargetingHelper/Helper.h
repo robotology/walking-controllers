@@ -14,9 +14,9 @@
 #include <vector>
 
 // iDyntree
-#include <iDynTree/Core/Rotation.h>
-#include <iDynTree/Core/Transform.h>
-#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/Rotation.h>
+#include <iDynTree/Transform.h>
+#include <iDynTree/VectorDynSize.h>
 
 // yarp
 #include <yarp/os/BufferedPort.h>

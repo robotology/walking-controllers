@@ -11,7 +11,7 @@
 
 // std
 #include <WalkingControllers/WholeBodyControllers/BLFIK.h>
-#include <iDynTree/Core/Rotation.h>
+#include <iDynTree/Rotation.h>
 #include <memory>
 #include <deque>
 
@@ -28,8 +28,8 @@
 
 
 // iDynTree
-#include <iDynTree/Core/VectorFixSize.h>
-#include <iDynTree/ModelIO/ModelLoader.h>
+#include <iDynTree/VectorFixSize.h>
+#include <iDynTree/ModelLoader.h>
 
 // WalkingControllers library
 #include <WalkingControllers/RobotInterface/Helper.h>

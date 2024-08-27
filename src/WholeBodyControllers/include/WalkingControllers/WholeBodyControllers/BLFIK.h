@@ -8,7 +8,7 @@
 #ifndef WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_BLF_IK
 #define WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_BLF_IK
 
-#include <iDynTree/Core/VectorDynSize.h>
+#include <iDynTree/VectorDynSize.h>
 #include <iDynTree/KinDynComputations.h>
 
 #include <BipedalLocomotion/ContinuousDynamicalSystem/MultiStateWeightProvider.h>

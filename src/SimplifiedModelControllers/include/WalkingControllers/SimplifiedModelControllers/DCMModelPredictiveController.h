@@ -17,8 +17,8 @@
 #include <Eigen/Sparse>
 
 // iDynTree
-#include <iDynTree/Core/Triplets.h>
-#include <iDynTree/Core/SparseMatrix.h>
+#include <iDynTree/Triplets.h>
+#include <iDynTree/SparseMatrix.h>
 #include <iDynTree/ConvexHullHelpers.h>
 
 // yarp

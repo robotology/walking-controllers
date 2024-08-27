@@ -19,7 +19,7 @@
 #include <yarp/os/Searchable.h>
 
 // iDynTree
-#include <iDynTree/Core/VectorFixSize.h>
+#include <iDynTree/VectorFixSize.h>
 
 #include <UnicycleGenerator.h>
 #include <FreeSpaceEllipse.h>

@@ -22,11 +22,11 @@
 #include <yarp/os/LogStream.h>
 
 // iDynTree
-#include <iDynTree/Core/VectorFixSize.h>
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/yarp/YARPConversions.h>
-#include <iDynTree/yarp/YARPEigenConversions.h>
-#include <iDynTree/Model/Model.h>
+#include <iDynTree/VectorFixSize.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/YARPConversions.h>
+#include <iDynTree/YARPEigenConversions.h>
+#include <iDynTree/Model.h>
 
 // blf
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
@@ -163,10 +163,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
 
     double maxFBDelay = rf.check("max_feedback_delay_in_s", yarp::os::Value(1.0)).asFloat64();
     m_feedbackAttemptDelay = m_dT / 10;
-    m_feedbackAttempts = maxFBDelay / m_feedbackAttemptDelay;
+    m_feedbackAttempts = static_cast<size_t>(std::round(maxFBDelay / m_feedbackAttemptDelay));
 
     double plannerAdvanceTimeInS = rf.check("planner_advance_time_in_s", yarp::os::Value(0.18)).asFloat64();
-    m_plannerAdvanceTimeSteps = std::round(plannerAdvanceTimeInS / m_dT) + 2; // The additional 2 steps are because the trajectory from the planner is requested two steps in advance wrt the merge point
+    m_plannerAdvanceTimeSteps = static_cast<size_t>(std::round(plannerAdvanceTimeInS / m_dT)) + 2; // The additional 2 steps are because the trajectory from the planner is requested two steps in advance wrt the merge point
 
     std::string name;
     if (!YarpUtilities::getStringFromSearchable(generalOptions, "name", name))
@@ -429,7 +429,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
 
     // time profiler
     m_profiler = std::make_unique<BipedalLocomotion::System::TimeProfiler>();
-    m_profiler->setPeriod(round(1 / m_dT));
+    m_profiler->setPeriod(static_cast<int>(round(1 / m_dT)));
     if (m_useMPC)
         m_profiler->addTimer("MPC");
 

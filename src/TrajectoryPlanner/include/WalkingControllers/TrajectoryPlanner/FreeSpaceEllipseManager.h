@@ -15,8 +15,8 @@
 #include <yarp/os/Bottle.h>
 
 // iDynTree
-#include <iDynTree/Core/MatrixFixSize.h>
-#include <iDynTree/Core/VectorFixSize.h>
+#include <iDynTree/MatrixFixSize.h>
+#include <iDynTree/VectorFixSize.h>
 
 //UnicyclePlanner
 #include <FreeSpaceEllipse.h>

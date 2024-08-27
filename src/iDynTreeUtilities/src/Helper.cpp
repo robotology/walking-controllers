@@ -13,8 +13,8 @@
 #include <cmath>
 
 // iDynTree
-#include <iDynTree/Core/EigenHelpers.h>
-#include <iDynTree/Core/Utils.h>
+#include <iDynTree/EigenHelpers.h>
+#include <iDynTree/Utils.h>
 
 #include <WalkingControllers/iDynTreeUtilities/Helper.h>
 
