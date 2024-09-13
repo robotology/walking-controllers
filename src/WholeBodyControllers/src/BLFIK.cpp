@@ -1,9 +1,5 @@
-/**
- * @file BLFIK.h
- * @authors Giulio Romualdi
- * @copyright 2022 Istituto Italiano di Tecnologia (IIT). This software may be modified and
- * distributed under the terms of the LGPLv2.1 or later, see LGPL.TXT
- */
+// SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia (IIT)
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include <BipedalLocomotion/Conversions/ManifConversions.h>
 #include <BipedalLocomotion/IK/JointTrackingTask.h>
