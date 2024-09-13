@@ -10,6 +10,8 @@
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/RetargetingHelper/Helper.h>
 
+#include <algorithm>
+
 using namespace WalkingControllers;
 
 void RetargetingClient::convertYarpVectorPoseIntoTransform(const yarp::sig::Vector& vector,
@@ -206,6 +208,25 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             yError() << "[RetargetingClient::initialize] Unable to get the number from searchable.";
             return false;
         }
+
+        if (!YarpUtilities::getVectorFromSearchable(config, "variation_range", m_comVariationRange))
+        {
+            yError() << "[RetargetingClient::initialize] Initialization failed while reading range vector.";
+            return false;
+        }
+
+        if (m_comVariationRange(0) > 0 || m_comVariationRange(1) < 0)
+        {
+            yError() << "[RetargetingClient::initialize] The range is not valid. The range has to contain the zero.";
+            return false;
+        }
+
+        if (m_comVariationRange(0) > m_comVariationRange(1))
+        {
+            yError() << "[RetargetingClient::initialize] The range is not valid. The first element has to be smaller than the second one.";
+            return false;
+        }
+
     }
 
     if (m_useJointRetargeting || m_useCoMHeightRetargeting)
@@ -317,9 +338,9 @@ bool RetargetingClient::getFeedback()
                 } else
                 {
                     const auto& desiredCoMHeight = HDEData->CoMPositionWRTGlobal.z;
-                    m_hdeRetargeting.com.smoother.yarpBuffer(0)
-                        = (desiredCoMHeight - m_comHeightInputOffset) * m_comHeightScalingFactor
-                          + m_comConstantHeight;
+                    double variation = (desiredCoMHeight - m_comHeightInputOffset) * m_comHeightScalingFactor;
+                    double clampedVariation = std::clamp(variation, m_comVariationRange(0), m_comVariationRange(1));
+                    m_hdeRetargeting.com.smoother.yarpBuffer(0) = clampedVariation + m_comConstantHeight;
                 }
             }
 
