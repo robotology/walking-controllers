@@ -98,6 +98,9 @@ private:
     /** Factor required to scale the human CoM displacement to a desired robot CoM displacement */
     double m_comHeightScalingFactor;
 
+    /** Flag to check if we received the initial value for the CoM height. */
+    bool m_comOffsetSet{ false };
+
     /** Mapping between the retarget joints and the controlled. */
     std::unordered_map<std::string, int> m_retargetedJointsToControlJoints;
 

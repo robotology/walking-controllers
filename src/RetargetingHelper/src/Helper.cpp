@@ -257,37 +257,12 @@ bool RetargetingClient::reset(WalkingFK& kinDynWrapper)
     m_hdeRetargeting.com.position = kinDynWrapper.getCoMPosition()(2);
     m_hdeRetargeting.com.velocity = 0;
     m_comConstantHeight = m_hdeRetargeting.com.position;
+    m_comOffsetSet = false;
 
     if(m_useCoMHeightRetargeting)
     {
-        m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_hdeRetargeting.com.position;
-        m_hdeRetargeting.joints.smoother.smoother->init(m_hdeRetargeting.com.smoother.yarpBuffer);
-
-        // let's read the port to reset the comHeightInput
-        bool okCoMHeight = false;
-        unsigned int attempt = 0;
-        do
-        {
-            if(!okCoMHeight)
-            {
-                auto data = m_hdeRetargeting.port.read(false);
-                if(data != nullptr)
-                {
-                    m_comHeightInputOffset = data->CoMPositionWRTGlobal.z;
-                    okCoMHeight = true;
-                }
-            }
-
-            if(okCoMHeight)
-                return true;
-
-            yarp::os::Time::delay(0.001);
-            attempt++;
-        } while (attempt < 100);
-
-        if(!okCoMHeight)
-            yError() << "[RetargetingClient::reset] The CoM height is not coming from the yarp port.";
-        return false;
+        m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_comConstantHeight;
+        m_hdeRetargeting.com.smoother.smoother->init(m_hdeRetargeting.com.smoother.yarpBuffer);
     }
 
     return true;
@@ -331,6 +306,11 @@ bool RetargetingClient::getFeedback()
             this->enableApproachingIfNecessary();
             if (m_useCoMHeightRetargeting)
             {
+                if (!m_comOffsetSet)
+                {
+                    m_comHeightInputOffset = HDEData->CoMPositionWRTGlobal.z;
+                    m_comOffsetSet = true;
+                }
                 if (m_phase == Phase::Walking)
                 {
                     m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_comConstantHeight;
@@ -379,7 +359,9 @@ bool RetargetingClient::getFeedback()
                 {
                     this->setPhase(Phase::Approaching);
                     m_retargetedJointsToHDEJoints.clear();
+                    m_comOffsetSet = false;
                     iDynTree::toEigen(m_hdeRetargeting.joints.smoother.yarpBuffer) = iDynTree::toEigen(m_hdeRetargeting.joints.initialState);
+                    m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_comConstantHeight;
                 }
             }
         }
