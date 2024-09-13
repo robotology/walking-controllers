@@ -1,11 +1,5 @@
-/**
- * @file InverseKinematics.h
- * @authors Stefano Dafarra
- *          Giulio Romualdi <giulio.romualdi@iit.it>
- * @copyright 2018 iCub Facility - Istituto Italiano di Tecnologia
- *            Released under the terms of the LGPLv2.1 or later, see LGPL.TXT
- * @date 2018
- */
+// SPDX-FileCopyrightText: Fondazione Istituto Italiano di Tecnologia (IIT)
+// SPDX-License-Identifier: BSD-3-Clause
 
 #ifndef WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_CONTROLLERS_IK_H
 #define WALKING_CONTROLLERS_WHOLE_BODY_CONTROLLERS_CONTROLLERS_IK_H
