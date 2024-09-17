@@ -53,7 +53,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
     m_hdeRetargeting.joints.position.resize(controlledJointNames.size());
     m_hdeRetargeting.joints.velocity.resize(controlledJointNames.size());
     m_hdeRetargeting.joints.smoother.yarpBuffer.resize(controlledJointNames.size());
-    m_hdeRetargeting.com.smoother.yarpBuffer(1);
+    m_hdeRetargeting.com.smoother.yarpBuffer.resize(1);
 
     if(!m_useHandRetargeting && !m_useVirtualizer &&
        !m_useJointRetargeting && !m_useCoMHeightRetargeting)
