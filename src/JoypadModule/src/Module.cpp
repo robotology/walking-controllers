@@ -71,7 +71,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
                                                                {"disconnectButton", m_disconnectButton}};
     for (auto &input : joypadInputs)
     {
-        if (!YarpUtilities::getNumberFromSearchable(rf, input.first, input.second))
+        if (!YarpUtilities::getNumberFromSearchable(rf, input.first, input.second) && m_joypadType != "pedals")
         {
             yError() << "[configure] Unable to get " << input.first << " from searchable";
             return false;
