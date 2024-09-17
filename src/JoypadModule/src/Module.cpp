@@ -64,7 +64,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     {
         for (const auto &input : inputs)
         {
-            if (!YarpUtilities::getNumberFromSearchable(rf, input.first, input.second) && (!checkJoypadType || m_joypadType != "pedals"))
+            if ((!checkJoypadType || m_joypadType != "pedals") && !YarpUtilities::getNumberFromSearchable(rf, input.first, input.second))
             {
                 yError() << "[configure] Unable to get " << input.first << " from searchable";
                 return false;
@@ -181,16 +181,16 @@ bool JoypadModule::updateModule()
     // get the values from stick
     double linearVelocity{0.0}, lateralVelocity{0.0}, angularVeloctiy{0.0};
     double x{0.0}, y{0.0}, z{0.0};
-    m_joypadController->getAxis(m_forwardAxis, y);
-    m_joypadController->getAxis(m_rotationAxis, x);
+    m_joypadController->getAxis(m_forwardAxis, x);
+    m_joypadController->getAxis(m_rotationAxis, y);
     m_joypadController->getAxis(m_sideAxis, z);
 
     if (m_joypadType == "pedals")
     {
         double epsilon = 0.01;
-        if (x > 0.0 && y > 0.0 && std::abs(x - y) < epsilon)
+        if (x > 0.0 && z > 0.0 && std::abs(x - z) < epsilon)
         {
-            linearVelocity = (x + y) / 2;
+            linearVelocity = (x + z) / 2;
         }
         else
         {
@@ -199,24 +199,24 @@ bool JoypadModule::updateModule()
             // if the second axis is pressed, we move laterally to the left
             // if both axes are pressed, we set both lateral and linear velocities. If the first is higher the
             // robot moves diagonally to the right, if the second is higher the robot moves diagonally to the left
-            if (x > y && x > 0.0)
+            if (x > z && x > 0.0)
             {
-                lateralVelocity = deadzone(x);
-                if (y > 0.0)
+                lateralVelocity = -deadzone(x);
+                if (z > 0.0)
                 {
-                    linearVelocity = deadzone(y);
+                    linearVelocity = deadzone(z);
                 }
             }
-            else if (y > x && y > 0.0)
+            else if (z > x && z > 0.0)
             {
-                lateralVelocity = -deadzone(y);
+                lateralVelocity = deadzone(z);
                 if (x > 0.0)
                 {
                     linearVelocity = deadzone(x);
                 }
             }
         }
-        angularVeloctiy = deadzone(z);
+        angularVeloctiy = deadzone(y);
         sendGoal(linearVelocity, angularVeloctiy, lateralVelocity);
     }
     // buttons and others only if not type is not pedals
