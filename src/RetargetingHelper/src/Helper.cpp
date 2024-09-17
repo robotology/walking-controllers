@@ -329,7 +329,7 @@ bool RetargetingClient::getFeedback()
             {
                 if (!m_comOffsetSet)
                 {
-                    m_comHeightInputOffset = HDEData->CoMPositionWRTGlobal.z;
+                    m_comHeightInputOffset = HDEData->baseOriginWRTGlobal.z;
                     m_comOffsetSet = true;
                 }
                 if (m_phase == Phase::Walking)
@@ -337,7 +337,7 @@ bool RetargetingClient::getFeedback()
                     m_hdeRetargeting.com.smoother.yarpBuffer(0) = m_comConstantHeight;
                 } else
                 {
-                    const auto& desiredCoMHeight = HDEData->CoMPositionWRTGlobal.z;
+                    const auto& desiredCoMHeight = HDEData->baseOriginWRTGlobal.z;
                     double variation = (desiredCoMHeight - m_comHeightInputOffset) * m_comHeightScalingFactor;
                     double clampedVariation = std::clamp(variation, m_comVariationRange(0), m_comVariationRange(1));
                     m_hdeRetargeting.com.smoother.yarpBuffer(0) = clampedVariation + m_comConstantHeight;
