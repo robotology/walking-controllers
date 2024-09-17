@@ -165,9 +165,7 @@ bool JoypadModule::close()
 }
 
 bool JoypadModule::updateModule()
-    m_joypadController->getAxis(m_forwardAxis, y);
-    m_joypadController->getAxis(rotationAxis, x);
-    m_joypadController->getAxis(sideAxis, z);
+{
         stop{0.0}, pause{0.0},
         connectGoal{0.0}, connectRpc{0.0}, disconnect{0.0};
 
