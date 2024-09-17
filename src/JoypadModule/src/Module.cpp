@@ -169,8 +169,6 @@ bool JoypadModule::updateModule()
     m_joypadController->getAxis(1, x);
     m_joypadController->getAxis(2, z);
 
-    angularVeloctiy = deadzone(z);
-
     if (m_joypadType == "pedals")
     {
         double epsilon = 0.01;
@@ -180,11 +178,11 @@ bool JoypadModule::updateModule()
         }
         else
         {
-        // we move either laterally or diagonally.
-        // if the first axis is pressed, we move laterally to the right
-        // if the second axis is pressed, we move laterally to the left
-        // if both axes are pressed, we set both lateral and linear velocities. If the first is higher the
-        // robot moves diagonally to the right, if the second is higher the robot moves diagonally to the left
+            // we move either laterally or diagonally.
+            // if the first axis is pressed, we move laterally to the right
+            // if the second axis is pressed, we move laterally to the left
+            // if both axes are pressed, we set both lateral and linear velocities. If the first is higher the
+            // robot moves diagonally to the right, if the second is higher the robot moves diagonally to the left
             if (x > y && x > 0.0)
             {
                 lateralVelocity = deadzone(x);
@@ -202,17 +200,16 @@ bool JoypadModule::updateModule()
                 }
             }
         }
-
+        angularVeloctiy = deadzone(z);
         sendGoal(linearVelocity, angularVeloctiy, lateralVelocity);
     }
     // buttons and others only if not type is not pedals
     else if (m_joypadType != "pedals")
     {
 
-        linearVelocity =  -deadzone(x);
+        linearVelocity = -deadzone(x);
         lateralVelocity = -deadzone(y);
         angularVeloctiy = -deadzone(z);
-
 
         m_joypadController->getButton(m_prepareButton, prepare);
         m_joypadController->getButton(m_startButton, start);
@@ -278,7 +275,11 @@ bool JoypadModule::updateModule()
         }
         else
         {
-           sendGoal(linearVelocity, angularVeloctiy, lateralVelocity);
+
+            linearVelocity = -deadzone(x);
+            angularVeloctiy = -deadzone(y);
+            lateralVelocity = -deadzone(z);
+            sendGoal(linearVelocity, angularVeloctiy, lateralVelocity);
         }
     }
 
