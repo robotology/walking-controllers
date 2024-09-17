@@ -59,32 +59,39 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
     // connectPortsSeparately is present or set to true
     m_connectPortsSeparately = rf.check(connectPortsTag) && (rf.find(connectPortsTag).isNull() || rf.find(connectPortsTag).asBool());
 
-    std::vector<std::pair<std::string, int &>> joypadAxes = {{"forwardAxis", m_forwardAxis},
-                                                             {"rotationAxis", m_rotationAxis},
-                                                             {"sideAxis", m_sideAxis}};
-    for (auto &input : joypadAxes)
+    // A lambda function to handle axis/button fetching from searchable
+    auto getInputFromSearchable = [&](const std::vector<std::pair<std::string, int &>> &inputs, bool checkJoypadType = false) -> bool
     {
-        if (!YarpUtilities::getNumberFromSearchable(rf, input.first, input.second))
+        for (const auto &input : inputs)
         {
-            yError() << "[configure] Unable to get " << input.first << " from searchable";
-            return false;
+            if (!YarpUtilities::getNumberFromSearchable(rf, input.first, input.second) && (!checkJoypadType || m_joypadType != "pedals"))
+            {
+                yError() << "[configure] Unable to get " << input.first << " from searchable";
+                return false;
+            }
         }
-    }
+        return true;
+    };
 
-    std::vector<std::pair<std::string, int &>> joypadButtons = {{"prepareButton", m_prepareButton},
-                                                               {"startButton", m_startButton},
-                                                               {"pauseButton", m_pauseButton},
-                                                               {"stopButton", m_stopButton},
-                                                               {"connectGoalButton", m_connectGoalButton},
-                                                               {"connectRpcButton", m_connectRpcButton},
-                                                               {"disconnectButton", m_disconnectButton}};
-    for (auto &input : joypadButtons)
+    std::vector<std::pair<std::string, int &>> joypadAxes = {
+        {"forwardAxis", m_forwardAxis},
+        {"rotationAxis", m_rotationAxis},
+        {"sideAxis", m_sideAxis}};
+
+    std::vector<std::pair<std::string, int &>> joypadButtons = {
+        {"prepareButton", m_prepareButton},
+        {"startButton", m_startButton},
+        {"pauseButton", m_pauseButton},
+        {"stopButton", m_stopButton},
+        {"connectGoalButton", m_connectGoalButton},
+        {"connectRpcButton", m_connectRpcButton},
+        {"disconnectButton", m_disconnectButton}};
+
+
+    if (!getInputFromSearchable(joypadAxes) || !getInputFromSearchable(joypadButtons, true))
     {
-        if (!YarpUtilities::getNumberFromSearchable(rf, input.first, input.second) && m_joypadType != "pedals")
-        {
-            yError() << "[configure] Unable to get " << input.first << " from searchable";
-            return false;
-        }
+        yError() << "[configure] Unable to get the joypad axes/buttons from the configuration file.";
+        return false;
     }
 
     yarp::os::Bottle &conf = rf.findGroup("JOYPAD_DEVICE");
@@ -167,9 +174,9 @@ bool JoypadModule::close()
 bool JoypadModule::updateModule()
 {
     yarp::os::Bottle cmd, outcome;
-    float prepare{ 0.0 }, start{ 0.0 },
-          stop{ 0.0 }, pause{ 0.0 },
-          connectGoal{ 0.0 }, connectRpc{ 0.0 }, disconnect { 0.0 };
+    float prepare{0.0}, start{0.0},
+        stop{0.0}, pause{0.0},
+        connectGoal{0.0}, connectRpc{0.0}, disconnect{0.0};
 
     // get the values from stick
     double linearVelocity{0.0}, lateralVelocity{0.0}, angularVeloctiy{0.0};
