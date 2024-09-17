@@ -220,7 +220,7 @@ bool JoypadModule::updateModule()
         sendGoal(linearVelocity, angularVeloctiy, lateralVelocity);
     }
     // buttons and others only if not type is not pedals
-    else if (m_joypadType != "pedals")
+    else
     {
 
         m_joypadController->getButton(m_prepareButton, prepare);
