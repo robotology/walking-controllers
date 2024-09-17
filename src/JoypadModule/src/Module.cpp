@@ -207,10 +207,6 @@ bool JoypadModule::updateModule()
     else if (m_joypadType != "pedals")
     {
 
-        linearVelocity = -deadzone(x);
-        lateralVelocity = -deadzone(y);
-        angularVeloctiy = -deadzone(z);
-
         m_joypadController->getButton(m_prepareButton, prepare);
         m_joypadController->getButton(m_startButton, start);
         m_joypadController->getButton(m_stopButton, stop);
