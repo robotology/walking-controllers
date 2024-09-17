@@ -209,7 +209,7 @@ bool RetargetingClient::initialize(const yarp::os::Searchable &config,
             return false;
         }
 
-        if (!YarpUtilities::getVectorFromSearchable(config, "variation_range", m_comVariationRange))
+        if (!YarpUtilities::getVectorFromSearchable(option, "variation_range", m_comVariationRange))
         {
             yError() << "[RetargetingClient::initialize] Initialization failed while reading range vector.";
             return false;
