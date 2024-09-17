@@ -166,15 +166,17 @@ bool JoypadModule::close()
 
 bool JoypadModule::updateModule()
 {
-        stop{0.0}, pause{0.0},
-        connectGoal{0.0}, connectRpc{0.0}, disconnect{0.0};
+    yarp::os::Bottle cmd, outcome;
+    float prepare{ 0.0 }, start{ 0.0 },
+          stop{ 0.0 }, pause{ 0.0 },
+          connectGoal{ 0.0 }, connectRpc{ 0.0 }, disconnect { 0.0 };
 
     // get the values from stick
     double linearVelocity{0.0}, lateralVelocity{0.0}, angularVeloctiy{0.0};
     double x{0.0}, y{0.0}, z{0.0};
     m_joypadController->getAxis(m_forwardAxis, y);
-    m_joypadController->getAxis(rotationAxis, x);
-    m_joypadController->getAxis(sideAxis, z);
+    m_joypadController->getAxis(m_rotationAxis, x);
+    m_joypadController->getAxis(m_sideAxis, z);
 
     if (m_joypadType == "pedals")
     {
