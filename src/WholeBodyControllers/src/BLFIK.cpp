@@ -46,6 +46,9 @@ bool BLFIK::initialize(
     m_useRootLinkForHeight = false;
     ptr->getParameter("use_root_link_for_height", m_useRootLinkForHeight);
 
+    m_useJointLimitsTask = false;
+    ptr->getParameter("use_joints_limits_task", m_useJointLimitsTask);
+
     // weight providers
     bool ok = m_qpIK.initialize(ptr->getGroup("IK"));
     auto group = ptr->getGroup("IK").lock();
@@ -108,6 +111,15 @@ bool BLFIK::initialize(
                                "joint_retargeting_task",
                                lowPriority,
                                m_jointRetargetingWeight);
+    }
+
+
+    if (m_useJointLimitsTask)
+    {
+        m_jointLimitsTask = std::make_shared<BipedalLocomotion::IK::JointLimitsTask>();
+        ok = ok && m_jointLimitsTask->setKinDyn(kinDyn);
+        ok = ok && m_jointLimitsTask->initialize(ptr->getGroup("JOINT_LIMITS_TASK"));
+        ok = ok && m_qpIK.addTask(m_jointLimitsTask, "joint_limits_task", highPriority);
     }
 
     if (m_useRootLinkForHeight)

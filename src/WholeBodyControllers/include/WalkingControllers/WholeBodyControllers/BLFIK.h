@@ -10,6 +10,7 @@
 #include <BipedalLocomotion/ContinuousDynamicalSystem/MultiStateWeightProvider.h>
 #include <BipedalLocomotion/IK/CoMTask.h>
 #include <BipedalLocomotion/IK/JointTrackingTask.h>
+#include <BipedalLocomotion/IK/JointLimitsTask.h>
 #include <BipedalLocomotion/IK/QPInverseKinematics.h>
 #include <BipedalLocomotion/IK/R3Task.h>
 #include <BipedalLocomotion/IK/SE3Task.h>
@@ -64,11 +65,13 @@ private:
     std::shared_ptr<BipedalLocomotion::IK::R3Task> m_rootTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRetargetingTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRegularizationTask;
+    std::shared_ptr<BipedalLocomotion::IK::JointLimitsTask> m_jointLimitsTask;
 
     iDynTree::VectorDynSize m_jointVelocity;
     bool m_usejointRetargeting{false};
     bool m_useRootLinkForHeight{false};
     bool m_useFeedforwardTermForJointRetargeting{false};
+    bool m_useJointLimitsTask{false};
 };
 
 } // namespace WalkingControllers
