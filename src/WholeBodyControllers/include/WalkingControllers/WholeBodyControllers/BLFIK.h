@@ -47,6 +47,10 @@ public:
     bool setTorsoSetPoint(const iDynTree::Rotation& rotation);
     const iDynTree::VectorDynSize& getDesiredJointVelocity() const;
 
+    bool initializeTask(std::shared_ptr<BipedalLocomotion::IK::IKLinearTask> task,
+                        const std::string robotVelocityVariableName,
+                        const std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler);
+
 private:
     std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>
         m_torsoWeight;
