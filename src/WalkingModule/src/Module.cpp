@@ -501,7 +501,7 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
 {
     const std::string phase = m_isStancePhase.front() ? "stance" : "walking";
     bool ok = m_BLFIKSolver->setPhase(phase);
-    ok = ok && m_BLFIKSolver->setTorsoSetPoint(desiredNeckOrientation.inverse());
+    ok = ok && m_BLFIKSolver->setTorsoSetPoint(desiredNeckOrientation);
 
     ok = ok && m_BLFIKSolver->setLeftFootSetPoint(m_leftTrajectory.front(),
                                                   m_leftTwistTrajectory.front());
@@ -905,7 +905,7 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            yawRotation = yawRotation * m_trajectoryGenerator->getChestAdditionalRotation();
+            yawRotation = yawRotation.inverse() * m_trajectoryGenerator->getChestAdditionalRotation();
 
             if (!solveBLFIK(desiredCoMPosition,
                             desiredCoMVelocity,
