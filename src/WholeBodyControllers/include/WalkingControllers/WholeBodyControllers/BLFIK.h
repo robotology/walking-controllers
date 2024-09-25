@@ -10,6 +10,7 @@
 #include <BipedalLocomotion/ContinuousDynamicalSystem/MultiStateWeightProvider.h>
 #include <BipedalLocomotion/IK/CoMTask.h>
 #include <BipedalLocomotion/IK/JointTrackingTask.h>
+#include <BipedalLocomotion/IK/JointLimitsTask.h>
 #include <BipedalLocomotion/IK/QPInverseKinematics.h>
 #include <BipedalLocomotion/IK/R3Task.h>
 #include <BipedalLocomotion/IK/SE3Task.h>
@@ -46,6 +47,10 @@ public:
     bool setTorsoSetPoint(const iDynTree::Rotation& rotation);
     const iDynTree::VectorDynSize& getDesiredJointVelocity() const;
 
+    bool initializeTask(std::shared_ptr<BipedalLocomotion::IK::IKLinearTask> task,
+                        const std::string robotVelocityVariableName,
+                        const std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler);
+
 private:
     std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>
         m_torsoWeight;
@@ -64,11 +69,13 @@ private:
     std::shared_ptr<BipedalLocomotion::IK::R3Task> m_rootTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRetargetingTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRegularizationTask;
+    std::shared_ptr<BipedalLocomotion::IK::JointLimitsTask> m_jointLimitsTask;
 
     iDynTree::VectorDynSize m_jointVelocity;
     bool m_usejointRetargeting{false};
     bool m_useRootLinkForHeight{false};
     bool m_useFeedforwardTermForJointRetargeting{false};
+    bool m_useJointLimitsTask{false};
 };
 
 } // namespace WalkingControllers
