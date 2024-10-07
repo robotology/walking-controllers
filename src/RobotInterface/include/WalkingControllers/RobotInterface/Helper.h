@@ -16,6 +16,8 @@
 #include <yarp/dev/IPositionDirect.h>
 #include <yarp/dev/IVelocityControl.h>
 #include <yarp/dev/IInteractionMode.h>
+#include <yarp/dev/IMotor.h>
+
 #include <yarp/sig/Vector.h>
 #include <yarp/os/Timer.h>
 
@@ -48,6 +50,7 @@ namespace WalkingControllers
         yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
         yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
         yarp::dev::IInteractionMode *m_interactionInterface{nullptr}; /**< Stiff/compliant mode interface. */
+        yarp::dev::IMotor *m_motorInterface{nullptr}; /**< Motor interface. */
 
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
 
@@ -66,6 +69,13 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_jointVelocitiesBounds; /**< Joint Velocity bounds [rad/s]. */
         iDynTree::VectorDynSize m_jointPositionsUpperBounds; /**< Joint Position upper bound [rad]. */
         iDynTree::VectorDynSize m_jointPositionsLowerBounds; /**< Joint Position lower bound [rad]. */
+
+        iDynTree::VectorDynSize m_motorTemperatures; /**< Motor temperature [Celsius]. */
+        mutable std::mutex m_motorTemperatureMutex; /**< Mutex for the motor temperature. */
+        std::atomic_bool m_motorTemperatureTreadIsRunning; /**< True if the motor temperature is updated. */
+        double m_motorTemperatureDt{0.5};
+        std::thread m_motorTemperatureThread; /**< Thread for the motor temperature. */
+
         // yarp::sig::Vector m_positionFeedbackDegFiltered;
         yarp::sig::Vector m_velocityFeedbackDegFiltered; /**< Vector containing the filtered joint velocity [deg/s]. */
         std::unique_ptr<iCub::ctrl::FirstOrderLowPassFilter> m_positionFilter; /**< Joint position low pass filter .*/
@@ -127,6 +137,8 @@ namespace WalkingControllers
                                         bool useWrenchFilter,
                                         double cutFrequency,
                                         MeasuredWrench& measuredWrench);
+
+        void readMotorTemperature();
     public:
 
         /**
@@ -204,6 +216,9 @@ namespace WalkingControllers
          * @return the joint velocities in radiants per second
          */
         const iDynTree::VectorDynSize& getJointVelocity() const;
+
+
+        iDynTree::VectorDynSize getMotorTemperature() const;
 
         /**
          * Get the joint upper limit
