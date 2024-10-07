@@ -61,6 +61,8 @@ namespace WalkingControllers
 
         double m_dT; /**< RFModule period. */
         double m_time; /**< Current time. */
+        double m_lastSetGoalTime; /**< Time of the last set goal. */
+        double m_maxTimeToWaitForGoal; /**< Maximum time to wait for a goal. */
         std::string m_robot; /**< Robot name. */
 
         bool m_useMPC; /**< True if the MPC controller is used. */

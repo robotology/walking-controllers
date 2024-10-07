@@ -138,6 +138,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
+    m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
 
     m_goalScaling.resize(3);
     if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
@@ -671,6 +672,17 @@ bool WalkingModule::updateModule()
         {
             applyGoalScaling(*desiredUnicyclePosition);
             if (!setPlannerInput(*desiredUnicyclePosition))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the planner input";
+                return false;
+            }
+            m_lastSetGoalTime = m_time;
+        }
+        else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
+        {
+            yWarning() << "[WalkingModule::updateModule] The goal has not been set for more than " << m_maxTimeToWaitForGoal << " seconds.";
+            yarp::sig::Vector dummy(3, 0.0);
+            if (!setPlannerInput(dummy))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
