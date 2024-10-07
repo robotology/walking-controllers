@@ -29,6 +29,8 @@
 // WalkingControllers library
 #include <WalkingControllers/RobotInterface/Helper.h>
 #include <WalkingControllers/RobotInterface/PIDHandler.h>
+#include <WalkingControllers/RobotInterface/MotorTemperatureChecker.h>
+
 #include <WalkingControllers/TrajectoryPlanner/TrajectoryGenerator.h>
 #include <WalkingControllers/TrajectoryPlanner/StableDCMModel.h>
 #include <WalkingControllers/TrajectoryPlanner/FreeSpaceEllipseManager.h>
@@ -61,6 +63,8 @@ namespace WalkingControllers
 
         double m_dT; /**< RFModule period. */
         double m_time; /**< Current time. */
+        double m_lastSetGoalTime; /**< Time of the last set goal. */
+        double m_maxTimeToWaitForGoal; /**< Maximum time to wait for a goal. */
         std::string m_robot; /**< Robot name. */
 
         bool m_useMPC; /**< True if the MPC controller is used. */
@@ -75,6 +79,7 @@ namespace WalkingControllers
         iDynTree::Position m_zmpOffsetLocal; /** < Offset in the local frame*/
 
         std::unique_ptr<RobotInterface> m_robotControlHelper; /**< Robot control helper. */
+        std::unique_ptr<MotorsTemperatureChecker> m_motorTemperatureChecker; /**< Robot control helper. */
         std::unique_ptr<TrajectoryGenerator> m_trajectoryGenerator; /**< Pointer to the trajectory generator object. */
         std::unique_ptr<FreeSpaceEllipseManager> m_freeSpaceEllipseManager; /**< Pointer to the free space ellipse manager. */
         std::unique_ptr<WalkingController> m_walkingController; /**< Pointer to the walking DCM MPC object. */
@@ -118,6 +123,7 @@ namespace WalkingControllers
 
         iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */
         iDynTree::VectorDynSize m_dqDesired; /**< Vector containing the results of the IK algorithm [rad]. */
+        iDynTree::VectorDynSize m_motorTemperature; /**< Vector containing the results of the IK algorithm [rad]. */
 
         iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 

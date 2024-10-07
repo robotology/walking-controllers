@@ -138,6 +138,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
+    m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
 
     m_goalScaling.resize(3);
     if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
@@ -179,6 +180,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     if (!m_robotControlHelper->configureRobot(robotControlHelperOptions))
     {
         yError() << "[WalkingModule::configure] Unable to configure the robot.";
+        return false;
+    }
+
+    m_motorTemperatureChecker = std::make_unique<MotorsTemperatureChecker>();
+    if (!m_motorTemperatureChecker->configure(robotControlHelperOptions, m_robotControlHelper->getActuatedDoFs()))
+    {
+        yError() << "[WalkingModule::configure] Unable to configure the motor temperature helper.";
         return false;
     }
 
@@ -409,6 +417,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::measured", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::retargeting", m_robotControlHelper->getAxesList());
 
+        // motor temperature
+        m_vectorsCollectionServer.populateMetadata("motors_state::temperature::measured", m_robotControlHelper->getAxesList());
+
         // root link information
         m_vectorsCollectionServer.populateMetadata("root_link::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("root_link::orientation::measured", {"roll", "pitch", "yaw"});
@@ -442,6 +453,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_motorTemperature.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -675,6 +687,17 @@ bool WalkingModule::updateModule()
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
             }
+            m_lastSetGoalTime = m_time;
+        }
+        else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
+        {
+            yWarning() << "[WalkingModule::updateModule] The goal has not been set for more than " << m_maxTimeToWaitForGoal << " seconds.";
+            yarp::sig::Vector dummy(3, 0.0);
+            if (!setPlannerInput(dummy))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the planner input";
+                return false;
+            }
         }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
@@ -729,6 +752,14 @@ bool WalkingModule::updateModule()
         if (!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
+            return false;
+        }
+
+        m_motorTemperature = m_robotControlHelper->getMotorTemperature();
+
+        if (!m_motorTemperatureChecker->setMotorTemperatures(m_motorTemperature))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to set the motor temperature to the helper.";
             return false;
         }
 
@@ -1064,6 +1095,9 @@ bool WalkingModule::updateModule()
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting_raw", m_retargetingClient->rawJointPositions());
             m_vectorsCollectionServer.populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
             m_vectorsCollectionServer.populateData("joints_state::velocities::retargeting", m_retargetingClient->jointVelocities());
+
+            // motor temperature
+            m_vectorsCollectionServer.populateData("motors_state::temperature::measured", m_motorTemperature);
 
             // root link information
             m_vectorsCollectionServer.populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());
@@ -1497,8 +1531,26 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
 {
-    m_plannerInput = plannerInput;
+    if (m_motorTemperatureChecker->isThereAMotorOverLimit())
+    {
+        yWarning() << "[WalkingModule::setPlannerInput] The motor temperature is over the limit.";
+        std::vector<unsigned int> indeces = m_motorTemperatureChecker->getMotorsOverLimit();
+        std::string msg = "The following motors temperature are over the limits: ";
+        for (auto index : indeces)
+        {
+            msg += m_robotControlHelper->getAxesList()[index]
+                + ": Max temperature: "
+                + std::to_string(m_motorTemperatureChecker->getMaxTemperature()[index]) + " celsius.";
+        }
+        msg += "The trajectory will be set to zero.";
+        yWarning() << msg;
 
+        m_plannerInput.zero();
+    }
+    else
+    {
+        m_plannerInput = plannerInput;
+    }
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if (m_mergePoints.empty())
     {
