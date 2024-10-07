@@ -4,7 +4,7 @@
 
 add_walking_controllers_library(
   NAME RobotInterface
-  SOURCES src/Helper.cpp src/PIDHandler.cpp
-  PUBLIC_HEADERS include/WalkingControllers/RobotInterface/Helper.h include/WalkingControllers/RobotInterface/PIDHandler.h
+  SOURCES src/Helper.cpp src/PIDHandler.cpp src/MotorTemperatureChecker.cpp
+  PUBLIC_HEADERS include/WalkingControllers/RobotInterface/Helper.h include/WalkingControllers/RobotInterface/PIDHandler.h include/WalkingControllers/RobotInterface/MotorTemperatureChecker.h
   PUBLIC_LINK_LIBRARIES WalkingControllers::YarpUtilities WalkingControllers::iDynTreeUtilities ctrlLib
   PRIVATE_LINK_LIBRARIES Eigen3::Eigen)

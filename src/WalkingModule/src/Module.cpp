@@ -182,6 +182,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    m_motorTemperatureChecker = std::make_unique<MotorsTemperatureChecker>();
+    if (!m_motorTemperatureChecker->configure(robotControlHelperOptions, m_robotControlHelper->getActuatedDoFs()))
+    {
+        yError() << "[WalkingModule::configure] Unable to configure the motor temperature helper.";
+        return false;
+    }
+
     yarp::os::Bottle &forceTorqueSensorsOptions = rf.findGroup("FT_SENSORS");
     forceTorqueSensorsOptions.append(generalOptions);
     if (!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
@@ -442,6 +449,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_motorTemperature.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -729,6 +737,14 @@ bool WalkingModule::updateModule()
         if (!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
+            return false;
+        }
+
+        m_motorTemperature = m_robotControlHelper->getMotorTemperature();
+
+        if (!m_motorTemperatureChecker->setMotorTemperatures(m_motorTemperature))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to set the motor temperature to the helper.";
             return false;
         }
 
@@ -1497,8 +1513,26 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
 {
-    m_plannerInput = plannerInput;
+    if (m_motorTemperatureChecker->isThereAMotorOverLimit())
+    {
+        yWarning() << "[WalkingModule::setPlannerInput] The motor temperature is over the limit.";
+        std::vector<unsigned int> indeces = m_motorTemperatureChecker->getMotorsOverLimit();
+        std::string msg = "The following motors temperature are over the limits: ";
+        for (auto index : indeces)
+        {
+            msg += m_robotControlHelper->getAxesList()[index]
+                + ": Max temperature: "
+                + std::to_string(m_motorTemperatureChecker->getMaxTemperature()[index]) + " celsius.";
+        }
+        msg += "The trajectory will be set to zero.";
+        yWarning() << msg;
 
+        m_plannerInput.zero();
+    }
+    else
+    {
+        m_plannerInput = plannerInput;
+    }
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if (m_mergePoints.empty())
     {
