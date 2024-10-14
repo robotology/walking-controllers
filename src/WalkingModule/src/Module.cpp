@@ -718,7 +718,6 @@ bool WalkingModule::updateModule()
             m_statusString += " ";
             initialStatusStringLength = m_statusString.size();
 
-            yWarning() << "[WalkingModule::updateModule] The goal has not been set for more than " << m_maxTimeToWaitForGoal << " seconds.";
 	        m_statusString += "Walking TimeOut ";	    
             yarp::sig::Vector dummy(3, 0.0);
             if (!setPlannerInput(dummy))
