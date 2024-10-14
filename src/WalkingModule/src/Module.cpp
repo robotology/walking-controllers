@@ -136,8 +136,10 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asFloat64();
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
+    std::string walkingStatusSuffix = rf.check("walking_status_suffix", yarp::os::Value("/status:o")).asString();
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
+    m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
 
     m_goalScaling.resize(3);
     if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
@@ -182,6 +184,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    m_motorTemperatureChecker = std::make_unique<MotorsTemperatureChecker>();
+    if (!m_motorTemperatureChecker->configure(robotControlHelperOptions, m_robotControlHelper->getActuatedDoFs()))
+    {
+        yError() << "[WalkingModule::configure] Unable to configure the motor temperature helper.";
+        return false;
+    }
+
     yarp::os::Bottle &forceTorqueSensorsOptions = rf.findGroup("FT_SENSORS");
     forceTorqueSensorsOptions.append(generalOptions);
     if (!m_robotControlHelper->configureForceTorqueSensors(forceTorqueSensorsOptions))
@@ -220,6 +229,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    std::string walkingStatusPort = "/" + getName() + walkingStatusSuffix;
+    if (!m_walkingStatusPort.open(walkingStatusPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << walkingStatusPort << " port.";
+        return false;
+    }
+    
+    
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle &trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
@@ -409,6 +426,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::measured", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::retargeting", m_robotControlHelper->getAxesList());
 
+        // motor temperature
+        m_vectorsCollectionServer.populateMetadata("motors_state::temperature::measured", m_robotControlHelper->getAxesList());
+
         // root link information
         m_vectorsCollectionServer.populateMetadata("root_link::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("root_link::orientation::measured", {"roll", "pitch", "yaw"});
@@ -442,6 +462,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // resize variables
     m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_motorTemperature.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -497,6 +518,7 @@ bool WalkingModule::close()
 bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
                                const iDynTree::Vector3 &desiredCoMVelocity,
                                const iDynTree::Rotation &desiredNeckOrientation,
+                               const iDynTree::SpatialMomentum &centroidalMomentumDesired,
                                iDynTree::VectorDynSize &output)
 {
     const std::string phase = m_isStancePhase.front() ? "stance" : "walking";
@@ -510,7 +532,7 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     ok = ok && m_BLFIKSolver->setCoMSetPoint(desiredCoMPosition, desiredCoMVelocity);
     ok = ok && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointPositions(),
                                                           m_retargetingClient->jointVelocities());
-
+    ok = ok && m_BLFIKSolver->setAngularMomentumSetPoint(centroidalMomentumDesired.getAngularVec3());
     if (m_useRootLinkForHeight)
     {
         ok = ok && m_BLFIKSolver->setRootSetPoint(desiredCoMPosition, desiredCoMVelocity);
@@ -555,6 +577,8 @@ bool WalkingModule::computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP)
 bool WalkingModule::updateModule()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
+
+    int initialStatusStringLength = -1;
 
     if (m_robotState == WalkingFSM::Preparing)
     {
@@ -669,8 +693,35 @@ bool WalkingModule::updateModule()
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if (desiredUnicyclePosition != nullptr)
         {
+            m_statusString = "";
+            // take m_time cast to int do the modulus 3 and then append a string to m_statusString of 3 caracters where the first
+            // modulo 3 is the number of = and the rest is the number of spaces
+            m_statusString += std::string((static_cast<int>(m_time) % 3), '=');
+            m_statusString += std::string(3 - (static_cast<int>(m_time) % 3), ' ');
+            m_statusString += " ";
+            initialStatusStringLength = m_statusString.size();
+
             applyGoalScaling(*desiredUnicyclePosition);
             if (!setPlannerInput(*desiredUnicyclePosition))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the planner input";
+                return false;
+            }
+            m_lastSetGoalTime = m_time;
+        }
+        else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
+        {
+            m_statusString = "";
+            // take m_time cast to int do the modulus 3 and then append a string to m_statusString of 3 caracters where the first
+            // modulo 3 is the number of = and the rest is the number of spaces
+            m_statusString += std::string((static_cast<int>(m_time) % 3), '=');
+            m_statusString += std::string(3 - (static_cast<int>(m_time) % 3), ' ');
+            m_statusString += " ";
+            initialStatusStringLength = m_statusString.size();
+
+	        m_statusString += "Walking TimeOut ";	    
+            yarp::sig::Vector dummy(3, 0.0);
+            if (!setPlannerInput(dummy))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
@@ -729,6 +780,14 @@ bool WalkingModule::updateModule()
         if (!m_robotControlHelper->getFeedbacks(m_feedbackAttempts, m_feedbackAttemptDelay))
         {
             yError() << "[WalkingModule::updateModule] Unable to get the feedback.";
+            return false;
+        }
+
+        m_motorTemperature = m_robotControlHelper->getMotorTemperature();
+
+        if (!m_motorTemperatureChecker->setMotorTemperatures(m_motorTemperature))
+        {
+            yError() << "[WalkingModule::updateModule] Unable to set the motor temperature to the helper.";
             return false;
         }
 
@@ -893,6 +952,10 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
+        // compute the desired torso velocity
+        const iDynTree::Twist desiredTorsoVelocity = this->computeAverageTwistFromPlannedFeet();
+        auto centroidalMomentumDesired = m_FKSolver->getKinDyn()->getCentroidalRobotLockedInertia() * desiredTorsoVelocity;
+
         if (m_useQPIK)
         {
             // integrate dq because velocity control mode seems not available
@@ -910,6 +973,7 @@ bool WalkingModule::updateModule()
             if (!solveBLFIK(desiredCoMPosition,
                             desiredCoMVelocity,
                             yawRotation,
+                            centroidalMomentumDesired,
                             m_dqDesired))
             {
                 yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with "
@@ -1065,6 +1129,9 @@ bool WalkingModule::updateModule()
             m_vectorsCollectionServer.populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
             m_vectorsCollectionServer.populateData("joints_state::velocities::retargeting", m_retargetingClient->jointVelocities());
 
+            // motor temperature
+            m_vectorsCollectionServer.populateData("motors_state::temperature::measured", m_motorTemperature);
+
             // root link information
             m_vectorsCollectionServer.populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());
             m_vectorsCollectionServer.populateData("root_link::orientation::measured", m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
@@ -1078,6 +1145,15 @@ bool WalkingModule::updateModule()
             m_vectorsCollectionServer.sendData();
         }
 
+	    auto& statusMsg = m_walkingStatusPort.prepare();
+        if (m_statusString.size() == initialStatusStringLength)
+        {
+            m_statusString += "All Good";
+        }
+
+        statusMsg.clear();
+        statusMsg.addString(m_statusString);
+        m_walkingStatusPort.write();
 
         propagateTime();
 
@@ -1112,6 +1188,21 @@ iDynTree::Rotation WalkingModule::computeAverageYawRotationFromPlannedFeet() con
     const double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
                                       std::cos(yawLeft) + std::cos(yawRight));
     return iDynTree::Rotation::RotZ(meanYaw);
+}
+
+iDynTree::Twist WalkingModule::computeAverageTwistFromPlannedFeet() const
+{
+    iDynTree::Twist twist;
+    iDynTree::Vector3 meanLinearVelocity, meanAngularVelocity;
+    iDynTree::toEigen(meanLinearVelocity) = (iDynTree::toEigen(m_leftTwistTrajectory.front().getLinearVec3()) +
+                                            iDynTree::toEigen(m_rightTwistTrajectory.front().getLinearVec3())) / 2.0;
+    iDynTree::toEigen(meanAngularVelocity) = (iDynTree::toEigen(m_leftTwistTrajectory.front().getAngularVec3()) +
+                                          iDynTree::toEigen(m_rightTwistTrajectory.front().getAngularVec3())) / 2.0;
+
+    twist.setLinearVec3(meanLinearVelocity);
+    twist.setAngularVec3(meanAngularVelocity);
+
+    return twist;
 }
 
 bool WalkingModule::prepareRobot(bool onTheFly)
@@ -1497,8 +1588,27 @@ bool WalkingModule::startWalking()
 
 bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
 {
-    m_plannerInput = plannerInput;
+    if (m_motorTemperatureChecker->isThereAMotorOverLimit())
+    {
+        yWarning() << "[WalkingModule::setPlannerInput] The motor temperature is over the limit.";
+        std::vector<unsigned int> indeces = m_motorTemperatureChecker->getMotorsOverLimit();
+        std::string msg = "The following motors temperature is over the limits: ";
+        for (auto index : indeces)
+        {
+            msg += m_robotControlHelper->getAxesList()[index]
+                + ": Max temperature: "
+                + std::to_string(m_motorTemperatureChecker->getMaxTemperature()[index]) + " C.";
+        }
+        msg += "The trajectory will be set to zero.";
+	    m_statusString += msg;	
+        yWarning() << msg;
 
+        m_plannerInput.zero();
+    }
+    else
+    {
+        m_plannerInput = plannerInput;
+    }
     // the trajectory was already finished the new trajectory will be attached as soon as possible
     if (m_mergePoints.empty())
     {

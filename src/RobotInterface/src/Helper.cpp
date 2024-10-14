@@ -269,6 +269,7 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     options.put("localPortPrefix", "/" + name + "/remoteControlBoard");
     yarp::os::Property& remoteControlBoardsOpts = options.addGroup("REMOTE_CONTROLBOARD_OPTIONS");
     remoteControlBoardsOpts.put("writeStrict", "on");
+    remoteControlBoardsOpts.put("carrier", "shmem");
 
     // get the actuated DoFs
     m_actuatedDOFs = m_axesList.size();
@@ -312,6 +313,8 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
                        << " is set to COMPLIANT. It is not possible to guarantee a good tracking.";
         }
     }
+
+    m_motorTemperatures.resize(m_actuatedDOFs);
 
     // open the device
     if(!m_robotDevice.open(options))
@@ -360,6 +363,12 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     if(!m_robotDevice.view(m_interactionInterface) || !m_interactionInterface)
     {
         yError() << "[configureRobot] Cannot obtain IInteractionMode interface";
+        return false;
+    }
+
+    if (!m_robotDevice.view(m_motorInterface) || !m_motorInterface)
+    {
+        yError() << "[configureRobot] Cannot obtain IMotor interface";
         return false;
     }
 
@@ -482,12 +491,35 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    m_motorTemperatureThread = std::thread(&RobotInterface::readMotorTemperature, this);
+
     return true;
+}
+
+void RobotInterface::readMotorTemperature()
+{
+    m_motorTemperatureTreadIsRunning = true;
+
+    while(m_motorTemperatureTreadIsRunning)
+    {
+        {
+            std::lock_guard<std::mutex> lock(m_motorTemperatureMutex);
+
+            if(!m_motorInterface->getTemperatures(m_motorTemperatures.data()))
+            {
+                yError() << "[RobotInterface::readMotorTemperature] Unable to get the motor temperatures.";
+            }
+        }
+
+        // TODO GR you should load the time required for the  read and close it
+        yarp::os::Time::delay(m_motorTemperatureDt);
+    }
 }
 
 bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
                                                 const std::string& portInputName,
                                                 const std::string& wholeBodyDynamicsPortName,
+                                                const std::string& carrier,
                                                 const double& samplingTime,
                                                 bool useWrenchFilter,
                                                 double cutFrequency,
@@ -497,7 +529,7 @@ bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
     measuredWrench.port = std::make_unique<yarp::os::BufferedPort<yarp::sig::Vector>>();
     measuredWrench.port->open("/" + portPrefix + portInputName);
     // connect port
-    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
+    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName, carrier))
     {
         yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
                  << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;
@@ -643,6 +675,7 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
         ok = ok && this->configureForceTorqueSensor(portPrefix,
                                                     leftFootWrenchInputPorts[i],
                                                     leftFootWrenchOutputPorts[i],
+                                                    "shmem",
                                                     samplingTime,
                                                     useWrenchFilter, cutFrequency,
                                                     m_leftFootMeasuredWrench[i]);
@@ -653,6 +686,7 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
         ok = ok && this->configureForceTorqueSensor(portPrefix,
                                                     rightFootWrenchInputPorts[i],
                                                     rightFootWrenchOutputPorts[i],
+                                                    "shmem",
                                                     samplingTime,
                                                     useWrenchFilter, cutFrequency,
                                                     m_rightFootMeasuredWrench[i]);
@@ -1096,6 +1130,12 @@ bool RobotInterface::setVelocityReferences(const iDynTree::VectorDynSize& desire
 
 bool RobotInterface::close()
 {
+    m_motorTemperatureTreadIsRunning = false;
+    if (m_motorTemperatureThread.joinable())
+    {
+        m_motorTemperatureThread.join();
+    }
+
     // close all the ports
     for(auto& wrench : m_leftFootMeasuredWrench)
         wrench.port->close();
@@ -1119,9 +1159,16 @@ const iDynTree::VectorDynSize& RobotInterface::getJointPosition() const
 {
     return m_positionFeedbackRad;
 }
+
 const iDynTree::VectorDynSize& RobotInterface::getJointVelocity() const
 {
     return m_velocityFeedbackRad;
+}
+
+iDynTree::VectorDynSize RobotInterface::getMotorTemperature() const
+{
+    std::lock_guard lock(m_motorTemperatureMutex);
+    return m_motorTemperatures;
 }
 
 const iDynTree::Wrench& RobotInterface::getLeftWrench() const
