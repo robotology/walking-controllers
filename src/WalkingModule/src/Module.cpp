@@ -136,6 +136,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asFloat64();
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
+    std::string walkingStatusSuffix = rf.check("walking_status_suffix", yarp::os::Value("/status:o")).asString();
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
     m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
@@ -228,6 +229,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    std::string walkingStatusPort = "/" + getName() + walkingStatusSuffix;
+    if (!m_walkingStatusPort.open(walkingStatusPort))
+    {
+        yError() << "[WalkingModule::configure] Could not open" << walkingStatusPort << " port.";
+        return false;
+    }
+    
+    
     // initialize the trajectory planner
     m_trajectoryGenerator = std::make_unique<TrajectoryGenerator>();
     yarp::os::Bottle &trajectoryPlannerOptions = rf.findGroup("TRAJECTORY_PLANNER");
@@ -568,6 +577,8 @@ bool WalkingModule::updateModule()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 
+    int initialStatusStringLength = -1;
+
     if (m_robotState == WalkingFSM::Preparing)
     {
         if (!m_robotControlHelper->getFeedbacksRaw(m_feedbackAttempts, m_feedbackAttemptDelay))
@@ -681,6 +692,14 @@ bool WalkingModule::updateModule()
         desiredUnicyclePosition = m_desiredUnyciclePositionPort.read(false);
         if (desiredUnicyclePosition != nullptr)
         {
+            m_statusString = "";
+            // take m_time cast to int do the modulus 3 and then append a string to m_statusString of 3 caracters where the first
+            // modulo 3 is the number of = and the rest is the number of spaces
+            m_statusString += std::string((static_cast<int>(m_time) % 3), '=');
+            m_statusString += std::string(3 - (static_cast<int>(m_time) % 3), ' ');
+            m_statusString += " ";
+            initialStatusStringLength = m_statusString.size();
+
             applyGoalScaling(*desiredUnicyclePosition);
             if (!setPlannerInput(*desiredUnicyclePosition))
             {
@@ -691,7 +710,16 @@ bool WalkingModule::updateModule()
         }
         else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
         {
+            m_statusString = "";
+            // take m_time cast to int do the modulus 3 and then append a string to m_statusString of 3 caracters where the first
+            // modulo 3 is the number of = and the rest is the number of spaces
+            m_statusString += std::string((static_cast<int>(m_time) % 3), '=');
+            m_statusString += std::string(3 - (static_cast<int>(m_time) % 3), ' ');
+            m_statusString += " ";
+            initialStatusStringLength = m_statusString.size();
+
             yWarning() << "[WalkingModule::updateModule] The goal has not been set for more than " << m_maxTimeToWaitForGoal << " seconds.";
+	        m_statusString += "Walking TimeOut ";	    
             yarp::sig::Vector dummy(3, 0.0);
             if (!setPlannerInput(dummy))
             {
@@ -1112,6 +1140,15 @@ bool WalkingModule::updateModule()
             m_vectorsCollectionServer.sendData();
         }
 
+	    auto& statusMsg = m_walkingStatusPort.prepare();
+        if (m_statusString.size() == initialStatusStringLength)
+        {
+            m_statusString += "All Good";
+        }
+
+        statusMsg.clear();
+        statusMsg.addString(m_statusString);
+        m_walkingStatusPort.write();
 
         propagateTime();
 
@@ -1535,14 +1572,15 @@ bool WalkingModule::setPlannerInput(const yarp::sig::Vector &plannerInput)
     {
         yWarning() << "[WalkingModule::setPlannerInput] The motor temperature is over the limit.";
         std::vector<unsigned int> indeces = m_motorTemperatureChecker->getMotorsOverLimit();
-        std::string msg = "The following motors temperature are over the limits: ";
+        std::string msg = "The following motors temperature is over the limits: ";
         for (auto index : indeces)
         {
             msg += m_robotControlHelper->getAxesList()[index]
                 + ": Max temperature: "
-                + std::to_string(m_motorTemperatureChecker->getMaxTemperature()[index]) + " celsius.";
+                + std::to_string(m_motorTemperatureChecker->getMaxTemperature()[index]) + " C.";
         }
         msg += "The trajectory will be set to zero.";
+	    m_statusString += msg;	
         yWarning() << msg;
 
         m_plannerInput.zero();
