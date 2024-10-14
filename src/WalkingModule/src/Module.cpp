@@ -680,7 +680,6 @@ bool WalkingModule::updateModule()
         }
         else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
         {
-            yWarning() << "[WalkingModule::updateModule] The goal has not been set for more than " << m_maxTimeToWaitForGoal << " seconds.";
             yarp::sig::Vector dummy(3, 0.0);
             if (!setPlannerInput(dummy))
             {
