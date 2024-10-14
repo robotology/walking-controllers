@@ -86,8 +86,13 @@ bool MotorsTemperatureChecker::setMotorTemperatures(const iDynTree::VectorDynSiz
 
     for (int i = 0; i < temperature.size(); i++)
     {
+      
+        if (m_limits(i) < 0)
+	{
+	    continue;
+	}
 
-        if (temperature(i) > m_limits(i))
+	if (temperature(i) > m_limits(i))
         {
             m_samplesAboveTheLimit[i]++;
         }
