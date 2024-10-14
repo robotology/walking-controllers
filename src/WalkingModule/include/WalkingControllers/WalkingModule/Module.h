@@ -179,6 +179,7 @@ namespace WalkingControllers
         bool solveBLFIK(const iDynTree::Position& desiredCoMPosition,
                         const iDynTree::Vector3& desiredCoMVelocity,
                         const iDynTree::Rotation& desiredNeckOrientation,
+                        const iDynTree::SpatialMomentum& desiredCentroidalMomentum,
                         iDynTree::VectorDynSize &output);
 
         /**
@@ -193,6 +194,8 @@ namespace WalkingControllers
          * @return the average Yaw rotation
          */
         iDynTree::Rotation computeAverageYawRotationFromPlannedFeet() const;
+
+        iDynTree::Twist computeAverageTwistFromPlannedFeet() const;
 
         /**
          * Generate the first trajectory.
