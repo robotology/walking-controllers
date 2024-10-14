@@ -269,6 +269,7 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
     options.put("localPortPrefix", "/" + name + "/remoteControlBoard");
     yarp::os::Property& remoteControlBoardsOpts = options.addGroup("REMOTE_CONTROLBOARD_OPTIONS");
     remoteControlBoardsOpts.put("writeStrict", "on");
+    remoteControlBoardsOpts.put("carrier", "shmem");
 
     // get the actuated DoFs
     m_actuatedDOFs = m_axesList.size();
@@ -518,6 +519,7 @@ void RobotInterface::readMotorTemperature()
 bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
                                                 const std::string& portInputName,
                                                 const std::string& wholeBodyDynamicsPortName,
+                                                const std::string& carrier,
                                                 const double& samplingTime,
                                                 bool useWrenchFilter,
                                                 double cutFrequency,
@@ -527,7 +529,7 @@ bool RobotInterface::configureForceTorqueSensor(const std::string& portPrefix,
     measuredWrench.port = std::make_unique<yarp::os::BufferedPort<yarp::sig::Vector>>();
     measuredWrench.port->open("/" + portPrefix + portInputName);
     // connect port
-    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName))
+    if(!yarp::os::Network::connect(wholeBodyDynamicsPortName, "/" + portPrefix + portInputName, carrier))
     {
         yError() << "[RobotInterface::configureForceTorqueSensors] Unable to connect to port "
                  << wholeBodyDynamicsPortName << " to " << "/" + portPrefix + portInputName;
@@ -673,6 +675,7 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
         ok = ok && this->configureForceTorqueSensor(portPrefix,
                                                     leftFootWrenchInputPorts[i],
                                                     leftFootWrenchOutputPorts[i],
+                                                    "shmem",
                                                     samplingTime,
                                                     useWrenchFilter, cutFrequency,
                                                     m_leftFootMeasuredWrench[i]);
@@ -683,6 +686,7 @@ bool RobotInterface::configureForceTorqueSensors(const yarp::os::Searchable& con
         ok = ok && this->configureForceTorqueSensor(portPrefix,
                                                     rightFootWrenchInputPorts[i],
                                                     rightFootWrenchOutputPorts[i],
+                                                    "shmem",
                                                     samplingTime,
                                                     useWrenchFilter, cutFrequency,
                                                     m_rightFootMeasuredWrench[i]);

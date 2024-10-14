@@ -131,7 +131,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
+    yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName, "shmem");
 
     if (!YarpUtilities::getStringFromSearchable(rf, "robotGoalOutputPort_name", portName))
     {
@@ -146,7 +146,7 @@ bool JoypadModule::configure(yarp::os::ResourceFinder &rf)
         yError() << "[configure] Unable to get a string from searchable";
         return false;
     }
-    yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
+    yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName, "shmem");
 
     return true;
 }
@@ -260,21 +260,21 @@ bool JoypadModule::updateModule()
         {
             yInfo() << "[updateModule] Connecting both ports";
             if (!yarp::os::Network::isConnected(m_rpcClientPortName, m_rpcServerPortName))
-                yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
+	      yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName, "shmem");
             if (!yarp::os::Network::isConnected(m_robotGoalOutputPortName, m_robotGoalInputPortName))
-                yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
+	      yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName, "shmem");
         }
         else if (m_connectPortsSeparately && connectGoal > 0)
         {
             yInfo() << "[updateModule] Connecting goal port";
             if (!yarp::os::Network::isConnected(m_robotGoalOutputPortName, m_robotGoalInputPortName))
-                yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName);
+	      yarp::os::Network::connect(m_robotGoalOutputPortName, m_robotGoalInputPortName, "shmem");
         }
         else if (m_connectPortsSeparately && connectRpc > 0)
         {
             yInfo() << "[updateModule] Connecting RPC port";
             if (!yarp::os::Network::isConnected(m_rpcClientPortName, m_rpcServerPortName))
-                yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName);
+	      yarp::os::Network::connect(m_rpcClientPortName, m_rpcServerPortName, "shmem");
         }
         // disconnect the ports
         else if (disconnect > 0)

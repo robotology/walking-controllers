@@ -133,6 +133,7 @@ namespace WalkingControllers
         bool configureForceTorqueSensor(const std::string& portPrefix,
                                         const std::string& portInputName,
                                         const std::string& wholeBodyDynamicsPortName,
+                                        const std::string& carrier,
                                         const double& samplingTime,
                                         bool useWrenchFilter,
                                         double cutFrequency,
