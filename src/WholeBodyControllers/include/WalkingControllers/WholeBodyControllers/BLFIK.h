@@ -16,6 +16,8 @@
 #include <BipedalLocomotion/IK/SO3Task.h>
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
 #include <BipedalLocomotion/System/VariablesHandler.h>
+#include <BipedalLocomotion/IK/AngularMomentumTask.h>
+
 
 #include <memory>
 
@@ -45,6 +47,8 @@ public:
     bool setRootSetPoint(const iDynTree::Position& position, const iDynTree::Vector3& velocity);
     bool setTorsoSetPoint(const iDynTree::Rotation& rotation);
     const iDynTree::VectorDynSize& getDesiredJointVelocity() const;
+    bool setAngularMomentumSetPoint(const iDynTree::Vector3& angularMomentum);
+    iDynTree::Twist getDesiredTorsoVelocity() const;
 
 private:
     std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>
@@ -64,11 +68,13 @@ private:
     std::shared_ptr<BipedalLocomotion::IK::R3Task> m_rootTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRetargetingTask;
     std::shared_ptr<BipedalLocomotion::IK::JointTrackingTask> m_jointRegularizationTask;
+    std::shared_ptr<BipedalLocomotion::IK::AngularMomentumTask> m_angularMomentumTask;
 
     iDynTree::VectorDynSize m_jointVelocity;
     bool m_usejointRetargeting{false};
     bool m_useRootLinkForHeight{false};
     bool m_useFeedforwardTermForJointRetargeting{false};
+    bool m_useAngularMomentumTask{false};
 };
 
 } // namespace WalkingControllers

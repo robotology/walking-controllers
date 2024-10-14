@@ -40,6 +40,9 @@ bool BLFIK::initialize(
     m_usejointRetargeting = false;
     ptr->getParameter("use_joint_retargeting", m_usejointRetargeting);
 
+    m_useAngularMomentumTask = false;
+    ptr->getParameter("use_angular_momentum_task", m_useAngularMomentumTask);
+
     ptr->getParameter("use_feedforward_term_for_joint_retargeting",
                       m_useFeedforwardTermForJointRetargeting);
 
@@ -56,6 +59,27 @@ bool BLFIK::initialize(
     m_torsoWeight
         = std::make_shared<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>();
     ok = ok && m_torsoWeight->initialize(ptr->getGroup("TORSO_TASK"));
+
+    if (m_useAngularMomentumTask)
+    {
+        m_angularMomentumTask = std::make_shared<BipedalLocomotion::IK::AngularMomentumTask>();
+        ok = ok && m_angularMomentumTask->setKinDyn(kinDyn);
+        ok = ok && m_angularMomentumTask->initialize(ptr->getGroup("ANGULAR_MOMENTUM_TASK"));
+
+        Eigen::VectorXd angularMomentumWeight;
+        ok = ok && ptr->getGroup("ANGULAR_MOMENTUM_TASK").lock()->getParameter("weight", angularMomentumWeight);
+
+        ok = ok
+            && m_qpIK.addTask(m_angularMomentumTask,
+                            "angular_momentum_task",
+                            lowPriority,
+                            angularMomentumWeight);
+    }
+    if (!ok)
+    {
+        BipedalLocomotion::log()->error("{} Unable to initialize the angular momentum task.", prefix);
+        return false;
+    }
 
     if (m_usejointRetargeting)
     {
@@ -218,4 +242,22 @@ bool BLFIK::setTorsoSetPoint(const iDynTree::Rotation& rotation)
 const iDynTree::VectorDynSize& BLFIK::getDesiredJointVelocity() const
 {
     return m_jointVelocity;
+}
+
+iDynTree::Twist BLFIK::getDesiredTorsoVelocity() const
+{
+    iDynTree::Twist tmp;
+    tmp.zero();
+    iDynTree::toEigen(tmp.getAngularVec3()) = m_torsoTask->getB();
+    return tmp;
+}
+
+bool BLFIK::setAngularMomentumSetPoint(const iDynTree::Vector3& angularMomentum)
+{
+    if (!m_angularMomentumTask)
+    {
+        return true;
+    }
+
+    return m_angularMomentumTask->setSetPoint(iDynTree::toEigen(angularMomentum));
 }

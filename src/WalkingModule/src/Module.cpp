@@ -518,6 +518,7 @@ bool WalkingModule::close()
 bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
                                const iDynTree::Vector3 &desiredCoMVelocity,
                                const iDynTree::Rotation &desiredNeckOrientation,
+                               const iDynTree::SpatialMomentum &centroidalMomentumDesired,
                                iDynTree::VectorDynSize &output)
 {
     const std::string phase = m_isStancePhase.front() ? "stance" : "walking";
@@ -531,7 +532,7 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     ok = ok && m_BLFIKSolver->setCoMSetPoint(desiredCoMPosition, desiredCoMVelocity);
     ok = ok && m_BLFIKSolver->setRetargetingJointSetPoint(m_retargetingClient->jointPositions(),
                                                           m_retargetingClient->jointVelocities());
-
+    ok = ok && m_BLFIKSolver->setAngularMomentumSetPoint(centroidalMomentumDesired.getAngularVec3());
     if (m_useRootLinkForHeight)
     {
         ok = ok && m_BLFIKSolver->setRootSetPoint(desiredCoMPosition, desiredCoMVelocity);
@@ -951,6 +952,10 @@ bool WalkingModule::updateModule()
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
 
+        // compute the desired torso velocity
+        const iDynTree::Twist desiredTorsoVelocity = this->computeAverageTwistFromPlannedFeet();
+        auto centroidalMomentumDesired = m_FKSolver->getKinDyn()->getCentroidalRobotLockedInertia() * desiredTorsoVelocity;
+
         if (m_useQPIK)
         {
             // integrate dq because velocity control mode seems not available
@@ -968,6 +973,7 @@ bool WalkingModule::updateModule()
             if (!solveBLFIK(desiredCoMPosition,
                             desiredCoMVelocity,
                             yawRotation,
+                            centroidalMomentumDesired,
                             m_dqDesired))
             {
                 yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with "
@@ -1182,6 +1188,21 @@ iDynTree::Rotation WalkingModule::computeAverageYawRotationFromPlannedFeet() con
     const double meanYaw = std::atan2(std::sin(yawLeft) + std::sin(yawRight),
                                       std::cos(yawLeft) + std::cos(yawRight));
     return iDynTree::Rotation::RotZ(meanYaw);
+}
+
+iDynTree::Twist WalkingModule::computeAverageTwistFromPlannedFeet() const
+{
+    iDynTree::Twist twist;
+    iDynTree::Vector3 meanLinearVelocity, meanAngularVelocity;
+    iDynTree::toEigen(meanLinearVelocity) = (iDynTree::toEigen(m_leftTwistTrajectory.front().getLinearVec3()) +
+                                            iDynTree::toEigen(m_rightTwistTrajectory.front().getLinearVec3())) / 2.0;
+    iDynTree::toEigen(meanAngularVelocity) = (iDynTree::toEigen(m_leftTwistTrajectory.front().getAngularVec3()) +
+                                          iDynTree::toEigen(m_rightTwistTrajectory.front().getAngularVec3())) / 2.0;
+
+    twist.setLinearVec3(meanLinearVelocity);
+    twist.setAngularVec3(meanAngularVelocity);
+
+    return twist;
 }
 
 bool WalkingModule::prepareRobot(bool onTheFly)
