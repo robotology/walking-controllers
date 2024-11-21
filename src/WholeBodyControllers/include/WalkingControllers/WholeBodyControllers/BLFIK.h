@@ -57,6 +57,8 @@ private:
         m_jointRegularizationWeight;
     std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>
         m_jointRetargetingWeight;
+    std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>
+        m_angularMomentumWeight;
 
     BipedalLocomotion::IK::QPInverseKinematics m_qpIK;
     BipedalLocomotion::System::VariablesHandler m_variableHandler;

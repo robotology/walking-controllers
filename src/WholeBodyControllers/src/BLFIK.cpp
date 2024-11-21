@@ -66,14 +66,14 @@ bool BLFIK::initialize(
         ok = ok && m_angularMomentumTask->setKinDyn(kinDyn);
         ok = ok && m_angularMomentumTask->initialize(ptr->getGroup("ANGULAR_MOMENTUM_TASK"));
 
-        Eigen::VectorXd angularMomentumWeight;
-        ok = ok && ptr->getGroup("ANGULAR_MOMENTUM_TASK").lock()->getParameter("weight", angularMomentumWeight);
+        m_angularMomentumWeight = std::make_shared<BipedalLocomotion::ContinuousDynamicalSystem::MultiStateWeightProvider>();
+        ok = ok && m_angularMomentumWeight->initialize(ptr->getGroup("ANGULAR_MOMENTUM_TASK"));
 
         ok = ok
             && m_qpIK.addTask(m_angularMomentumTask,
                             "angular_momentum_task",
                             lowPriority,
-                            angularMomentumWeight);
+                            m_angularMomentumWeight);
     }
     if (!ok)
     {
@@ -155,6 +155,10 @@ bool BLFIK::solve()
 {
     bool ok = m_torsoWeight->advance();
     ok = ok && m_jointRegularizationWeight->advance();
+    if (m_angularMomentumWeight)
+    {
+        ok = ok && m_angularMomentumWeight->advance();
+    }
     if (m_usejointRetargeting)
     {
         ok = ok && m_jointRetargetingWeight->advance();
@@ -175,6 +179,10 @@ bool BLFIK::setPhase(const std::string& phase)
 {
     bool ok = m_torsoWeight->setState(phase);
     ok = ok && m_jointRegularizationWeight->setState(phase);
+    if (m_angularMomentumWeight)
+    {
+        ok = ok && m_angularMomentumWeight->setState(phase);
+    }
 
     if (m_usejointRetargeting)
         ok = ok && m_jointRetargetingWeight->setState(phase);
