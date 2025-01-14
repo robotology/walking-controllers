@@ -340,6 +340,19 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    // configure the transform server
+    yarp::os::Bottle transformServerOptions = rf.findGroup("TRANSFORM_SERVER");
+    if (!transformServerOptions.isNull())
+    {
+        transformServerOptions.append(generalOptions);
+        m_transformServerHelper = std::make_unique<YarpUtilities::TransformServerHelper>();
+        if (!m_transformServerHelper->configure(transformServerOptions))
+        {
+            yWarning() << "[WalkingModule::configure] Failed to configure the transform server. Avoiding using it.";
+            m_transformServerHelper.reset(nullptr);
+        }
+    }
+
     // initialize the logger
     if (m_dumpData)
     {
@@ -491,6 +504,7 @@ bool WalkingModule::close()
     m_IKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
+    m_transformServerHelper.reset(nullptr);
 
     return true;
 }
@@ -965,6 +979,14 @@ bool WalkingModule::updateModule()
             }
         }
         m_profiler->setEndTime("IK");
+
+        if (m_transformServerHelper)
+        {
+            if (!m_transformServerHelper->setBaseTransform(m_FKSolver->getRootLinkToWorldTransform()))
+            {
+                yWarning() << "[WalkingModule::updateModule] Unable to publish the base transform.";
+            }
+        }
 
         if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
         {

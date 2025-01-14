@@ -367,7 +367,7 @@ void TrajectoryGenerator::computeThread()
             break;
         }
 
-        unicyclePlanner->setDesiredDirectControl(m_desiredDirectControl(0), m_desiredDirectControl(1), m_desiredDirectControl(2));
+        unicyclePlanner->setDesiredDirectControl(desiredDirectControl(0), desiredDirectControl(1), desiredDirectControl(2));
 
         if (!m_dcmGenerator->setDCMInitialState(initialState)) {
             // something goes wrong
