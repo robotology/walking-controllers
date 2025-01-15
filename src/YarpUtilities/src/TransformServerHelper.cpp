@@ -59,7 +59,7 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::configure(const y
     m_buffer.resize(4, 4);
     m_buffer.zero();
     //TODO: configuration file
-    //TODO: get the joystick position
+    //TODO: add possibility to stream additional frames
 
     return true;
 }

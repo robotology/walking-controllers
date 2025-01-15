@@ -229,6 +229,7 @@ bool TrajectoryGenerator::configurePlanner(const yarp::os::Searchable& config)
         return false;
     }
 
+    m_unicyclePose = iDynTree::Transform::Identity();
 
     return ok;
 }
@@ -261,6 +262,15 @@ void TrajectoryGenerator::computeThread()
 
         bool shouldUpdateEllipsoid;
         FreeSpaceEllipse freeSpaceEllipse;
+
+        iDynTree::Vector2 measuredPosition;
+        double measuredAngle;
+        DCMInitialState initialState;
+        Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
+        unicyclePositionFromStanceFoot(0) = 0.0;
+
+        Eigen::Matrix2d unicycleRotation;
+        double unicycleAngle;
 
         // wait until a new trajectory has to be evaluated.
         {
@@ -308,45 +318,40 @@ void TrajectoryGenerator::computeThread()
             {
                 yInfo() << "[TrajectoryGenerator_Thread] Setting ellipsoid: " << freeSpaceEllipse.printInfo();
             }
+
+            measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
+            measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
+
+            initialState.initialPosition = DCMBoundaryConditionAtMergePointPosition;
+            initialState.initialVelocity = DCMBoundaryConditionAtMergePointVelocity;
+
+            if (correctLeft)
+            {
+                unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
+                unicycleAngle = measuredAngleLeft - leftYawDeltaInRad;
+                footPosition = iDynTree::toEigen(measuredPositionLeft);
+            }
+            else
+            {
+                unicyclePositionFromStanceFoot(1) = nominalWidth/2;
+                unicycleAngle = measuredAngleRight - rightYawDeltaInRad;
+                footPosition = iDynTree::toEigen(measuredPositionRight);
+            }
+
+            double s_theta = std::sin(unicycleAngle);
+            double c_theta = std::cos(unicycleAngle);
+
+            unicycleRotation(0,0) = c_theta;
+            unicycleRotation(0,1) = -s_theta;
+            unicycleRotation(1,0) = s_theta;
+            unicycleRotation(1,1) = c_theta;
+
+            unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
+
+            iDynTree::Position unicyclePosition3D(unicyclePosition(0), unicyclePosition(1), 0.0);
+            iDynTree::Rotation unicycleRotation3D = iDynTree::Rotation::RotZ(unicycleAngle);
+            m_unicyclePose = iDynTree::Transform(unicycleRotation3D, unicyclePosition3D);
         }
-
-        iDynTree::Vector2 measuredPosition;
-        double measuredAngle;
-        measuredPosition = correctLeft ? measuredPositionLeft : measuredPositionRight;
-        measuredAngle = correctLeft ? measuredAngleLeft : measuredAngleRight;
-
-        DCMInitialState initialState;
-        initialState.initialPosition = DCMBoundaryConditionAtMergePointPosition;
-        initialState.initialVelocity = DCMBoundaryConditionAtMergePointVelocity;
-
-        Eigen::Vector2d unicyclePositionFromStanceFoot, footPosition, unicyclePosition;
-        unicyclePositionFromStanceFoot(0) = 0.0;
-
-        Eigen::Matrix2d unicycleRotation;
-        double unicycleAngle;
-
-        if (correctLeft)
-        {
-            unicyclePositionFromStanceFoot(1) = -nominalWidth/2;
-            unicycleAngle = measuredAngleLeft - leftYawDeltaInRad;
-            footPosition = iDynTree::toEigen(measuredPositionLeft);
-        }
-        else
-        {
-            unicyclePositionFromStanceFoot(1) = nominalWidth/2;
-            unicycleAngle = measuredAngleRight - rightYawDeltaInRad;
-            footPosition = iDynTree::toEigen(measuredPositionRight);
-        }
-
-        double s_theta = std::sin(unicycleAngle);
-        double c_theta = std::cos(unicycleAngle);
-
-        unicycleRotation(0,0) = c_theta;
-        unicycleRotation(0,1) = -s_theta;
-        unicycleRotation(1,0) = s_theta;
-        unicycleRotation(1,1) = c_theta;
-
-        unicyclePosition = unicycleRotation * unicyclePositionFromStanceFoot + footPosition;
 
         // apply the homogeneous transformation w_H_{unicycle}
         iDynTree::toEigen(desiredPointInAbsoluteFrame) = unicycleRotation * (iDynTree::toEigen(m_referencePointDistance) +
@@ -862,4 +867,9 @@ bool TrajectoryGenerator::getDesiredZMPPosition(std::vector<iDynTree::Vector2> &
 const iDynTree::Rotation& TrajectoryGenerator::getChestAdditionalRotation() const
 {
     return m_chestAdditionalRotation;
+}
+
+const iDynTree::Transform& WalkingControllers::TrajectoryGenerator::getUnicyclePose() const
+{
+    return m_unicyclePose;
 }

@@ -986,6 +986,11 @@ bool WalkingModule::updateModule()
             {
                 yWarning() << "[WalkingModule::updateModule] Unable to publish the base transform.";
             }
+
+            if (!m_transformServerHelper->setJoystickTransform(m_trajectoryGenerator->getUnicyclePose()))
+            {
+                yWarning() << "[WalkingModule::updateModule] Unable to publish the joystick transform.";
+            }
         }
 
         if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
