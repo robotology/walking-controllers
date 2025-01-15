@@ -24,7 +24,8 @@ namespace YarpUtilities
         std::string m_joystickFrameName;
 
         yarp::dev::IFrameTransform* m_tfPublisher;
-        yarp::dev::PolyDriver m_driver;
+        yarp::dev::PolyDriver m_clientDriver;
+        yarp::dev::PolyDriver m_serverDriver;
 
         yarp::sig::Matrix m_buffer;
 

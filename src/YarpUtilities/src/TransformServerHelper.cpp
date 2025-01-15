@@ -28,29 +28,45 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::configure(const y
     std::string prefix = "/" + config.check("name", yarp::os::Value("walking-coordinator")).asString();
 
 
-    m_rootFrame = config.check("tf_root_frame", yarp::os::Value("world")).asString();
-    m_baseFrameName = config.check("tf_base_frame", yarp::os::Value("root_link")).asString();
-    m_joystickFrameName = config.check("tf_joystick_frame", yarp::os::Value("joystick")).asString();
+    m_rootFrame = config.check("rootFrame", yarp::os::Value("world")).asString();
+    m_baseFrameName = config.check("baseFrame", yarp::os::Value("root_link")).asString();
+    m_joystickFrameName = config.check("joystickFrame", yarp::os::Value("joystick")).asString();
+
+    if (config.check("runServer", yarp::os::Value(false)).asBool())
+    {
+        yarp::os::Bottle& conf = config.findGroup("SERVER");
+
+        if (conf.isNull())
+        {
+            yError() << "[TransformServerHelper::initialize] Unable to get the group SERVER from the configuration file.";
+            return false;
+        }
+        if (!m_serverDriver.open(conf))
+        {
+            yError() << "[TransformServerHelper::initialize] Unable to open the server device with the following options:" << conf.toString();
+            return false;
+        }
+    }
 
     yarp::os::Property tfClientCfg;
-    tfClientCfg.put("device", config.check("tfDevice", yarp::os::Value("frameTransformClient")).asString());
-    tfClientCfg.put("filexml_option", config.check("tfFile", yarp::os::Value("ftc_yarp_only.xml")).asString());
-    tfClientCfg.put("ft_client_prefix", config.check("tfLocal", yarp::os::Value(prefix + "/tf")).asString());
+    tfClientCfg.put("device", config.check("device", yarp::os::Value("frameTransformClient")).asString());
+    tfClientCfg.put("filexml_option", config.check("filexml_option", yarp::os::Value("ftc_yarp_only.xml")).asString());
+    tfClientCfg.put("ft_client_prefix", prefix + "/transforms");
     if (config.check("tfRemote"))
     {
-        tfClientCfg.put("ft_server_prefix", config.find("tfRemote").asString());
+        tfClientCfg.put("ft_server_prefix", config.find("ft_server_prefix").asString());
     }
 
     tfClientCfg.put("period", period);
-    tfClientCfg.put("local_rpc", prefix + "/tf/local_rpc");
+    tfClientCfg.put("local_rpc", prefix + "/transforms/client_rpc");
 
-    if (!m_driver.open(tfClientCfg))
+    if (!m_clientDriver.open(tfClientCfg))
     {
-        yError() << "[TransformServerHelper::initialize] Unable to open polydriver with the following options:" << tfClientCfg.toString();
+        yError() << "[TransformServerHelper::initialize] Unable to open transform client with the following options:" << tfClientCfg.toString();
         return false;
     }
 
-    if (!m_driver.view(m_tfPublisher) || m_tfPublisher == nullptr)
+    if (!m_clientDriver.view(m_tfPublisher) || m_tfPublisher == nullptr)
     {
         yError() << "[TransformServerHelper::initialize] Unable to view IFrameTransform interface.";
         return false;
@@ -80,6 +96,7 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::setJoystickTransf
 
 void WalkingControllers::YarpUtilities::TransformServerHelper::close()
 {
-    m_driver.close();
+    m_clientDriver.close();
     m_tfPublisher = nullptr;
+    m_serverDriver.close();
 }
