@@ -340,16 +340,16 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
-    // configure the transform server
-    yarp::os::Bottle transformServerOptions = rf.findGroup("TRANSFORM_SERVER");
-    if (!transformServerOptions.isNull())
+    // configure the transform helper
+    yarp::os::Bottle transformHelperOptions = rf.findGroup("TRANSFORM_HELPER");
+    if (!transformHelperOptions.isNull())
     {
-        transformServerOptions.append(generalOptions);
-        m_transformServerHelper = std::make_unique<YarpUtilities::TransformServerHelper>();
-        if (!m_transformServerHelper->configure(transformServerOptions))
+        transformHelperOptions.append(generalOptions);
+        m_transformHelper = std::make_unique<YarpUtilities::TransformHelper>();
+        if (!m_transformHelper->configure(transformHelperOptions))
         {
-            yWarning() << "[WalkingModule::configure] Failed to configure the transform server. Avoiding using it.";
-            m_transformServerHelper.reset(nullptr);
+            yWarning() << "[WalkingModule::configure] Failed to configure the transform helper. Avoiding using it.";
+            m_transformHelper.reset(nullptr);
         }
     }
 
@@ -504,7 +504,7 @@ bool WalkingModule::close()
     m_IKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
-    m_transformServerHelper.reset(nullptr);
+    m_transformHelper.reset(nullptr);
 
     return true;
 }
@@ -980,14 +980,14 @@ bool WalkingModule::updateModule()
         }
         m_profiler->setEndTime("IK");
 
-        if (m_transformServerHelper)
+        if (m_transformHelper)
         {
-            if (!m_transformServerHelper->setBaseTransform(m_FKSolver->getRootLinkToWorldTransform()))
+            if (!m_transformHelper->setBaseTransform(m_FKSolver->getRootLinkToWorldTransform()))
             {
                 yWarning() << "[WalkingModule::updateModule] Unable to publish the base transform.";
             }
 
-            if (!m_transformServerHelper->setJoystickTransform(m_trajectoryGenerator->getUnicyclePose()))
+            if (!m_transformHelper->setJoystickTransform(m_trajectoryGenerator->getUnicyclePose()))
             {
                 yWarning() << "[WalkingModule::updateModule] Unable to publish the joystick transform.";
             }

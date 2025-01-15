@@ -43,7 +43,7 @@
 
 #include <WalkingControllers/RetargetingHelper/Helper.h>
 
-#include <WalkingControllers/YarpUtilities/TransformServerHelper.h>
+#include <WalkingControllers/YarpUtilities/TransformHelper.h>
 
 // iCub-ctrl
 #include <iCub/ctrl/filters.h>
@@ -91,7 +91,7 @@ namespace WalkingControllers
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<BipedalLocomotion::System::TimeProfiler> m_profiler; /**< Time profiler. */
-        std::unique_ptr<YarpUtilities::TransformServerHelper> m_transformServerHelper; /**< Transform server helper. */
+        std::unique_ptr<YarpUtilities::TransformHelper> m_transformHelper; /**< Transform server/client helper. */
         BipedalLocomotion::Contacts::GlobalCoPEvaluator m_globalCoPEvaluator;
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */

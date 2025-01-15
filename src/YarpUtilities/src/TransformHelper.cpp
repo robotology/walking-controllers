@@ -3,9 +3,9 @@
 
 #include <yarp/os/LogStream.h>
 
-#include <WalkingControllers/YarpUtilities/TransformServerHelper.h>
+#include <WalkingControllers/YarpUtilities/TransformHelper.h>
 
-void WalkingControllers::YarpUtilities::TransformServerHelper::convertTransform(const iDynTree::Transform& transform, yarp::sig::Matrix& buffer)
+void WalkingControllers::YarpUtilities::TransformHelper::convertTransform(const iDynTree::Transform& transform, yarp::sig::Matrix& buffer)
 {
     buffer.resize(4, 4);
     buffer.zero();
@@ -16,12 +16,12 @@ void WalkingControllers::YarpUtilities::TransformServerHelper::convertTransform(
     memcpy(buffer.data(), homTrans.data(), 4 * 4 * sizeof(double));
 }
 
-WalkingControllers::YarpUtilities::TransformServerHelper::~TransformServerHelper()
+WalkingControllers::YarpUtilities::TransformHelper::~TransformHelper()
 {
     close();
 }
 
-bool WalkingControllers::YarpUtilities::TransformServerHelper::configure(const yarp::os::Searchable& config)
+bool WalkingControllers::YarpUtilities::TransformHelper::configure(const yarp::os::Searchable& config)
 {
     //From the GENERAL options
     double period = config.check("sampling_time", yarp::os::Value(0.01)).asFloat64();
@@ -38,12 +38,12 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::configure(const y
 
         if (conf.isNull())
         {
-            yError() << "[TransformServerHelper::initialize] Unable to get the group SERVER from the configuration file.";
+            yError() << "[TransformHelper::initialize] Unable to get the group SERVER from the configuration file.";
             return false;
         }
         if (!m_serverDriver.open(conf))
         {
-            yError() << "[TransformServerHelper::initialize] Unable to open the server device with the following options:" << conf.toString();
+            yError() << "[TransformHelper::initialize] Unable to open the server device with the following options:" << conf.toString();
             return false;
         }
     }
@@ -62,13 +62,13 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::configure(const y
 
     if (!m_clientDriver.open(tfClientCfg))
     {
-        yError() << "[TransformServerHelper::initialize] Unable to open transform client with the following options:" << tfClientCfg.toString();
+        yError() << "[TransformHelper::initialize] Unable to open transform client with the following options:" << tfClientCfg.toString();
         return false;
     }
 
     if (!m_clientDriver.view(m_tfPublisher) || m_tfPublisher == nullptr)
     {
-        yError() << "[TransformServerHelper::initialize] Unable to view IFrameTransform interface.";
+        yError() << "[TransformHelper::initialize] Unable to view IFrameTransform interface.";
         return false;
     }
 
@@ -80,7 +80,7 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::configure(const y
     return true;
 }
 
-bool WalkingControllers::YarpUtilities::TransformServerHelper::setBaseTransform(const iDynTree::Transform& transform)
+bool WalkingControllers::YarpUtilities::TransformHelper::setBaseTransform(const iDynTree::Transform& transform)
 {
     convertTransform(transform, m_buffer);
     return m_tfPublisher->setTransform(m_baseFrameName, m_rootFrame, m_buffer);
@@ -88,13 +88,13 @@ bool WalkingControllers::YarpUtilities::TransformServerHelper::setBaseTransform(
 
 
 
-bool WalkingControllers::YarpUtilities::TransformServerHelper::setJoystickTransform(const iDynTree::Transform& transform)
+bool WalkingControllers::YarpUtilities::TransformHelper::setJoystickTransform(const iDynTree::Transform& transform)
 {
     convertTransform(transform, m_buffer);
     return m_tfPublisher->setTransform(m_joystickFrameName, m_rootFrame, m_buffer);
 }
 
-void WalkingControllers::YarpUtilities::TransformServerHelper::close()
+void WalkingControllers::YarpUtilities::TransformHelper::close()
 {
     m_clientDriver.close();
     m_tfPublisher = nullptr;

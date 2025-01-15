@@ -17,7 +17,7 @@ namespace WalkingControllers
 
 namespace YarpUtilities
 {
-    class TransformServerHelper
+    class TransformHelper
     {
         std::string m_rootFrame;
         std::string m_baseFrameName;
@@ -36,9 +36,9 @@ namespace YarpUtilities
         /**
          * Destructor.
          */
-        ~TransformServerHelper();
+        ~TransformHelper();
         /**
-         * Configure the transform server.
+         * Configure the transform helper.
          * @param config the configuration parameters;
          * @return true/false in case of success/failure.
          */
@@ -58,7 +58,7 @@ namespace YarpUtilities
         bool setJoystickTransform(const iDynTree::Transform& transform);
 
         /**
-        * Closes the transform server.
+        * Closes the transform helper.
         */
         void close();
 

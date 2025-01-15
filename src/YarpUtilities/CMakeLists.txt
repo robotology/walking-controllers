@@ -4,10 +4,10 @@
 
 set(YARP_UTILITIES_HDR include/WalkingControllers/YarpUtilities/Helper.h
                        include/WalkingControllers/YarpUtilities/Helper.tpp
-                       include/WalkingControllers/YarpUtilities/TransformServerHelper.h)
+                       include/WalkingControllers/YarpUtilities/TransformHelper.h)
 
 set(YARP_UTILITIES_SRC src/Helper.cpp
-                       src/TransformServerHelper.cpp)
+                       src/TransformHelper.cpp)
 
 add_walking_controllers_library(
   NAME YarpUtilities
