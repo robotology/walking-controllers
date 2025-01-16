@@ -74,8 +74,9 @@ bool WalkingControllers::YarpUtilities::TransformHelper::configure(const yarp::o
         tfClientCfg.put("ft_server_prefix", config.find("ft_server_prefix").asString());
     }
 
-    tfClientCfg.put("period", period);
+    tfClientCfg.put("period", config.check("period", yarp::os::Value(period)).asFloat64());
     tfClientCfg.put("local_rpc", prefix + "/transforms/client_rpc");
+    tfClientCfg.put("ftc_storage_timeout", config.check("ftc_storage_timeout", yarp::os::Value(0.2)).asFloat64());
 
     if (!m_clientDriver.open(tfClientCfg))
     {
