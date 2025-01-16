@@ -5,6 +5,7 @@
 #define WALKING_CONTROLLERS_TF_HELPER_H
 
 #include <string>
+#include <vector>
 
 #include <yarp/dev/PolyDriver.h>
 #include <yarp/dev/IFrameTransform.h>
@@ -26,6 +27,8 @@ namespace YarpUtilities
         yarp::dev::IFrameTransform* m_tfPublisher;
         yarp::dev::PolyDriver m_clientDriver;
         yarp::dev::PolyDriver m_serverDriver;
+
+        std::vector<std::string> m_frames;
 
         yarp::sig::Matrix m_buffer;
 
@@ -56,6 +59,20 @@ namespace YarpUtilities
          * @return true/false in case of success/failure.
          */
         bool setJoystickTransform(const iDynTree::Transform& transform);
+
+        /**
+         * Set a generic transform in the transform server.
+         * @param name is the name of the transform;
+         * @param transform is the transform to set.
+         * @return true/false in case of success/failure.
+         */
+        bool setTransform(const std::string& name, const iDynTree::Transform& transform);
+
+        /**
+         * Get the list of additional frames to publish, obtained from configuration file
+         * @return the list of additional frames.
+         */
+        const std::vector<std::string>& getAdditionalFrames();
 
         /**
         * Closes the transform helper.

@@ -32,6 +32,23 @@ bool WalkingControllers::YarpUtilities::TransformHelper::configure(const yarp::o
     m_baseFrameName = config.check("baseFrame", yarp::os::Value("root_link")).asString();
     m_joystickFrameName = config.check("joystickFrame", yarp::os::Value("joystick")).asString();
 
+    if (config.check("additionalFrames"))
+    {
+        yarp::os::Value additionalFrames = config.find("additionalFrames");
+        if (!additionalFrames.isList())
+        {
+            yError() << "[TransformHelper::initialize] The additionalFrames is present, but it is not a list. No additional frame will be published.";
+        }
+        else
+        {
+            yarp::os::Bottle* frames = additionalFrames.asList();
+            for (int i = 0; i < frames->size(); ++i)
+            {
+                m_frames.push_back(frames->get(i).asString());
+            }
+        }
+    }
+
     if (config.check("runServer", yarp::os::Value(false)).asBool())
     {
         yarp::os::Bottle& conf = config.findGroup("SERVER");
@@ -74,24 +91,28 @@ bool WalkingControllers::YarpUtilities::TransformHelper::configure(const yarp::o
 
     m_buffer.resize(4, 4);
     m_buffer.zero();
-    //TODO: configuration file
-    //TODO: add possibility to stream additional frames
-
     return true;
 }
 
 bool WalkingControllers::YarpUtilities::TransformHelper::setBaseTransform(const iDynTree::Transform& transform)
 {
-    convertTransform(transform, m_buffer);
-    return m_tfPublisher->setTransform(m_baseFrameName, m_rootFrame, m_buffer);
+    return setTransform(m_baseFrameName, transform);
 }
-
-
 
 bool WalkingControllers::YarpUtilities::TransformHelper::setJoystickTransform(const iDynTree::Transform& transform)
 {
+    return setTransform(m_joystickFrameName, transform);
+}
+
+bool WalkingControllers::YarpUtilities::TransformHelper::setTransform(const std::string& name, const iDynTree::Transform& transform)
+{
     convertTransform(transform, m_buffer);
-    return m_tfPublisher->setTransform(m_joystickFrameName, m_rootFrame, m_buffer);
+    return m_tfPublisher->setTransform(name, m_rootFrame, m_buffer);
+}
+
+const std::vector<std::string>& WalkingControllers::YarpUtilities::TransformHelper::getAdditionalFrames()
+{
+    return m_frames;
 }
 
 void WalkingControllers::YarpUtilities::TransformHelper::close()

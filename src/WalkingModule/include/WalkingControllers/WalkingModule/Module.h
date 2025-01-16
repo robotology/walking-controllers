@@ -9,6 +9,7 @@
 #include <iDynTree/Rotation.h>
 #include <memory>
 #include <deque>
+#include <vector>
 
 // YARP
 #include <yarp/os/RFModule.h>
@@ -93,6 +94,8 @@ namespace WalkingControllers
         std::unique_ptr<BipedalLocomotion::System::TimeProfiler> m_profiler; /**< Time profiler. */
         std::unique_ptr<YarpUtilities::TransformHelper> m_transformHelper; /**< Transform server/client helper. */
         BipedalLocomotion::Contacts::GlobalCoPEvaluator m_globalCoPEvaluator;
+
+        std::vector<std::pair<iDynTree::FrameIndex, std::string>> m_framesToStream; /**< Frames to send to the transform server. */
 
         double m_additionalRotationWeightDesired; /**< Desired additional rotational weight matrix. */
         double m_desiredJointsWeight; /**< Desired joint weight matrix. */
