@@ -676,16 +676,6 @@ bool WalkingModule::updateModule()
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
             }
-            m_lastSetGoalTime = m_time;
-        }
-        else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
-        {
-            yarp::sig::Vector dummy(3, 0.0);
-            if (!setPlannerInput(dummy))
-            {
-                yError() << "[WalkingModule::updateModule] Unable to set the planner input";
-                return false;
-            }
         }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
