@@ -69,7 +69,7 @@ bool WalkingControllers::YarpUtilities::TransformHelper::configure(const yarp::o
     tfClientCfg.put("device", config.check("device", yarp::os::Value("frameTransformClient")).asString());
     tfClientCfg.put("filexml_option", config.check("filexml_option", yarp::os::Value("ftc_yarp_only.xml")).asString());
     tfClientCfg.put("ft_client_prefix", prefix + "/transforms");
-    if (config.check("tfRemote"))
+    if (config.check("ft_server_prefix"))
     {
         tfClientCfg.put("ft_server_prefix", config.find("ft_server_prefix").asString());
     }

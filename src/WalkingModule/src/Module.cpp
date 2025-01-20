@@ -351,16 +351,18 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
             yWarning() << "[WalkingModule::configure] Failed to configure the transform helper. Avoiding using it.";
             m_transformHelper.reset(nullptr);
         }
-        for (const std::string& frame : m_transformHelper->getAdditionalFrames())
-        {
-            iDynTree::FrameIndex frameIndex = m_loader.model().getFrameIndex(frame);
-            if (frameIndex != iDynTree::FRAME_INVALID_INDEX)
+        else {
+            for (const std::string& frame : m_transformHelper->getAdditionalFrames())
             {
-                m_framesToStream.push_back({ frameIndex, frame });
-            }
-            else
-            {
-                yWarning() << "[WalkingModule::configure] Frame " << frame << " not found in the model. It will not be published in the transform server.";
+                iDynTree::FrameIndex frameIndex = m_loader.model().getFrameIndex(frame);
+                if (frameIndex != iDynTree::FRAME_INVALID_INDEX)
+                {
+                    m_framesToStream.push_back({ frameIndex, frame });
+                }
+                else
+                {
+                    yWarning() << "[WalkingModule::configure] Frame " << frame << " not found in the model. It will not be published in the transform server.";
+                }
             }
         }
     }
