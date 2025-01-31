@@ -74,6 +74,8 @@ namespace WalkingControllers
 
         iDynTree::Rotation m_chestAdditionalRotation; /**< Additional rotation to be applied to the chest. */
 
+        iDynTree::Transform m_unicyclePose; /**< Pose of the unicycle used to interpret the joystick input. */
+
         /**
          * Main thread method.
          */
@@ -267,6 +269,13 @@ namespace WalkingControllers
          * @return the chest additional rotation
          */
         const iDynTree::Rotation& getChestAdditionalRotation() const;
+
+        /**
+         * Get the unicycle pose
+         * Note that this pose is updated only when the planner is called.
+         * @return the unicycle pose
+         */
+        const iDynTree::Transform& getUnicyclePose() const;
     };
 };
 

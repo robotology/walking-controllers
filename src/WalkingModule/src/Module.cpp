@@ -340,6 +340,33 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         return false;
     }
 
+    // configure the transform helper
+    yarp::os::Bottle transformHelperOptions = rf.findGroup("TRANSFORM_HELPER");
+    if (!transformHelperOptions.isNull())
+    {
+        transformHelperOptions.append(generalOptions);
+        m_transformHelper = std::make_unique<YarpUtilities::TransformHelper>();
+        if (!m_transformHelper->configure(transformHelperOptions))
+        {
+            yWarning() << "[WalkingModule::configure] Failed to configure the transform helper. Avoiding using it.";
+            m_transformHelper.reset(nullptr);
+        }
+        else {
+            for (const std::string& frame : m_transformHelper->getAdditionalFrames())
+            {
+                iDynTree::FrameIndex frameIndex = m_loader.model().getFrameIndex(frame);
+                if (frameIndex != iDynTree::FRAME_INVALID_INDEX)
+                {
+                    m_framesToStream.push_back({ frameIndex, frame });
+                }
+                else
+                {
+                    yWarning() << "[WalkingModule::configure] Frame " << frame << " not found in the model. It will not be published in the transform server.";
+                }
+            }
+        }
+    }
+
     // initialize the logger
     if (m_dumpData)
     {
@@ -491,6 +518,7 @@ bool WalkingModule::close()
     m_IKSolver.reset(nullptr);
     m_FKSolver.reset(nullptr);
     m_stableDCMModel.reset(nullptr);
+    m_transformHelper.reset(nullptr);
 
     return true;
 }
@@ -965,6 +993,29 @@ bool WalkingModule::updateModule()
             }
         }
         m_profiler->setEndTime("IK");
+
+        if (m_transformHelper)
+        {
+            if (!m_transformHelper->setBaseTransform(m_FKSolver->getRootLinkToWorldTransform()))
+            {
+                yWarning() << "[WalkingModule::updateModule] Unable to publish the base transform.";
+            }
+
+            if (!m_transformHelper->setJoystickTransform(m_trajectoryGenerator->getUnicyclePose()))
+            {
+                yWarning() << "[WalkingModule::updateModule] Unable to publish the joystick transform.";
+            }
+
+            auto kinDynPointer = m_FKSolver->getKinDyn();
+
+            for (const auto& frame : m_framesToStream)
+            {
+                if (!m_transformHelper->setTransform(frame.second, kinDynPointer->getWorldTransform(frame.first)))
+                {
+                    yWarning() << "[WalkingModule::updateModule] Unable to publish the transform of" << frame.second;
+                }
+            }
+        }
 
         if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
         {
