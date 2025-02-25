@@ -5,6 +5,7 @@
 #define WALKING_MODULE_HPP
 
 // std
+#include <iDynTree/Position.h>
 #include <iDynTree/Rotation.h>
 #include <iDynTree/VectorDynSize.h>
 
@@ -218,7 +219,9 @@ namespace WalkingControllers
                         const iDynTree::Rotation& desiredNeckOrientation,
                         iDynTree::VectorDynSize &output);
 
-        bool solveBLFTSID(iDynTree::VectorDynSize &output);
+        bool solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
+                          const iDynTree::Vector3& desiredCoMVelocity,
+                          const iDynTree::Rotation& desiredTorsoRotation);
 
         /**
          * Get the desired joint acceleration and torque computed by the TSID controller.

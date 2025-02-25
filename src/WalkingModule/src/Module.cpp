@@ -340,8 +340,6 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
 
         m_jointAccelerationIntegrator = std::make_unique<JointAccelerationIntegrator>();
         m_jointAccelerationIntegrator->initialize(m_robotControlHelper->getActuatedDoFs(), m_dT);
-        m_jointAccelerationIntegrator->setState(iDynTree::toEigen(m_robotControlHelper->getJointPosition()),
-                                                iDynTree::toEigen(m_robotControlHelper->getJointVelocity()));
     }
 
 
@@ -505,6 +503,8 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_qDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
     m_dqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
     m_ddqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_desiredJointTorquesTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_desiredJointTorquesLL.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -590,15 +590,59 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     return ok;
 }
 
-bool WalkingModule::solveBLFTSID(iDynTree::VectorDynSize &output)
+bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
+                                 const iDynTree::Vector3& desiredCoMVelocity,
+                                 const iDynTree::Rotation& desiredTorsoRotation)
 {
+    iDynTree::Vector3 zero3dVector;
+    zero3dVector.zero();
 
-    bool ok =  m_BLFTSIDSolver->solve();
+    iDynTree::Twist zeroTwist;
+    zeroTwist.zero();
 
-    if (ok)
+    iDynTree::VectorDynSize zeroNdofVector(m_robotControlHelper->getActuatedDoFs());
+    zeroNdofVector.zero();
+
+    bool isLeftInContact = m_leftInContact.front();
+    bool isRightInContact = m_rightInContact.front();
+
+    double robotMass = m_FKSolver->getKinDyn()->getRobotModel().getTotalMass();
+    iDynTree::Vector3 robotWeight;
+    robotWeight.zero();
+    robotWeight(2) = -9.81 * robotMass;
+
+    iDynTree::Wrench leftContactWrench;
+    iDynTree::Wrench rightContactWrench;
+    leftContactWrench.zero();
+    rightContactWrench.zero();
+
+    if (isLeftInContact)
     {
-        output = m_BLFTSIDSolver->getDesiredJointAcceleration();
+        leftContactWrench.setLinearVec3(robotWeight);
     }
+    if (isRightInContact)
+    {
+        rightContactWrench.setLinearVec3(robotWeight);
+    }
+
+    bool ok{true};
+    ok = ok && m_BLFTSIDSolver->setCoMTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
+    ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), m_leftTwistTrajectory.front(), zeroTwist);
+    ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), m_rightTwistTrajectory.front(), zeroTwist);
+    ok = ok && m_BLFTSIDSolver->setJointTrackingSetPoint(m_qDesiredIK, m_dqDesiredIK, zeroNdofVector);
+    ok = ok && m_BLFTSIDSolver->setTorsoTrackingSetPoint(desiredTorsoRotation, zero3dVector, zero3dVector);
+    m_BLFTSIDSolver->setLeftContactActive(isLeftInContact);
+    m_BLFTSIDSolver->setRightContactActive(isRightInContact);
+    ok = ok && m_BLFTSIDSolver->setLeftContactWrenchSetPoint(leftContactWrench);
+    ok = ok && m_BLFTSIDSolver->setRightContactWrenchSetPoint(rightContactWrench);
+    ok = ok && m_BLFTSIDSolver->setTorqueRegularizationSetPoint(zeroNdofVector);
+
+    if (m_useRootLinkForHeight)
+    {
+        ok = ok && m_BLFTSIDSolver->setRootTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
+    }
+
+    ok = ok && m_BLFTSIDSolver->solve();
 
     return ok;
 }
@@ -691,7 +735,7 @@ bool WalkingModule::updateModule()
 
             yarp::sig::Vector buffer(m_qDesiredIK.size());
             iDynTree::toYarp(m_qDesiredIK, buffer);
-            // instantiate Integrator object
+            // instantiate Integrators object
 
             yarp::sig::Matrix jointLimits(m_robotControlHelper->getActuatedDoFs(), 2);
             for (int i = 0; i < m_robotControlHelper->getActuatedDoFs(); i++)
@@ -700,6 +744,13 @@ bool WalkingModule::updateModule()
                 jointLimits(i, 1) = m_robotControlHelper->getPositionUpperLimits()(i);
             }
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
+
+            if (m_useTSIDadmittance){
+                m_qDesiredTSID = m_qDesiredIK;
+                m_dqDesiredTSID = m_dqDesiredIK;
+                m_jointAccelerationIntegrator->setState(iDynTree::toEigen(m_qDesiredTSID),
+                iDynTree::toEigen(m_dqDesiredTSID));
+            }
 
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
@@ -982,6 +1033,9 @@ bool WalkingModule::updateModule()
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
         desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
 
+        iDynTree::Position desiredCOMPositionTSID = desiredCoMPosition;
+        iDynTree::Vector3 desiredCOMVelocityTSID = desiredCoMVelocity;
+
         if (m_firstRun)
         {
             double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocity).norm();
@@ -1005,6 +1059,8 @@ bool WalkingModule::updateModule()
 
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
+
+        iDynTree::Rotation desiredYawRotationTSID = yawRotation;
 
         if (m_useQPIK)
         {
@@ -1034,6 +1090,18 @@ bool WalkingModule::updateModule()
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
             iDynTree::toiDynTree(bufferPosition, m_qDesiredIK);
+
+            // update robot state with IK solution
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredIK, m_dqDesiredIK))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+            desiredCOMPositionTSID = m_FKSolver->getCoMPosition();
+            desiredCOMVelocityTSID = m_FKSolver->getCoMVelocity();
+            desiredYawRotationTSID = m_FKSolver->getNeckOrientation();
+
+            // restore robot state
 
             if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                                    m_robotControlHelper->getJointVelocity()))
@@ -1102,7 +1170,11 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(!solveBLFTSID(m_ddqDesiredTSID))
+            if(!solveBLFTSID(desiredCOMPositionTSID,
+                desiredCOMVelocityTSID, desiredYawRotationTSID)){
+                yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
+                return false;
+            }
             {
                 yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
                 return false;
