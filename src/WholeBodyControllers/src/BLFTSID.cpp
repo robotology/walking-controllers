@@ -59,7 +59,7 @@ bool BLFTSID::initialize(
     return getTask("LEFT_FOOT_TRACKING", m_qpTSID.tasks.leftFootTracking) &&
            getTask("RIGHT_FOOT_TRACKING", m_qpTSID.tasks.rightFootTracking) &&
            getTask("COM_TRACKING", m_qpTSID.tasks.comTracking) //
-           && getTask("CHEST_TRACKING", m_qpTSID.tasks.torsoTracking) &&
+           && getTask("TORSO_TRACKING", m_qpTSID.tasks.torsoTracking) &&
            getTask("JOINT_TRACKING", m_qpTSID.tasks.jointTracking) &&
            getTask("ROOT_TRACKING", m_qpTSID.tasks.rootTracking) &&
            getTask("BASE_DYNAMICS", m_qpTSID.tasks.baseDynamics) &&
