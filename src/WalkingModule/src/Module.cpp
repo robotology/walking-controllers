@@ -642,7 +642,17 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
         ok = ok && m_BLFTSIDSolver->setRootTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
     }
 
+    if (!ok)
+    {
+        yError() << "[WalkingModule::solveBLFTSID] Unable to set the TSID set points.";
+    }
+
     ok = ok && m_BLFTSIDSolver->solve();
+
+    if (!ok)
+    {
+        yError() << "[WalkingModule::solveBLFTSID] Unable to solve the optimization problem.";
+    }
 
     return ok;
 }
@@ -1172,10 +1182,6 @@ bool WalkingModule::updateModule()
 
             if(!solveBLFTSID(desiredCOMPositionTSID,
                 desiredCOMVelocityTSID, desiredYawRotationTSID)){
-                yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
-                return false;
-            }
-            {
                 yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
                 return false;
             }
