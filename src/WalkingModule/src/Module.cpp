@@ -32,7 +32,6 @@
 #include <WalkingControllers/WalkingModule/Module.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/StdUtilities/Helper.h>
-#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 
 using namespace WalkingControllers;
 
@@ -133,6 +132,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // module name (used as prefix for opened ports)
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
+    m_useTSIDadmittance = rf.check("use_TSID-Admittance", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asFloat64();
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
@@ -314,6 +314,37 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         }
     }
 
+    // initialize the TSID admittance controller
+    if (m_useTSIDadmittance)
+    {
+        yarp::os::Bottle &TSIDOptions = rf.findGroup("TASK_SPACE_INVERSE_DYNAMICS");
+        m_BLFTSIDSolver = std::make_unique<BLFTSID>();
+        auto paramHandler = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>();
+        paramHandler->set(TSIDOptions);
+        paramHandler->setParameter("use_root_link_for_height", m_useRootLinkForHeight);
+        if (!m_BLFTSIDSolver->initialize(paramHandler, m_FKSolver->getKinDyn()))
+        {
+            yError() << "[WalkingModule::configure] Failed to configure the TSID controller";
+            return false;
+        }
+
+        yarp::os::Bottle &AdmittanceControllerOptions = rf.findGroup("JOINT_ADMITTANCE_CONTROLLER");
+        m_jointAdmittanceController = std::make_unique<AdmittanceController>();
+        paramHandler->set(AdmittanceControllerOptions);
+        paramHandler->setParameter("number_of_joints", static_cast<int>(m_robotControlHelper->getActuatedDoFs()));
+        if (!m_jointAdmittanceController->initialize(paramHandler))
+        {
+            yError() << "[WalkingModule::configure] Failed to configure the Joint Admittance controller";
+            return false;
+        }
+
+        m_jointAccelerationIntegrator = std::make_unique<JointAccelerationIntegrator>();
+        m_jointAccelerationIntegrator->initialize(m_robotControlHelper->getActuatedDoFs(), m_dT);
+        m_jointAccelerationIntegrator->setState(iDynTree::toEigen(m_robotControlHelper->getJointPosition()),
+                                                iDynTree::toEigen(m_robotControlHelper->getJointVelocity()));
+    }
+
+
     // initialize the linear inverted pendulum model
     m_stableDCMModel = std::make_unique<StableDCMModel>();
     if (!m_stableDCMModel->initialize(generalOptions))
@@ -456,6 +487,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_profiler->addTimer("MPC");
 
     m_profiler->addTimer("IK");
+    m_profiler->addTimer("TSID");
     m_profiler->addTimer("Total");
     m_profiler->addTimer("Loop");
     m_profiler->addTimer("Feedback");
@@ -468,8 +500,11 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
 
     // resize variables
-    m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
-    m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_qDesiredIK.resize(m_robotControlHelper->getActuatedDoFs());
+    m_dqDesiredIK.resize(m_robotControlHelper->getActuatedDoFs());
+    m_qDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_dqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_ddqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -555,6 +590,45 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     return ok;
 }
 
+bool WalkingModule::solveBLFTSID(iDynTree::VectorDynSize &output)
+{
+
+    bool ok =  m_BLFTSIDSolver->solve();
+
+    if (ok)
+    {
+        output = m_BLFTSIDSolver->getDesiredJointAcceleration();
+    }
+
+    return ok;
+}
+
+void WalkingModule::getBLFTSIDOutput(iDynTree::VectorDynSize &jointDesiredAcceleration,
+                                     iDynTree::VectorDynSize &jointDesiredTorque)
+{
+    jointDesiredAcceleration = m_BLFTSIDSolver->getDesiredJointAcceleration();
+    jointDesiredTorque = m_BLFTSIDSolver->getDesiredJointTorque();
+}
+
+bool WalkingModule::advanceJointAdmittanceController(const iDynTree::VectorDynSize & jointTorqueFeedforward,
+                                                     const iDynTree::VectorDynSize & jointDesiredPosition,
+                                                     const iDynTree::VectorDynSize & jointDesiredVelocity,
+                                                     iDynTree::VectorDynSize & jointDesiredTorque)
+{
+    bool ok = m_jointAdmittanceController->setInput(iDynTree::toEigen(jointTorqueFeedforward),
+                                                    iDynTree::toEigen(jointDesiredPosition),
+                                                    iDynTree::toEigen(jointDesiredVelocity),
+                                                    iDynTree::toEigen(m_robotControlHelper->getJointPosition()),
+                                                    iDynTree::toEigen(m_robotControlHelper->getJointVelocity()));
+
+    ok = ok && m_jointAdmittanceController->advance();
+    if (ok)
+    {
+        iDynTree::toEigen(jointDesiredTorque) = m_jointAdmittanceController->getOutput();
+    }
+    return ok;
+}
+
 bool WalkingModule::computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP)
 {
     BipedalLocomotion::Contacts::ContactWrench leftFootContact, rightFootContact;
@@ -605,7 +679,7 @@ bool WalkingModule::updateModule()
         if (motionDone)
         {
             // send the reference again in order to reduce error
-            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
             {
                 yError() << "[prepareRobot] Error while setting the initial position using "
                          << "POSITION DIRECT mode.";
@@ -615,8 +689,8 @@ bool WalkingModule::updateModule()
                 return true;
             }
 
-            yarp::sig::Vector buffer(m_qDesired.size());
-            iDynTree::toYarp(m_qDesired, buffer);
+            yarp::sig::Vector buffer(m_qDesiredIK.size());
+            iDynTree::toYarp(m_qDesiredIK, buffer);
             // instantiate Integrator object
 
             yarp::sig::Matrix jointLimits(m_robotControlHelper->getActuatedDoFs(), 2);
@@ -645,10 +719,10 @@ bool WalkingModule::updateModule()
             }
 
             // reset the retargeting client with the desired robot data
-            iDynTree::VectorDynSize zero(m_qDesired.size());
+            iDynTree::VectorDynSize zero(m_qDesiredIK.size());
             zero.zero();
             // reset the internal robot state of the kindyn object
-            if (!m_FKSolver->setInternalRobotState(m_qDesired, zero))
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredIK, zero))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the robot state before resetting the retargeting client.";
                 return false;
@@ -938,7 +1012,7 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
             yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
 
-            if (!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredIK, m_dqDesiredIK))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
@@ -949,17 +1023,17 @@ bool WalkingModule::updateModule()
             if (!solveBLFIK(desiredCoMPosition,
                             desiredCoMVelocity,
                             yawRotation,
-                            m_dqDesired))
+                            m_dqDesiredIK))
             {
                 yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with "
                             "blf ik.";
                 return false;
             }
 
-            iDynTree::toYarp(m_dqDesired, bufferVelocity);
+            iDynTree::toYarp(m_dqDesiredIK, bufferVelocity);
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-            iDynTree::toiDynTree(bufferPosition, m_qDesired);
+            iDynTree::toiDynTree(bufferPosition, m_qDesiredIK);
 
             if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                                    m_robotControlHelper->getJointVelocity()))
@@ -985,7 +1059,7 @@ bool WalkingModule::updateModule()
                 }
 
                 if (!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                                           desiredCoMPosition, m_qDesired))
+                                           desiredCoMPosition, m_qDesiredIK))
                 {
                     yError() << "[WalkingModule::updateModule] Error during the inverse Kinematics iteration.";
                     return false;
@@ -1017,10 +1091,69 @@ bool WalkingModule::updateModule()
             }
         }
 
-        if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-        {
-            yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            return false;
+        // tsid-admittance
+        m_profiler->setInitTime("TSID");
+        if (m_useTSIDadmittance){
+
+            // set robot state to TSID joint values
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredTSID, m_dqDesiredTSID))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
+            if(!solveBLFTSID(m_ddqDesiredTSID))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
+                return false;
+            }
+
+            getBLFTSIDOutput(m_ddqDesiredTSID, m_desiredJointTorquesTSID);
+
+            // double integration of joint acceleration to get joint position
+            m_jointAccelerationIntegrator->setInput(iDynTree::toEigen(m_ddqDesiredTSID));
+            m_jointAccelerationIntegrator->oneStepIntegration();
+            iDynTree::toEigen(m_dqDesiredTSID) = m_jointAccelerationIntegrator->getJointVelocity();
+            iDynTree::toEigen(m_qDesiredTSID) = m_jointAccelerationIntegrator->getJointPosition();
+
+            // admittance controller
+            advanceJointAdmittanceController(m_desiredJointTorquesTSID,
+                                             m_qDesiredTSID,
+                                             m_dqDesiredTSID,
+                                             m_desiredJointTorquesLL);
+
+            // restore robot state
+            if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                   m_robotControlHelper->getJointVelocity()))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
+
+        }
+        m_profiler->setEndTime("TSID");
+
+
+        if (m_useTSIDadmittance){
+
+            // if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorques))
+            // {
+            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+            //     return false;
+            // }
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
+
+        } else {
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
         }
 
         // send data to the logger
@@ -1121,7 +1254,7 @@ bool WalkingModule::updateModule()
 
             // Joint
             m_vectorsCollectionServer.populateData("joints_state::positions::measured", m_robotControlHelper->getJointPosition());
-            m_vectorsCollectionServer.populateData("joints_state::positions::desired", m_qDesired);
+            m_vectorsCollectionServer.populateData("joints_state::positions::desired", (m_useTSIDadmittance)? m_qDesiredTSID : m_qDesiredIK);
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting", m_retargetingClient->jointPositions());
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting_raw", m_retargetingClient->rawJointPositions());
             m_vectorsCollectionServer.populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
@@ -1264,15 +1397,15 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     if (!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                               desiredCoMPosition, m_qDesired))
+                               desiredCoMPosition, m_qDesiredIK))
     {
         yError() << "[WalkingModule::prepareRobot] Inverse Kinematics failed while computing the initial position.";
         return false;
     }
 
-    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesired) * 180 / M_PI).transpose() << std::endl;
+    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesiredIK) * 180 / M_PI).transpose() << std::endl;
 
-    if (!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
+    if (!m_robotControlHelper->setPositionReferences(m_qDesiredIK, 5.0))
     {
         yError() << "[WalkingModule::prepareRobot] Error while setting the initial position.";
         return false;

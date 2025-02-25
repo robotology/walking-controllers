@@ -186,3 +186,7 @@ void BLFTSID::setRightContactActive(bool isActive) {
 const iDynTree::VectorDynSize &BLFTSID::getDesiredJointAcceleration() const {
     return m_jointAccelerations;
 }
+
+const iDynTree::VectorDynSize &BLFTSID::getDesiredJointTorque() const {
+    return m_jointTorques;
+}

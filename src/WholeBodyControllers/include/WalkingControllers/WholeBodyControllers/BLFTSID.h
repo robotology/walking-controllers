@@ -76,6 +76,7 @@ class BLFTSID {
     void setRightContactActive(bool isActive);
 
     const iDynTree::VectorDynSize &getDesiredJointAcceleration() const;
+    const iDynTree::VectorDynSize &getDesiredJointTorque() const;
 
   private:
     struct TSIDProblemAndTasks {

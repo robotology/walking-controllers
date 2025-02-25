@@ -18,6 +18,8 @@ add_walking_controllers_application(
                  WalkingControllers::TrajectoryPlanner
                  WalkingControllers::SimplifiedModelControllers
                  WalkingControllers::WholeBodyControllers
+                 WalkingControllers::JointControllers
+                 WalkingControllers::Integrators
                  WalkingControllers::RetargetingHelper
                  BipedalLocomotion::VectorsCollection
                  BipedalLocomotion::ParametersHandlerYarpImplementation
