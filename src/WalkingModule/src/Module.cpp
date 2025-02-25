@@ -760,7 +760,7 @@ bool WalkingModule::updateModule()
 
             if (m_useTSIDadmittance){
                 m_qDesiredTSID = m_qDesiredIK;
-                m_dqDesiredTSID = m_dqDesiredIK;
+                m_dqDesiredTSID.zero();
                 m_jointAccelerationIntegrator->setState(iDynTree::toEigen(m_qDesiredTSID),
                 iDynTree::toEigen(m_dqDesiredTSID));
             }

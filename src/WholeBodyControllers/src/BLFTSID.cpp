@@ -25,6 +25,9 @@ bool BLFTSID::initialize(
     std::shared_ptr<iDynTree::KinDynComputations> kinDyn) {
     constexpr auto logPrefix = "[WholeBodyQPBlock::instantiateTSID]";
 
+    m_jointAccelerations.resize(kinDyn->getNrOfDegreesOfFreedom());
+    m_jointTorques.resize(kinDyn->getNrOfDegreesOfFreedom());
+
     auto getTask = [this, logPrefix](const std::string &taskName,
                                      auto &task) -> bool {
         auto ptr = m_qpTSID.problem.tsid->getTask(taskName).lock();
