@@ -345,6 +345,12 @@ bool RobotInterface::configureRobot(const yarp::os::Searchable& config)
         return false;
     }
 
+    if(!m_robotDevice.view(m_torqueInterface) || !m_torqueInterface)
+    {
+        yError() << "[configureRobot] Cannot obtain ITorqueControl interface";
+        return false;
+    }
+
     if(!m_robotDevice.view(m_controlModeInterface) || !m_controlModeInterface)
     {
         yError() << "[configureRobot] Cannot obtain IControlMode interface";
@@ -867,6 +873,41 @@ bool RobotInterface::setInteractionMode(std::vector<yarp::dev::InteractionModeEn
             m_currentJointInteractionMode = interactionModes;
 
         return ok;
+    }
+
+    return true;
+}
+
+bool RobotInterface::setTorqueReferences(const iDynTree::VectorDynSize& desiredTorqueNm)
+{
+    if (m_controlMode != VOCAB_CM_TORQUE)
+    {
+        if (!switchToControlMode(VOCAB_CM_TORQUE))
+        {
+            yError() << "[RobotInterface::setTorqueReferences] Unable to switch in torque control mode.";
+            return false;
+        }
+        m_controlMode = VOCAB_CM_TORQUE;
+    }
+
+    if (m_torqueInterface == nullptr)
+    {
+        yError() << "[RobotInterface::setTorqueReferences] Torque I/F is not ready.";
+        return false;
+    }
+
+    if (desiredTorqueNm.size() != m_actuatedDOFs)
+    {
+        yError() << "[RobotInterface::setTorqueReferences] Dimension mismatch between desired torque "
+                 << "vector and the number of controlled joints.";
+        return false;
+    }
+
+    // convert a radians vector into a degree vector
+    if (!m_torqueInterface->setRefTorques(desiredTorqueNm.data()))
+    {
+        yError() << "[RobotInterface::setTorqueReferences] Error while setting the desired torques.";
+        return false;
     }
 
     return true;
