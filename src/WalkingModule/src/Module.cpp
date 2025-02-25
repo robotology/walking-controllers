@@ -89,6 +89,12 @@ bool WalkingModule::advanceReferenceSignals()
     m_desiredZMP.pop_front();
     m_desiredZMP.push_back(m_desiredZMP.back());
 
+    m_weightInLeftDesired.pop_front();
+    m_weightInLeftDesired.push_back(m_weightInLeftDesired.back());
+
+    m_weightInRightDesired.pop_front();
+    m_weightInRightDesired.push_back(m_weightInRightDesired.back());
+
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
     // A new trajectory will be merged at the first merge point or if the deque is empty
@@ -603,36 +609,32 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
     iDynTree::VectorDynSize zeroNdofVector(m_robotControlHelper->getActuatedDoFs());
     zeroNdofVector.zero();
 
-    bool isLeftInContact = m_leftInContact.front();
-    bool isRightInContact = m_rightInContact.front();
-
+    // compute the desired contact wrenches
     double robotMass = m_FKSolver->getKinDyn()->getRobotModel().getTotalMass();
-    iDynTree::Vector3 robotWeight;
-    robotWeight.zero();
-    robotWeight(2) = -9.81 * robotMass;
+    iDynTree::Vector3 robotWeightinLeft;
+    robotWeightinLeft.zero();
+    robotWeightinLeft(2) = m_weightInLeftDesired.front() * robotMass * 9.81;
+
+    iDynTree::Vector3 robotWeightinRight;
+    robotWeightinRight.zero();
+    robotWeightinRight(2) = m_weightInRightDesired.front() * robotMass * 9.81;
 
     iDynTree::Wrench leftContactWrench;
     iDynTree::Wrench rightContactWrench;
     leftContactWrench.zero();
     rightContactWrench.zero();
+    leftContactWrench.setLinearVec3(robotWeightinLeft);
+    rightContactWrench.setLinearVec3(robotWeightinRight);
 
-    if (isLeftInContact)
-    {
-        leftContactWrench.setLinearVec3(robotWeight);
-    }
-    if (isRightInContact)
-    {
-        rightContactWrench.setLinearVec3(robotWeight);
-    }
-
+    // set the desired set points
     bool ok{true};
     ok = ok && m_BLFTSIDSolver->setCoMTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
     ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), m_leftTwistTrajectory.front(), zeroTwist);
     ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), m_rightTwistTrajectory.front(), zeroTwist);
     ok = ok && m_BLFTSIDSolver->setJointTrackingSetPoint(m_qDesiredIK, m_dqDesiredIK, zeroNdofVector);
     ok = ok && m_BLFTSIDSolver->setTorsoTrackingSetPoint(desiredTorsoRotation, zero3dVector, zero3dVector);
-    m_BLFTSIDSolver->setLeftContactActive(isLeftInContact);
-    m_BLFTSIDSolver->setRightContactActive(isRightInContact);
+    m_BLFTSIDSolver->setLeftContactActive(m_leftInContact.front());
+    m_BLFTSIDSolver->setRightContactActive(m_rightInContact.front());
     ok = ok && m_BLFTSIDSolver->setLeftContactWrenchSetPoint(leftContactWrench);
     ok = ok && m_BLFTSIDSolver->setRightContactWrenchSetPoint(rightContactWrench);
     ok = ok && m_BLFTSIDSolver->setTorqueRegularizationSetPoint(zeroNdofVector);
@@ -647,6 +649,7 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
         yError() << "[WalkingModule::solveBLFTSID] Unable to set the TSID set points.";
     }
 
+    // solve the optimization problem
     ok = ok && m_BLFTSIDSolver->solve();
 
     if (!ok)
@@ -1624,6 +1627,8 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     std::vector<size_t> mergePoints;
     std::vector<bool> isLeftFixedFrame;
     std::vector<bool> isStancePhase;
+    std::vector<double> weightInLeft;
+    std::vector<double> weightInRight;
 
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
@@ -1647,6 +1652,8 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
 
     m_trajectoryGenerator->getDesiredZMPPosition(desiredZMP);
 
+    m_trajectoryGenerator->getWeightPercentage(weightInLeft, weightInRight);
+
     // append vectors to deques
     StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
@@ -1666,6 +1673,9 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
 
     StdUtilities::appendVectorToDeque(desiredZMP, m_desiredZMP, mergePoint);
+
+    StdUtilities::appendVectorToDeque(weightInLeft, m_weightInLeftDesired, mergePoint);
+    StdUtilities::appendVectorToDeque(weightInRight, m_weightInRightDesired, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 

@@ -146,6 +146,9 @@ namespace WalkingControllers
 
         std::deque<iDynTree::Vector2> m_desiredZMP; /**< Deque containing the desired ZMP position. */
 
+        std::deque<double> m_weightInLeftDesired; /**< Deque containing the desired weight percentage on the left foot */
+        std::deque<double> m_weightInRightDesired; /**< Deque containing the desired weight percentage on the right foot */
+
         iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
         iDynTree::VectorDynSize m_qDesiredIK; /**< Vector containing the results of the IK algorithm [rad]. */
