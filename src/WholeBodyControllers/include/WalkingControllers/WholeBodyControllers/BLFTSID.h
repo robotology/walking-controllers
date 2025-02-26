@@ -6,6 +6,7 @@
 
 #include <iDynTree/EigenHelpers.h>
 #include <iDynTree/KinDynComputations.h>
+#include <iDynTree/SpatialAcc.h>
 #include <iDynTree/VectorDynSize.h>
 
 #include <BipedalLocomotion/ParametersHandler/IParametersHandler.h>
@@ -38,12 +39,12 @@ class BLFTSID {
     bool
     setLeftFootTrackingSetPoint(const iDynTree::Transform &desiredTransform,
                                 const iDynTree::Twist &desiredVelocity,
-                                const iDynTree::Twist &desiredAcceleration);
+                                const iDynTree::SpatialAcc &desiredAcceleration);
 
     bool
     setRightFootTrackingSetPoint(const iDynTree::Transform &desiredTransform,
                                  const iDynTree::Twist &desiredVelocity,
-                                 const iDynTree::Twist &desiredAcceleration);
+                                 const iDynTree::SpatialAcc &desiredAcceleration);
     bool
     setJointTrackingSetPoint(const iDynTree::VectorDynSize &jointPosition,
                              const iDynTree::VectorDynSize &jointVelocity,

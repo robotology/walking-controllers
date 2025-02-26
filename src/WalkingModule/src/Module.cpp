@@ -59,8 +59,14 @@ bool WalkingModule::advanceReferenceSignals()
     m_rightTwistTrajectory.pop_front();
     m_rightTwistTrajectory.push_back(m_rightTwistTrajectory.back());
 
+    m_rightAccelerationTrajectory.pop_front();
+    m_rightAccelerationTrajectory.push_back(m_rightAccelerationTrajectory.back());
+
     m_leftTwistTrajectory.pop_front();
     m_leftTwistTrajectory.push_back(m_leftTwistTrajectory.back());
+
+    m_leftAccelerationTrajectory.pop_front();
+    m_leftAccelerationTrajectory.push_back(m_leftAccelerationTrajectory.back());
 
     m_rightInContact.pop_front();
     m_rightInContact.push_back(m_rightInContact.back());
@@ -638,8 +644,10 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
     // set the desired set points
     bool ok{true};
     ok = ok && m_BLFTSIDSolver->setCoMTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
-    ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), m_leftTwistTrajectory.front(), zeroTwist);
-    ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), m_rightTwistTrajectory.front(), zeroTwist);
+    ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), m_leftTwistTrajectory.front(),
+        m_leftAccelerationTrajectory.front());
+    ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), m_rightTwistTrajectory.front(),
+        m_rightAccelerationTrajectory.front());
     ok = ok && m_BLFTSIDSolver->setJointTrackingSetPoint(m_qDesiredIK, m_dqDesiredIK, zeroNdofVector);
     ok = ok && m_BLFTSIDSolver->setTorsoTrackingSetPoint(desiredTorsoRotation, zero3dVector, zero3dVector);
     m_BLFTSIDSolver->setLeftContactActive(m_leftInContact.front());
@@ -1637,6 +1645,8 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     std::vector<iDynTree::Transform> rightTrajectory;
     std::vector<iDynTree::Twist> leftTwistTrajectory;
     std::vector<iDynTree::Twist> rightTwistTrajectory;
+    std::vector<iDynTree::SpatialAcc> leftAccelerationTrajectory;
+    std::vector<iDynTree::SpatialAcc> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
     std::vector<iDynTree::Vector2> desiredZMP;
@@ -1657,6 +1667,7 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
     m_trajectoryGenerator->getFeetTwist(leftTwistTrajectory, rightTwistTrajectory);
+    m_trajectoryGenerator->getFeetAcceleration(leftAccelerationTrajectory, rightAccelerationTrajectory);
     m_trajectoryGenerator->getFeetStandingPeriods(leftInContact, rightInContact);
     m_trajectoryGenerator->getWhenUseLeftAsFixed(isLeftFixedFrame);
 
@@ -1679,6 +1690,8 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(leftTwistTrajectory, m_leftTwistTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTwistTrajectory, m_rightTwistTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(leftAccelerationTrajectory, m_leftAccelerationTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(rightAccelerationTrajectory, m_rightAccelerationTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(isLeftFixedFrame, m_isLeftFixedFrame, mergePoint);
 
     StdUtilities::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);

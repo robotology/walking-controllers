@@ -96,7 +96,7 @@ bool BLFTSID::solve() {
 bool BLFTSID::setLeftFootTrackingSetPoint(
     const iDynTree::Transform &desiredTransform,
     const iDynTree::Twist &desiredVelocity,
-    const iDynTree::Twist &desiredAcceleration) {
+    const iDynTree::SpatialAcc &desiredAcceleration) {
     return m_qpTSID.tasks.leftFootTracking->setSetPoint(
         BipedalLocomotion::Conversions::toManifPose(desiredTransform),
         BipedalLocomotion::Conversions::toManifTwist(desiredVelocity),
@@ -106,7 +106,7 @@ bool BLFTSID::setLeftFootTrackingSetPoint(
 bool BLFTSID::setRightFootTrackingSetPoint(
     const iDynTree::Transform &desiredTransform,
     const iDynTree::Twist &desiredVelocity,
-    const iDynTree::Twist &desiredAcceleration) {
+    const iDynTree::SpatialAcc &desiredAcceleration) {
     return m_qpTSID.tasks.rightFootTracking->setSetPoint(
         BipedalLocomotion::Conversions::toManifPose(desiredTransform),
         BipedalLocomotion::Conversions::toManifTwist(desiredVelocity),
