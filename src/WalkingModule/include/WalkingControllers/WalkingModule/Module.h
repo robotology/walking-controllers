@@ -261,6 +261,8 @@ namespace WalkingControllers
          */
         bool computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP);
 
+        bool computeLocalCoPCorrection(Eigen::Ref<Eigen::Vector3d> leftCorrection, Eigen::Ref<Eigen::Vector3d> rightCorrection);
+
         /**
          * Given the two planned feet, it computes the average yaw rotation
          * @return the average Yaw rotation

@@ -641,12 +641,24 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
     leftContactWrench.setLinearVec3(robotWeightinLeft);
     rightContactWrench.setLinearVec3(robotWeightinRight);
 
+
+    // compute ankle strategy
+    Eigen::Vector3d leftCorrection, rightCorrection;
+    computeLocalCoPCorrection(leftCorrection, rightCorrection);
+    auto leftTwist = m_leftTwistTrajectory.front();
+    auto rightTwist = m_rightTwistTrajectory.front();
+    iDynTree::Vector3 temp;
+    iDynTree::toEigen(temp) = iDynTree::toEigen(leftTwist.getAngularVec3()) + leftCorrection;
+    leftTwist.setAngularVec3(temp);
+    iDynTree::toEigen(temp) = iDynTree::toEigen(rightTwist.getAngularVec3()) + rightCorrection;
+    rightTwist.setAngularVec3(temp);
+
     // set the desired set points
     bool ok{true};
     ok = ok && m_BLFTSIDSolver->setCoMTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
-    ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), m_leftTwistTrajectory.front(),
+    ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), leftTwist,
         m_leftAccelerationTrajectory.front());
-    ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), m_rightTwistTrajectory.front(),
+    ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), rightTwist,
         m_rightAccelerationTrajectory.front());
     ok = ok && m_BLFTSIDSolver->setJointTrackingSetPoint(m_qDesiredIK, m_dqDesiredIK, zeroNdofVector);
     ok = ok && m_BLFTSIDSolver->setTorsoTrackingSetPoint(desiredTorsoRotation, zero3dVector, zero3dVector);
@@ -728,6 +740,56 @@ bool WalkingModule::computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP)
 
     return true;
 }
+
+bool WalkingModule::computeLocalCoPCorrection(Eigen::Ref<Eigen::Vector3d> leftCorrection, Eigen::Ref<Eigen::Vector3d> rightCorrection)
+{
+    BipedalLocomotion::Contacts::ContactWrench leftFootContact, rightFootContact;
+    leftFootContact.wrench = iDynTree::toEigen(m_robotControlHelper->getLeftWrench().asVector());
+    leftFootContact.pose = BipedalLocomotion::Conversions::toManifPose(m_FKSolver->getLeftFootToWorldTransform());
+
+    rightFootContact.wrench = iDynTree::toEigen(m_robotControlHelper->getRightWrench().asVector());
+    rightFootContact.pose = BipedalLocomotion::Conversions::toManifPose(m_FKSolver->getRightFootToWorldTransform());
+
+    Eigen::Vector3d leftCoP, rightCoP;
+    leftCoP = leftFootContact.wrench.getLocalCoP();
+    rightCoP = rightFootContact.wrench.getLocalCoP();
+
+    Eigen::Vector3d errorCoPLeft;
+    Eigen::Vector3d errorCoPRight;
+
+    errorCoPLeft = -leftCoP;
+    double gain{1.0};
+    Eigen::Vector3d localCorrectionLeft;
+
+    localCorrectionLeft(0) = errorCoPLeft(1) * (-gain);
+    localCorrectionLeft(1) = errorCoPLeft(0) * gain;
+    localCorrectionLeft(2) = 0.0;
+
+    errorCoPRight = -rightCoP;
+    Eigen::Vector3d localCorrectionRight;
+
+    localCorrectionRight(0) = errorCoPRight(1) * (-gain);
+    localCorrectionRight(1) = errorCoPRight(0) * gain;
+    localCorrectionRight(2) = 0.0;
+
+    // set to 0 if force too small
+    if (leftFootContact.wrench.force().z() < 10)
+    {
+        localCorrectionLeft.setZero();
+    }
+    if (rightFootContact.wrench.force().z() < 10)
+    {
+        localCorrectionRight.setZero();
+    }
+
+    leftCorrection = leftFootContact.pose.rotation() * localCorrectionLeft;
+    leftCorrection(2) = 0.0;
+    rightCorrection = rightFootContact.pose.rotation() * localCorrectionRight;
+    rightCorrection(2) = 0.0;
+
+    return true;
+}
+
 
 bool WalkingModule::updateModule()
 {
@@ -1237,16 +1299,16 @@ bool WalkingModule::updateModule()
 
         if (m_useTSIDadmittance){
 
-            if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorquesAdmittance))
-            {
-                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-                return false;
-            }
-            // if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            // if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorquesAdmittance))
             // {
             //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
             //     return false;
             // }
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
 
         } else {
             if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
