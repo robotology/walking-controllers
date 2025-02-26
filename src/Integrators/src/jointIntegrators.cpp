@@ -127,8 +127,8 @@ bool JointAccelerationIntegrator::setState(
 
     if (!dynamics->setState({state})) {
         BipedalLocomotion::log()->error(
-            "[JointAccelerationIntegrator::setState] Failed to set state of "
-            "the dynamical system");
+            "{} Failed to set state of the dynamical system",
+            logPrefix);
         return false;
     }
 
@@ -160,7 +160,6 @@ bool JointAccelerationIntegrator::oneStepIntegration() {
 }
 
 const Eigen::VectorXd &JointAccelerationIntegrator::getJointPosition() const {
-    const auto &[stateX] = integrator->getSolution();
     return m_jointPosition;
 }
 

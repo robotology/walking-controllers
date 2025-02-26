@@ -466,11 +466,20 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
 
         // Joint
         m_vectorsCollectionServer.populateMetadata("joints_state::positions::measured", m_robotControlHelper->getAxesList());
-        m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired::ik", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::positions::retargeting", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::positions::retargeting_raw", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::measured", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::velocities::desired::ik", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::retargeting", m_robotControlHelper->getAxesList());
+        if (m_useTSIDadmittance)
+        {
+            m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired::tsid", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::velocity::desired::tsid", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::acceleration::desired", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::torque::desired::tsid", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::torque::desired::admittance", m_robotControlHelper->getAxesList());
+        }
 
         // root link information
         m_vectorsCollectionServer.populateMetadata("root_link::position::measured", {"x", "y", "z"});
@@ -510,7 +519,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_dqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
     m_ddqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
     m_desiredJointTorquesTSID.resize(m_robotControlHelper->getActuatedDoFs());
-    m_desiredJointTorquesLL.resize(m_robotControlHelper->getActuatedDoFs());
+    m_desiredJointTorquesAdmittance.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -1046,8 +1055,6 @@ bool WalkingModule::updateModule()
         desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
         desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
 
-        iDynTree::Position desiredCOMPositionTSID = desiredCoMPosition;
-        iDynTree::Vector3 desiredCOMVelocityTSID = desiredCoMVelocity;
 
         if (m_firstRun)
         {
@@ -1072,8 +1079,6 @@ bool WalkingModule::updateModule()
 
         yawRotation = yawRotation.inverse();
         modifiedInertial = yawRotation * m_inertial_R_worldFrame;
-
-        iDynTree::Rotation desiredYawRotationTSID = yawRotation;
 
         if (m_useQPIK)
         {
@@ -1110,9 +1115,6 @@ bool WalkingModule::updateModule()
                 yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
             }
-            desiredCOMPositionTSID = m_FKSolver->getCoMPosition();
-            desiredCOMVelocityTSID = m_FKSolver->getCoMVelocity();
-            desiredYawRotationTSID = m_FKSolver->getNeckOrientation();
 
             // restore robot state
 
@@ -1183,8 +1185,8 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(!solveBLFTSID(desiredCOMPositionTSID,
-                desiredCOMVelocityTSID, desiredYawRotationTSID)){
+            if(!solveBLFTSID(desiredCoMPosition,
+                desiredCoMVelocity, yawRotation)){
                 yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
                 return false;
             }
@@ -1201,7 +1203,7 @@ bool WalkingModule::updateModule()
             advanceJointAdmittanceController(m_desiredJointTorquesTSID,
                                              m_qDesiredTSID,
                                              m_dqDesiredTSID,
-                                             m_desiredJointTorquesLL);
+                                             m_desiredJointTorquesAdmittance);
 
             // restore robot state
             if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
@@ -1335,11 +1337,20 @@ bool WalkingModule::updateModule()
 
             // Joint
             m_vectorsCollectionServer.populateData("joints_state::positions::measured", m_robotControlHelper->getJointPosition());
-            m_vectorsCollectionServer.populateData("joints_state::positions::desired", (m_useTSIDadmittance)? m_qDesiredTSID : m_qDesiredIK);
+            m_vectorsCollectionServer.populateData("joints_state::positions::desired::ik", m_qDesiredIK);
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting", m_retargetingClient->jointPositions());
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting_raw", m_retargetingClient->rawJointPositions());
             m_vectorsCollectionServer.populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
+            m_vectorsCollectionServer.populateData("joints_state::velocities::desired::ik", m_dqDesiredIK);
             m_vectorsCollectionServer.populateData("joints_state::velocities::retargeting", m_retargetingClient->jointVelocities());
+            if (m_useTSIDadmittance)
+            {
+                m_vectorsCollectionServer.populateData("joints_state::positions::desired::tsid", m_qDesiredTSID);
+                m_vectorsCollectionServer.populateData("joints_state::velocity::desired::tsid", m_dqDesiredTSID);
+                m_vectorsCollectionServer.populateData("joints_state::acceleration::desired", m_ddqDesiredTSID);
+                m_vectorsCollectionServer.populateData("joints_state::torque::desired::tsid", m_desiredJointTorquesTSID);
+                m_vectorsCollectionServer.populateData("joints_state::torque::desired::admittance", m_desiredJointTorquesAdmittance);
+            }
 
             // root link information
             m_vectorsCollectionServer.populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());

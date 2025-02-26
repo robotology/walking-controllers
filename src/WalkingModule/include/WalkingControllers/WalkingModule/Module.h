@@ -158,7 +158,8 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_dqDesiredTSID; /**< Vector containing the desired joint velocity [rad/s]. */
         iDynTree::VectorDynSize m_ddqDesiredTSID; /**< Vector containing the desired joint acceleration [rad/s^2]. */
         iDynTree::VectorDynSize m_desiredJointTorquesTSID; /**< Vector containing the desired joint torques for the low-level [Nm]. */
-        iDynTree::VectorDynSize m_desiredJointTorquesLL;   /**< Vector containing the desired joint torques for the low-level [Nm]. */
+        iDynTree::VectorDynSize m_desiredJointTorquesAdmittance;   /**< Vector containing the desired joint torques for the low-level,
+                                                                        computed by the joint admittance controller [Nm]. */
 
         iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
