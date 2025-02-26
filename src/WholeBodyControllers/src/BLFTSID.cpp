@@ -77,7 +77,6 @@ bool BLFTSID::initialize(
                    m_qpTSID.tasks.rightContactWrenchRegularization) &&
            getTask("TORQUE_REGULARIZATION",
                    m_qpTSID.tasks.torqueRegularization);
-    ;
 }
 
 bool BLFTSID::solve() {
@@ -134,12 +133,9 @@ bool BLFTSID::setCoMTrackingSetPoint(const iDynTree::Position &position,
 bool BLFTSID::setRootTrackingSetPoint(
     const iDynTree::Position &position, const iDynTree::Vector3 &linearVelocity,
     const iDynTree::Vector3 &linearAcceleration) {
-    if (m_useRootLinkForHeight) {
-        return m_qpTSID.tasks.rootTracking->setSetPoint(
-            iDynTree::toEigen(position), iDynTree::toEigen(linearVelocity),
-            iDynTree::toEigen(linearAcceleration));
-    }
-    return true;
+    return m_qpTSID.tasks.rootTracking->setSetPoint(
+        iDynTree::toEigen(position), iDynTree::toEigen(linearVelocity),
+        iDynTree::toEigen(linearAcceleration));
 }
 
 bool BLFTSID::setTorsoTrackingSetPoint(

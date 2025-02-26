@@ -115,8 +115,6 @@ class BLFTSID {
 
     iDynTree::VectorDynSize m_jointAccelerations;
     iDynTree::VectorDynSize m_jointTorques;
-
-    bool m_useRootLinkForHeight{false};
 };
 
 } // namespace WalkingControllers
