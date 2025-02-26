@@ -1045,20 +1045,29 @@ bool WalkingModule::updateModule()
         // inverse kinematics
         m_profiler->setInitTime("IK");
 
-        iDynTree::Position desiredCoMPosition;
-        desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
-        desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
+        iDynTree::Position desiredCoMPositionIK;
+        desiredCoMPositionIK(0) = m_stableDCMModel->getCoMPosition()(0);
+        desiredCoMPositionIK(1) = m_stableDCMModel->getCoMPosition()(1);
+        desiredCoMPositionIK(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
 
-        iDynTree::Vector3 desiredCoMVelocity;
-        desiredCoMVelocity(0) = outputZMPCoMControllerVelocity(0);
-        desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
-        desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
+        iDynTree::Vector3 desiredCoMVelocityIK;
+        desiredCoMVelocityIK(0) = m_stableDCMModel->getCoMVelocity()(0);
+        desiredCoMVelocityIK(1) = m_stableDCMModel->getCoMVelocity()(1);
+        desiredCoMVelocityIK(2) = m_retargetingClient->comHeightVelocity();
 
+        iDynTree::Position desiredCoMPositionTSID;
+        desiredCoMPositionTSID(0) = outputZMPCoMControllerPosition(0);
+        desiredCoMPositionTSID(1) = outputZMPCoMControllerPosition(1);
+        desiredCoMPositionTSID(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
+
+        iDynTree::Vector3 desiredCoMVelocityTSID;
+        desiredCoMVelocityTSID(0) = outputZMPCoMControllerVelocity(0);
+        desiredCoMVelocityTSID(1) = outputZMPCoMControllerVelocity(1);
+        desiredCoMVelocityTSID(2) = m_retargetingClient->comHeightVelocity();
 
         if (m_firstRun)
         {
-            double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocity).norm();
+            double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocityTSID).norm();
 
             if (comVelocityNorm > m_maxInitialCoMVelocity)
             {
@@ -1094,8 +1103,8 @@ bool WalkingModule::updateModule()
 
             yawRotation = yawRotation.inverse() * m_trajectoryGenerator->getChestAdditionalRotation();
 
-            if (!solveBLFIK(desiredCoMPosition,
-                            desiredCoMVelocity,
+            if (!solveBLFIK(desiredCoMPositionIK,
+                            desiredCoMVelocityIK,
                             yawRotation,
                             m_dqDesiredIK))
             {
@@ -1142,7 +1151,7 @@ bool WalkingModule::updateModule()
                 }
 
                 if (!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                                           desiredCoMPosition, m_qDesiredIK))
+                                           desiredCoMPositionIK, m_qDesiredIK))
                 {
                     yError() << "[WalkingModule::updateModule] Error during the inverse Kinematics iteration.";
                     return false;
@@ -1185,8 +1194,8 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            if(!solveBLFTSID(desiredCoMPosition,
-                desiredCoMVelocity, yawRotation)){
+            if(!solveBLFTSID(desiredCoMPositionTSID,
+                desiredCoMVelocityTSID, yawRotation)){
                 yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
                 return false;
             }
@@ -1220,16 +1229,16 @@ bool WalkingModule::updateModule()
 
         if (m_useTSIDadmittance){
 
-            // if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorques))
-            // {
-            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            //     return false;
-            // }
-            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorquesAdmittance))
             {
                 yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
                 return false;
             }
+            // if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            // {
+            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+            //     return false;
+            // }
 
         } else {
             if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
@@ -1284,7 +1293,7 @@ bool WalkingModule::updateModule()
             CoMPositionDesired[2] = m_retargetingClient->comHeight() + m_comHeightOffset;
 
             m_vectorsCollectionServer.populateData("com::position::desired", CoMPositionDesired);
-            m_vectorsCollectionServer.populateData("com::position::CoM_ZMP_controller", desiredCoMPosition);
+            m_vectorsCollectionServer.populateData("com::position::CoM_ZMP_controller", desiredCoMPositionTSID);
 
             // Manual definition of this value to add also the planned CoM height velocity
             std::vector<double> CoMVelocityDesired(3);
