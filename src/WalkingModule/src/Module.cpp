@@ -1301,16 +1301,16 @@ bool WalkingModule::updateModule()
 
         if (m_useTSIDadmittance){
 
-            // if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorquesAdmittance))
-            // {
-            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            //     return false;
-            // }
-            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorquesAdmittance))
             {
                 yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
                 return false;
             }
+            // if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            // {
+            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+            //     return false;
+            // }
 
         } else {
             if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
