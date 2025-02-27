@@ -132,6 +132,9 @@ namespace WalkingControllers
         std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
         std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
 
+        Eigen::Vector3d m_leftAngularVelocityCorrection;
+        Eigen::Vector3d m_rightAngularVelocityCorrection;
+
         std::deque<iDynTree::SpatialAcc> m_leftAccelerationTrajectory; /**< Deque containing the spatial acceleration trajectory of the left foot. */
         std::deque<iDynTree::SpatialAcc> m_rightAccelerationTrajectory; /**< Deque containing the spatial acceleration trajectory of the left foot. */
 

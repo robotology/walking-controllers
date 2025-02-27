@@ -460,6 +460,9 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_force::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::angular_torque::measured", {"x", "y", "z"});
 
+        m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::correction", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::correction", {"x", "y", "z"});
+
         // Right foot
         m_vectorsCollectionServer.populateMetadata("right_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::position::desired", {"x", "y", "z"});
@@ -643,14 +646,13 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
 
 
     // compute ankle strategy
-    Eigen::Vector3d leftCorrection, rightCorrection;
-    computeLocalCoPCorrection(leftCorrection, rightCorrection);
+    computeLocalCoPCorrection(m_leftAngularVelocityCorrection, m_rightAngularVelocityCorrection);
     auto leftTwist = m_leftTwistTrajectory.front();
     auto rightTwist = m_rightTwistTrajectory.front();
     iDynTree::Vector3 temp;
-    iDynTree::toEigen(temp) = iDynTree::toEigen(leftTwist.getAngularVec3()) + leftCorrection;
+    iDynTree::toEigen(temp) = iDynTree::toEigen(leftTwist.getAngularVec3()) + m_leftAngularVelocityCorrection;
     leftTwist.setAngularVec3(temp);
-    iDynTree::toEigen(temp) = iDynTree::toEigen(rightTwist.getAngularVec3()) + rightCorrection;
+    iDynTree::toEigen(temp) = iDynTree::toEigen(rightTwist.getAngularVec3()) + m_rightAngularVelocityCorrection;
     rightTwist.setAngularVec3(temp);
 
     // set the desired set points
@@ -758,7 +760,7 @@ bool WalkingModule::computeLocalCoPCorrection(Eigen::Ref<Eigen::Vector3d> leftCo
     Eigen::Vector3d errorCoPRight;
 
     errorCoPLeft = -leftCoP;
-    double gain{1.0};
+    double gain{0.1};
     Eigen::Vector3d localCorrectionLeft;
 
     localCorrectionLeft(0) = errorCoPLeft(1) * (-gain);
@@ -1388,6 +1390,9 @@ bool WalkingModule::updateModule()
             // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
             m_vectorsCollectionServer.populateData("left_foot::linear_velocity::desired", m_leftTwistTrajectory.front().getLinearVec3());
             m_vectorsCollectionServer.populateData("left_foot::angular_velocity::desired", m_leftTwistTrajectory.front().getAngularVec3());
+
+            m_vectorsCollectionServer.populateData("left_foot::angular_velocity::correction", m_leftAngularVelocityCorrection);
+            m_vectorsCollectionServer.populateData("right_foot::angular_velocity::correction", m_rightAngularVelocityCorrection);
 
             // "lf_force_x", "lf_force_y", "lf_force_z",
             // "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
