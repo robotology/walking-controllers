@@ -5,11 +5,6 @@
 #define WALKING_MODULE_HPP
 
 // std
-#include <iDynTree/Position.h>
-#include <iDynTree/Rotation.h>
-#include <iDynTree/SpatialAcc.h>
-#include <iDynTree/VectorDynSize.h>
-
 #include <memory>
 #include <deque>
 #include <vector>
@@ -17,19 +12,24 @@
 // YARP
 #include <yarp/os/RFModule.h>
 #include <yarp/sig/Vector.h>
-
 #include <yarp/os/RpcClient.h>
 
+// BipedalLocomotion
 #include <BipedalLocomotion/ContinuousDynamicalSystem/LinearTimeInvariantSystem.h>
 #include <BipedalLocomotion/ContinuousDynamicalSystem/RK4.h>
 #include <BipedalLocomotion/YarpUtilities/VectorsCollectionServer.h>
 #include <BipedalLocomotion/Contacts/GlobalCoPEvaluator.h>
 #include <BipedalLocomotion/System/TimeProfiler.h>
 
-
 // iDynTree
 #include <iDynTree/VectorFixSize.h>
 #include <iDynTree/ModelLoader.h>
+#include <iDynTree/Position.h>
+#include <iDynTree/Rotation.h>
+#include <iDynTree/SpatialAcc.h>
+#include <iDynTree/Transform.h>
+#include <iDynTree/Twist.h>
+#include <iDynTree/VectorDynSize.h>
 
 // WalkingControllers library
 #include <WalkingControllers/RobotInterface/Helper.h>
@@ -168,6 +168,13 @@ namespace WalkingControllers
         iDynTree::VectorDynSize m_desiredJointTorquesAdmittance;   /**< Vector containing the desired joint torques for the low-level,
                                                                         computed by the joint admittance controller [Nm]. */
 
+        iDynTree::Position m_CoMPositionTSID; /**< CoM position computed by the TSID controller. */
+        iDynTree::Vector3 m_CoMVelocityTSID; /**< CoM velocity computed by the TSID controller. */
+        iDynTree::Transform m_leftFootPoseTSID; /**< Left foot pose computed by the TSID controller. */
+        iDynTree::Transform m_rightFootPoseTSID; /**< Right foot pose computed by the TSID controller. */
+        iDynTree::Twist m_leftFootTwistTSID; /**< Left foot twist computed by the TSID controller. */
+        iDynTree::Twist m_rightFootTwistTSID; /**< Right foot twist computed by the TSID controller. */
+
         iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
         yarp::os::Port m_rpcPort; /**< Remote Procedure Call port. */
@@ -229,7 +236,13 @@ namespace WalkingControllers
                         const iDynTree::Vector3& desiredCoMVelocity,
                         const iDynTree::Rotation& desiredNeckOrientation,
                         iDynTree::VectorDynSize &output);
-
+        /**
+         * Set and solve the TSID problem.
+         * @param desiredCoMPosition desired CoM position;
+         * @param desiredCoMVelocity desired CoM velocity;
+         * @param desiredTorsoRotation desired torso rotation (rotation matrix);
+         * @return true in case of success and false otherwise.
+         */
         bool solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
                           const iDynTree::Vector3& desiredCoMVelocity,
                           const iDynTree::Rotation& desiredTorsoRotation);
@@ -242,6 +255,12 @@ namespace WalkingControllers
         void getBLFTSIDOutput(iDynTree::VectorDynSize &jointDesiredAcceleration, 
                               iDynTree::VectorDynSize &jointDesiredTorque);
         
+        /**
+        * Store the trajectories computed by the BLFTSID controller.
+        * @return true in case of success and false otherwise.
+        */
+        bool storeBLFTSIDTrajectories();
+
         /**
         * Set the Admittance controller references, advance it, and return the output.
         * @param jointTorqueFeedforward joint torque feedforward term.

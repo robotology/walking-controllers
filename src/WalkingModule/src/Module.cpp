@@ -448,15 +448,21 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("com::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("com::position::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("com::position::CoM_ZMP_controller", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::position::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("com::velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::velocity::tsid", {"x", "y", "z"});
 
         // Left foot
         m_vectorsCollectionServer.populateMetadata("left_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::position::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::orientation::measured", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("left_foot::orientation::desired", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::orientation::tsid", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::linear_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_force::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::angular_torque::measured", {"x", "y", "z"});
 
@@ -466,10 +472,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         // Right foot
         m_vectorsCollectionServer.populateMetadata("right_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::position::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::orientation::measured", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("right_foot::orientation::desired", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::orientation::tsid", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("right_foot::linear_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::linear_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::linear_force::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::angular_torque::measured", {"x", "y", "z"});
 
@@ -696,6 +706,28 @@ void WalkingModule::getBLFTSIDOutput(iDynTree::VectorDynSize &jointDesiredAccele
 {
     jointDesiredAcceleration = m_BLFTSIDSolver->getDesiredJointAcceleration();
     jointDesiredTorque = m_BLFTSIDSolver->getDesiredJointTorque();
+}
+
+bool WalkingModule::storeBLFTSIDTrajectories()
+{
+
+    // set robot state to TSID joint values
+    if (!m_FKSolver->setInternalRobotState(m_qDesiredTSID, m_dqDesiredTSID))
+    {
+        yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+        return false;
+    }
+
+    m_CoMPositionTSID = m_FKSolver->getCoMPosition();
+    m_CoMVelocityTSID = m_FKSolver->getCoMVelocity();
+
+    m_leftFootPoseTSID = m_FKSolver->getLeftFootToWorldTransform();
+    m_rightFootPoseTSID = m_FKSolver->getRightFootToWorldTransform();
+
+    m_leftFootTwistTSID = m_FKSolver->getLeftFootTwist();
+    m_rightFootTwistTSID = m_FKSolver->getRightFootTwist();
+
+    return true;
 }
 
 bool WalkingModule::advanceJointAdmittanceController(const iDynTree::VectorDynSize & jointTorqueFeedforward,
@@ -1280,6 +1312,8 @@ bool WalkingModule::updateModule()
             iDynTree::toEigen(m_dqDesiredTSID) = m_jointAccelerationIntegrator->getJointVelocity();
             iDynTree::toEigen(m_qDesiredTSID) = m_jointAccelerationIntegrator->getJointPosition();
 
+            storeBLFTSIDTrajectories();
+
             // admittance controller
             advanceJointAdmittanceController(m_desiredJointTorquesTSID,
                                              m_qDesiredTSID,
@@ -1366,6 +1400,7 @@ bool WalkingModule::updateModule()
 
             m_vectorsCollectionServer.populateData("com::position::desired", CoMPositionDesired);
             m_vectorsCollectionServer.populateData("com::position::CoM_ZMP_controller", desiredCoMPositionTSID);
+            m_vectorsCollectionServer.populateData("com::position::tsid", m_CoMPositionTSID);
 
             // Manual definition of this value to add also the planned CoM height velocity
             std::vector<double> CoMVelocityDesired(3);
@@ -1374,10 +1409,12 @@ bool WalkingModule::updateModule()
             CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
 
             m_vectorsCollectionServer.populateData("com::velocity::desired", CoMVelocityDesired);
+            m_vectorsCollectionServer.populateData("com::velocity::tsid", m_CoMVelocityTSID);
 
             // Left foot position
             m_vectorsCollectionServer.populateData("left_foot::position::measured", leftFoot.getPosition());
             m_vectorsCollectionServer.populateData("left_foot::position::desired", m_leftTrajectory.front().getPosition());
+            m_vectorsCollectionServer.populateData("left_foot::position::tsid", m_leftFootPoseTSID.getPosition());
 
             // Left foot orientation
             const iDynTree::Vector3 leftFootOrientationMeasured = leftFoot.getRotation().asRPY();
@@ -1385,11 +1422,14 @@ bool WalkingModule::updateModule()
 
             const iDynTree::Vector3 leftFootOrientationDesired = m_leftTrajectory.front().getRotation().asRPY();
             m_vectorsCollectionServer.populateData("left_foot::orientation::desired", leftFootOrientationDesired);
+            m_vectorsCollectionServer.populateData("left_foot::orientation::tsid", m_leftFootPoseTSID.getRotation().asRPY());
 
             // "lf_des_dx", "lf_des_dy", "lf_des_dz",
             // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
             m_vectorsCollectionServer.populateData("left_foot::linear_velocity::desired", m_leftTwistTrajectory.front().getLinearVec3());
+            m_vectorsCollectionServer.populateData("left_foot::linear_velocity::tsid", m_leftFootTwistTSID.getLinearVec3());
             m_vectorsCollectionServer.populateData("left_foot::angular_velocity::desired", m_leftTwistTrajectory.front().getAngularVec3());
+            m_vectorsCollectionServer.populateData("left_foot::angular_velocity::tsid", m_leftFootTwistTSID.getAngularVec3());
 
             m_vectorsCollectionServer.populateData("left_foot::angular_velocity::correction", m_leftAngularVelocityCorrection);
             m_vectorsCollectionServer.populateData("right_foot::angular_velocity::correction", m_rightAngularVelocityCorrection);
@@ -1402,17 +1442,21 @@ bool WalkingModule::updateModule()
             // Right foot position
             m_vectorsCollectionServer.populateData("right_foot::position::measured", rightFoot.getPosition());
             m_vectorsCollectionServer.populateData("right_foot::position::desired", m_rightTrajectory.front().getPosition());
+            m_vectorsCollectionServer.populateData("right_foot::position::tsid", m_rightFootPoseTSID.getPosition());
 
             // Right foot orientation
             const iDynTree::Vector3 rightFootOrientationMeasured = rightFoot.getRotation().asRPY();
             m_vectorsCollectionServer.populateData("right_foot::orientation::measured", rightFootOrientationMeasured);
             const iDynTree::Vector3 rightFootOrientationDesired = m_rightTrajectory.front().getRotation().asRPY();
             m_vectorsCollectionServer.populateData("right_foot::orientation::desired", rightFootOrientationDesired);
+            m_vectorsCollectionServer.populateData("right_foot::orientation::tsid", m_rightFootPoseTSID.getRotation().asRPY());
 
             // "rf_des_dx", "rf_des_dy", "rf_des_dz",
             // "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
             m_vectorsCollectionServer.populateData("right_foot::linear_velocity::desired", m_rightTwistTrajectory.front().getLinearVec3());
+            m_vectorsCollectionServer.populateData("right_foot::linear_velocity::tsid", m_rightFootTwistTSID.getLinearVec3());
             m_vectorsCollectionServer.populateData("right_foot::angular_velocity::desired", m_rightTwistTrajectory.front().getAngularVec3());
+            m_vectorsCollectionServer.populateData("right_foot::angular_velocity::tsid", m_rightFootTwistTSID.getAngularVec3());
 
             // "rf_force_x", "rf_force_y", "rf_force_z",
             // "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
