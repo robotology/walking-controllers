@@ -1315,9 +1315,11 @@ bool WalkingModule::updateModule()
             storeBLFTSIDTrajectories();
 
             // admittance controller
+            iDynTree::VectorDynSize m_desiredJointVelocitiesAdmittance(m_robotControlHelper->getActuatedDoFs());
+            m_desiredJointVelocitiesAdmittance.zero();
             advanceJointAdmittanceController(m_desiredJointTorquesTSID,
                                              m_qDesiredTSID,
-                                             m_dqDesiredTSID,
+                                             m_desiredJointVelocitiesAdmittance,
                                              m_desiredJointTorquesAdmittance);
 
             // restore robot state
