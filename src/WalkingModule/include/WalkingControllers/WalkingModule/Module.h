@@ -174,6 +174,7 @@ namespace WalkingControllers
         iDynTree::Transform m_rightFootPoseTSID; /**< Right foot pose computed by the TSID controller. */
         iDynTree::Twist m_leftFootTwistTSID; /**< Left foot twist computed by the TSID controller. */
         iDynTree::Twist m_rightFootTwistTSID; /**< Right foot twist computed by the TSID controller. */
+        iDynTree::Position m_rootLinkPositionTSID; /**< Root link position computed by the TSID controller. */
 
         iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 

@@ -501,6 +501,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         }
 
         // root link information
+        m_vectorsCollectionServer.populateMetadata("root_link::position::desired::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("root_link::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("root_link::orientation::measured", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("root_link::linear_velocity::measured", {"x", "y", "z"});
@@ -720,6 +721,8 @@ bool WalkingModule::storeBLFTSIDTrajectories()
 
     m_CoMPositionTSID = m_FKSolver->getCoMPosition();
     m_CoMVelocityTSID = m_FKSolver->getCoMVelocity();
+
+    m_rootLinkPositionTSID = m_FKSolver->getRootLinkToWorldTransform().getPosition();
 
     m_leftFootPoseTSID = m_FKSolver->getLeftFootToWorldTransform();
     m_rightFootPoseTSID = m_FKSolver->getRightFootToWorldTransform();
@@ -1492,6 +1495,7 @@ bool WalkingModule::updateModule()
             }
 
             // root link information
+            m_vectorsCollectionServer.populateData("root_link::position::desired::tsid", m_rootLinkPositionTSID);
             m_vectorsCollectionServer.populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());
             m_vectorsCollectionServer.populateData("root_link::orientation::measured", m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
             m_vectorsCollectionServer.populateData("root_link::linear_velocity::measured", m_FKSolver->getRootLinkVelocity().getLinearVec3());
