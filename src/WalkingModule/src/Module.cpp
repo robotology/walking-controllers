@@ -795,7 +795,7 @@ bool WalkingModule::computeLocalCoPCorrection(Eigen::Ref<Eigen::Vector3d> leftCo
     Eigen::Vector3d errorCoPRight;
 
     errorCoPLeft = -leftCoP;
-    double gain{0.1};
+    double gain{5.0};
     Eigen::Vector3d localCorrectionLeft;
 
     localCorrectionLeft(0) = errorCoPLeft(1) * (-gain);
