@@ -173,10 +173,22 @@ namespace WalkingControllers
         iDynTree::Transform getLeftFootToWorldTransform();
 
         /**
+         * Return the left foot twist.
+         * @return left foot twist.
+         */
+        iDynTree::Twist getLeftFootTwist();
+
+        /**
          * Return the transformation between the right foot frame (r_sole) and the world reference frame.
          * @return world_H_right_frame.
          */
         iDynTree::Transform getRightFootToWorldTransform();
+
+        /**
+         * Return the right foot twist.
+         * @return right foot twist.
+         */
+         iDynTree::Twist getRightFootTwist();
 
         /**
          * Return the transformation between the left hand frame and the world reference frame.

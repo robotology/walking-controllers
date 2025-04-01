@@ -32,7 +32,6 @@
 #include <WalkingControllers/WalkingModule/Module.h>
 #include <WalkingControllers/YarpUtilities/Helper.h>
 #include <WalkingControllers/StdUtilities/Helper.h>
-#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
 
 using namespace WalkingControllers;
 
@@ -60,8 +59,14 @@ bool WalkingModule::advanceReferenceSignals()
     m_rightTwistTrajectory.pop_front();
     m_rightTwistTrajectory.push_back(m_rightTwistTrajectory.back());
 
+    m_rightAccelerationTrajectory.pop_front();
+    m_rightAccelerationTrajectory.push_back(m_rightAccelerationTrajectory.back());
+
     m_leftTwistTrajectory.pop_front();
     m_leftTwistTrajectory.push_back(m_leftTwistTrajectory.back());
+
+    m_leftAccelerationTrajectory.pop_front();
+    m_leftAccelerationTrajectory.push_back(m_leftAccelerationTrajectory.back());
 
     m_rightInContact.pop_front();
     m_rightInContact.push_back(m_rightInContact.back());
@@ -89,6 +94,12 @@ bool WalkingModule::advanceReferenceSignals()
 
     m_desiredZMP.pop_front();
     m_desiredZMP.push_back(m_desiredZMP.back());
+
+    m_weightInLeftDesired.pop_front();
+    m_weightInLeftDesired.push_back(m_weightInLeftDesired.back());
+
+    m_weightInRightDesired.pop_front();
+    m_weightInRightDesired.push_back(m_weightInRightDesired.back());
 
     // at each sampling time the merge points are decreased by one.
     // If the first merge point is equal to 0 it will be dropped.
@@ -133,12 +144,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     // module name (used as prefix for opened ports)
     m_useMPC = rf.check("use_mpc", yarp::os::Value(false)).asBool();
     m_useQPIK = rf.check("use_QP-IK", yarp::os::Value(false)).asBool();
+    m_useTSIDadmittance = rf.check("use_TSID-Admittance", yarp::os::Value(false)).asBool();
     m_dumpData = rf.check("dump_data", yarp::os::Value(false)).asBool();
     m_maxInitialCoMVelocity = rf.check("max_initial_com_vel", yarp::os::Value(1.0)).asFloat64();
     std::string goalSuffix = rf.check("goal_port_suffix", yarp::os::Value("/goal:i")).asString();
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
-    m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
+    // m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
 
     m_goalScaling.resize(3);
     if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
@@ -314,6 +326,35 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         }
     }
 
+    // initialize the TSID admittance controller
+    if (m_useTSIDadmittance)
+    {
+        yarp::os::Bottle &TSIDOptions = rf.findGroup("TASK_SPACE_INVERSE_DYNAMICS");
+        m_BLFTSIDSolver = std::make_unique<BLFTSID>();
+        auto paramHandler = std::make_shared<BipedalLocomotion::ParametersHandler::YarpImplementation>();
+        paramHandler->set(TSIDOptions);
+        paramHandler->setParameter("use_root_link_for_height", m_useRootLinkForHeight);
+        if (!m_BLFTSIDSolver->initialize(paramHandler, m_FKSolver->getKinDyn()))
+        {
+            yError() << "[WalkingModule::configure] Failed to configure the TSID controller";
+            return false;
+        }
+
+        yarp::os::Bottle &AdmittanceControllerOptions = rf.findGroup("JOINT_ADMITTANCE_CONTROLLER");
+        m_jointAdmittanceController = std::make_unique<AdmittanceController>();
+        paramHandler->set(AdmittanceControllerOptions);
+        paramHandler->setParameter("number_of_joints", static_cast<int>(m_robotControlHelper->getActuatedDoFs()));
+        if (!m_jointAdmittanceController->initialize(paramHandler))
+        {
+            yError() << "[WalkingModule::configure] Failed to configure the Joint Admittance controller";
+            return false;
+        }
+
+        m_jointAccelerationIntegrator = std::make_unique<JointAccelerationIntegrator>();
+        m_jointAccelerationIntegrator->initialize(m_robotControlHelper->getActuatedDoFs(), m_dT);
+    }
+
+
     // initialize the linear inverted pendulum model
     m_stableDCMModel = std::make_unique<StableDCMModel>();
     if (!m_stableDCMModel->initialize(generalOptions))
@@ -407,37 +448,60 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_vectorsCollectionServer.populateMetadata("com::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("com::position::desired", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("com::position::CoM_ZMP_controller", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::position::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("com::velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("com::velocity::tsid", {"x", "y", "z"});
 
         // Left foot
         m_vectorsCollectionServer.populateMetadata("left_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::position::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::orientation::measured", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("left_foot::orientation::desired", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::orientation::tsid", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::linear_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::linear_force::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("left_foot::angular_torque::measured", {"x", "y", "z"});
+
+        m_vectorsCollectionServer.populateMetadata("left_foot::angular_velocity::correction", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::correction", {"x", "y", "z"});
 
         // Right foot
         m_vectorsCollectionServer.populateMetadata("right_foot::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::position::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::position::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::orientation::measured", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("right_foot::orientation::desired", {"roll", "pitch", "yaw"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::orientation::tsid", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("right_foot::linear_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::linear_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::desired", {"x", "y", "z"});
+        m_vectorsCollectionServer.populateMetadata("right_foot::angular_velocity::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::linear_force::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("right_foot::angular_torque::measured", {"x", "y", "z"});
 
         // Joint
         m_vectorsCollectionServer.populateMetadata("joints_state::positions::measured", m_robotControlHelper->getAxesList());
-        m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired::ik", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::positions::retargeting", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::positions::retargeting_raw", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::measured", m_robotControlHelper->getAxesList());
+        m_vectorsCollectionServer.populateMetadata("joints_state::velocities::desired::ik", m_robotControlHelper->getAxesList());
         m_vectorsCollectionServer.populateMetadata("joints_state::velocities::retargeting", m_robotControlHelper->getAxesList());
+        if (m_useTSIDadmittance)
+        {
+            m_vectorsCollectionServer.populateMetadata("joints_state::positions::desired::tsid", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::velocity::desired::tsid", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::acceleration::desired", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::torque::desired::tsid", m_robotControlHelper->getAxesList());
+            m_vectorsCollectionServer.populateMetadata("joints_state::torque::desired::admittance", m_robotControlHelper->getAxesList());
+        }
 
         // root link information
+        m_vectorsCollectionServer.populateMetadata("root_link::position::desired::tsid", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("root_link::position::measured", {"x", "y", "z"});
         m_vectorsCollectionServer.populateMetadata("root_link::orientation::measured", {"roll", "pitch", "yaw"});
         m_vectorsCollectionServer.populateMetadata("root_link::linear_velocity::measured", {"x", "y", "z"});
@@ -456,6 +520,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         m_profiler->addTimer("MPC");
 
     m_profiler->addTimer("IK");
+    m_profiler->addTimer("TSID");
     m_profiler->addTimer("Total");
     m_profiler->addTimer("Loop");
     m_profiler->addTimer("Feedback");
@@ -468,8 +533,13 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_inertial_R_worldFrame = iDynTree::Rotation::Identity();
 
     // resize variables
-    m_qDesired.resize(m_robotControlHelper->getActuatedDoFs());
-    m_dqDesired.resize(m_robotControlHelper->getActuatedDoFs());
+    m_qDesiredIK.resize(m_robotControlHelper->getActuatedDoFs());
+    m_dqDesiredIK.resize(m_robotControlHelper->getActuatedDoFs());
+    m_qDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_dqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_ddqDesiredTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_desiredJointTorquesTSID.resize(m_robotControlHelper->getActuatedDoFs());
+    m_desiredJointTorquesAdmittance.resize(m_robotControlHelper->getActuatedDoFs());
 
     yInfo() << "[WalkingModule::configure] Ready to play! Please prepare the robot.";
 
@@ -555,6 +625,133 @@ bool WalkingModule::solveBLFIK(const iDynTree::Position &desiredCoMPosition,
     return ok;
 }
 
+bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
+                                 const iDynTree::Vector3& desiredCoMVelocity,
+                                 const iDynTree::Rotation& desiredTorsoRotation)
+{
+    iDynTree::Vector3 zero3dVector;
+    zero3dVector.zero();
+
+    iDynTree::Twist zeroTwist;
+    zeroTwist.zero();
+
+    iDynTree::VectorDynSize zeroNdofVector(m_robotControlHelper->getActuatedDoFs());
+    zeroNdofVector.zero();
+
+    // compute the desired contact wrenches
+    double robotMass = m_FKSolver->getKinDyn()->getRobotModel().getTotalMass();
+    iDynTree::Vector3 robotWeightinLeft;
+    robotWeightinLeft.zero();
+    robotWeightinLeft(2) = m_weightInLeftDesired.front() * robotMass * 9.81;
+
+    iDynTree::Vector3 robotWeightinRight;
+    robotWeightinRight.zero();
+    robotWeightinRight(2) = m_weightInRightDesired.front() * robotMass * 9.81;
+
+    iDynTree::Wrench leftContactWrench;
+    iDynTree::Wrench rightContactWrench;
+    leftContactWrench.zero();
+    rightContactWrench.zero();
+    leftContactWrench.setLinearVec3(robotWeightinLeft);
+    rightContactWrench.setLinearVec3(robotWeightinRight);
+
+
+    // compute ankle strategy
+    computeLocalCoPCorrection(m_leftAngularVelocityCorrection, m_rightAngularVelocityCorrection);
+    auto leftTwist = m_leftTwistTrajectory.front();
+    auto rightTwist = m_rightTwistTrajectory.front();
+    iDynTree::Vector3 temp;
+    iDynTree::toEigen(temp) = iDynTree::toEigen(leftTwist.getAngularVec3()) + m_leftAngularVelocityCorrection;
+    leftTwist.setAngularVec3(temp);
+    iDynTree::toEigen(temp) = iDynTree::toEigen(rightTwist.getAngularVec3()) + m_rightAngularVelocityCorrection;
+    rightTwist.setAngularVec3(temp);
+
+    // set the desired set points
+    bool ok{true};
+    ok = ok && m_BLFTSIDSolver->setCoMTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
+    ok = ok && m_BLFTSIDSolver->setLeftFootTrackingSetPoint(m_leftTrajectory.front(), leftTwist,
+        m_leftAccelerationTrajectory.front());
+    ok = ok && m_BLFTSIDSolver->setRightFootTrackingSetPoint(m_rightTrajectory.front(), rightTwist,
+        m_rightAccelerationTrajectory.front());
+    ok = ok && m_BLFTSIDSolver->setJointTrackingSetPoint(m_qDesiredIK, m_dqDesiredIK, zeroNdofVector);
+    ok = ok && m_BLFTSIDSolver->setTorsoTrackingSetPoint(desiredTorsoRotation, zero3dVector, zero3dVector);
+    m_BLFTSIDSolver->setLeftContactActive(m_leftInContact.front());
+    m_BLFTSIDSolver->setRightContactActive(m_rightInContact.front());
+    ok = ok && m_BLFTSIDSolver->setLeftContactWrenchSetPoint(leftContactWrench);
+    ok = ok && m_BLFTSIDSolver->setRightContactWrenchSetPoint(rightContactWrench);
+    ok = ok && m_BLFTSIDSolver->setTorqueRegularizationSetPoint(m_desiredJointTorquesTSID);
+
+    if (m_useRootLinkForHeight)
+    {
+        ok = ok && m_BLFTSIDSolver->setRootTrackingSetPoint(desiredCoMPosition, desiredCoMVelocity, zero3dVector);
+    }
+
+    if (!ok)
+    {
+        yError() << "[WalkingModule::solveBLFTSID] Unable to set the TSID set points.";
+    }
+
+    // solve the optimization problem
+    ok = ok && m_BLFTSIDSolver->solve();
+
+    if (!ok)
+    {
+        yError() << "[WalkingModule::solveBLFTSID] Unable to solve the optimization problem.";
+    }
+
+    return ok;
+}
+
+void WalkingModule::getBLFTSIDOutput(iDynTree::VectorDynSize &jointDesiredAcceleration,
+                                     iDynTree::VectorDynSize &jointDesiredTorque)
+{
+    jointDesiredAcceleration = m_BLFTSIDSolver->getDesiredJointAcceleration();
+    jointDesiredTorque = m_BLFTSIDSolver->getDesiredJointTorque();
+}
+
+bool WalkingModule::storeBLFTSIDTrajectories()
+{
+
+    // set robot state to TSID joint values
+    if (!m_FKSolver->setInternalRobotState(m_qDesiredTSID, m_dqDesiredTSID))
+    {
+        yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+        return false;
+    }
+
+    m_CoMPositionTSID = m_FKSolver->getCoMPosition();
+    m_CoMVelocityTSID = m_FKSolver->getCoMVelocity();
+
+    m_rootLinkPositionTSID = m_FKSolver->getRootLinkToWorldTransform().getPosition();
+
+    m_leftFootPoseTSID = m_FKSolver->getLeftFootToWorldTransform();
+    m_rightFootPoseTSID = m_FKSolver->getRightFootToWorldTransform();
+
+    m_leftFootTwistTSID = m_FKSolver->getLeftFootTwist();
+    m_rightFootTwistTSID = m_FKSolver->getRightFootTwist();
+
+    return true;
+}
+
+bool WalkingModule::advanceJointAdmittanceController(const iDynTree::VectorDynSize & jointTorqueFeedforward,
+                                                     const iDynTree::VectorDynSize & jointDesiredPosition,
+                                                     const iDynTree::VectorDynSize & jointDesiredVelocity,
+                                                     iDynTree::VectorDynSize & jointDesiredTorque)
+{
+    bool ok = m_jointAdmittanceController->setInput(iDynTree::toEigen(jointTorqueFeedforward),
+                                                    iDynTree::toEigen(jointDesiredPosition),
+                                                    iDynTree::toEigen(jointDesiredVelocity),
+                                                    iDynTree::toEigen(m_robotControlHelper->getJointPosition()),
+                                                    iDynTree::toEigen(m_robotControlHelper->getJointVelocity()));
+
+    ok = ok && m_jointAdmittanceController->advance();
+    if (ok)
+    {
+        iDynTree::toEigen(jointDesiredTorque) = m_jointAdmittanceController->getOutput();
+    }
+    return ok;
+}
+
 bool WalkingModule::computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP)
 {
     BipedalLocomotion::Contacts::ContactWrench leftFootContact, rightFootContact;
@@ -581,6 +778,56 @@ bool WalkingModule::computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP)
     return true;
 }
 
+bool WalkingModule::computeLocalCoPCorrection(Eigen::Ref<Eigen::Vector3d> leftCorrection, Eigen::Ref<Eigen::Vector3d> rightCorrection)
+{
+    BipedalLocomotion::Contacts::ContactWrench leftFootContact, rightFootContact;
+    leftFootContact.wrench = iDynTree::toEigen(m_robotControlHelper->getLeftWrench().asVector());
+    leftFootContact.pose = BipedalLocomotion::Conversions::toManifPose(m_FKSolver->getLeftFootToWorldTransform());
+
+    rightFootContact.wrench = iDynTree::toEigen(m_robotControlHelper->getRightWrench().asVector());
+    rightFootContact.pose = BipedalLocomotion::Conversions::toManifPose(m_FKSolver->getRightFootToWorldTransform());
+
+    Eigen::Vector3d leftCoP, rightCoP;
+    leftCoP = leftFootContact.wrench.getLocalCoP();
+    rightCoP = rightFootContact.wrench.getLocalCoP();
+
+    Eigen::Vector3d errorCoPLeft;
+    Eigen::Vector3d errorCoPRight;
+
+    errorCoPLeft = -leftCoP;
+    double gain{5.0};
+    Eigen::Vector3d localCorrectionLeft;
+
+    localCorrectionLeft(0) = errorCoPLeft(1) * (-gain);
+    localCorrectionLeft(1) = errorCoPLeft(0) * gain;
+    localCorrectionLeft(2) = 0.0;
+
+    errorCoPRight = -rightCoP;
+    Eigen::Vector3d localCorrectionRight;
+
+    localCorrectionRight(0) = errorCoPRight(1) * (-gain);
+    localCorrectionRight(1) = errorCoPRight(0) * gain;
+    localCorrectionRight(2) = 0.0;
+
+    // set to 0 if force too small
+    if (leftFootContact.wrench.force().z() < 10)
+    {
+        localCorrectionLeft.setZero();
+    }
+    if (rightFootContact.wrench.force().z() < 10)
+    {
+        localCorrectionRight.setZero();
+    }
+
+    leftCorrection = leftFootContact.pose.rotation() * localCorrectionLeft;
+    leftCorrection(2) = 0.0;
+    rightCorrection = rightFootContact.pose.rotation() * localCorrectionRight;
+    rightCorrection(2) = 0.0;
+
+    return true;
+}
+
+
 bool WalkingModule::updateModule()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
@@ -605,7 +852,7 @@ bool WalkingModule::updateModule()
         if (motionDone)
         {
             // send the reference again in order to reduce error
-            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
             {
                 yError() << "[prepareRobot] Error while setting the initial position using "
                          << "POSITION DIRECT mode.";
@@ -615,9 +862,9 @@ bool WalkingModule::updateModule()
                 return true;
             }
 
-            yarp::sig::Vector buffer(m_qDesired.size());
-            iDynTree::toYarp(m_qDesired, buffer);
-            // instantiate Integrator object
+            yarp::sig::Vector buffer(m_qDesiredIK.size());
+            iDynTree::toYarp(m_qDesiredIK, buffer);
+            // instantiate Integrators object
 
             yarp::sig::Matrix jointLimits(m_robotControlHelper->getActuatedDoFs(), 2);
             for (int i = 0; i < m_robotControlHelper->getActuatedDoFs(); i++)
@@ -626,6 +873,13 @@ bool WalkingModule::updateModule()
                 jointLimits(i, 1) = m_robotControlHelper->getPositionUpperLimits()(i);
             }
             m_velocityIntegral = std::make_unique<iCub::ctrl::Integrator>(m_dT, buffer, jointLimits);
+
+            if (m_useTSIDadmittance){
+                m_qDesiredTSID = m_qDesiredIK;
+                m_dqDesiredTSID.zero();
+                m_jointAccelerationIntegrator->setState(iDynTree::toEigen(m_qDesiredTSID),
+                iDynTree::toEigen(m_dqDesiredTSID));
+            }
 
             // reset the models
             m_walkingZMPController->reset(m_DCMPositionDesired.front());
@@ -645,10 +899,10 @@ bool WalkingModule::updateModule()
             }
 
             // reset the retargeting client with the desired robot data
-            iDynTree::VectorDynSize zero(m_qDesired.size());
+            iDynTree::VectorDynSize zero(m_qDesiredIK.size());
             zero.zero();
             // reset the internal robot state of the kindyn object
-            if (!m_FKSolver->setInternalRobotState(m_qDesired, zero))
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredIK, zero))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the robot state before resetting the retargeting client.";
                 return false;
@@ -680,6 +934,15 @@ bool WalkingModule::updateModule()
                 m_comHeightOffset = 0.0;
             }
 
+            // warm start desired torque for tsid
+            iDynTree::VectorDynSize generalizedGravityForces(m_robotControlHelper->getActuatedDoFs()+6);
+            m_FKSolver->getKinDyn()->generalizedGravityForces(generalizedGravityForces);
+            iDynTree::toEigen(m_desiredJointTorquesTSID) =
+                iDynTree::toEigen(generalizedGravityForces).tail(m_robotControlHelper->getActuatedDoFs());
+
+            yInfo() << "[WalkingModule::updateModule] Warm start the desired torque for tsid."
+                        << m_desiredJointTorquesTSID.toString();
+
             m_robotState = WalkingFSM::Prepared;
 
             yInfo() << "[WalkingModule::updateModule] The robot is prepared.";
@@ -704,16 +967,16 @@ bool WalkingModule::updateModule()
                 yError() << "[WalkingModule::updateModule] Unable to set the planner input";
                 return false;
             }
-            m_lastSetGoalTime = m_time;
-        }
-        else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
-        {
-            yarp::sig::Vector dummy(3, 0.0);
-            if (!setPlannerInput(dummy))
-            {
-                yError() << "[WalkingModule::updateModule] Unable to set the planner input";
-                return false;
-            }
+        //     m_lastSetGoalTime = m_time;
+        // }
+        // else if (!m_firstRun && ((m_time - m_lastSetGoalTime) > m_maxTimeToWaitForGoal))
+        // {
+        //     yarp::sig::Vector dummy(3, 0.0);
+        //     if (!setPlannerInput(dummy))
+        //     {
+        //         yError() << "[WalkingModule::updateModule] Unable to set the planner input";
+        //         return false;
+        //     }
         }
 
         // if a new trajectory is required check if its the time to evaluate the new trajectory or
@@ -898,19 +1161,29 @@ bool WalkingModule::updateModule()
         // inverse kinematics
         m_profiler->setInitTime("IK");
 
-        iDynTree::Position desiredCoMPosition;
-        desiredCoMPosition(0) = outputZMPCoMControllerPosition(0);
-        desiredCoMPosition(1) = outputZMPCoMControllerPosition(1);
-        desiredCoMPosition(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
+        iDynTree::Position desiredCoMPositionIK;
+        desiredCoMPositionIK(0) = m_stableDCMModel->getCoMPosition()(0);
+        desiredCoMPositionIK(1) = m_stableDCMModel->getCoMPosition()(1);
+        desiredCoMPositionIK(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
 
-        iDynTree::Vector3 desiredCoMVelocity;
-        desiredCoMVelocity(0) = outputZMPCoMControllerVelocity(0);
-        desiredCoMVelocity(1) = outputZMPCoMControllerVelocity(1);
-        desiredCoMVelocity(2) = m_retargetingClient->comHeightVelocity();
+        iDynTree::Vector3 desiredCoMVelocityIK;
+        desiredCoMVelocityIK(0) = m_stableDCMModel->getCoMVelocity()(0);
+        desiredCoMVelocityIK(1) = m_stableDCMModel->getCoMVelocity()(1);
+        desiredCoMVelocityIK(2) = m_retargetingClient->comHeightVelocity();
+
+        iDynTree::Position desiredCoMPositionTSID;
+        desiredCoMPositionTSID(0) = outputZMPCoMControllerPosition(0);
+        desiredCoMPositionTSID(1) = outputZMPCoMControllerPosition(1);
+        desiredCoMPositionTSID(2) = m_retargetingClient->comHeight() + m_comHeightOffset;
+
+        iDynTree::Vector3 desiredCoMVelocityTSID;
+        desiredCoMVelocityTSID(0) = outputZMPCoMControllerVelocity(0);
+        desiredCoMVelocityTSID(1) = outputZMPCoMControllerVelocity(1);
+        desiredCoMVelocityTSID(2) = m_retargetingClient->comHeightVelocity();
 
         if (m_firstRun)
         {
-            double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocity).norm();
+            double comVelocityNorm = iDynTree::toEigen(desiredCoMVelocityTSID).norm();
 
             if (comVelocityNorm > m_maxInitialCoMVelocity)
             {
@@ -938,7 +1211,7 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
             yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
 
-            if (!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredIK, m_dqDesiredIK))
             {
                 yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
                 return false;
@@ -946,20 +1219,29 @@ bool WalkingModule::updateModule()
 
             yawRotation = yawRotation.inverse() * m_trajectoryGenerator->getChestAdditionalRotation();
 
-            if (!solveBLFIK(desiredCoMPosition,
-                            desiredCoMVelocity,
+            if (!solveBLFIK(desiredCoMPositionIK,
+                            desiredCoMVelocityIK,
                             yawRotation,
-                            m_dqDesired))
+                            m_dqDesiredIK))
             {
                 yError() << "[WalkingModule::updateModule] Unable to solve the QP problem with "
                             "blf ik.";
                 return false;
             }
 
-            iDynTree::toYarp(m_dqDesired, bufferVelocity);
+            iDynTree::toYarp(m_dqDesiredIK, bufferVelocity);
 
             bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-            iDynTree::toiDynTree(bufferPosition, m_qDesired);
+            iDynTree::toiDynTree(bufferPosition, m_qDesiredIK);
+
+            // update robot state with IK solution
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredIK, m_dqDesiredIK))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
+            // restore robot state
 
             if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
                                                    m_robotControlHelper->getJointVelocity()))
@@ -985,7 +1267,7 @@ bool WalkingModule::updateModule()
                 }
 
                 if (!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                                           desiredCoMPosition, m_qDesired))
+                                           desiredCoMPositionIK, m_qDesiredIK))
                 {
                     yError() << "[WalkingModule::updateModule] Error during the inverse Kinematics iteration.";
                     return false;
@@ -1017,10 +1299,73 @@ bool WalkingModule::updateModule()
             }
         }
 
-        if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
-        {
-            yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            return false;
+        // tsid-admittance
+        m_profiler->setInitTime("TSID");
+        if (m_useTSIDadmittance){
+
+            // set robot state to TSID joint values
+            if (!m_FKSolver->setInternalRobotState(m_qDesiredTSID, m_dqDesiredTSID))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
+            if(!solveBLFTSID(desiredCoMPositionTSID,
+                desiredCoMVelocityTSID, yawRotation)){
+                yError() << "[WalkingModule::updateModule] Unable to solve the TSID problem";
+                return false;
+            }
+
+            getBLFTSIDOutput(m_ddqDesiredTSID, m_desiredJointTorquesTSID);
+
+            // double integration of joint acceleration to get joint position
+            m_jointAccelerationIntegrator->setInput(iDynTree::toEigen(m_ddqDesiredTSID));
+            m_jointAccelerationIntegrator->oneStepIntegration();
+            iDynTree::toEigen(m_dqDesiredTSID) = m_jointAccelerationIntegrator->getJointVelocity();
+            iDynTree::toEigen(m_qDesiredTSID) = m_jointAccelerationIntegrator->getJointPosition();
+
+            storeBLFTSIDTrajectories();
+
+            // admittance controller
+            iDynTree::VectorDynSize m_desiredJointVelocitiesAdmittance(m_robotControlHelper->getActuatedDoFs());
+            m_desiredJointVelocitiesAdmittance.zero();
+            advanceJointAdmittanceController(m_desiredJointTorquesTSID,
+                                             m_qDesiredTSID,
+                                             m_desiredJointVelocitiesAdmittance,
+                                             m_desiredJointTorquesAdmittance);
+
+            // restore robot state
+            if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                   m_robotControlHelper->getJointVelocity()))
+            {
+                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                return false;
+            }
+
+
+        }
+        m_profiler->setEndTime("TSID");
+
+
+        if (m_useTSIDadmittance){
+
+            if (!m_robotControlHelper->setTorqueReferences(m_desiredJointTorquesAdmittance))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
+            // if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredTSID))
+            // {
+            //     yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+            //     return false;
+            // }
+
+        } else {
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesiredIK))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
         }
 
         // send data to the logger
@@ -1068,7 +1413,8 @@ bool WalkingModule::updateModule()
             CoMPositionDesired[2] = m_retargetingClient->comHeight() + m_comHeightOffset;
 
             m_vectorsCollectionServer.populateData("com::position::desired", CoMPositionDesired);
-            m_vectorsCollectionServer.populateData("com::position::CoM_ZMP_controller", desiredCoMPosition);
+            m_vectorsCollectionServer.populateData("com::position::CoM_ZMP_controller", desiredCoMPositionTSID);
+            m_vectorsCollectionServer.populateData("com::position::tsid", m_CoMPositionTSID);
 
             // Manual definition of this value to add also the planned CoM height velocity
             std::vector<double> CoMVelocityDesired(3);
@@ -1077,10 +1423,12 @@ bool WalkingModule::updateModule()
             CoMVelocityDesired[2] = m_retargetingClient->comHeightVelocity();
 
             m_vectorsCollectionServer.populateData("com::velocity::desired", CoMVelocityDesired);
+            m_vectorsCollectionServer.populateData("com::velocity::tsid", m_CoMVelocityTSID);
 
             // Left foot position
             m_vectorsCollectionServer.populateData("left_foot::position::measured", leftFoot.getPosition());
             m_vectorsCollectionServer.populateData("left_foot::position::desired", m_leftTrajectory.front().getPosition());
+            m_vectorsCollectionServer.populateData("left_foot::position::tsid", m_leftFootPoseTSID.getPosition());
 
             // Left foot orientation
             const iDynTree::Vector3 leftFootOrientationMeasured = leftFoot.getRotation().asRPY();
@@ -1088,11 +1436,17 @@ bool WalkingModule::updateModule()
 
             const iDynTree::Vector3 leftFootOrientationDesired = m_leftTrajectory.front().getRotation().asRPY();
             m_vectorsCollectionServer.populateData("left_foot::orientation::desired", leftFootOrientationDesired);
+            m_vectorsCollectionServer.populateData("left_foot::orientation::tsid", m_leftFootPoseTSID.getRotation().asRPY());
 
             // "lf_des_dx", "lf_des_dy", "lf_des_dz",
             // "lf_des_droll", "lf_des_dpitch", "lf_des_dyaw",
             m_vectorsCollectionServer.populateData("left_foot::linear_velocity::desired", m_leftTwistTrajectory.front().getLinearVec3());
+            m_vectorsCollectionServer.populateData("left_foot::linear_velocity::tsid", m_leftFootTwistTSID.getLinearVec3());
             m_vectorsCollectionServer.populateData("left_foot::angular_velocity::desired", m_leftTwistTrajectory.front().getAngularVec3());
+            m_vectorsCollectionServer.populateData("left_foot::angular_velocity::tsid", m_leftFootTwistTSID.getAngularVec3());
+
+            m_vectorsCollectionServer.populateData("left_foot::angular_velocity::correction", m_leftAngularVelocityCorrection);
+            m_vectorsCollectionServer.populateData("right_foot::angular_velocity::correction", m_rightAngularVelocityCorrection);
 
             // "lf_force_x", "lf_force_y", "lf_force_z",
             // "lf_force_roll", "lf_force_pitch", "lf_force_yaw",
@@ -1102,17 +1456,21 @@ bool WalkingModule::updateModule()
             // Right foot position
             m_vectorsCollectionServer.populateData("right_foot::position::measured", rightFoot.getPosition());
             m_vectorsCollectionServer.populateData("right_foot::position::desired", m_rightTrajectory.front().getPosition());
+            m_vectorsCollectionServer.populateData("right_foot::position::tsid", m_rightFootPoseTSID.getPosition());
 
             // Right foot orientation
             const iDynTree::Vector3 rightFootOrientationMeasured = rightFoot.getRotation().asRPY();
             m_vectorsCollectionServer.populateData("right_foot::orientation::measured", rightFootOrientationMeasured);
             const iDynTree::Vector3 rightFootOrientationDesired = m_rightTrajectory.front().getRotation().asRPY();
             m_vectorsCollectionServer.populateData("right_foot::orientation::desired", rightFootOrientationDesired);
+            m_vectorsCollectionServer.populateData("right_foot::orientation::tsid", m_rightFootPoseTSID.getRotation().asRPY());
 
             // "rf_des_dx", "rf_des_dy", "rf_des_dz",
             // "rf_des_droll", "rf_des_dpitch", "rf_des_dyaw",
             m_vectorsCollectionServer.populateData("right_foot::linear_velocity::desired", m_rightTwistTrajectory.front().getLinearVec3());
+            m_vectorsCollectionServer.populateData("right_foot::linear_velocity::tsid", m_rightFootTwistTSID.getLinearVec3());
             m_vectorsCollectionServer.populateData("right_foot::angular_velocity::desired", m_rightTwistTrajectory.front().getAngularVec3());
+            m_vectorsCollectionServer.populateData("right_foot::angular_velocity::tsid", m_rightFootTwistTSID.getAngularVec3());
 
             // "rf_force_x", "rf_force_y", "rf_force_z",
             // "rf_force_roll", "rf_force_pitch", "rf_force_yaw",
@@ -1121,13 +1479,23 @@ bool WalkingModule::updateModule()
 
             // Joint
             m_vectorsCollectionServer.populateData("joints_state::positions::measured", m_robotControlHelper->getJointPosition());
-            m_vectorsCollectionServer.populateData("joints_state::positions::desired", m_qDesired);
+            m_vectorsCollectionServer.populateData("joints_state::positions::desired::ik", m_qDesiredIK);
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting", m_retargetingClient->jointPositions());
             m_vectorsCollectionServer.populateData("joints_state::positions::retargeting_raw", m_retargetingClient->rawJointPositions());
             m_vectorsCollectionServer.populateData("joints_state::velocities::measured", m_robotControlHelper->getJointVelocity());
+            m_vectorsCollectionServer.populateData("joints_state::velocities::desired::ik", m_dqDesiredIK);
             m_vectorsCollectionServer.populateData("joints_state::velocities::retargeting", m_retargetingClient->jointVelocities());
+            if (m_useTSIDadmittance)
+            {
+                m_vectorsCollectionServer.populateData("joints_state::positions::desired::tsid", m_qDesiredTSID);
+                m_vectorsCollectionServer.populateData("joints_state::velocity::desired::tsid", m_dqDesiredTSID);
+                m_vectorsCollectionServer.populateData("joints_state::acceleration::desired", m_ddqDesiredTSID);
+                m_vectorsCollectionServer.populateData("joints_state::torque::desired::tsid", m_desiredJointTorquesTSID);
+                m_vectorsCollectionServer.populateData("joints_state::torque::desired::admittance", m_desiredJointTorquesAdmittance);
+            }
 
             // root link information
+            m_vectorsCollectionServer.populateData("root_link::position::desired::tsid", m_rootLinkPositionTSID);
             m_vectorsCollectionServer.populateData("root_link::position::measured", m_FKSolver->getRootLinkToWorldTransform().getPosition());
             m_vectorsCollectionServer.populateData("root_link::orientation::measured", m_FKSolver->getRootLinkToWorldTransform().getRotation().asRPY());
             m_vectorsCollectionServer.populateData("root_link::linear_velocity::measured", m_FKSolver->getRootLinkVelocity().getLinearVec3());
@@ -1264,15 +1632,15 @@ bool WalkingModule::prepareRobot(bool onTheFly)
     }
 
     if (!m_IKSolver->computeIK(m_leftTrajectory.front(), m_rightTrajectory.front(),
-                               desiredCoMPosition, m_qDesired))
+                               desiredCoMPosition, m_qDesiredIK))
     {
         yError() << "[WalkingModule::prepareRobot] Inverse Kinematics failed while computing the initial position.";
         return false;
     }
 
-    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesired) * 180 / M_PI).transpose() << std::endl;
+    std::cerr << "q desired IK " << Eigen::VectorXd(iDynTree::toEigen(m_qDesiredIK) * 180 / M_PI).transpose() << std::endl;
 
-    if (!m_robotControlHelper->setPositionReferences(m_qDesired, 5.0))
+    if (!m_robotControlHelper->setPositionReferences(m_qDesiredIK, 5.0))
     {
         yError() << "[WalkingModule::prepareRobot] Error while setting the initial position.";
         return false;
@@ -1403,6 +1771,8 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     std::vector<iDynTree::Transform> rightTrajectory;
     std::vector<iDynTree::Twist> leftTwistTrajectory;
     std::vector<iDynTree::Twist> rightTwistTrajectory;
+    std::vector<iDynTree::SpatialAcc> leftAccelerationTrajectory;
+    std::vector<iDynTree::SpatialAcc> rightAccelerationTrajectory;
     std::vector<iDynTree::Vector2> DCMPositionDesired;
     std::vector<iDynTree::Vector2> DCMVelocityDesired;
     std::vector<iDynTree::Vector2> desiredZMP;
@@ -1413,6 +1783,8 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     std::vector<size_t> mergePoints;
     std::vector<bool> isLeftFixedFrame;
     std::vector<bool> isStancePhase;
+    std::vector<double> weightInLeft;
+    std::vector<double> weightInRight;
 
     // get dcm position and velocity
     m_trajectoryGenerator->getDCMPositionTrajectory(DCMPositionDesired);
@@ -1421,6 +1793,7 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     // get feet trajectories
     m_trajectoryGenerator->getFeetTrajectories(leftTrajectory, rightTrajectory);
     m_trajectoryGenerator->getFeetTwist(leftTwistTrajectory, rightTwistTrajectory);
+    m_trajectoryGenerator->getFeetAcceleration(leftAccelerationTrajectory, rightAccelerationTrajectory);
     m_trajectoryGenerator->getFeetStandingPeriods(leftInContact, rightInContact);
     m_trajectoryGenerator->getWhenUseLeftAsFixed(isLeftFixedFrame);
 
@@ -1436,11 +1809,15 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
 
     m_trajectoryGenerator->getDesiredZMPPosition(desiredZMP);
 
+    m_trajectoryGenerator->getWeightPercentage(weightInLeft, weightInRight);
+
     // append vectors to deques
     StdUtilities::appendVectorToDeque(leftTrajectory, m_leftTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTrajectory, m_rightTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(leftTwistTrajectory, m_leftTwistTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(rightTwistTrajectory, m_rightTwistTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(leftAccelerationTrajectory, m_leftAccelerationTrajectory, mergePoint);
+    StdUtilities::appendVectorToDeque(rightAccelerationTrajectory, m_rightAccelerationTrajectory, mergePoint);
     StdUtilities::appendVectorToDeque(isLeftFixedFrame, m_isLeftFixedFrame, mergePoint);
 
     StdUtilities::appendVectorToDeque(DCMPositionDesired, m_DCMPositionDesired, mergePoint);
@@ -1455,6 +1832,9 @@ bool WalkingModule::updateTrajectories(const size_t &mergePoint)
     StdUtilities::appendVectorToDeque(isStancePhase, m_isStancePhase, mergePoint);
 
     StdUtilities::appendVectorToDeque(desiredZMP, m_desiredZMP, mergePoint);
+
+    StdUtilities::appendVectorToDeque(weightInLeft, m_weightInLeftDesired, mergePoint);
+    StdUtilities::appendVectorToDeque(weightInRight, m_weightInRightDesired, mergePoint);
 
     m_mergePoints.assign(mergePoints.begin(), mergePoints.end());
 

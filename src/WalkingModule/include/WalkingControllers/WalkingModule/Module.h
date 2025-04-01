@@ -5,8 +5,6 @@
 #define WALKING_MODULE_HPP
 
 // std
-#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
-#include <iDynTree/Rotation.h>
 #include <memory>
 #include <deque>
 #include <vector>
@@ -14,18 +12,24 @@
 // YARP
 #include <yarp/os/RFModule.h>
 #include <yarp/sig/Vector.h>
-
 #include <yarp/os/RpcClient.h>
 
-
+// BipedalLocomotion
+#include <BipedalLocomotion/ContinuousDynamicalSystem/LinearTimeInvariantSystem.h>
+#include <BipedalLocomotion/ContinuousDynamicalSystem/RK4.h>
 #include <BipedalLocomotion/YarpUtilities/VectorsCollectionServer.h>
 #include <BipedalLocomotion/Contacts/GlobalCoPEvaluator.h>
 #include <BipedalLocomotion/System/TimeProfiler.h>
 
-
 // iDynTree
 #include <iDynTree/VectorFixSize.h>
 #include <iDynTree/ModelLoader.h>
+#include <iDynTree/Position.h>
+#include <iDynTree/Rotation.h>
+#include <iDynTree/SpatialAcc.h>
+#include <iDynTree/Transform.h>
+#include <iDynTree/Twist.h>
+#include <iDynTree/VectorDynSize.h>
 
 // WalkingControllers library
 #include <WalkingControllers/RobotInterface/Helper.h>
@@ -39,6 +43,11 @@
 #include <WalkingControllers/SimplifiedModelControllers/ZMPController.h>
 
 #include <WalkingControllers/WholeBodyControllers/InverseKinematics.h>
+#include <WalkingControllers/WholeBodyControllers/BLFTSID.h>
+#include <WalkingControllers/WholeBodyControllers/BLFIK.h>
+
+#include <WalkingControllers/JointControllers/AdmittanceController.h>
+#include <WalkingControllers/Integrators/jointIntegrators.h>
 
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>
 
@@ -64,12 +73,13 @@ namespace WalkingControllers
 
         double m_dT; /**< RFModule period. */
         double m_time; /**< Current time. */
-        double m_lastSetGoalTime; /**< Time of the last set goal. */
-        double m_maxTimeToWaitForGoal; /**< Maximum time to wait for a goal. */
-        std::string m_robot; /**< Robot name. */
+        // double m_lastSetGoalTime; /**< Time of the last set goal. */
+        // double m_maxTimeToWaitForGoal; /**< Maximum time to wait for a goal. */
+        // std::string m_robot; /**< Robot name. */
 
         bool m_useMPC; /**< True if the MPC controller is used. */
         bool m_useQPIK; /**< True if the QP-IK is used. */
+        bool m_useTSIDadmittance; /**< True if the TSID admittance controller is used. */
         bool m_dumpData; /**< True if data are saved. */
         bool m_firstRun; /**< True if it is the first run. */
         bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
@@ -88,12 +98,27 @@ namespace WalkingControllers
         std::unique_ptr<WalkingIK> m_IKSolver; /**< Pointer to the inverse kinematics solver. */
         std::unique_ptr<BLFIK> m_BLFIKSolver; /**< Pointer to the integration based ik. */
         std::unique_ptr<WalkingFK> m_FKSolver; /**< Pointer to the forward kinematics solver. */
+        std::unique_ptr<BLFTSID> m_BLFTSIDSolver; /**< Pointer to the task space inverse dynamics. */
+        std::unique_ptr<AdmittanceController> m_jointAdmittanceController; /**< Pointer to the joint Admittance Controller. */
+        std::unique_ptr<JointAccelerationIntegrator> m_jointAccelerationIntegrator; /**< Pointer to the joint acceleration integrator. */
         std::unique_ptr<StableDCMModel> m_stableDCMModel; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<WalkingPIDHandler> m_PIDHandler; /**< Pointer to the PID handler object. */
         std::unique_ptr<RetargetingClient> m_retargetingClient; /**< Pointer to the stable DCM dynamics. */
         std::unique_ptr<BipedalLocomotion::System::TimeProfiler> m_profiler; /**< Time profiler. */
         std::unique_ptr<YarpUtilities::TransformHelper> m_transformHelper; /**< Transform server/client helper. */
         BipedalLocomotion::Contacts::GlobalCoPEvaluator m_globalCoPEvaluator;
+
+        struct JointsKinematics {
+            std::shared_ptr<
+                BipedalLocomotion::ContinuousDynamicalSystem::LinearTimeInvariantSystem>
+                dynamics;
+            std::shared_ptr<BipedalLocomotion::ContinuousDynamicalSystem::RK4<
+                BipedalLocomotion::ContinuousDynamicalSystem::
+                    LinearTimeInvariantSystem>>
+                integrator;
+          };
+
+          JointsKinematics m_jointsAccelerationIntegrator; /**< Double integrator of joint accelerations */
 
         std::vector<std::pair<iDynTree::FrameIndex, std::string>> m_framesToStream; /**< Frames to send to the transform server. */
 
@@ -106,6 +131,12 @@ namespace WalkingControllers
 
         std::deque<iDynTree::Twist> m_leftTwistTrajectory; /**< Deque containing the twist trajectory of the left foot. */
         std::deque<iDynTree::Twist> m_rightTwistTrajectory; /**< Deque containing the twist trajectory of the right foot. */
+
+        Eigen::Vector3d m_leftAngularVelocityCorrection;
+        Eigen::Vector3d m_rightAngularVelocityCorrection;
+
+        std::deque<iDynTree::SpatialAcc> m_leftAccelerationTrajectory; /**< Deque containing the spatial acceleration trajectory of the left foot. */
+        std::deque<iDynTree::SpatialAcc> m_rightAccelerationTrajectory; /**< Deque containing the spatial acceleration trajectory of the left foot. */
 
         std::deque<iDynTree::Vector2> m_DCMPositionDesired; /**< Deque containing the desired DCM position. */
         std::deque<iDynTree::Vector2> m_DCMVelocityDesired; /**< Deque containing the desired DCM velocity. */
@@ -122,10 +153,28 @@ namespace WalkingControllers
 
         std::deque<iDynTree::Vector2> m_desiredZMP; /**< Deque containing the desired ZMP position. */
 
+        std::deque<double> m_weightInLeftDesired; /**< Deque containing the desired weight percentage on the left foot */
+        std::deque<double> m_weightInRightDesired; /**< Deque containing the desired weight percentage on the right foot */
+
         iDynTree::ModelLoader m_loader; /**< Model loader class. */
 
-        iDynTree::VectorDynSize m_qDesired; /**< Vector containing the results of the IK algorithm [rad]. */
-        iDynTree::VectorDynSize m_dqDesired; /**< Vector containing the results of the IK algorithm [rad]. */
+        iDynTree::VectorDynSize m_qDesiredIK; /**< Vector containing the results of the IK algorithm [rad]. */
+        iDynTree::VectorDynSize m_dqDesiredIK; /**< Vector containing the results of the IK algorithm [rad]. */
+
+        iDynTree::VectorDynSize m_qDesiredTSID; /**< Vector containing the desired joint position [rad]. */
+        iDynTree::VectorDynSize m_dqDesiredTSID; /**< Vector containing the desired joint velocity [rad/s]. */
+        iDynTree::VectorDynSize m_ddqDesiredTSID; /**< Vector containing the desired joint acceleration [rad/s^2]. */
+        iDynTree::VectorDynSize m_desiredJointTorquesTSID; /**< Vector containing the desired joint torques for the low-level [Nm]. */
+        iDynTree::VectorDynSize m_desiredJointTorquesAdmittance;   /**< Vector containing the desired joint torques for the low-level,
+                                                                        computed by the joint admittance controller [Nm]. */
+
+        iDynTree::Position m_CoMPositionTSID; /**< CoM position computed by the TSID controller. */
+        iDynTree::Vector3 m_CoMVelocityTSID; /**< CoM velocity computed by the TSID controller. */
+        iDynTree::Transform m_leftFootPoseTSID; /**< Left foot pose computed by the TSID controller. */
+        iDynTree::Transform m_rightFootPoseTSID; /**< Right foot pose computed by the TSID controller. */
+        iDynTree::Twist m_leftFootTwistTSID; /**< Left foot twist computed by the TSID controller. */
+        iDynTree::Twist m_rightFootTwistTSID; /**< Right foot twist computed by the TSID controller. */
+        iDynTree::Position m_rootLinkPositionTSID; /**< Root link position computed by the TSID controller. */
 
         iDynTree::Rotation m_inertial_R_worldFrame; /**< Rotation between the inertial and the world frame. */
 
@@ -188,6 +237,45 @@ namespace WalkingControllers
                         const iDynTree::Vector3& desiredCoMVelocity,
                         const iDynTree::Rotation& desiredNeckOrientation,
                         iDynTree::VectorDynSize &output);
+        /**
+         * Set and solve the TSID problem.
+         * @param desiredCoMPosition desired CoM position;
+         * @param desiredCoMVelocity desired CoM velocity;
+         * @param desiredTorsoRotation desired torso rotation (rotation matrix);
+         * @return true in case of success and false otherwise.
+         */
+        bool solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
+                          const iDynTree::Vector3& desiredCoMVelocity,
+                          const iDynTree::Rotation& desiredTorsoRotation);
+
+        /**
+         * Get the desired joint acceleration and torque computed by the TSID controller.
+         * @param jointDesiredAcceleration is the desired joint acceleration;
+         * @param jointDesiredTorque is the desired joint torque.
+         */
+        void getBLFTSIDOutput(iDynTree::VectorDynSize &jointDesiredAcceleration, 
+                              iDynTree::VectorDynSize &jointDesiredTorque);
+        
+        /**
+        * Store the trajectories computed by the BLFTSID controller.
+        * @return true in case of success and false otherwise.
+        */
+        bool storeBLFTSIDTrajectories();
+
+        /**
+        * Set the Admittance controller references, advance it, and return the output.
+        * @param jointTorqueFeedforward joint torque feedforward term.
+        * @param jointDesiredPosition joint desired position.
+        * @param jointDesiredVelocity joint desired velocity.
+        * @param jointMeasuredPosition joint measured position.
+        * @param jointMeasuredVelocity joint measured velocity.
+        * @param jointDesiredTorque joint desired torque, computed by the Admittance controller.
+        * @return true if successful.
+        */
+        bool advanceJointAdmittanceController(const iDynTree::VectorDynSize & jointTorqueFeedforward,
+                                              const iDynTree::VectorDynSize & jointDesiredPosition,
+                                              const iDynTree::VectorDynSize & jointDesiredVelocity,
+                                              iDynTree::VectorDynSize & jointDesiredTorque);
 
         /**
          * Compute Global CoP.
@@ -195,6 +283,8 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool computeGlobalCoP(Eigen::Ref<Eigen::Vector2d> globalCoP);
+
+        bool computeLocalCoPCorrection(Eigen::Ref<Eigen::Vector3d> leftCorrection, Eigen::Ref<Eigen::Vector3d> rightCorrection);
 
         /**
          * Given the two planned feet, it computes the average yaw rotation

@@ -4,10 +4,12 @@
 
 add_walking_controllers_library(
   NAME WholeBodyControllers
-  SOURCES src/InverseKinematics.cpp src/BLFIK.cpp
+  SOURCES src/InverseKinematics.cpp src/BLFIK.cpp src/BLFTSID.cpp
   PUBLIC_HEADERS include/WalkingControllers/WholeBodyControllers/InverseKinematics.h
                  include/WalkingControllers/WholeBodyControllers/BLFIK.h
+                 include/WalkingControllers/WholeBodyControllers/BLFTSID.h
   PUBLIC_LINK_LIBRARIES BipedalLocomotion::IK
+                        BipedalLocomotion::TSID
                         BipedalLocomotion::ContinuousDynamicalSystem
                         WalkingControllers::YarpUtilities
                         WalkingControllers::iDynTreeUtilities

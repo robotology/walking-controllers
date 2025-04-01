@@ -14,6 +14,7 @@
 #include <yarp/dev/IControlLimits.h>
 #include <yarp/dev/IPositionControl.h>
 #include <yarp/dev/IPositionDirect.h>
+#include <yarp/dev/ITorqueControl.h>
 #include <yarp/dev/IVelocityControl.h>
 #include <yarp/dev/IInteractionMode.h>
 #include <yarp/sig/Vector.h>
@@ -44,7 +45,8 @@ namespace WalkingControllers
         yarp::dev::IEncodersTimed *m_encodersInterface{nullptr}; /**< Encorders interface. */
         yarp::dev::IPositionDirect *m_positionDirectInterface{nullptr}; /**< Direct position control interface. */
         yarp::dev::IPositionControl *m_positionInterface{nullptr}; /**< Position control interface. */
-        yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< Position control interface. */
+        yarp::dev::IVelocityControl *m_velocityInterface{nullptr}; /**< velocity control interface. */
+        yarp::dev::ITorqueControl *m_torqueInterface{nullptr}; /**< Torque control interface. */
         yarp::dev::IControlMode *m_controlModeInterface{nullptr}; /**< Control mode interface. */
         yarp::dev::IControlLimits *m_limitsInterface{nullptr}; /**< Encorders interface. */
         yarp::dev::IInteractionMode *m_interactionInterface{nullptr}; /**< Stiff/compliant mode interface. */
@@ -180,6 +182,14 @@ namespace WalkingControllers
          * @return true in case of success and false otherwise.
          */
         bool setVelocityReferences(const iDynTree::VectorDynSize& desiredVelocityRad);
+
+        /**
+         * Set the desired torque reference.
+         * (The position will be sent using TorqueControl mode)
+         * @param desiredTorqueNm desired joints torque;
+         * @return true in case of success and false otherwise.
+         */
+        bool setTorqueReferences(const iDynTree::VectorDynSize& desiredTorqueNm);
 
         /**
          * Reset filters.
