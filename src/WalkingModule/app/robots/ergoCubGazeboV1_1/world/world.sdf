@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<sdf version="1.11">
+    <world name="tutorial_controlboard">
+        <physics name="1ms" type="ignored">
+            <max_step_size>0.001</max_step_size>
+            <real_time_factor>0.4</real_time_factor>
+            <real_time_update_rate>400</real_time_update_rate>
+        </physics>
+        <plugin
+            filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics">
+        </plugin>
+        <plugin
+            filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands">
+        </plugin>
+        <plugin
+            filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+        </plugin>
+        <plugin
+            filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster">
+        </plugin>
+        <plugin
+            filename="gz-sim-contact-system"
+            name="gz::sim::systems::Contact">
+        </plugin>
+
+        <!-- YARP CLOCK -->
+        <plugin
+            filename="gz-sim-yarp-clock-system"
+            name="gzyarp::Clock">
+        </plugin>
+
+        <light type="directional" name="sun">
+            <cast_shadows>true</cast_shadows>
+            <pose>0 0 10 0 0 0</pose>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <attenuation>
+                <range>1000</range>
+                <constant>0.9</constant>
+                <linear>0.01</linear>
+                <quadratic>0.001</quadratic>
+            </attenuation>
+            <direction>-0.5 0.1 -0.9</direction>
+        </light>
+
+        <model name="ground_plane">
+            <static>true</static>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <plane>
+                            <normal>0 0 1</normal>
+                            <size>100 100</size>
+                        </plane>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <plane>
+                            <normal>0 0 1</normal>
+                            <size>100 100</size>
+                        </plane>
+                    </geometry>
+                    <material>
+                        <ambient>0.8 0.8 0.8 1</ambient>
+                        <diffuse>0.8 0.8 0.8 1</diffuse>
+                        <specular>0.8 0.8 0.8 1</specular>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <model name="ergoCubGazevoV1_1_overidden_initial_conf">
+
+          <include>
+            <uri>model://ergoCubGazeboV1_1</uri>
+            <pose>0.0 0.0 0.75 0.0 -0.142 0.0</pose>
+          </include>
+
+          <plugin name='gzyarp::ConfigurationOverride' filename='gz-sim-yarp-configurationoverride-system'>
+            <yarpPluginConfigurationOverride yarpDeviceName='torso_hardware_device'/>
+            <initialConfiguration>0.0 0.138 0.0</initialConfiguration>
+          </plugin>
+
+          <plugin name='gzyarp::ConfigurationOverride' filename='gz-sim-yarp-configurationoverride-system'>
+            <yarpPluginConfigurationOverride yarpDeviceName='left_arm_hardware_device'/>
+            <initialConfiguration>-0.059         0.34        -0.225         0.71         0.0000         0.0000         0.0000</initialConfiguration>
+          </plugin>
+
+          <plugin name='gzyarp::ConfigurationOverride' filename='gz-sim-yarp-configurationoverride-system'>
+            <yarpPluginConfigurationOverride yarpDeviceName='right_arm_hardware_device'/>
+            <initialConfiguration>-0.059         0.34        -0.225         0.71         0.0000         0.0000         0.0000</initialConfiguration>
+          </plugin>
+
+          <plugin name='gzyarp::ConfigurationOverride' filename='gz-sim-yarp-configurationoverride-system'>
+            <yarpPluginConfigurationOverride yarpDeviceName='left_leg_hardware_device'/>
+            <initialConfiguration>0.095         0.0157        -0.0038       -0.6000        -0.362        -0.016</initialConfiguration>
+          </plugin>
+
+          <plugin name='gzyarp::ConfigurationOverride' filename='gz-sim-yarp-configurationoverride-system'>
+            <yarpPluginConfigurationOverride yarpDeviceName='right_leg_hardware_device'/>
+            <initialConfiguration>0.095         0.0157        -0.0038       -0.6000        -0.362        -0.016</initialConfiguration>
+          </plugin>
+          
+        </model>
+
+    </world>
+</sdf>
