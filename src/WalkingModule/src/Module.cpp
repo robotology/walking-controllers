@@ -678,7 +678,7 @@ bool WalkingModule::solveBLFTSID(const iDynTree::Position& desiredCoMPosition,
     m_BLFTSIDSolver->setRightContactActive(m_rightInContact.front());
     ok = ok && m_BLFTSIDSolver->setLeftContactWrenchSetPoint(leftContactWrench);
     ok = ok && m_BLFTSIDSolver->setRightContactWrenchSetPoint(rightContactWrench);
-    ok = ok && m_BLFTSIDSolver->setTorqueRegularizationSetPoint(zeroNdofVector);
+    ok = ok && m_BLFTSIDSolver->setTorqueRegularizationSetPoint(m_desiredJointTorquesTSID);
 
     if (m_useRootLinkForHeight)
     {
@@ -930,6 +930,15 @@ bool WalkingModule::updateModule()
             {
                 m_comHeightOffset = 0.0;
             }
+
+            // warm start desired torque for tsid
+            iDynTree::VectorDynSize generalizedGravityForces(m_robotControlHelper->getActuatedDoFs()+6);
+            m_FKSolver->getKinDyn()->generalizedGravityForces(generalizedGravityForces);
+            iDynTree::toEigen(m_desiredJointTorquesTSID) =
+                iDynTree::toEigen(generalizedGravityForces).tail(m_robotControlHelper->getActuatedDoFs());
+
+            yInfo() << "[WalkingModule::updateModule] Warm start the desired torque for tsid."
+                        << m_desiredJointTorquesTSID.toString();
 
             m_robotState = WalkingFSM::Prepared;
 
