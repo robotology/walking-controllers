@@ -139,6 +139,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
     m_skipDCMController = rf.check("skip_dcm_controller", yarp::os::Value(false)).asBool();
     m_removeZMPOffset = rf.check("remove_zmp_offset", yarp::os::Value(false)).asBool();
     m_maxTimeToWaitForGoal = rf.check("max_time_to_wait_for_goal", yarp::os::Value(1.0)).asFloat64();
+    m_useVelocityController = rf.check("use_velocity_controller", yarp::os::Value(false)).asBool();
 
     m_goalScaling.resize(3);
     if (!YarpUtilities::getVectorFromSearchable(rf, "goal_port_scaling", m_goalScaling))
@@ -351,13 +352,14 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
             yWarning() << "[WalkingModule::configure] Failed to configure the transform helper. Avoiding using it.";
             m_transformHelper.reset(nullptr);
         }
-        else {
-            for (const std::string& frame : m_transformHelper->getAdditionalFrames())
+        else
+        {
+            for (const std::string &frame : m_transformHelper->getAdditionalFrames())
             {
                 iDynTree::FrameIndex frameIndex = m_loader.model().getFrameIndex(frame);
                 if (frameIndex != iDynTree::FRAME_INVALID_INDEX)
                 {
-                    m_framesToStream.push_back({ frameIndex, frame });
+                    m_framesToStream.push_back({frameIndex, frame});
                 }
                 else
                 {
@@ -378,7 +380,7 @@ bool WalkingModule::configure(yarp::os::ResourceFinder &rf)
         }
 
         std::string logPort;
-        if(!loggerOption->getParameter("remote", logPort))
+        if (!loggerOption->getParameter("remote", logPort))
         {
             yError() << "[WalkingModule::configure] Unable to get the remote from the group WALKING_LOGGER.";
             return false;
@@ -938,12 +940,14 @@ bool WalkingModule::updateModule()
             yarp::sig::Vector bufferVelocity(m_robotControlHelper->getActuatedDoFs());
             yarp::sig::Vector bufferPosition(m_robotControlHelper->getActuatedDoFs());
 
-            if (!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+            if (!m_useVelocityController)
             {
-                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
-                return false;
+                if (!m_FKSolver->setInternalRobotState(m_qDesired, m_dqDesired))
+                {
+                    yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                    return false;
+                }
             }
-
             yawRotation = yawRotation.inverse() * m_trajectoryGenerator->getChestAdditionalRotation();
 
             if (!solveBLFIK(desiredCoMPosition,
@@ -956,16 +960,19 @@ bool WalkingModule::updateModule()
                 return false;
             }
 
-            iDynTree::toYarp(m_dqDesired, bufferVelocity);
-
-            bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
-            iDynTree::toiDynTree(bufferPosition, m_qDesired);
-
-            if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
-                                                   m_robotControlHelper->getJointVelocity()))
+            if (!m_useVelocityController)
             {
-                yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
-                return false;
+                iDynTree::toYarp(m_dqDesired, bufferVelocity);
+
+                bufferPosition = m_velocityIntegral->integrate(bufferVelocity);
+                iDynTree::toiDynTree(bufferPosition, m_qDesired);
+
+                if (!m_FKSolver->setInternalRobotState(m_robotControlHelper->getJointPosition(),
+                                                       m_robotControlHelper->getJointVelocity()))
+                {
+                    yError() << "[WalkingModule::updateModule] Unable to set the internal robot state.";
+                    return false;
+                }
             }
         }
         else
@@ -1008,7 +1015,7 @@ bool WalkingModule::updateModule()
 
             auto kinDynPointer = m_FKSolver->getKinDyn();
 
-            for (const auto& frame : m_framesToStream)
+            for (const auto &frame : m_framesToStream)
             {
                 if (!m_transformHelper->setTransform(frame.second, kinDynPointer->getWorldTransform(frame.first)))
                 {
@@ -1017,12 +1024,22 @@ bool WalkingModule::updateModule()
             }
         }
 
-        if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+        if (!m_useVelocityController)
         {
-            yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
-            return false;
+            if (!m_robotControlHelper->setDirectPositionReferences(m_qDesired))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference position to iCub.";
+                return false;
+            }
         }
-
+        else
+        {
+            if (!m_robotControlHelper->setVelocityReferences(m_dqDesired))
+            {
+                yError() << "[WalkingModule::updateModule] Error while setting the reference velocity to iCub.";
+                return false;
+            }
+        }
         // send data to the logger
         if (m_dumpData)
         {
@@ -1140,12 +1157,10 @@ bool WalkingModule::updateModule()
             m_vectorsCollectionServer.sendData();
         }
 
-
         propagateTime();
 
         // advance all the signals
         advanceReferenceSignals();
-
 
         m_retargetingClient->setRobotBaseOrientation(yawRotation.inverse());
 

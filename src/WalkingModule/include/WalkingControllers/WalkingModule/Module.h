@@ -74,6 +74,7 @@ namespace WalkingControllers
         bool m_firstRun; /**< True if it is the first run. */
         bool m_skipDCMController; /**< True if the desired ZMP should be used instead of the DCM controller. */
         bool m_removeZMPOffset{false}; /**< If true the offset between the ZMP and CoM is removed */
+        bool m_useVelocityController{false}; /**< If true the velocity control is used. */
 
         double m_maxInitialCoMVelocity; /**< Bound on the initial CoM velocity to check if the robot is going to jump at startup. */
         iDynTree::Position m_zmpOffset; /** < Offset reading the zmp at the beginning*/
