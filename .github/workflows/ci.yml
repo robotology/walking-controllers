@@ -1,0 +1,101 @@
+name: C++ CI Workflow
+
+on:
+  push:
+  pull_request:
+  schedule:
+  # * is a special character in YAML so you have to quote this string
+  # Execute a "nightly" build at 2 AM UTC
+  - cron:  '0 2 * * *'
+
+
+jobs:
+  build:
+    name: '[${{ matrix.os }}@${{ matrix.build_type }}]'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build_type: [Release]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+
+
+    steps:
+    - uses: actions/checkout@master
+
+    - uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-variant: Miniforge3
+        miniforge-version: latest
+        channel-priority: true
+        conda-remove-defaults: true
+        channels: conda-forge, robotology
+
+    # ============
+    # DEPENDENCIES
+    # ============
+
+    - name: Dependencies
+      shell: bash -l {0}
+      run: |
+        conda install cmake cxx-compiler make ninja pkg-config yarp ycm-cmake-modules icub-main eigen "idyntree>=10.0.0" libunicycle-footstep-planner osqp-eigen "bipedal-locomotion-framework>=0.18.0" libtrintrin
+
+    - name: Print used environment
+      shell: bash -l {0}
+      run: |
+        conda list
+        env
+    # ===================
+    # CMAKE-BASED PROJECT
+    # ===================
+    - name: Install icub-contrib from source [Ubuntu/macOs]
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
+      shell: bash -l {0}
+      run: |
+        git clone https://github.com/robotology/icub-contrib-common
+        cd icub-contrib-common
+        mkdir build
+        cd build
+        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}  ..
+        cmake --build . --target install
+
+    - name: Install icub-contrib from source [Windows]
+      if: matrix.os == 'windows-latest'
+      shell: bash -l {0}
+      run: |
+        git clone https://github.com/robotology/icub-contrib-common
+        cd icub-contrib-common
+        mkdir build
+        cd build
+        cmake -G"Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}/Library  ..
+        cmake --build . --target install
+
+    - name: Configure [Windows]
+      # Use bash also on Windows (otherwise cd, mkdir, ... do not work)
+      if: matrix.os == 'windows-latest'
+      shell: bash -l {0}
+      run: |
+        mkdir -p build
+        cd build
+        cmake  -G"Visual Studio 17 2022" \
+              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_INSTALL_PREFIX=${GITHUB_WORKSPACE}/install ..
+
+    - name: Configure [Ubuntu/macOS]
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
+      shell: bash -l {0}
+      run: |
+        mkdir -p build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_INSTALL_PREFIX=${GITHUB_WORKSPACE}/install ..
+
+    - name: Build
+      shell: bash -l {0}
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Install
+      shell: bash -l {0}
+      run: |
+        cd build
+        cmake --build . --config ${{ matrix.build_type }} --target install
