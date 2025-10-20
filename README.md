@@ -65,6 +65,7 @@ Eprint = {arXiv:1809.02167},
 
 # :page_facing_up: Dependencies
 * [YARP](http://www.yarp.it/): to handle the comunication with the robot;
+* [trintrin](https://github.com/ami-iit/trintrin): a library with common messages for interprocess communication in robotics applications.
 * [iDynTree](https://github.com/robotology/idyntree): to handle the robot kinematics;
 * [iCubContrib](https://github.com/robotology/icub-contrib-common): to configure the modules;
 * [icub-main](https://github.com/robotology/icub-main): to smooth and integrate signals;

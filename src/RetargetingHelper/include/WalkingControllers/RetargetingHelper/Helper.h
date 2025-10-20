@@ -22,7 +22,7 @@
 #include <iCub/ctrl/minJerkCtrl.h>
 
 #include <WalkingControllers/KinDynWrapper/Wrapper.h>
-#include <WalkingControllers/YarpUtilities/HumanState.h>
+#include <trintrin/msgs/HumanState.h>
 
 namespace WalkingControllers
 {
@@ -67,7 +67,7 @@ private:
         T velocity;
     };
 
-    struct HDERetargeting : public RetargetingElement<WalkingControllers::YarpUtilities::HumanState>
+    struct HDERetargeting : public RetargetingElement<trintrin::msgs::HumanState>
     {
         KinematicState<iDynTree::VectorDynSize> joints;
         KinematicState<double> com;

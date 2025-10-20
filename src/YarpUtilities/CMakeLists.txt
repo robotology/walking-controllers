@@ -14,8 +14,3 @@ add_walking_controllers_library(
   SOURCES ${YARP_UTILITIES_SRC}
   PUBLIC_HEADERS ${YARP_UTILITIES_HDR}
   PUBLIC_LINK_LIBRARIES ${YARP_LIBRARIES} ${iDynTree_LIBRARIES})
-
-add_walking_controllers_yarp_thrift(
-  NAME HumanState
-  THRIFT thrifts/WalkingControllers/YarpUtilities/HumanState.thrift
-  INSTALLATION_FOLDER YarpUtilities)
