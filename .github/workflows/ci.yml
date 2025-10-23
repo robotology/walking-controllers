@@ -38,7 +38,7 @@ jobs:
     - name: Dependencies
       shell: bash -l {0}
       run: |
-        conda install cmake cxx-compiler make ninja pkg-config yarp ycm-cmake-modules icub-main eigen "idyntree>=10.0.0" libunicycle-footstep-planner osqp-eigen "bipedal-locomotion-framework>=0.18.0" libtrintrin
+        conda install cmake cxx-compiler make ninja pkg-config yarp ycm-cmake-modules icub-main eigen "idyntree>=10.0.0" libunicycle-footstep-planner osqp-eigen "bipedal-locomotion-framework>=0.18.0" libtrintrin icub-contrib-common
 
     - name: Print used environment
       shell: bash -l {0}
@@ -48,27 +48,6 @@ jobs:
     # ===================
     # CMAKE-BASED PROJECT
     # ===================
-    - name: Install icub-contrib from source [Ubuntu/macOs]
-      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
-      shell: bash -l {0}
-      run: |
-        git clone https://github.com/robotology/icub-contrib-common
-        cd icub-contrib-common
-        mkdir build
-        cd build
-        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}  ..
-        cmake --build . --target install
-
-    - name: Install icub-contrib from source [Windows]
-      if: matrix.os == 'windows-latest'
-      shell: bash -l {0}
-      run: |
-        git clone https://github.com/robotology/icub-contrib-common
-        cd icub-contrib-common
-        mkdir build
-        cd build
-        cmake -G"Visual Studio 17 2022" -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}/Library  ..
-        cmake --build . --target install
 
     - name: Configure [Windows]
       # Use bash also on Windows (otherwise cd, mkdir, ... do not work)
