@@ -22,6 +22,24 @@
 
 using namespace WalkingControllers;
 
+bool BLFIK::initializeTask(std::shared_ptr<BipedalLocomotion::IK::IKLinearTask> task,
+                           const std::string robotVelocityVariableName,
+                           const std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler)
+{
+    auto ptr = handler.lock();
+    if (ptr == nullptr)
+    {
+        BipedalLocomotion::log()->error("[BLFIK::initializeTask] Invalid parameter handler");
+        return false;
+    }
+
+    auto clone = ptr->clone();
+    clone->setParameter("robot_velocity_variable_name", robotVelocityVariableName);
+
+    return task->initialize(clone);
+}
+
+
 bool BLFIK::initialize(
     std::weak_ptr<const BipedalLocomotion::ParametersHandler::IParametersHandler> handler,
     std::shared_ptr<iDynTree::KinDynComputations> kinDyn)
@@ -45,6 +63,9 @@ bool BLFIK::initialize(
 
     m_useRootLinkForHeight = false;
     ptr->getParameter("use_root_link_for_height", m_useRootLinkForHeight);
+
+    m_useJointLimitsTask = false;
+    ptr->getParameter("use_joints_limits_task", m_useJointLimitsTask);
 
     // weight providers
     bool ok = m_qpIK.initialize(ptr->getGroup("IK"));
@@ -71,27 +92,27 @@ bool BLFIK::initialize(
     // CoM Task
     m_comTask = std::make_shared<BipedalLocomotion::IK::CoMTask>();
     ok = ok && m_comTask->setKinDyn(kinDyn);
-    ok = ok && m_comTask->initialize(ptr->getGroup("COM_TASK"));
+    ok = ok && this->initializeTask(m_comTask, variable, ptr->getGroup("COM_TASK"));
     ok = ok && m_qpIK.addTask(m_comTask, "com_task", highPriority);
 
     m_rightFootTask = std::make_shared<BipedalLocomotion::IK::SE3Task>();
     ok = ok && m_rightFootTask->setKinDyn(kinDyn);
-    ok = ok && m_rightFootTask->initialize(ptr->getGroup("RIGHT_FOOT_TASK"));
+    ok = ok && this->initializeTask(m_rightFootTask, variable, ptr->getGroup("RIGHT_FOOT_TASK"));
     ok = ok && m_qpIK.addTask(m_rightFootTask, "right_foot_task", highPriority);
 
     m_leftFootTask = std::make_shared<BipedalLocomotion::IK::SE3Task>();
     ok = ok && m_leftFootTask->setKinDyn(kinDyn);
-    ok = ok && m_leftFootTask->initialize(ptr->getGroup("LEFT_FOOT_TASK"));
+    ok = ok && this->initializeTask(m_leftFootTask, variable, ptr->getGroup("LEFT_FOOT_TASK"));
     ok = ok && m_qpIK.addTask(m_leftFootTask, "left_foot_task", highPriority);
 
     m_torsoTask = std::make_shared<BipedalLocomotion::IK::SO3Task>();
     ok = ok && m_torsoTask->setKinDyn(kinDyn);
-    ok = ok && m_torsoTask->initialize(ptr->getGroup("TORSO_TASK"));
+    ok = ok && this->initializeTask(m_torsoTask, variable, ptr->getGroup("TORSO_TASK"));
     ok = ok && m_qpIK.addTask(m_torsoTask, "torso_task", lowPriority, m_torsoWeight);
 
     m_jointRegularizationTask = std::make_shared<BipedalLocomotion::IK::JointTrackingTask>();
     ok = ok && m_jointRegularizationTask->setKinDyn(kinDyn);
-    ok = ok && m_jointRegularizationTask->initialize(ptr->getGroup("JOINT_REGULARIZATION_TASK"));
+    ok = ok && this->initializeTask(m_jointRegularizationTask, variable, ptr->getGroup("JOINT_REGULARIZATION_TASK"));
     ok = ok
          && m_qpIK.addTask(m_jointRegularizationTask,
                            "joint_regularization_task",
@@ -102,7 +123,7 @@ bool BLFIK::initialize(
     {
         m_jointRetargetingTask = std::make_shared<BipedalLocomotion::IK::JointTrackingTask>();
         ok = ok && m_jointRetargetingTask->setKinDyn(kinDyn);
-        ok = ok && m_jointRetargetingTask->initialize(ptr->getGroup("JOINT_RETARGETING_TASK"));
+        ok = ok && this->initializeTask(m_jointRetargetingTask, variable, ptr->getGroup("JOINT_RETARGETING_TASK"));
         ok = ok
              && m_qpIK.addTask(m_jointRetargetingTask,
                                "joint_retargeting_task",
@@ -110,11 +131,20 @@ bool BLFIK::initialize(
                                m_jointRetargetingWeight);
     }
 
+
+    if (m_useJointLimitsTask)
+    {
+        m_jointLimitsTask = std::make_shared<BipedalLocomotion::IK::JointLimitsTask>();
+        ok = ok && m_jointLimitsTask->setKinDyn(kinDyn);
+        ok = ok && this->initializeTask(m_jointLimitsTask, variable, ptr->getGroup("JOINT_LIMITS_TASK"));
+        ok = ok && m_qpIK.addTask(m_jointLimitsTask, "joint_limits_task", highPriority);
+    }
+
     if (m_useRootLinkForHeight)
     {
         m_rootTask = std::make_shared<BipedalLocomotion::IK::R3Task>();
         ok = ok && m_rootTask->setKinDyn(kinDyn);
-        ok = ok && m_rootTask->initialize(ptr->getGroup("ROOT_TASK"));
+        ok = ok && this->initializeTask(m_rootTask, variable, ptr->getGroup("ROOT_TASK"));
         ok = ok && m_qpIK.addTask(m_rootTask, "root_task", highPriority);
     }
 
@@ -153,7 +183,9 @@ bool BLFIK::setPhase(const std::string& phase)
     ok = ok && m_jointRegularizationWeight->setState(phase);
 
     if (m_usejointRetargeting)
+    {
         ok = ok && m_jointRetargetingWeight->setState(phase);
+    }
 
     return ok;
 }
